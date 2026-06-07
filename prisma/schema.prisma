@@ -1,0 +1,98 @@
+// Postaí — SaaS de postagem automática no Instagram (carrossel + feed por IA).
+// Multi-marca: cada Marca tem sua identidade visual e sua conexão própria com a Meta.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
+}
+
+// Uma marca/cliente que posta pelo Postaí (ex: Castelo da Diversão).
+model Marca {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  nome        String
+  // Identidade visual — cada marca com a sua cara nas artes
+  corPrimaria String   @default("#7C3AED") // cor de destaque (faixa, traço, CTA)
+  corFundo    String   @default("#0E0E0E") // fundo das artes de cor sólida
+  logoTexto   String   @default("") // texto da faixa da marca (ex: "CASTELO DA DIVERSÃO")
+  site        String   @default("") // aparece no rodapé das artes
+  telefone    String   @default("") // aparece no rodapé/CTA
+  // Conexão com o Instagram (Meta Graph API) — própria de cada marca
+  igUserId    String   @default("") // IG User ID da conta
+  accessToken String   @default("") // token do Usuário do Sistema com permissão de postar
+  // Agenda automática: dias da semana (0=dom … 6=sáb) de cada tipo + hora (BRT)
+  diasCarrossel String @default("1,3,5") // seg/qua/sex
+  diasFeed      String @default("2,4,6") // ter/qui/sáb
+  horaPost      Int    @default(10)
+  // Contexto pra IA escrever no tom da marca
+  descricao   String   @default("") // o que é o negócio, público, produtos
+  ativa       Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+
+  conteudos   Conteudo[]
+  publicacoes Publicacao[]
+}
+
+// Carrossel (2 a 10 artes) agendado pra uma marca.
+model Conteudo {
+  id          String   @id @default(cuid())
+  marcaId     String
+  marca       Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  slug        String   @unique
+  data        DateTime
+  titulo      String
+  legenda     String
+  hashtags    String
+  slides      String // JSON: URLs das artes dos slides
+  slidesTexto String? // JSON: texto de cada slide
+  tema        String?
+  status      String   @default("a_postar") // a_postar | postado
+  createdAt   DateTime @default(now())
+
+  @@index([marcaId, data])
+}
+
+// Post de feed (imagem única) agendado pra uma marca.
+model Publicacao {
+  id        String   @id @default(cuid())
+  marcaId   String
+  marca     Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  slug      String   @unique
+  data      DateTime
+  template  String   @default("dica") // dica | produto | vinte_anos | frase
+  titulo    String
+  texto     String   @default("")
+  legenda   String
+  hashtags  String   @default("")
+  imagemUrl String?
+  tema      String?
+  status    String   @default("a_postar") // a_postar | postado
+  createdAt DateTime @default(now())
+
+  @@index([marcaId, data])
+}
+
+// Operadores do painel (admin mestre via ADMIN_SENHA; usuários extras opcionais).
+model Usuario {
+  id        String   @id @default(cuid())
+  nome      String   @unique
+  senhaHash String
+  admin     Boolean  @default(false)
+  criadoEm  DateTime @default(now())
+}
+
+// Log de ações ("Postaí postou X pra marca Y") — feed de atividade do painel.
+model AtividadeAgente {
+  id       String   @id @default(cuid())
+  agente   String
+  texto    String
+  marcaId  String?
+  criadoEm DateTime @default(now())
+
+  @@index([criadoEm])
+}

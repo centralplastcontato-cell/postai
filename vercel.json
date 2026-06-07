@@ -1,0 +1,10 @@
+{
+  "framework": "nextjs",
+  "regions": ["gru1"],
+  "crons": [
+    {
+      "path": "/api/cron/postar",
+      "schedule": "0 13 * * *"
+    }
+  ]
+}

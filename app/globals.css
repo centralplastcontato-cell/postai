@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --color-preto: #0a0a0a;
+  --color-preto-card: #141414;
+  --color-vermelho: #7c3aed;
+  --color-vermelho-hover: #8b4ef5;
+  --color-cream: #f4f1ea;
+  --color-linha: #2a2a2a;
+  --color-muted: #b9b9b9;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-oswald), sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+body {
+  background: var(--color-preto);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+/* Títulos: Oswald, caixa alta, condensado */
+.display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+}
+
+/* Scrollbar escura e discreta */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-vermelho) #0a0a0a;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-vermelho);
+  border-radius: 9999px;
+  border: 2px solid #0a0a0a;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-vermelho-hover);
+}
+.scroll-bonito::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
