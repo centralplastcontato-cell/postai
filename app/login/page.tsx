@@ -27,7 +27,7 @@ export default function LoginPage() {
           autoFocus
           autoCapitalize="none"
           autoComplete="username"
-          className="mt-6 w-full rounded-md border border-linha bg-preto px-3 py-2.5 text-white placeholder:text-muted/60 focus:border-vermelho focus:outline-none"
+          className="input-base"
         />
 
         <div className="relative mt-3">
@@ -36,7 +36,7 @@ export default function LoginPage() {
             name="senha"
             placeholder="Senha"
             autoComplete="current-password"
-            className="w-full rounded-md border border-linha bg-preto px-3 py-2.5 pr-11 text-white placeholder:text-muted/60 focus:border-vermelho focus:outline-none"
+            className="input-base pr-11"
           />
           <button
             type="button"

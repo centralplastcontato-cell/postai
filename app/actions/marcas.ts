@@ -99,10 +99,11 @@ export async function extrairCoresLogo(logoUrl: string) {
               'Você analisa o logotipo de uma marca e devolve as cores dela pra usar em artes de Instagram. ' +
               'Responda SÓ com JSON: {"paleta":["#RRGGBB", ...],"corPrimaria":"#RRGGBB","corFundo":"#RRGGBB"}. ' +
               'paleta = as cores VIVAS e marcantes do logo (o desenho e as letras), de 2 a 5 cores, da mais proeminente pra menos. ' +
-              'IGNORE o fundo da imagem e qualquer cor neutra (cinza, branco, bege, preto) — só cores vibrantes da marca. ' +
+              'IGNORE completamente o fundo da imagem e qualquer cor neutra (cinza, branco, bege, preto, marrom) — só cores vibrantes da marca. ' +
               'Se o logo for de uma cor só, devolva 1 cor na paleta. ' +
-              'corPrimaria = a cor mais marcante e viva da paleta (nunca uma neutra). ' +
-              'corFundo = uma cor escura, quase preta, que combine com a paleta pra servir de fundo das artes. ' +
+              'corPrimaria = a cor mais marcante e viva da paleta (NUNCA uma neutra, NUNCA preto). ' +
+              'corFundo = uma cor MUITO escura (tipo #0F0F0F, #1A1A1A ou #2D2D2D), mas NÃO puro preto (#000000), que combine com a paleta pra servir de fundo das artes. ' +
+              'Regra crítica: NUNCA devolva #000000. NUNCA devolva cores neutras. SEMPRE cores vibrantes na paleta. ' +
               'Use sempre hex de 6 dígitos.',
           },
           {

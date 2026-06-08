@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { excluirConteudo, excluirPublicacao } from "@/app/actions/excluir";
 import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
 
@@ -128,10 +130,50 @@ export function CalendarioRedes({
             >
               <span className="absolute left-0.5 top-0.5 text-[10px] leading-none">{icone}</span>
               {diaCel}
+              {/* Delete button */}
+              <DeleteButton tipo={tipo} id={item.id} />
             </button>
           );
         })}
       </div>
     </div>
+  );
+}
+
+function DeleteButton({ tipo, id }: { tipo: "carrossel" | "feed"; id: string }) {
+  // Render a server-action form so deletion runs on the server (no cookie/fetch issues)
+  if (tipo === "carrossel") {
+    return (
+      <form action={excluirConteudo} onSubmit={(e) => e.stopPropagation()} className="absolute right-1 top-1 z-10">
+        <input type="hidden" name="id" value={id} />
+        <button
+          type="submit"
+          onClick={(ev) => {
+            ev.stopPropagation();
+            if (!confirm("Excluir este carrossel? A ação não pode ser desfeita.")) ev.preventDefault();
+          }}
+          title="Excluir"
+          className="rounded bg-black/30 px-1.5 py-0.5 text-xs text-red-400 opacity-90 hover:bg-red-900/30"
+        >
+          🗑
+        </button>
+      </form>
+    );
+  }
+  return (
+    <form action={excluirPublicacao} onSubmit={(e) => e.stopPropagation()} className="absolute right-1 top-1 z-10">
+      <input type="hidden" name="id" value={id} />
+      <button
+        type="submit"
+        onClick={(ev) => {
+          ev.stopPropagation();
+          if (!confirm("Excluir esta publicação? A ação não pode ser desfeita.")) ev.preventDefault();
+        }}
+        title="Excluir"
+        className="rounded bg-black/30 px-1.5 py-0.5 text-xs text-red-400 opacity-90 hover:bg-red-900/30"
+      >
+        🗑
+      </button>
+    </form>
   );
 }

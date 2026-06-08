@@ -185,7 +185,7 @@ export function PublicacoesAba({
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <label className="flex-1 text-xs text-muted">
             Assunto (opcional — se vazio, a IA escolhe)
-            <input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: novidade da semana" className="mt-1 w-full rounded-md border border-linha bg-preto px-3 py-2 text-sm text-white placeholder:text-muted/60 focus:border-vermelho focus:outline-none" />
+            <input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: novidade da semana" className="input-base" />
           </label>
           <button onClick={handleGerar} disabled={isPending} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
             {isPending ? "Gerando…" : "Gerar"}

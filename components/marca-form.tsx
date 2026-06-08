@@ -159,7 +159,7 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
     });
   }
 
-  const inp = "mt-1 w-full rounded-md border border-linha bg-preto px-3 py-2 text-sm text-white placeholder:text-muted/60 focus:border-vermelho focus:outline-none";
+  const inp = "input-base";
   const diaBtn = (ativo: boolean) =>
     `rounded-md px-2.5 py-1 text-xs font-semibold transition ${ativo ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"}`;
 
@@ -200,8 +200,8 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-xs text-muted">Nome<input value={f.nome} onChange={(e) => set("nome", e.target.value)} className={inp} /></label>
           <label className="text-xs text-muted">Texto da faixa (na arte)<input value={f.logoTexto} onChange={(e) => set("logoTexto", e.target.value)} placeholder="CASTELO DA DIVERSÃO" className={inp} /></label>
-          <label className="text-xs text-muted">Cor principal<input type="color" value={f.corPrimaria} onChange={(e) => set("corPrimaria", e.target.value)} className="mt-1 h-10 w-full rounded-md border border-linha bg-preto" /></label>
-          <label className="text-xs text-muted">Cor de fundo<input type="color" value={f.corFundo} onChange={(e) => set("corFundo", e.target.value)} className="mt-1 h-10 w-full rounded-md border border-linha bg-preto" /></label>
+          <label className="text-xs text-muted">Cor principal<input type="color" value={f.corPrimaria} onChange={(e) => set("corPrimaria", e.target.value)} className="input-compact" /></label>
+          <label className="text-xs text-muted">Cor de fundo<input type="color" value={f.corFundo} onChange={(e) => set("corFundo", e.target.value)} className="input-compact" /></label>
           {paleta.length > 0 && (
             <div className="text-xs text-muted sm:col-span-2">
               Paleta da marca (régua multicolor das artes)
@@ -250,7 +250,7 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
           {DIAS.map((d) => <button key={d.n} type="button" onClick={() => toggleDia("diasFeed", d.n)} className={diaBtn(diasFeed.includes(d.n))}>{d.l}</button>)}
         </div>
         <label className="text-xs text-muted">Hora de postar (BRT)
-          <select value={f.horaPost} onChange={(e) => set("horaPost", Number(e.target.value))} className="mt-1 block rounded-md border border-linha bg-preto px-2 py-2 text-sm text-white focus:border-vermelho focus:outline-none">
+          <select value={f.horaPost} onChange={(e) => set("horaPost", Number(e.target.value))} className="input-base">
             {Array.from({ length: 24 }, (_, h) => h).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
           </select>
         </label>

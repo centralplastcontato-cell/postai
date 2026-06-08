@@ -60,3 +60,15 @@ body {
   width: 8px;
   height: 8px;
 }
+
+@layer components {
+  .input-base {
+    @apply mt-1 w-full rounded-md border border-[#2a2a2a] bg-[#0a0a0a] px-3 py-2 text-sm text-white placeholder:text-[#b9b9b9] focus:border-[#7c3aed] focus:outline-none;
+  }
+  .input-compact {
+    @apply h-10 rounded-md border border-[#2a2a2a] bg-[#0a0a0a] px-3 text-sm text-white placeholder:text-[#b9b9b9] focus:border-[#7c3aed] focus:outline-none;
+  }
+  .btn-delete {
+    @apply absolute right-1 top-1 z-10 rounded bg-black/30 px-1.5 py-0.5 text-xs text-red-400 opacity-90 hover:bg-red-900/30;
+  }
+}

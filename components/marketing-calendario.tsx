@@ -206,7 +206,7 @@ export function MarketingCalendario({
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <label className="flex-1 text-xs text-muted">
             Tema
-            <input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: novidades da semana" className="mt-1 w-full rounded-md border border-linha bg-preto px-3 py-2 text-sm text-white placeholder:text-muted/60 focus:border-vermelho focus:outline-none" />
+            <input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: novidades da semana" className="input-base" />
           </label>
           <div className="text-xs text-muted">
             Dia do post
@@ -216,7 +216,7 @@ export function MarketingCalendario({
           </div>
           <div className="text-xs text-muted">
             Nº de artes
-            <select value={nSlides} onChange={(e) => setNSlides(Number(e.target.value))} className="mt-1 block rounded-md border border-linha bg-preto px-2 py-2 text-sm text-white focus:border-vermelho focus:outline-none">
+            <select value={nSlides} onChange={(e) => setNSlides(Number(e.target.value))} className="input-base">
               {[4, 5, 6, 7, 8, 9, 10].map((n) => <option key={n} value={n}>{n} slides</option>)}
             </select>
           </div>

@@ -29,7 +29,7 @@ export default async function PainelHome() {
             name="nome"
             required
             placeholder="Ex: Castelo da Diversão"
-            className="mt-1 w-full rounded-md border border-linha bg-preto px-3 py-2 text-sm text-white placeholder:text-muted/60 focus:border-vermelho focus:outline-none"
+            className="input-base"
           />
         </label>
         <button className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover">
