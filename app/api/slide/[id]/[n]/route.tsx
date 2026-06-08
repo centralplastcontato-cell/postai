@@ -17,7 +17,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
   let logoUrl = "";
   let site = "";
   let telefone = "";
-  let paleta: string[] = [];
   try {
     const c = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
     if (c) {
@@ -27,10 +26,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
       logoUrl = c.marca.logoUrl || "";
       site = c.marca.site || "";
       telefone = c.marca.telefone || "";
-      try {
-        const pal = JSON.parse(c.marca.paleta || "[]");
-        if (Array.isArray(pal)) paleta = pal.filter((x) => typeof x === "string");
-      } catch {}
       const arr = JSON.parse(c.slidesTexto || "[]") as Slide[];
       if (arr[idx]) slide = arr[idx];
     }
@@ -42,16 +37,6 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
   const bg = isCapa ? cor : fundo;
   const CINZA = "#C9C9C9";
 
-  // Régua: faixa multicolor com as cores do logo (ou um traço só na cor principal).
-  const cores = paleta.length ? paleta : [cor];
-  const Regua = () => (
-    <div style={{ display: "flex", marginBottom: 36 }}>
-      {cores.map((c, i) => (
-        <div key={i} style={{ width: 36, height: 8, backgroundColor: c, display: "flex" }} />
-      ))}
-    </div>
-  );
-
   // Faixa da marca: logo (se houver) ou o texto. `claro` = sobre fundo colorido.
   const marcaEl = (claro: boolean) =>
     logoUrl ? (
@@ -61,20 +46,42 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
       <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: 2, color: claro ? "#ffffff" : cor }}>{marcaTexto}</span>
     );
 
+  // Slide com foto de fundo: texto ancorado embaixo, gradiente forte só na base.
   if (slide.imagemUrl) {
+    const sombra = "0 2px 12px rgba(0,0,0,0.6)";
     return new ImageResponse(
       (
         <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={slide.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
-          <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "60px", backgroundImage: "linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.82))" }}>
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "1080px",
+              height: "1350px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              padding: "80px",
+              backgroundImage:
+                "linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.05) 24%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.72) 76%, rgba(0,0,0,0.94) 100%)",
+            }}
+          >
             <div style={{ display: "flex" }}>{marcaEl(true)}</div>
-            {slide.titulo || slide.texto ? (
-              <div style={{ display: "flex", flexDirection: "column", padding: "44px", borderRadius: 18, backgroundImage: "linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.82))" }}>
-                {slide.titulo ? <div style={{ display: "flex", fontSize: 64, fontWeight: 800, color: "#fff", lineHeight: 1.05 }}>{slide.titulo}</div> : null}
-                {slide.texto ? <div style={{ display: "flex", marginTop: 18, fontSize: 34, color: "#eaeaea", lineHeight: 1.3 }}>{slide.texto}</div> : null}
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", width: 90, height: 8, backgroundColor: cor, borderRadius: 4, marginBottom: 28 }} />
+              {slide.titulo ? <div style={{ display: "flex", fontSize: isCapa ? 82 : 68, fontWeight: 800, color: "#fff", lineHeight: 1.04, textShadow: sombra }}>{slide.titulo}</div> : null}
+              {slide.texto ? <div style={{ display: "flex", marginTop: 20, fontSize: 36, color: "rgba(255,255,255,0.88)", lineHeight: 1.3, textShadow: sombra }}>{slide.texto}</div> : null}
+              {isCta && telefone ? (
+                <div style={{ marginTop: 32, display: "flex", backgroundColor: cor, color: "#fff", fontSize: 34, fontWeight: 700, padding: "18px 32px", borderRadius: 999 }}>{telefone}</div>
+              ) : null}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 40, paddingTop: 28, borderTop: "1px solid rgba(255,255,255,0.25)" }}>
+                <span style={{ display: "flex", fontSize: 26, color: "rgba(255,255,255,0.7)", letterSpacing: 0.5 }}>{site}</span>
+                {isCapa ? <span style={{ display: "flex", fontSize: 28, fontWeight: 600, color: "#fff" }}>arraste →</span> : null}
               </div>
-            ) : null}
+            </div>
           </div>
         </div>
       ),
@@ -82,16 +89,17 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
     );
   }
 
+  // Fallback (sem foto): cor sólida.
   return new ImageResponse(
     (
       <div style={{ width: "1080px", height: "1350px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: bg, padding: "90px", fontFamily: "sans-serif" }}>
         <div style={{ display: "flex", alignItems: "center" }}>{marcaEl(isCapa)}</div>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {!isCapa && <Regua />}
+          {!isCapa && <div style={{ display: "flex", width: 90, height: 8, backgroundColor: cor, borderRadius: 4, marginBottom: 36 }} />}
           <div style={{ fontSize: isCapa ? 92 : 70, fontWeight: 800, color: "#fff", lineHeight: 1.05, display: "flex" }}>{slide.titulo ?? ""}</div>
           {slide.texto ? <div style={{ marginTop: 32, fontSize: 40, color: isCapa ? "#fff" : CINZA, lineHeight: 1.3, display: "flex" }}>{slide.texto}</div> : null}
           {isCta && telefone ? (
-            <div style={{ marginTop: 48, display: "flex", backgroundColor: cor, color: "#fff", fontSize: 38, fontWeight: 700, padding: "26px 40px", borderRadius: 16 }}>{telefone}</div>
+            <div style={{ marginTop: 48, display: "flex", backgroundColor: isCapa ? "#fff" : cor, color: isCapa ? cor : "#fff", fontSize: 38, fontWeight: 700, padding: "26px 40px", borderRadius: 16 }}>{telefone}</div>
           ) : null}
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 28, color: isCapa ? "#fff" : "#7a7a7a" }}>

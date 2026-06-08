@@ -66,12 +66,13 @@ model Publicacao {
   marca     Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
   slug      String   @unique
   data      DateTime
-  template  String   @default("dica") // dica | produto | vinte_anos | frase
+  template  String   @default("dica") // promocao | data_comemorativa | divulgacao | dica
   titulo    String
   texto     String   @default("")
   legenda   String
   hashtags  String   @default("")
   imagemUrl String?
+  extra     String? // JSON com dados específicos do template (oferta, validade, selo, linhas do título, cor de fundo...)
   tema      String?
   status    String   @default("a_postar") // a_postar | postado
   createdAt DateTime @default(now())

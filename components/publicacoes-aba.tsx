@@ -12,6 +12,9 @@ import {
   removerImagemPublicacao,
 } from "@/app/actions/feed";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
+import { ConfirmDialog } from "./confirm-dialog";
+
+type Confirmacao = { titulo: string; descricao?: string; textoConfirmar: string; acao: () => void };
 
 export type PublicacaoView = {
   id: string;
@@ -64,6 +67,7 @@ export function PublicacoesAba({
   const [proc, setProc] = useState<string | null>(null);
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
   const [legendaAbertaId, setLegendaAbertaId] = useState<string | null>(null);
+  const [confirmacao, setConfirmacao] = useState<Confirmacao | null>(null);
 
   function handleGerar() {
     setErro(null);
@@ -87,23 +91,34 @@ export function PublicacoesAba({
     });
   }
   function handleExcluir(id: string) {
-    if (!confirm("Excluir esta publicação?")) return;
-    startTransition(async () => {
-      const r = await excluirPublicacao(id);
-      if (!r.ok) setErro(r.erro);
-      router.refresh();
+    setConfirmacao({
+      titulo: "Excluir esta publicação?",
+      descricao: "A ação não pode ser desfeita.",
+      textoConfirmar: "Excluir",
+      acao: () =>
+        startTransition(async () => {
+          const r = await excluirPublicacao(id);
+          if (!r.ok) setErro(r.erro);
+          router.refresh();
+        }),
     });
   }
-  async function handlePostar(p: PublicacaoView) {
-    if (!confirm(`Postar "${p.titulo}" no Instagram agora? Vai ao ar de verdade.`)) return;
-    setProc(p.id);
-    try {
-      const r = await postarPublicacao(p.id);
-      if (!r.ok) setErro(r.erro);
-      router.refresh();
-    } finally {
-      setProc(null);
-    }
+  function handlePostar(p: PublicacaoView) {
+    setConfirmacao({
+      titulo: "Postar no Instagram agora?",
+      descricao: `"${p.titulo}" vai ao ar de verdade no perfil da marca.`,
+      textoConfirmar: "Postar agora",
+      acao: async () => {
+        setProc(p.id);
+        try {
+          const r = await postarPublicacao(p.id);
+          if (!r.ok) setErro(r.erro);
+          router.refresh();
+        } finally {
+          setProc(null);
+        }
+      },
+    });
   }
   function handleGerarImagem(id: string) {
     setErro(null);
@@ -252,6 +267,18 @@ export function PublicacoesAba({
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        aberto={!!confirmacao}
+        titulo={confirmacao?.titulo ?? ""}
+        descricao={confirmacao?.descricao}
+        textoConfirmar={confirmacao?.textoConfirmar ?? "Confirmar"}
+        onConfirmar={() => {
+          confirmacao?.acao();
+          setConfirmacao(null);
+        }}
+        onCancelar={() => setConfirmacao(null)}
+      />
     </div>
   );
 }

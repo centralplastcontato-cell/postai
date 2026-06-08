@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 export const runtime = "nodejs";
 
-export async function DELETE(req: Request, ctx: { params: { id: string } }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   try {
     const cookieHeader = req.headers.get("cookie");
     console.log("[DELETE /api/publicacao] cookie:", cookieHeader);
@@ -17,7 +17,7 @@ export async function DELETE(req: Request, ctx: { params: { id: string } }) {
     return Response.json({ ok: false, erro: "Sem permissão." }, { status: 401 });
   }
 
-  const id = ctx.params.id;
+  const { id } = await ctx.params;
   try {
     const p = await prisma.publicacao.findUnique({ where: { id } });
     if (!p) return Response.json({ ok: false, erro: "Publicação não encontrada." }, { status: 404 });

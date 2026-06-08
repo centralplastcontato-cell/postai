@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 export const runtime = "nodejs";
 
-export async function DELETE(req: Request, ctx: { params: { id: string } }) {
+export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   // Debug: log cookie header to help diagnose auth failures
   try {
     const cookieHeader = req.headers.get("cookie");
@@ -18,7 +18,7 @@ export async function DELETE(req: Request, ctx: { params: { id: string } }) {
     return Response.json({ ok: false, erro: "Sem permissão." }, { status: 401 });
   }
 
-  const id = ctx.params.id;
+  const { id } = await ctx.params;
   try {
     const c = await prisma.conteudo.findUnique({ where: { id } });
     if (!c) return Response.json({ ok: false, erro: "Conteúdo não encontrado." }, { status: 404 });

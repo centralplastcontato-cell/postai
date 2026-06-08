@@ -75,6 +75,43 @@ async function gerarConteudo(marca: Marca, tema: string, nSlides: number): Promi
   return JSON.parse(content) as Gerado;
 }
 
+// Gera UMA foto de fundo (IA) e devolve a URL no Blob — ou null se falhar.
+// Não toca no banco, pra poder rodar várias em paralelo sem corrida.
+async function gerarFotoFundo(marca: Marca, descricao: string, ref: string): Promise<string | null> {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return null;
+  const prompt = `Fotografia profissional, realista e limpa para a marca "${marca.nome}" (${
+    marca.descricao || "negócio local"
+  }). Tema: ${descricao}. Iluminação de estúdio, alta qualidade, formato vertical. NÃO inclua nenhum texto, letra, número ou logotipo na imagem.`;
+  try {
+    const resp = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-image-1", prompt, n: 1, size: "1024x1536" }),
+    });
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
+    const data = await resp.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) throw new Error("Resposta sem imagem.");
+    const blob = await put(`${marca.id}/${ref}-${Date.now()}.png`, Buffer.from(b64, "base64"), {
+      access: "public",
+      contentType: "image/png",
+    });
+    return blob.url;
+  } catch (e) {
+    console.error("Erro ao gerar foto de fundo:", e);
+    return null;
+  }
+}
+
+// Gera as fotos de todos os slides em paralelo e devolve o array com imagemUrl preenchida.
+async function comFotosDeIA(marca: Marca, id: string, slides: SlideTexto[]): Promise<SlideTexto[]> {
+  const fotos = await Promise.all(
+    slides.map((s, i) => gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`))
+  );
+  return slides.map((s, i) => (fotos[i] ? { ...s, imagemUrl: fotos[i]! } : s));
+}
+
 export async function gerarCarrossel(input: {
   marcaId: string;
   tema: string;
@@ -112,8 +149,13 @@ export async function gerarCarrossel(input: {
       status: "a_postar",
     },
   });
-  const slides = JSON.stringify(gerado.slides.map((_, i) => `/api/slide/${criado.id}/${i + 1}`));
-  await prisma.conteudo.update({ where: { id: criado.id }, data: { slides } });
+  // Gera foto de IA pra cada slide. Se alguma falhar, aquele slide fica em cor sólida.
+  const slidesFinais = await comFotosDeIA(marca, criado.id, gerado.slides);
+  const slides = JSON.stringify(slidesFinais.map((_, i) => `/api/slide/${criado.id}/${i + 1}`));
+  await prisma.conteudo.update({
+    where: { id: criado.id },
+    data: { slides, slidesTexto: JSON.stringify(slidesFinais) },
+  });
 
   revalidatePath(`/painel/marcas/${marca.id}`);
   return { ok: true as const, id: criado.id };
@@ -138,14 +180,15 @@ export async function regerarCarrossel(id: string) {
     console.error("Erro ao regerar:", e);
     return { ok: false as const, erro: "Não consegui regerar agora." };
   }
-  const slides = JSON.stringify(gerado.slides.map((_, i) => `/api/slide/${id}/${i + 1}`));
+  const slidesFinais = await comFotosDeIA(atual.marca, id, gerado.slides);
+  const slides = JSON.stringify(slidesFinais.map((_, i) => `/api/slide/${id}/${i + 1}`));
   await prisma.conteudo.update({
     where: { id },
     data: {
       titulo: gerado.titulo || atual.titulo,
       legenda: gerado.legenda || "",
       hashtags: gerado.hashtags || "",
-      slidesTexto: JSON.stringify(gerado.slides),
+      slidesTexto: JSON.stringify(slidesFinais),
       slides,
       status: "a_postar",
     },
@@ -245,40 +288,11 @@ export async function gerarImagemSlide(input: { id: string; indice: number; desc
   const slides = lerSlides(c.slidesTexto);
   const slide = slides?.[input.indice];
   if (!slide) return { ok: false as const, erro: "Slide não encontrado." };
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  if (!process.env.OPENAI_API_KEY) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
 
   const base = input.descricao?.trim() || `${slide.titulo}. ${slide.texto ?? ""}`;
-  const prompt = `Fotografia profissional, realista e limpa para a marca "${c.marca.nome}" (${
-    c.marca.descricao || "negócio local"
-  }). Tema: ${base}. Iluminação de estúdio, alta qualidade, formato vertical. NÃO inclua nenhum texto, letra, número ou logotipo na imagem.`;
-
-  let b64: string | undefined;
-  try {
-    const resp = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-image-1", prompt, n: 1, size: "1024x1536" }),
-    });
-    if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
-    const data = await resp.json();
-    b64 = data.data?.[0]?.b64_json;
-    if (!b64) throw new Error("Resposta sem imagem.");
-  } catch (e) {
-    console.error("Erro ao gerar imagem do slide:", e);
-    return { ok: false as const, erro: "Não consegui gerar a imagem agora." };
-  }
-  let url: string;
-  try {
-    const blob = await put(`${c.marcaId}/slide-${input.id}-${input.indice}-${Date.now()}.png`, Buffer.from(b64, "base64"), {
-      access: "public",
-      contentType: "image/png",
-    });
-    url = blob.url;
-  } catch (e) {
-    console.error("Erro ao salvar imagem (Blob):", e);
-    return { ok: false as const, erro: "Imagem gerada, mas não consegui salvar (Vercel Blob)." };
-  }
+  const url = await gerarFotoFundo(c.marca, base, `slide-${input.id}-${input.indice}`);
+  if (!url) return { ok: false as const, erro: "Não consegui gerar a imagem agora." };
   slides![input.indice] = { ...slide, imagemUrl: url };
   await prisma.conteudo.update({ where: { id: input.id }, data: { slidesTexto: JSON.stringify(slides) } });
   revalidatePath(`/painel/marcas/${c.marcaId}`);

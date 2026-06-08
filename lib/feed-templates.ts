@@ -1,12 +1,11 @@
 // Templates de feed (imagem única). Módulo normal (NÃO "use server") porque um
 // arquivo de Server Actions só pode exportar funções async.
+// Templates por finalidade real do negócio (não mais abstratos).
 
-export const TEMPLATES = ["dica", "produto", "vinte_anos", "frase"] as const;
+export const TEMPLATES = ["promocao", "dica"] as const;
 export type Template = (typeof TEMPLATES)[number];
 
 export const TEMPLATE_LABEL: Record<Template, string> = {
-  dica: "💡 Dica rápida",
-  produto: "📦 Produto / serviço",
-  vinte_anos: "🏅 Prova social / autoridade",
-  frase: "❝ Frase / citação",
+  promocao: "🎉 Promoção / Oferta",
+  dica: "💡 Dica / Conteúdo",
 };

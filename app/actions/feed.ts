@@ -8,19 +8,47 @@ import { publicar, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
+import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import type { Marca } from "@prisma/client";
 
+// Monta o JSON do campo `extra` conforme o template (dados específicos da arte).
+function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number): string | null {
+  if (template === "promocao") {
+    const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    return JSON.stringify({
+      oferta: g.oferta?.trim() || "",
+      validade: g.validade?.trim() || "",
+      corFundo: escolherFundoFesta(paleta, seed),
+    });
+  }
+  return null;
+}
+
 const GUIA: Record<Template, string> = {
+  promocao:
+    'Crie uma PROMOÇÃO/OFERTA irresistível pro público da marca. O "titulo" é a chamada principal (curta e forte); preencha "oferta" com o benefício em destaque e "validade" com a condição, quando fizer sentido.',
   dica: 'Faça uma DICA prática e útil pro público da marca. O "titulo" é a dica em si, direta.',
-  produto:
-    'Destaque UM produto ou serviço da marca. O "titulo" é o produto/serviço + principal benefício; o "texto" reforça a vantagem.',
-  vinte_anos:
-    'Reforce CREDIBILIDADE/autoridade da marca (experiência, qualidade, atendimento). O "titulo" é uma frase de confiança curta.',
-  frase:
-    'Crie uma FRASE de impacto curta (estilo citação) ligada ao universo da marca. O "titulo" é a frase; "texto" pode complementar ou ficar vazio.',
 };
 
-function sistema(marca: Marca): string {
+// Formato de JSON esperado por template (a Promoção pede oferta/validade).
+const FORMATO_JSON: Record<Template, string> = {
+  promocao: `{
+  "titulo": "chamada principal forte e curta (3 a 6 palavras) — vai GRANDE na arte",
+  "oferta": "o benefício em destaque, CURTÍSSIMO e em CAIXA ALTA (ex: 10 CRIANÇAS GRÁTIS, 30% OFF) — ou vazio",
+  "texto": "1 frase de apoio curta (até ~16 palavras)",
+  "validade": "condição/validade curta (ex: Válido para os 10 primeiros contratos) — ou vazio",
+  "legenda": "legenda do post (3-5 linhas com \\n), termina com convite à ação no WhatsApp",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
+  dica: `{
+  "titulo": "frase principal forte e curta (até ~9 palavras) — texto GRANDE da arte",
+  "texto": "texto de apoio curto, 1 frase (até ~18 palavras)",
+  "legenda": "legenda do post (3-5 linhas com \\n), termina com convite à ação",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
+};
+
+function sistema(marca: Marca, template: Template): string {
   const tel = marca.telefone ? ` Telefone/WhatsApp: ${marca.telefone}.` : "";
   return `Você cria POSTS DE FEED (imagem única) para o Instagram da marca "${marca.nome}". ${
     marca.descricao || "Negócio local."
@@ -29,16 +57,14 @@ function sistema(marca: Marca): string {
 Tom: profissional, próximo e confiável. Sem jargão de guru, sem "prezado cliente", no máximo 1 emoji no texto.
 
 Devolva SEMPRE um JSON válido:
-{
-  "titulo": "frase principal forte e curta (até ~9 palavras) — texto GRANDE da arte",
-  "texto": "texto de apoio curto, 1 frase (até ~18 palavras)",
-  "legenda": "legenda do post (3-5 linhas com \\n), termina com convite à ação",
-  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
-}
+${FORMATO_JSON[template]}
 Português do Brasil.`;
 }
 
-type Gerado = { titulo: string; texto?: string; legenda: string; hashtags: string };
+type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; legenda: string; hashtags: string };
+
+// Templates que usam foto de IA de fundo (os de fundo colorido não geram foto).
+const USA_FOTO: Record<Template, boolean> = { promocao: false, dica: true };
 
 function slugify(s: string): string {
   return s
@@ -86,7 +112,7 @@ async function gerarTexto(marca: Marca, template: Template, tema?: string): Prom
       response_format: { type: "json_object" },
       temperature: 0.85,
       messages: [
-        { role: "system", content: sistema(marca) },
+        { role: "system", content: sistema(marca, template) },
         { role: "user", content: pedido },
       ],
     }),
@@ -130,10 +156,13 @@ export async function gerarPublicacao(input: {
       texto: gerado.texto || "",
       legenda: gerado.legenda || "",
       hashtags: gerado.hashtags || "",
+      extra: montarExtra(marca, template, gerado, Date.now()),
       tema: input.tema?.trim() || null,
       status: "a_postar",
     },
   });
+  // Só os templates com foto (ex: dica) geram imagem de IA; promoção usa fundo colorido.
+  if (USA_FOTO[template]) await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
   revalidatePath(`/painel/marcas/${marca.id}`);
   return { ok: true as const, id: criado.id };
 }
@@ -142,13 +171,15 @@ export async function regerarPublicacao(id: string) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  const template: Template = (TEMPLATES as readonly string[]).includes(p.template) ? (p.template as Template) : "dica";
   let gerado: Gerado;
   try {
-    gerado = await gerarTexto(p.marca, p.template as Template, p.tema ?? undefined);
+    gerado = await gerarTexto(p.marca, template, p.tema ?? undefined);
   } catch (e) {
     console.error("Erro ao regerar publicação:", e);
     return { ok: false as const, erro: "Não consegui regerar agora." };
   }
+  const seed = p.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
   await prisma.publicacao.update({
     where: { id },
     data: {
@@ -156,6 +187,7 @@ export async function regerarPublicacao(id: string) {
       texto: gerado.texto || "",
       legenda: gerado.legenda || "",
       hashtags: gerado.hashtags || "",
+      extra: montarExtra(p.marca, template, gerado, seed),
       status: "a_postar",
     },
   });

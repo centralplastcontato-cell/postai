@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { excluirConteudo, excluirPublicacao } from "@/app/actions/excluir";
+import { ConfirmDialog } from "./confirm-dialog";
 import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
 
@@ -141,39 +142,43 @@ export function CalendarioRedes({
 }
 
 function DeleteButton({ tipo, id }: { tipo: "carrossel" | "feed"; id: string }) {
-  // Render a server-action form so deletion runs on the server (no cookie/fetch issues)
-  if (tipo === "carrossel") {
-    return (
-      <form action={excluirConteudo} onSubmit={(e) => e.stopPropagation()} className="absolute right-1 top-1 z-10">
-        <input type="hidden" name="id" value={id} />
-        <button
-          type="submit"
-          onClick={(ev) => {
-            ev.stopPropagation();
-            if (!confirm("Excluir este carrossel? A ação não pode ser desfeita.")) ev.preventDefault();
-          }}
-          title="Excluir"
-          className="rounded bg-black/30 px-1.5 py-0.5 text-xs text-red-400 opacity-90 hover:bg-red-900/30"
-        >
-          🗑
-        </button>
-      </form>
-    );
+  const router = useRouter();
+  const [aberto, setAberto] = useState(false);
+  const [ocupado, startTransition] = useTransition();
+
+  function confirmar() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.append("id", id);
+      if (tipo === "carrossel") await excluirConteudo(fd);
+      else await excluirPublicacao(fd);
+      setAberto(false);
+      router.refresh();
+    });
   }
+
   return (
-    <form action={excluirPublicacao} onSubmit={(e) => e.stopPropagation()} className="absolute right-1 top-1 z-10">
-      <input type="hidden" name="id" value={id} />
+    <>
       <button
-        type="submit"
+        type="button"
         onClick={(ev) => {
           ev.stopPropagation();
-          if (!confirm("Excluir esta publicação? A ação não pode ser desfeita.")) ev.preventDefault();
+          setAberto(true);
         }}
         title="Excluir"
-        className="rounded bg-black/30 px-1.5 py-0.5 text-xs text-red-400 opacity-90 hover:bg-red-900/30"
+        className="absolute right-1 top-1 z-10 rounded bg-black/30 px-1.5 py-0.5 text-xs text-red-400 opacity-90 hover:bg-red-900/30"
       >
         🗑
       </button>
-    </form>
+      <ConfirmDialog
+        aberto={aberto}
+        titulo={tipo === "carrossel" ? "Excluir este carrossel?" : "Excluir esta publicação?"}
+        descricao="A ação não pode ser desfeita."
+        textoConfirmar="Excluir"
+        onConfirmar={confirmar}
+        onCancelar={() => setAberto(false)}
+        ocupado={ocupado}
+      />
+    </>
   );
 }

@@ -17,6 +17,8 @@ html {
   scroll-behavior: smooth;
   overflow-x: clip;
   max-width: 100%;
+  /* Controles nativos (select, date, autofill) renderizam no tema escuro. */
+  color-scheme: dark;
 }
 
 body {
@@ -71,4 +73,21 @@ body {
   .btn-delete {
     @apply absolute right-1 top-1 z-10 rounded bg-black/30 px-1.5 py-0.5 text-xs text-red-400 opacity-90 hover:bg-red-900/30;
   }
+}
+
+/* Dropdown dos <select> no padrão escuro da plataforma (Chrome/Edge/Firefox no Windows
+   respeitam background/color das options). */
+select.input-base,
+select.input-compact {
+  color-scheme: dark;
+}
+select.input-base option,
+select.input-compact option {
+  background-color: #141414;
+  color: #ffffff;
+}
+select.input-base option:checked,
+select.input-compact option:checked {
+  background-color: #7c3aed;
+  color: #ffffff;
 }

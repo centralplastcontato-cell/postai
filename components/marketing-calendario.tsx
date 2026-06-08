@@ -13,6 +13,7 @@ import {
   sugerirTemas,
   marcarConteudo,
 } from "@/app/actions/marketing";
+import { ConfirmDialog } from "./confirm-dialog";
 
 export type Post = {
   id: string;
@@ -65,6 +66,7 @@ export function MarketingCalendario({
   const [erroPost, setErroPost] = useState<string | null>(null);
   const [temasIA, setTemasIA] = useState<string[]>([]);
   const [sugerindo, setSugerindo] = useState(false);
+  const [postarAlvo, setPostarAlvo] = useState<Post | null>(null);
 
   const selecionado = posts.find((p) => p.id === selId) ?? null;
 
@@ -102,8 +104,10 @@ export function MarketingCalendario({
       setSugerindo(false);
     });
   }
-  async function handlePostar(p: Post) {
-    if (!confirm(`Postar "${p.titulo}" no Instagram agora? Vai ao ar de verdade.`)) return;
+  function handlePostar(p: Post) {
+    setPostarAlvo(p);
+  }
+  async function confirmarPostar(p: Post) {
     setErroPost(null);
     setPostando(true);
     try {
@@ -295,6 +299,18 @@ export function MarketingCalendario({
           {erroPost && <p className="mt-3 rounded-md border border-red-800 bg-red-950/40 p-3 text-sm text-red-300">{erroPost}</p>}
         </div>
       )}
+
+      <ConfirmDialog
+        aberto={!!postarAlvo}
+        titulo="Postar no Instagram agora?"
+        descricao={postarAlvo ? `"${postarAlvo.titulo}" vai ao ar de verdade no perfil da marca.` : undefined}
+        textoConfirmar="Postar agora"
+        onConfirmar={() => {
+          if (postarAlvo) confirmarPostar(postarAlvo);
+          setPostarAlvo(null);
+        }}
+        onCancelar={() => setPostarAlvo(null)}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { salvarMarca, excluirMarca, testarConexao, extrairCoresLogo } from "@/app/actions/marcas";
+import { ConfirmDialog } from "./confirm-dialog";
 
 export type MarcaView = {
   id: string;
@@ -48,6 +49,7 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
   const [subindoLogo, setSubindoLogo] = useState(false);
   const [lendoCores, setLendoCores] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [confirmarExcluir, setConfirmarExcluir] = useState(false);
 
   const diasCar = parseDias(f.diasCarrossel);
   const diasFeed = parseDias(f.diasFeed);
@@ -144,14 +146,16 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         set("corFundo", r.corFundo);
         set("paleta", JSON.stringify(r.paleta));
         const n = r.paleta.length;
-        setAviso(`🎨 ${n} ${n === 1 ? "cor lida" : "cores lidas"} do logo! Principal ${r.corPrimaria}. A régua das artes vai ficar multicolor. Confira e clique em Salvar.`);
+        setAviso(`🎨 ${n} ${n === 1 ? "cor lida" : "cores lidas"} do logo! Principal ${r.corPrimaria}. Confira e clique em Salvar.`);
         setTimeout(() => setAviso(null), 8000);
       } else setErro(r.erro);
       setLendoCores(false);
     });
   }
   function handleExcluir() {
-    if (!confirm(`Excluir a marca "${f.nome}" e todo o conteúdo dela? Não dá pra desfazer.`)) return;
+    setConfirmarExcluir(true);
+  }
+  function confirmarExclusao() {
     startTransition(async () => {
       const r = await excluirMarca(f.id);
       if (r.ok) router.push("/painel");
@@ -265,6 +269,19 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         <button onClick={handleSalvar} disabled={isPending} className="rounded-lg bg-vermelho px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">{isPending ? "Salvando…" : salvo ? "✓ Salvo!" : "Salvar"}</button>
         <button onClick={handleExcluir} disabled={isPending} className="rounded-lg border border-red-900 px-4 py-2.5 text-sm text-red-400 transition hover:bg-red-950/40 disabled:opacity-50">Excluir marca</button>
       </div>
+
+      <ConfirmDialog
+        aberto={confirmarExcluir}
+        titulo={`Excluir a marca "${f.nome}"?`}
+        descricao="Todo o conteúdo dela (carrosséis e publicações) será apagado. Não dá pra desfazer."
+        textoConfirmar="Excluir marca"
+        onConfirmar={() => {
+          confirmarExclusao();
+          setConfirmarExcluir(false);
+        }}
+        onCancelar={() => setConfirmarExcluir(false)}
+        ocupado={isPending}
+      />
     </div>
   );
 }
