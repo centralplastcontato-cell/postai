@@ -27,9 +27,16 @@ export function MarcaHub({
       <Link href="/painel" className="text-sm text-muted transition hover:text-white">← Marcas</Link>
 
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: marca.corPrimaria }}>
-          {marca.nome.slice(0, 2).toUpperCase()}
-        </span>
+        {marca.logoUrl ? (
+          <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: marca.corFundo || "#0E0E0E" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={marca.logoUrl} alt={marca.nome} className="max-h-full max-w-full object-contain" />
+          </span>
+        ) : (
+          <span className="flex h-11 w-11 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: marca.corPrimaria }}>
+            {marca.nome.slice(0, 2).toUpperCase()}
+          </span>
+        )}
         <h1 className="display text-3xl text-white">{marca.nome}</h1>
         <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${conectada ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>
           {conectada ? "✓ Instagram conectado" : "⚠ Falta conectar"}
