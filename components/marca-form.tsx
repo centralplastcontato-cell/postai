@@ -2,14 +2,16 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { salvarMarca, excluirMarca, testarConexao } from "@/app/actions/marcas";
+import { salvarMarca, excluirMarca, testarConexao, extrairCoresLogo } from "@/app/actions/marcas";
 
 export type MarcaView = {
   id: string;
   nome: string;
   corPrimaria: string;
   corFundo: string;
+  paleta: string; // JSON array de hex
   logoTexto: string;
+  logoUrl: string;
   site: string;
   telefone: string;
   igUserId: string;
@@ -43,9 +45,20 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
   const [erro, setErro] = useState<string | null>(null);
   const [teste, setTeste] = useState<string | null>(null);
   const [testando, setTestando] = useState(false);
+  const [subindoLogo, setSubindoLogo] = useState(false);
+  const [lendoCores, setLendoCores] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const diasCar = parseDias(f.diasCarrossel);
   const diasFeed = parseDias(f.diasFeed);
+  const paleta: string[] = (() => {
+    try {
+      const a = JSON.parse(f.paleta || "[]");
+      return Array.isArray(a) ? a.filter((c) => typeof c === "string") : [];
+    } catch {
+      return [];
+    }
+  })();
 
   function set<K extends keyof MarcaView>(k: K, v: MarcaView[K]) {
     setF((cur) => ({ ...cur, [k]: v }));
@@ -65,7 +78,9 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         nome: f.nome,
         corPrimaria: f.corPrimaria,
         corFundo: f.corFundo,
+        paleta: f.paleta,
         logoTexto: f.logoTexto,
+        logoUrl: f.logoUrl,
         site: f.site,
         telefone: f.telefone,
         igUserId: f.igUserId,
@@ -92,6 +107,49 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
       setTestando(false);
     }
   }
+  async function handleUploadLogo(file: File | undefined) {
+    if (!file) return;
+    setErro(null);
+    setSubindoLogo(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const resp = await fetch("/api/marketing/upload?tipo=logo", { method: "POST", body: form });
+      const data = await resp.json();
+      if (!data.ok) {
+        setErro(data.erro || "Falha no upload do logo.");
+        return;
+      }
+      set("logoUrl", data.url);
+      setAviso("✓ Logo enviado (fundo removido)! Agora clique em “Ler cores com IA”.");
+      setTimeout(() => setAviso(null), 5000);
+    } catch {
+      setErro("Não consegui subir o logo. (O Blob Store já está configurado?)");
+    } finally {
+      setSubindoLogo(false);
+    }
+  }
+  function handleLerCores() {
+    if (!f.logoUrl) {
+      setErro("Suba o logo primeiro.");
+      return;
+    }
+    setErro(null);
+    setAviso(null);
+    setLendoCores(true);
+    startTransition(async () => {
+      const r = await extrairCoresLogo(f.logoUrl);
+      if (r.ok) {
+        set("corPrimaria", r.corPrimaria);
+        set("corFundo", r.corFundo);
+        set("paleta", JSON.stringify(r.paleta));
+        const n = r.paleta.length;
+        setAviso(`🎨 ${n} ${n === 1 ? "cor lida" : "cores lidas"} do logo! Principal ${r.corPrimaria}. A régua das artes vai ficar multicolor. Confira e clique em Salvar.`);
+        setTimeout(() => setAviso(null), 8000);
+      } else setErro(r.erro);
+      setLendoCores(false);
+    });
+  }
   function handleExcluir() {
     if (!confirm(`Excluir a marca "${f.nome}" e todo o conteúdo dela? Não dá pra desfazer.`)) return;
     startTransition(async () => {
@@ -110,11 +168,54 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
       {/* Identidade */}
       <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
         <h3 className="mb-3 text-sm font-semibold text-white">Identidade</h3>
+
+        {/* Logo: sobe a imagem, a IA lê as cores e o logo aparece na arte */}
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-linha bg-preto p-3">
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-md border border-linha" style={{ backgroundColor: f.corFundo || "#0E0E0E" }}>
+            {f.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={f.logoUrl} alt="Logo" className="max-h-full max-w-full object-contain" />
+            ) : (
+              <span className="text-[10px] text-muted">sem logo</span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="cursor-pointer rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">
+              {subindoLogo ? "Subindo…" : f.logoUrl ? "Trocar logo" : "📤 Subir logo (PNG)"}
+              <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => handleUploadLogo(e.target.files?.[0])} />
+            </label>
+            <button type="button" onClick={handleLerCores} disabled={!f.logoUrl || lendoCores} className="rounded-md border border-amber-500/40 bg-amber-500/5 px-3 py-1.5 text-xs font-semibold text-amber-200 transition hover:border-amber-400 disabled:opacity-40">
+              {lendoCores ? "🎨 Lendo…" : "🎨 Ler cores com IA"}
+            </button>
+            {f.logoUrl && (
+              <button type="button" onClick={() => set("logoUrl", "")} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:text-white">Remover</button>
+            )}
+          </div>
+          <p className="w-full text-[11px] text-muted">Use <strong className="text-white/80">PNG com fundo transparente</strong> — se tiver fundo (cinza, branco), ele vira um quadradão na arte e atrapalha a IA a ler as cores. A IA monta a paleta do logo e ele aparece na faixa das artes.</p>
+          {aviso && (
+            <p className="w-full rounded-md border border-green-700 bg-green-950/40 px-3 py-2 text-xs text-green-300">{aviso}</p>
+          )}
+        </div>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-xs text-muted">Nome<input value={f.nome} onChange={(e) => set("nome", e.target.value)} className={inp} /></label>
           <label className="text-xs text-muted">Texto da faixa (na arte)<input value={f.logoTexto} onChange={(e) => set("logoTexto", e.target.value)} placeholder="CASTELO DA DIVERSÃO" className={inp} /></label>
           <label className="text-xs text-muted">Cor principal<input type="color" value={f.corPrimaria} onChange={(e) => set("corPrimaria", e.target.value)} className="mt-1 h-10 w-full rounded-md border border-linha bg-preto" /></label>
           <label className="text-xs text-muted">Cor de fundo<input type="color" value={f.corFundo} onChange={(e) => set("corFundo", e.target.value)} className="mt-1 h-10 w-full rounded-md border border-linha bg-preto" /></label>
+          {paleta.length > 0 && (
+            <div className="text-xs text-muted sm:col-span-2">
+              Paleta da marca (régua multicolor das artes)
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                {paleta.map((c, i) => (
+                  <span key={i} className="flex items-center gap-1.5 rounded-md border border-linha bg-preto px-2 py-1">
+                    <span className="h-4 w-4 rounded-sm border border-white/10" style={{ backgroundColor: c }} />
+                    <span className="text-[10px] uppercase text-white/70">{c}</span>
+                  </span>
+                ))}
+                <button type="button" onClick={() => set("paleta", "[]")} className="text-[10px] text-muted underline transition hover:text-white">limpar</button>
+              </div>
+            </div>
+          )}
           <label className="text-xs text-muted">Site (rodapé da arte)<input value={f.site} onChange={(e) => set("site", e.target.value)} placeholder="castelodadiversao.com.br" className={inp} /></label>
           <label className="text-xs text-muted">Telefone/WhatsApp (CTA)<input value={f.telefone} onChange={(e) => set("telefone", e.target.value)} placeholder="(15) 99999-9999" className={inp} /></label>
         </div>

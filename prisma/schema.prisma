@@ -19,7 +19,9 @@ model Marca {
   // Identidade visual — cada marca com a sua cara nas artes
   corPrimaria String   @default("#7C3AED") // cor de destaque (faixa, traço, CTA)
   corFundo    String   @default("#0E0E0E") // fundo das artes de cor sólida
+  paleta      String   @default("[]") // cores vivas do logo (JSON array de hex) — régua/detalhes multicolor nas artes
   logoTexto   String   @default("") // texto da faixa da marca (ex: "CASTELO DA DIVERSÃO")
+  logoUrl     String   @default("") // logotipo (PNG) — aparece na faixa da arte e a IA lê as cores dele
   site        String   @default("") // aparece no rodapé das artes
   telefone    String   @default("") // aparece no rodapé/CTA
   // Conexão com o Instagram (Meta Graph API) — própria de cada marca

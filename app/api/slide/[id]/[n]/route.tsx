@@ -14,16 +14,23 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
   let cor = "#7C3AED";
   let fundo = "#0E0E0E";
   let marcaTexto = "POSTAÍ";
+  let logoUrl = "";
   let site = "";
   let telefone = "";
+  let paleta: string[] = [];
   try {
     const c = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
     if (c) {
       cor = c.marca.corPrimaria || cor;
       fundo = c.marca.corFundo || fundo;
       marcaTexto = (c.marca.logoTexto || c.marca.nome).toUpperCase();
+      logoUrl = c.marca.logoUrl || "";
       site = c.marca.site || "";
       telefone = c.marca.telefone || "";
+      try {
+        const pal = JSON.parse(c.marca.paleta || "[]");
+        if (Array.isArray(pal)) paleta = pal.filter((x) => typeof x === "string");
+      } catch {}
       const arr = JSON.parse(c.slidesTexto || "[]") as Slide[];
       if (arr[idx]) slide = arr[idx];
     }
@@ -35,6 +42,25 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
   const bg = isCapa ? cor : fundo;
   const CINZA = "#C9C9C9";
 
+  // Régua: faixa multicolor com as cores do logo (ou um traço só na cor principal).
+  const cores = paleta.length ? paleta : [cor];
+  const Regua = () => (
+    <div style={{ display: "flex", marginBottom: 36 }}>
+      {cores.map((c, i) => (
+        <div key={i} style={{ width: 36, height: 8, backgroundColor: c, display: "flex" }} />
+      ))}
+    </div>
+  );
+
+  // Faixa da marca: logo (se houver) ou o texto. `claro` = sobre fundo colorido.
+  const marcaEl = (claro: boolean) =>
+    logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={logoUrl} height={72} style={{ height: "72px", width: "auto", objectFit: "contain" }} />
+    ) : (
+      <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: 2, color: claro ? "#ffffff" : cor }}>{marcaTexto}</span>
+    );
+
   if (slide.imagemUrl) {
     return new ImageResponse(
       (
@@ -42,9 +68,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={slide.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
           <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "60px", backgroundImage: "linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.82))" }}>
-            <div style={{ display: "flex" }}>
-              <span style={{ backgroundColor: cor, color: "#fff", fontSize: 30, fontWeight: 700, letterSpacing: 2, padding: "10px 22px" }}>{marcaTexto}</span>
-            </div>
+            <div style={{ display: "flex" }}>{marcaEl(true)}</div>
             {slide.titulo || slide.texto ? (
               <div style={{ display: "flex", flexDirection: "column", padding: "44px", borderRadius: 18, backgroundImage: "linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0.82))" }}>
                 {slide.titulo ? <div style={{ display: "flex", fontSize: 64, fontWeight: 800, color: "#fff", lineHeight: 1.05 }}>{slide.titulo}</div> : null}
@@ -61,11 +85,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
   return new ImageResponse(
     (
       <div style={{ width: "1080px", height: "1350px", display: "flex", flexDirection: "column", justifyContent: "space-between", backgroundColor: bg, padding: "90px", fontFamily: "sans-serif" }}>
-        <div style={{ display: "flex", alignItems: "center" }}>
-          <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: 2, color: isCapa ? "#fff" : cor }}>{marcaTexto}</span>
-        </div>
+        <div style={{ display: "flex", alignItems: "center" }}>{marcaEl(isCapa)}</div>
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {!isCapa && <div style={{ width: 90, height: 8, backgroundColor: cor, marginBottom: 36, display: "flex" }} />}
+          {!isCapa && <Regua />}
           <div style={{ fontSize: isCapa ? 92 : 70, fontWeight: 800, color: "#fff", lineHeight: 1.05, display: "flex" }}>{slide.titulo ?? ""}</div>
           {slide.texto ? <div style={{ marginTop: 32, fontSize: 40, color: isCapa ? "#fff" : CINZA, lineHeight: 1.3, display: "flex" }}>{slide.texto}</div> : null}
           {isCta && telefone ? (
