@@ -11,14 +11,45 @@ import { TEMPLATES, type Template } from "@/lib/feed-templates";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import type { Marca } from "@prisma/client";
 
+// Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
+// `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
+type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string };
+
 // Monta o JSON do campo `extra` conforme o template (dados específicos da arte).
-function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number): string | null {
+// `travas` são valores digitados pelo usuário — usados exatos e preservados no regerar.
+function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, travas?: Travas): string | null {
   if (template === "promocao") {
     const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    const oferta = travas?.oferta || g.oferta?.trim() || "";
+    const validade = travas?.validade || g.validade?.trim() || "";
+    const inclui = (travas?.inclui || []).map((s) => s.trim()).filter(Boolean).slice(0, 5);
     return JSON.stringify({
-      oferta: g.oferta?.trim() || "",
-      validade: g.validade?.trim() || "",
+      oferta,
+      validade,
+      inclui,
+      regras: travas?.regras || "",
       corFundo: escolherFundoFesta(paleta, seed),
+      // Guarda o que foi digitado pra manter fixo quando o usuário regerar o texto.
+      ofertaTravada: travas?.oferta || undefined,
+      validadeTravada: travas?.validade || undefined,
+    });
+  }
+  if (template === "data-comemorativa") {
+    const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    return JSON.stringify({
+      selo: g.selo?.trim() || "",
+      corFundo: escolherFundoFesta(paleta, seed),
+    });
+  }
+  if (template === "divulgacao") {
+    const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    const manuais = (travas?.diferenciais || []).map((s) => s.trim()).filter(Boolean);
+    const diferenciais = (manuais.length ? manuais : g.diferenciais || []).map((s) => s.trim()).filter(Boolean).slice(0, 4);
+    return JSON.stringify({
+      diferenciais,
+      corFundo: escolherFundoFesta(paleta, seed),
+      // Mantém fixos os diferenciais digitados ao regerar o texto.
+      diferenciaisTravados: manuais.length ? manuais : undefined,
     });
   }
   return null;
@@ -27,6 +58,8 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number):
 const GUIA: Record<Template, string> = {
   promocao:
     'Crie uma PROMOÇÃO/OFERTA irresistível pro público da marca. O "titulo" é a chamada principal (curta e forte); preencha "oferta" com o benefício em destaque e "validade" com a condição, quando fizer sentido.',
+  "data-comemorativa":
+    'Crie uma SAUDAÇÃO calorosa para a data comemorativa indicada (ex: Natal, Dia das Crianças, Páscoa). O "titulo" é a saudação principal, curta e festiva (ex: "Feliz Natal!"); preencha "selo" com o nome/data da comemoração e "texto" com uma mensagem afetuosa que conecte a data com a marca. NÃO ofereça promoção aqui — é puro carinho/celebração.',
   dica: 'Faça uma DICA prática e útil pro público da marca. O "titulo" é a dica em si, direta.',
 };
 
@@ -38,6 +71,13 @@ const FORMATO_JSON: Record<Template, string> = {
   "texto": "1 frase de apoio curta (até ~16 palavras)",
   "validade": "condição/validade curta (ex: Válido para os 10 primeiros contratos) — ou vazio",
   "legenda": "legenda do post (3-5 linhas com \\n), termina com convite à ação no WhatsApp",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
+  "data-comemorativa": `{
+  "titulo": "saudação principal curta e festiva (2 a 5 palavras) — vai GRANDE na arte (ex: Feliz Natal!)",
+  "selo": "nome/data curta da comemoração (ex: 25 de Dezembro, Dia das Crianças) — ou vazio",
+  "texto": "mensagem afetuosa curta (até ~16 palavras) ligando a data à marca",
+  "legenda": "legenda do post (3-5 linhas com \\n), tom caloroso, termina com um convite leve",
   "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
 }`,
   dica: `{
@@ -61,10 +101,10 @@ ${FORMATO_JSON[template]}
 Português do Brasil.`;
 }
 
-type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; legenda: string; hashtags: string };
+type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; selo?: string; legenda: string; hashtags: string };
 
 // Templates que usam foto de IA de fundo (os de fundo colorido não geram foto).
-const USA_FOTO: Record<Template, boolean> = { promocao: false, dica: true };
+const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, dica: true };
 
 function slugify(s: string): string {
   return s
@@ -98,12 +138,22 @@ async function proximaDataFeed(marca: Marca): Promise<Date> {
   return new Date(`${amanha.toISOString().slice(0, 10)}T10:00:00-03:00`);
 }
 
-async function gerarTexto(marca: Marca, template: Template, tema?: string): Promise<Gerado> {
+async function gerarTexto(marca: Marca, template: Template, tema?: string, travas?: Travas): Promise<Gerado> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error("OPENAI_API_KEY não configurada.");
-  const pedido = tema?.trim()
+  let pedido = tema?.trim()
     ? `${GUIA[template]} Tema/assunto sugerido: "${tema.trim()}".`
     : `${GUIA[template]} Escolha um ângulo novo e útil.`;
+  // A oferta/validade digitadas pelo usuário são FIXAS — a IA não pode inventar outras.
+  const fixos: string[] = [];
+  if (travas?.oferta) fixos.push(`a oferta/desconto é EXATAMENTE "${travas.oferta}"`);
+  if (travas?.validade) fixos.push(`a validade/condição é EXATAMENTE "${travas.validade}"`);
+  const itensInclui = (travas?.inclui || []).map((s) => s.trim()).filter(Boolean);
+  if (itensInclui.length) fixos.push(`a oferta inclui: ${itensInclui.join(", ")}`);
+  if (travas?.regras) fixos.push(`as regras/condições são: "${travas.regras}"`);
+  if (fixos.length) {
+    pedido += ` IMPORTANTE: ${fixos.join("; ")}. Use esses dados sem alterar e escreva o título e a legenda de forma coerente com eles. NÃO invente outros valores, descontos, itens ou condições.`;
+  }
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -129,15 +179,29 @@ export async function gerarPublicacao(input: {
   template: Template;
   tema?: string;
   data?: string;
+  oferta?: string;
+  validade?: string;
+  inclui?: string[];
+  regras?: string;
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const template = (TEMPLATES as readonly string[]).includes(input.template) ? input.template : "dica";
 
+  // Oferta/validade/inclui/regras só fazem sentido na promoção; ignorados nos demais.
+  const travas: Travas = template === "promocao"
+    ? {
+        oferta: input.oferta?.trim() || undefined,
+        validade: input.validade?.trim() || undefined,
+        inclui: (input.inclui || []).map((s) => s.trim()).filter(Boolean),
+        regras: input.regras?.trim() || undefined,
+      }
+    : {};
+
   let gerado: Gerado;
   try {
-    gerado = await gerarTexto(marca, template, input.tema);
+    gerado = await gerarTexto(marca, template, input.tema, travas);
   } catch (e) {
     console.error("Erro ao gerar publicação:", e);
     return { ok: false as const, erro: "Não consegui gerar agora. Confira a chave da OpenAI." };
@@ -156,7 +220,7 @@ export async function gerarPublicacao(input: {
       texto: gerado.texto || "",
       legenda: gerado.legenda || "",
       hashtags: gerado.hashtags || "",
-      extra: montarExtra(marca, template, gerado, Date.now()),
+      extra: montarExtra(marca, template, gerado, Date.now(), travas),
       tema: input.tema?.trim() || null,
       status: "a_postar",
     },
@@ -172,9 +236,22 @@ export async function regerarPublicacao(id: string) {
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   const template: Template = (TEMPLATES as readonly string[]).includes(p.template) ? (p.template as Template) : "dica";
+
+  // Recupera o que o usuário havia fixado pra manter a oferta/validade no regerar.
+  let travas: Travas = {};
+  try {
+    const ex = JSON.parse(p.extra || "{}");
+    travas = {
+      oferta: ex.ofertaTravada || undefined,
+      validade: ex.validadeTravada || undefined,
+      inclui: Array.isArray(ex.inclui) ? ex.inclui : [],
+      regras: ex.regras || undefined,
+    };
+  } catch {}
+
   let gerado: Gerado;
   try {
-    gerado = await gerarTexto(p.marca, template, p.tema ?? undefined);
+    gerado = await gerarTexto(p.marca, template, p.tema ?? undefined, travas);
   } catch (e) {
     console.error("Erro ao regerar publicação:", e);
     return { ok: false as const, erro: "Não consegui regerar agora." };
@@ -187,7 +264,7 @@ export async function regerarPublicacao(id: string) {
       texto: gerado.texto || "",
       legenda: gerado.legenda || "",
       hashtags: gerado.hashtags || "",
-      extra: montarExtra(p.marca, template, gerado, seed),
+      extra: montarExtra(p.marca, template, gerado, seed, travas),
       status: "a_postar",
     },
   });

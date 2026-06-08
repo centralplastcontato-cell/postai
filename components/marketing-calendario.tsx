@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import {
   gerarCarrossel,
   regerarCarrossel,
@@ -69,6 +70,14 @@ export function MarketingCalendario({
   const [postarAlvo, setPostarAlvo] = useState<Post | null>(null);
 
   const selecionado = posts.find((p) => p.id === selId) ?? null;
+
+  // Ao escolher um dia comemorativo, já sugere o tema do carrossel com a data
+  // (ex: "Dia dos Namorados"). O dono ajusta ou gera direto.
+  useEffect(() => {
+    if (!dataAlvo) return;
+    const dc = dataComemorativaDe(dataAlvo);
+    if (dc?.sugestao) setTema(dc.sugestao);
+  }, [dataAlvo]);
 
   function handleGerar() {
     setErro(null);

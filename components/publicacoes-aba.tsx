@@ -12,6 +12,7 @@ import {
   removerImagemPublicacao,
 } from "@/app/actions/feed";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
+import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
 
 type Confirmacao = { titulo: string; descricao?: string; textoConfirmar: string; acao: () => void };
@@ -62,6 +63,10 @@ export function PublicacoesAba({
   const [isPending, startTransition] = useTransition();
   const [template, setTemplate] = useState<Template>("dica");
   const [tema, setTema] = useState("");
+  const [oferta, setOferta] = useState("");
+  const [validade, setValidade] = useState("");
+  const [inclui, setInclui] = useState("");
+  const [regras, setRegras] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
@@ -69,12 +74,25 @@ export function PublicacoesAba({
   const [legendaAbertaId, setLegendaAbertaId] = useState<string | null>(null);
   const [confirmacao, setConfirmacao] = useState<Confirmacao | null>(null);
 
+  const comemorativa = dataAlvo ? dataComemorativaDe(dataAlvo) : null;
+
+  function usarTemplateData() {
+    if (!comemorativa) return;
+    setTemplate("data-comemorativa");
+    if (comemorativa.sugestao) setTema(comemorativa.sugestao);
+  }
+
   function handleGerar() {
     setErro(null);
     startTransition(async () => {
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined });
+      const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras });
       if (r.ok) {
         setTema("");
+        setOferta("");
+        setValidade("");
+        setInclui("");
+        setRegras("");
         onGerado?.();
         router.refresh();
       } else setErro(r.erro);
@@ -196,6 +214,43 @@ export function PublicacoesAba({
             )}
           </div>
         </div>
+
+        {comemorativa && (
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-yellow-400/40 bg-yellow-400/5 px-3 py-2.5">
+            <span className="text-sm text-yellow-100">
+              {comemorativa.emoji} Esse dia é <strong className="font-semibold text-yellow-200">{comemorativa.nome}</strong>. Quer fazer um post da data?
+            </span>
+            {template === "data-comemorativa" ? (
+              <span className="text-xs font-semibold text-green-300">✓ usando o template de data comemorativa</span>
+            ) : (
+              <button type="button" onClick={usarTemplateData} className="rounded-md border border-yellow-400/60 bg-yellow-400/10 px-3 py-1 text-xs font-semibold text-yellow-100 transition hover:bg-yellow-400/20">
+                🎄 Usar template Data Comemorativa
+              </button>
+            )}
+          </div>
+        )}
+
+        {template === "promocao" && (
+          <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="text-xs text-muted">
+              Oferta / destaque
+              <input value={oferta} onChange={(e) => setOferta(e.target.value)} placeholder="Ex: 20% OFF, 10 crianças grátis" className="input-base" />
+            </label>
+            <label className="text-xs text-muted">
+              Validade / condição
+              <input value={validade} onChange={(e) => setValidade(e.target.value)} placeholder="Ex: Válido até 30/06" className="input-base" />
+            </label>
+            <label className="text-xs text-muted sm:col-span-2">
+              O que está incluso <span className="text-muted/70">(um item por linha — aparece como lista na arte)</span>
+              <textarea value={inclui} onChange={(e) => setInclui(e.target.value)} rows={4} placeholder={"Ex:\n2h de salão\nMonitor incluso\nDecoração temática"} className="input-base resize-y" />
+            </label>
+            <label className="text-xs text-muted sm:col-span-2">
+              Regras / condições <span className="text-muted/70">(letras miúdas no rodapé)</span>
+              <input value={regras} onChange={(e) => setRegras(e.target.value)} placeholder="Ex: Válido seg a qui, mediante reserva, não cumulativo" className="input-base" />
+            </label>
+            <p className="text-[11px] text-amber-400/90 sm:col-span-2">⚠ Oferta vazia: a IA sugere — confira antes de postar. Itens inclusos e regras são só seus (a IA não inventa).</p>
+          </div>
+        )}
 
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <label className="flex-1 text-xs text-muted">

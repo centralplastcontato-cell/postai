@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutFoto, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; corFundo?: string } = {};
+  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; corFundo?: string } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -40,7 +40,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   if (p.template === "promocao") {
     return new ImageResponse(
-      LayoutPromocao({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo }),
+      LayoutPromocao({ ...base, oferta: extra.oferta, validade: extra.validade, inclui: extra.inclui, regras: extra.regras, corFundo: extra.corFundo }),
+      { width: 1080, height: 1350, fonts }
+    );
+  }
+
+  if (p.template === "data-comemorativa") {
+    return new ImageResponse(
+      LayoutDataComemorativa({ ...base, selo: extra.selo, corFundo: extra.corFundo, imagemUrl: p.imagemUrl || undefined }),
       { width: 1080, height: 1350, fonts }
     );
   }

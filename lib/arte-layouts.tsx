@@ -1,7 +1,7 @@
 // Layouts completos (canvas 1080x1350) por template, reaproveitados pelo route de
 // produção e pela rota de preview. Cada função recebe os dados já prontos e
 // devolve o JSX para o ImageResponse.
-import { Confete, OndaBase, TituloMulticolor, CtaWhatsApp, LogoSolto, escolherFundoFesta, BRANCO, PRETO } from "@/lib/arte";
+import { Confete, OndaBase, TituloMulticolor, CtaWhatsApp, LogoSolto, escolherFundoFesta, contorno, BRANCO, PRETO } from "@/lib/arte";
 
 export type DadosArte = {
   paleta: string[];
@@ -12,6 +12,10 @@ export type DadosArte = {
   textoApoio?: string;
   oferta?: string; // selo grande (ex: "10 CRIANÇAS GRÁTIS")
   validade?: string; // ex: "Válido até 15/02"
+  inclui?: string[]; // lista "o que está incluso" (ex: 2h de salão, monitor...)
+  regras?: string; // letras miúdas / condições (ex: seg a qui, mediante reserva)
+  diferenciais?: string[]; // pontos fortes "por que escolher" (institucional)
+  selo?: string; // pílula curta destacada (ex: a data: "25 de Dezembro")
   corFundo?: string; // cor de fundo (default: azul da paleta)
 };
 
@@ -35,33 +39,49 @@ export function LayoutPromocao(d: DadosArte) {
       <Confete cores={[c2, c3, c5, c1]} />
       {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
 
-      <div style={{ display: "flex", flexDirection: "column", padding: "0 80px", marginTop: 360, flexGrow: 1 }}>
-        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 100 : 116} />
+      {(() => {
+        const itens = (d.inclui || []).filter((s) => s && s.trim()).slice(0, 5);
+        const temLista = itens.length > 0;
+        const rodape = [d.validade, d.regras].filter((s) => s && s.trim()).join("  ·  ");
+        return (
+          <div style={{ display: "flex", flexDirection: "column", padding: "0 80px", marginTop: temLista ? 300 : 360, flexGrow: 1 }}>
+            <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 96 : 112} />
 
-        {d.textoApoio ? (
-          <div style={{ display: "flex", marginTop: 26, fontSize: 42, color: BRANCO, lineHeight: 1.25, textShadow: "0 2px 6px rgba(0,0,0,0.45)", maxWidth: 840 }}>
-            {d.textoApoio}
-          </div>
-        ) : null}
+            {d.oferta ? (
+              <div style={{ display: "flex", marginTop: 30 }}>
+                <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 56, color: PRETO, backgroundColor: c3, padding: "16px 34px", borderRadius: 18, transform: "rotate(-2deg)", boxShadow: "0 8px 0 rgba(0,0,0,0.2)" }}>
+                  {d.oferta}
+                </div>
+              </div>
+            ) : null}
 
-        {d.oferta ? (
-          <div style={{ display: "flex", marginTop: 36 }}>
-            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 56, color: PRETO, backgroundColor: c3, padding: "16px 34px", borderRadius: 18, transform: "rotate(-2deg)", boxShadow: "0 8px 0 rgba(0,0,0,0.2)" }}>
-              {d.oferta}
+            {temLista ? (
+              <div style={{ display: "flex", flexDirection: "column", marginTop: 30 }}>
+                {itens.map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", marginTop: i === 0 ? 0 : 16 }}>
+                    <div style={{ display: "flex", width: 18, height: 18, borderRadius: 6, backgroundColor: c2, marginRight: 18, transform: "rotate(8deg)" }} />
+                    <div style={{ display: "flex", fontSize: 38, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.45)" }}>{item}</div>
+                  </div>
+                ))}
+              </div>
+            ) : d.textoApoio ? (
+              <div style={{ display: "flex", marginTop: 26, fontSize: 42, color: BRANCO, lineHeight: 1.25, textShadow: "0 2px 6px rgba(0,0,0,0.45)", maxWidth: 840 }}>
+                {d.textoApoio}
+              </div>
+            ) : null}
+
+            <div style={{ display: "flex", marginTop: 40 }}>
+              {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
             </div>
-          </div>
-        ) : null}
 
-        <div style={{ display: "flex", marginTop: 44 }}>
-          {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
-        </div>
-
-        {d.validade ? (
-          <div style={{ display: "flex", marginTop: 22, fontSize: 28, color: "rgba(255,255,255,0.92)", fontFamily: "Fredoka", textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
-            {d.validade}
+            {rodape ? (
+              <div style={{ display: "flex", marginTop: 20, fontSize: 26, color: "rgba(255,255,255,0.9)", fontFamily: "Fredoka", textShadow: "0 2px 4px rgba(0,0,0,0.4)", maxWidth: 880, lineHeight: 1.2 }}>
+                {rodape}
+              </div>
+            ) : null}
           </div>
-        ) : null}
-      </div>
+        );
+      })()}
 
       <OndaBase cor={c1} />
       <div style={{ position: "absolute", bottom: 60, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
@@ -111,6 +131,148 @@ export function LayoutFoto(d: DadosArte & { imagemUrl?: string }) {
             <span style={{ display: "flex", fontFamily: "Fredoka", fontSize: 28, color: "rgba(255,255,255,0.85)" }}>{d.site}</span>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// 🎄 Data Comemorativa — saudação temática GRANDE centralizada sobre foto de IA,
+// com selo da data, confete festivo e logo no topo. Tom de celebração.
+export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
+  const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || escolherFundoFesta(d.paleta);
+  const logoW = Math.round(96 * 1.76);
+  return (
+    <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative", backgroundColor: fundo, fontFamily: "Baloo" }}>
+      {d.imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={d.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
+      ) : null}
+
+      {/* Vinheta: escurece topo e base pra leitura, deixa o miolo respirando a foto */}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "1080px",
+          height: "1350px",
+          display: "flex",
+          backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.12) 26%, rgba(0,0,0,0.12) 60%, rgba(0,0,0,0.78) 100%)",
+        }}
+      />
+
+      <Confete cores={[c2, c3, c5, c1]} />
+
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "1080px",
+          height: "1350px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "96px 80px",
+        }}
+      >
+        {/* Logo no topo (centralizado) */}
+        {d.logoSrc ? (
+          <div style={{ display: "flex" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={d.logoSrc} width={logoW} height={96} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.5))" }} />
+          </div>
+        ) : <div style={{ display: "flex" }} />}
+
+        {/* Saudação grande centralizada + selo + apoio */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          {d.selo ? (
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 38, color: PRETO, backgroundColor: c3, padding: "10px 30px", borderRadius: 999, marginBottom: 30, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.22)" }}>
+              {d.selo}
+            </div>
+          ) : null}
+
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Fredoka" }}>
+            {d.titulo.map((l, i) => (
+              <div key={i} style={{ display: "flex", fontSize: d.titulo.length >= 3 ? 104 : 124, color: l.c, lineHeight: 1.0, textShadow: contorno(), letterSpacing: 1, textAlign: "center" }}>
+                {l.t}
+              </div>
+            ))}
+          </div>
+
+          {d.textoApoio ? (
+            <div style={{ display: "flex", marginTop: 30, fontSize: 40, color: "rgba(255,255,255,0.95)", lineHeight: 1.28, textShadow: "0 2px 10px rgba(0,0,0,0.7)", maxWidth: 820, textAlign: "center" }}>
+              {d.textoApoio}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Rodapé: site (+ WhatsApp se houver) */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
+          <div style={{ display: "flex", marginTop: d.telefone ? 22 : 0, fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>
+            {d.site}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ⭐ Divulgação / Institucional — fundo colorido festa + "por que escolher" com
+// os diferenciais em destaque (lista com checks) + CTA WhatsApp.
+export function LayoutDivulgacao(d: DadosArte) {
+  const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || escolherFundoFesta(d.paleta);
+  const itens = (d.diferenciais || []).filter((s) => s && s.trim()).slice(0, 4);
+  return (
+    <div
+      style={{
+        width: "1080px",
+        height: "1350px",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        backgroundColor: fundo,
+        backgroundImage: "radial-gradient(circle at 50% 32%, rgba(255,255,255,0.24), rgba(0,0,0,0.16) 72%)",
+        fontFamily: "Baloo",
+      }}
+    >
+      <Confete cores={[c2, c3, c5, c1]} />
+      {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
+
+      <div style={{ display: "flex", flexDirection: "column", padding: "0 80px", marginTop: 300, flexGrow: 1 }}>
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 92 : 108} />
+
+        {d.textoApoio && itens.length === 0 ? (
+          <div style={{ display: "flex", marginTop: 26, fontSize: 42, color: BRANCO, lineHeight: 1.25, textShadow: "0 2px 6px rgba(0,0,0,0.45)", maxWidth: 840 }}>
+            {d.textoApoio}
+          </div>
+        ) : null}
+
+        {itens.length ? (
+          <div style={{ display: "flex", flexDirection: "column", marginTop: 36 }}>
+            {itens.map((item, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", marginTop: i === 0 ? 0 : 22 }}>
+                <div style={{ display: "flex", width: 44, height: 44, borderRadius: 999, backgroundColor: c3, alignItems: "center", justifyContent: "center", marginRight: 24, boxShadow: "0 4px 0 rgba(0,0,0,0.2)" }}>
+                  <div style={{ display: "flex", width: 16, height: 16, borderRadius: 5, backgroundColor: PRETO, transform: "rotate(8deg)" }} />
+                </div>
+                <div style={{ display: "flex", fontSize: 44, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.45)" }}>{item}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        <div style={{ display: "flex", marginTop: 48 }}>
+          {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
+        </div>
+      </div>
+
+      <OndaBase cor={c1} />
+      <div style={{ position: "absolute", bottom: 60, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
+        {d.site}
       </div>
     </div>
   );
