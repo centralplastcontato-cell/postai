@@ -56,12 +56,22 @@ export default async function PainelHome() {
                 className="flex flex-col rounded-xl border border-linha bg-preto-card p-4 transition hover:border-vermelho"
               >
                 <div className="flex items-center gap-3">
-                  <span
-                    className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-bold text-white"
-                    style={{ backgroundColor: m.corPrimaria }}
-                  >
-                    {m.nome.slice(0, 2).toUpperCase()}
-                  </span>
+                  {m.logoUrl ? (
+                    <span
+                      className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg p-1"
+                      style={{ backgroundColor: m.corFundo || "#0E0E0E" }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={m.logoUrl} alt={m.nome} className="max-h-full max-w-full object-contain" />
+                    </span>
+                  ) : (
+                    <span
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white"
+                      style={{ backgroundColor: m.corPrimaria }}
+                    >
+                      {m.nome.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
                   <div className="min-w-0">
                     <p className="truncate font-semibold text-white">{m.nome}</p>
                     <p className="text-xs text-muted">

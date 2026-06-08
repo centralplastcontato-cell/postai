@@ -28,12 +28,12 @@ export function MarcaHub({
 
       <div className="mt-2 flex flex-wrap items-center gap-3">
         {marca.logoUrl ? (
-          <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg" style={{ backgroundColor: marca.corFundo || "#0E0E0E" }}>
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl p-1.5" style={{ backgroundColor: marca.corFundo || "#0E0E0E" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={marca.logoUrl} alt={marca.nome} className="max-h-full max-w-full object-contain" />
           </span>
         ) : (
-          <span className="flex h-11 w-11 items-center justify-center rounded-lg text-sm font-bold text-white" style={{ backgroundColor: marca.corPrimaria }}>
+          <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl text-lg font-bold text-white" style={{ backgroundColor: marca.corPrimaria }}>
             {marca.nome.slice(0, 2).toUpperCase()}
           </span>
         )}
