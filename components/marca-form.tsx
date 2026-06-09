@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { salvarMarca, excluirMarca, testarConexao, extrairCoresLogo } from "@/app/actions/marcas";
 import { ConfirmDialog } from "./confirm-dialog";
-import { BancoImagens, type ImagemView } from "./banco-imagens";
 
 export type MarcaView = {
   id: string;
@@ -39,7 +38,7 @@ function parseDias(s: string): number[] {
   return s.split(",").map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
 }
 
-export function MarcaForm({ marca, imagens }: { marca: MarcaView; imagens: ImagemView[] }) {
+export function MarcaForm({ marca }: { marca: MarcaView }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [f, setF] = useState<MarcaView>(marca);
@@ -263,8 +262,6 @@ export function MarcaForm({ marca, imagens }: { marca: MarcaView; imagens: Image
           <input type="checkbox" checked={f.ativa} onChange={(e) => set("ativa", e.target.checked)} /> Piloto automático ativo
         </label>
       </section>
-
-      <BancoImagens marcaId={marca.id} imagens={imagens} />
 
       {erro && <p className="text-sm text-red-400">{erro}</p>}
 

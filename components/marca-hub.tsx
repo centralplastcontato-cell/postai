@@ -6,7 +6,7 @@ import { RedesSociais } from "./redes-sociais";
 import { MarcaForm, type MarcaView } from "./marca-form";
 import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
-import { type ImagemView } from "./banco-imagens";
+import { BancoImagens, type ImagemView } from "./banco-imagens";
 
 export function MarcaHub({
   marca,
@@ -21,7 +21,7 @@ export function MarcaHub({
   imagens: ImagemView[];
   conectada: boolean;
 }) {
-  const [aba, setAba] = useState<"redes" | "config">("redes");
+  const [aba, setAba] = useState<"redes" | "imagens" | "config">("redes");
   const cls = (a: boolean) =>
     `rounded-lg px-4 py-2 text-sm font-semibold transition ${a ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"}`;
 
@@ -54,12 +54,14 @@ export function MarcaHub({
 
       <div className="mt-5 flex gap-2">
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
+        <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
         <button onClick={() => setAba("config")} className={cls(aba === "config")}>⚙️ Configurações</button>
       </div>
 
       <div className="mt-6">
         {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} />}
-        {aba === "config" && <MarcaForm marca={marca} imagens={imagens} />}
+        {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
+        {aba === "config" && <MarcaForm marca={marca} />}
       </div>
     </div>
   );

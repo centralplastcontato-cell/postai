@@ -29,6 +29,19 @@ const MODELOS_DIVULGACAO: { rotulo: string; assunto: string; diferenciais: strin
   { rotulo: "🎨 Personalização", assunto: "cada festa do jeitinho que vocês sonham", diferenciais: ["Temas personalizados", "Pacotes flexíveis", "Do intimista ao grande", "Orçamento sem compromisso"] },
 ];
 
+// Modelos prontos de Dica/Conteúdo (clique preenche o Assunto; a IA escreve a dica).
+// Temas úteis pro público de um buffet infantil — o dono ajusta o que quiser.
+const MODELOS_DICA: { rotulo: string; assunto: string }[] = [
+  { rotulo: "🎂 Planejar a festa", assunto: "como organizar a festa infantil com antecedência e sem stress" },
+  { rotulo: "📋 Checklist", assunto: "o que não pode faltar numa festa infantil de sucesso" },
+  { rotulo: "🎈 Escolher o tema", assunto: "como escolher o tema da festa do jeito que a criança ama" },
+  { rotulo: "👶 Por idade", assunto: "brincadeiras e atrações ideais para cada idade na festa" },
+  { rotulo: "🍰 Cardápio", assunto: "como montar um cardápio que agrada crianças e adultos" },
+  { rotulo: "🎁 Lembrancinhas", assunto: "ideias de lembrancinhas que encantam a criançada" },
+  { rotulo: "😌 Buffet x casa", assunto: "vantagens de comemorar no buffet em vez de fazer em casa" },
+  { rotulo: "📅 Melhor data", assunto: "como escolher o melhor dia e horário para a festa" },
+];
+
 export type PublicacaoView = {
   id: string;
   slug: string;
@@ -303,6 +316,24 @@ export function PublicacoesAba({
               <textarea value={diferenciais} onChange={(e) => setDiferenciais(e.target.value)} rows={4} placeholder={"Ex:\nMonitores treinados\nBuffet completo\nDecoração temática"} className="input-base resize-y" />
             </label>
             <p className="mt-1 text-[11px] text-amber-400/90">⚠ Se deixar vazio, a IA sugere os diferenciais — confira antes de postar.</p>
+          </div>
+        )}
+
+        {template === "dica" && (
+          <div className="mb-3">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique pra preencher o assunto)</p>
+            <div className="flex flex-wrap gap-2">
+              {MODELOS_DICA.map((m) => (
+                <button
+                  key={m.rotulo}
+                  type="button"
+                  onClick={() => setTema(m.assunto)}
+                  className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white"
+                >
+                  {m.rotulo}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
