@@ -73,6 +73,7 @@ export function MarketingCalendario({
   const [isPending, startTransition] = useTransition();
   const [tema, setTema] = useState("");
   const [nSlides, setNSlides] = useState(7);
+  const [mosaico, setMosaico] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [legendaAberta, setLegendaAberta] = useState(true);
@@ -102,7 +103,7 @@ export function MarketingCalendario({
       return;
     }
     startTransition(async () => {
-      const r = await gerarCarrossel({ marcaId, tema, data: dataAlvo, nSlides });
+      const r = await gerarCarrossel({ marcaId, tema, data: dataAlvo, nSlides, mosaico });
       if (r.ok) {
         setTema("");
         onSelId(r.id);
@@ -282,6 +283,17 @@ export function MarketingCalendario({
           </div>
           <button onClick={handleGerar} disabled={isPending || !tema.trim()} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
             {isPending ? "Gerando…" : "Gerar"}
+          </button>
+        </div>
+        <div className="mt-3">
+          <button
+            type="button"
+            onClick={() => setMosaico((v) => !v)}
+            title="A capa do carrossel vira um mosaico com 4 fotos REAIS do seu banco de imagens (mostra o espaço de verdade). O conteúdo segue gerado pela IA."
+            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${mosaico ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}
+          >
+            <span className={`flex h-4 w-4 items-center justify-center rounded border ${mosaico ? "border-vermelho bg-vermelho text-white" : "border-linha"}`}>{mosaico ? "✓" : ""}</span>
+            🖼️ Capa em mosaico (fotos reais do banco)
           </button>
         </div>
         <div className="mt-3">

@@ -8,7 +8,7 @@ import { publicar, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
-import { sortearImagemBanco } from "@/app/actions/imagens";
+import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import type { Marca } from "@prisma/client";
 
@@ -59,7 +59,37 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
     const cat = categoria && categoria !== "geral" ? categoria : "";
     return cat ? JSON.stringify({ categoria: cat }) : null;
   }
+  if (template === "mosaico") {
+    // As 4 fotos reais NÃO entram aqui (são sorteadas e mescladas depois, em
+    // aplicarFotosMosaico). Aqui só o selo opcional, a categoria e a cor de fundo.
+    const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    const oferta = travas?.oferta || g.oferta?.trim() || "";
+    const validade = travas?.validade || g.validade?.trim() || "";
+    const cat = categoria && categoria !== "geral" ? categoria : "";
+    return JSON.stringify({
+      oferta,
+      validade,
+      categoria: cat || undefined,
+      corFundo: escolherFundoFesta(paleta, seed),
+      ofertaTravada: travas?.oferta || undefined,
+      validadeTravada: travas?.validade || undefined,
+    });
+  }
   return null;
+}
+
+// Sorteia até 4 fotos reais do banco (rodízio) e MESCLA no extra da publicação
+// Mosaico — sem apagar o selo/cor já gravados por montarExtra. Usado no gerar e no
+// regerar (cada regerar traz fotos novas, graças ao rodízio por menos-usadas).
+async function aplicarFotosMosaico(pubId: string, marcaId: string, categoria?: string) {
+  const fotos = await sortearImagensBanco(marcaId, 4, categoria);
+  const p = await prisma.publicacao.findUnique({ where: { id: pubId }, select: { extra: true } });
+  let ex: Record<string, unknown> = {};
+  try {
+    ex = JSON.parse(p?.extra || "{}");
+  } catch {}
+  ex.fotos = fotos;
+  await prisma.publicacao.update({ where: { id: pubId }, data: { extra: JSON.stringify(ex) } });
 }
 
 const GUIA: Record<Template, string> = {
@@ -70,6 +100,8 @@ const GUIA: Record<Template, string> = {
   divulgacao:
     'Crie uma DIVULGAÇÃO INSTITUCIONAL ("por que escolher a gente"). O "titulo" é uma chamada de valor, curta e convidativa (ex: "A festa dos sonhos começa aqui"); preencha "diferenciais" com 3 ou 4 pontos fortes BEM curtos (2 a 4 palavras cada, ex: "Monitores treinados", "Buffet completo"). Foco em confiança e qualidade — NÃO ofereça desconto/promoção aqui.',
   dica: 'Faça uma DICA prática e útil pro público da marca. O "titulo" é a dica em si, direta.',
+  mosaico:
+    'Crie uma CAPA do tipo "mostre seu espaço" — um post que exibe FOTOS REAIS do lugar/produtos. O "titulo" é uma chamada curta e atraente (2 a 5 palavras, ex: "Especial de Férias", "Conheça nosso espaço"). Se fizer sentido um chamariz leve, preencha "oferta" com um selo CURTÍSSIMO (ex: CONDIÇÃO ESPECIAL) e "validade" com o período; senão deixe vazios. NÃO invente preço/desconto.',
 };
 
 // Formato de JSON esperado por template (a Promoção pede oferta/validade).
@@ -102,6 +134,14 @@ const FORMATO_JSON: Record<Template, string> = {
   "legenda": "legenda do post (3-5 linhas com \\n), termina com convite à ação",
   "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
 }`,
+  mosaico: `{
+  "titulo": "chamada curta e forte (2 a 5 palavras) — vai GRANDE na arte (ex: Especial de Férias)",
+  "oferta": "selo curtíssimo em destaque (ex: CONDIÇÃO ESPECIAL) — ou vazio",
+  "validade": "condição/período curto (ex: Datas de julho) — ou vazio",
+  "texto": "1 frase de apoio curta — opcional",
+  "legenda": "legenda do post (3-5 linhas com \\n), convida a conhecer o espaço e chamar no WhatsApp",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
 };
 
 function sistema(marca: Marca, template: Template): string {
@@ -120,7 +160,9 @@ Português do Brasil.`;
 type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; selo?: string; diferenciais?: string[]; legenda: string; hashtags: string };
 
 // Templates que usam foto de IA de fundo (os de fundo colorido não geram foto).
-const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true };
+// O Mosaico também usa fotos reais, mas precisa de VÁRIAS (tratadas à parte em
+// aplicarFotosMosaico), por isso fica fora do fluxo de foto única do USA_FOTO.
+const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false };
 
 function slugify(s: string): string {
   return s
@@ -220,6 +262,8 @@ export async function gerarPublicacao(input: {
     };
   } else if (template === "divulgacao") {
     travas = { diferenciais: (input.diferenciais || []).map((s) => s.trim()).filter(Boolean) };
+  } else if (template === "mosaico") {
+    travas = { oferta: input.oferta?.trim() || undefined, validade: input.validade?.trim() || undefined };
   }
 
   let gerado: Gerado;
@@ -255,6 +299,9 @@ export async function gerarPublicacao(input: {
     const real = await sortearImagemBanco(marca.id, input.categoria);
     if (real) await definirImagemPublicacao({ id: criado.id, url: real }).catch(() => {});
     else await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
+  } else if (template === "mosaico") {
+    // Puxa as 4 fotos reais do banco (rodízio) e grava no extra.
+    await aplicarFotosMosaico(criado.id, marca.id, input.categoria).catch(() => {});
   }
   revalidatePath(`/painel/marcas/${marca.id}`);
   return { ok: true as const, id: criado.id };
@@ -300,6 +347,10 @@ export async function regerarPublicacao(id: string) {
       status: "a_postar",
     },
   });
+  // Mosaico: re-sorteia 4 fotos novas do banco (rodízio) a cada regerar.
+  if (template === "mosaico") {
+    await aplicarFotosMosaico(id, p.marcaId, categoria).catch(() => {});
+  }
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const };
 }

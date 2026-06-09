@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutAnivCapa, LayoutAnivCard } from "@/lib/arte-layouts";
+import { LayoutAnivCapa, LayoutAnivCard, LayoutMosaico } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const maxDuration = 60;
 // ?v= troca sozinho quando o conteúdo muda.
 const CACHE = { "cache-control": "public, max-age=31536000, immutable" };
 
-type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string };
+type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string; fotos?: string[] };
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: string }> }) {
   const { id, n } = await ctx.params;
@@ -41,6 +41,22 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       if (arr[idx]) slide = arr[idx];
     }
   } catch {}
+
+  // Capa em Mosaico: 4 fotos reais do banco em círculos, com a cara da marca.
+  if (slide.tipo === "mosaico") {
+    const fonts = carregarFontes();
+    const el = LayoutMosaico({
+      paleta,
+      logoSrc,
+      site,
+      telefone,
+      titulo: montarTituloColorido(slide.titulo || "Conheça nosso espaço", paleta),
+      oferta: slide.texto || undefined,
+      fotos: slide.fotos,
+      arraste: true,
+    });
+    return new ImageResponse(el, { width: 1080, height: 1350, fonts, headers: CACHE });
+  }
 
   // Slides festivos (Aniversariantes da Semana): layout colorido com a cara da marca.
   if (slide.tipo === "aniv-capa" || slide.tipo === "aniv") {

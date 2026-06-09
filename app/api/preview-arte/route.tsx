@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, LayoutAnivCapa, LayoutAnivCard, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, LayoutAnivCapa, LayoutAnivCard, LayoutMosaico, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +51,28 @@ export async function GET(req: Request) {
       ...base,
       titulo: montarTituloColorido("Aniversariantes da Semana", paleta),
       textoApoio: "Semana de 08 a 14 de junho",
+    });
+  } else if (template === "mosaico") {
+    // Puxa até 4 fotos reais do banco da marca pra ver o mosaico de verdade.
+    const banco = marca
+      ? await prisma.imagemMarca.findMany({ where: { marcaId: marca.id }, orderBy: { criadoEm: "asc" }, take: 4, select: { url: true } })
+      : [];
+    const fotos = banco.length
+      ? banco.map((b) => b.url)
+      : [
+          "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80",
+          "https://images.unsplash.com/photo-1464349095431-e9a21285b5f3?w=800&q=80",
+          "https://images.unsplash.com/photo-1518621736915-f3b1c41bfd00?w=800&q=80",
+          "https://images.unsplash.com/photo-1543237087-e6d1f1a01a37?w=800&q=80",
+        ];
+    elemento = LayoutMosaico({
+      ...base,
+      titulo: montarTituloColorido(tituloParam || "Especial de Férias", paleta),
+      oferta: "CONDIÇÃO ESPECIAL",
+      validade: "Datas de julho",
+      fotos,
+      // ?arraste=1 mostra o "arraste →" (como fica de CAPA de carrossel).
+      arraste: url.searchParams.get("arraste") === "1",
     });
   } else if (template === "aniv") {
     elemento = LayoutAnivCard({

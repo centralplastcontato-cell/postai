@@ -380,3 +380,84 @@ export function LayoutAnivCard(d: DadosArte & { nome?: string; idade?: string; f
     </div>
   );
 }
+
+// 🖼️ Mosaico de Fotos Reais — CAPA de carrossel que mostra o ESPAÇO DE VERDADE
+// (fotos do banco em círculos sobrepostos), com título multicolor, selo de oferta
+// tipo carimbo e CTA. Inspirado nas capas de buffet que vendem mostrando o lugar
+// real (não IA). Usa até 4 fotos; com menos, usa os círculos maiores.
+export function LayoutMosaico(d: DadosArte & { fotos?: string[]; arraste?: boolean }) {
+  const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || escolherFundoFesta(d.paleta);
+  const fotos = (d.fotos || []).filter(Boolean).slice(0, 4);
+  const logoW = Math.round(80 * 1.76);
+  // Círculos das fotos (maior primeiro): coluna à direita estilo capa de buffet.
+  const slots = [
+    { size: 400, top: 60, left: 600 },
+    { size: 330, top: 430, left: 480 },
+    { size: 360, top: 720, left: 640 },
+    { size: 280, top: 1010, left: 700 },
+  ];
+  return (
+    <div
+      style={{
+        width: "1080px",
+        height: "1350px",
+        display: "flex",
+        position: "relative",
+        backgroundColor: fundo,
+        backgroundImage: "radial-gradient(circle at 28% 30%, rgba(255,255,255,0.22), rgba(0,0,0,0.18) 72%)",
+        fontFamily: "Baloo",
+      }}
+    >
+      <Confete cores={[c2, c3, c5, c1]} />
+
+      {/* Fotos reais em círculos emoldurados. O borderRadius vai DIRETO na <img>:
+          no Satori (next/og) o overflow:hidden de um <div> pai NÃO recorta a img
+          em círculo — os cantos quadrados vazam. Borda branca também na própria img. */}
+      {fotos.map((src, i) => {
+        const s = slots[i];
+        return (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={i}
+            src={src}
+            width={s.size}
+            height={s.size}
+            style={{ position: "absolute", top: s.top, left: s.left, width: `${s.size}px`, height: `${s.size}px`, objectFit: "cover", borderRadius: 9999, border: "12px solid #fff", boxShadow: "0 12px 30px rgba(0,0,0,0.35)" }}
+          />
+        );
+      })}
+
+      {/* Logo no topo-esquerda */}
+      {d.logoSrc ? (
+        <div style={{ position: "absolute", top: 70, left: 64, display: "flex" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={d.logoSrc} width={logoW} height={80} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.5))" }} />
+        </div>
+      ) : null}
+
+      {/* Título multicolor (canto superior esquerdo) */}
+      <div style={{ position: "absolute", top: 200, left: 64, display: "flex", flexDirection: "column", maxWidth: 480 }}>
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 76 : 92} />
+      </div>
+
+      {/* Selo de oferta (carimbo circular) — só quando há oferta */}
+      {d.oferta ? (
+        <div style={{ position: "absolute", top: 560, left: 70, width: 250, height: 250, borderRadius: 9999, backgroundColor: "#fff", border: `6px solid ${c1}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", transform: "rotate(-7deg)", boxShadow: "0 10px 24px rgba(0,0,0,0.3)", padding: 18 }}>
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 42, color: c1, textAlign: "center", lineHeight: 1.0 }}>{d.oferta}</div>
+          {d.validade ? <div style={{ display: "flex", marginTop: 12, fontFamily: "Fredoka", fontSize: 22, color: PRETO, textAlign: "center", lineHeight: 1.1 }}>{d.validade}</div> : null}
+        </div>
+      ) : null}
+
+      {/* Rodapé: CTA WhatsApp + site + "arraste" */}
+      <div style={{ position: "absolute", bottom: 60, left: 64, display: "flex", flexDirection: "column" }}>
+        {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
+        {d.site || d.arraste ? (
+          <div style={{ display: "flex", marginTop: 18, fontFamily: "Fredoka", fontSize: 28, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>
+            {d.site}{d.site && d.arraste ? "   ·   " : ""}{d.arraste ? "arraste →" : ""}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}

@@ -66,6 +66,17 @@ const MODELOS_DICA: { rotulo: string; assunto: string; categoria: string }[] = [
   { rotulo: "📅 Melhor data", assunto: "como escolher o melhor dia e horário para a festa", categoria: "geral" },
 ];
 
+// Modelos prontos de Mosaico (capa "mostre seu espaço" com fotos reais).
+// Clique preenche o título (tema), o selo opcional e de qual categoria puxar as fotos.
+const MODELOS_MOSAICO: { rotulo: string; assunto: string; oferta: string; validade: string; categoria: string }[] = [
+  { rotulo: "🏰 Conheça o espaço", assunto: "Conheça nosso espaço", oferta: "", validade: "", categoria: "geral" },
+  { rotulo: "📅 Especial de férias", assunto: "Especial de Férias", oferta: "CONDIÇÃO ESPECIAL", validade: "Datas de julho", categoria: "geral" },
+  { rotulo: "🎠 Nossos brinquedos", assunto: "Diversão garantida", oferta: "", validade: "", categoria: "brinquedos" },
+  { rotulo: "🎉 Festas inesquecíveis", assunto: "Festas inesquecíveis", oferta: "", validade: "", categoria: "festa" },
+  { rotulo: "🍰 Nosso buffet", assunto: "Buffet que agrada", oferta: "", validade: "", categoria: "comida" },
+  { rotulo: "✨ Agende uma visita", assunto: "Venha nos visitar", oferta: "AGENDE SUA VISITA", validade: "", categoria: "espaco" },
+];
+
 export type PublicacaoView = {
   id: string;
   slug: string;
@@ -140,7 +151,7 @@ export function PublicacoesAba({
     startTransition(async () => {
       const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: template === "dica" ? categoriaFoto : undefined });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: template === "dica" || template === "mosaico" ? categoriaFoto : undefined });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -330,18 +341,7 @@ export function PublicacoesAba({
 
         {template === "promocao" && (
           <div className="mb-3">
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <p className="text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique pra preencher)</p>
-              <button
-                type="button"
-                onClick={handleVariarPromocao}
-                disabled={sugerindo}
-                title="Deixa a IA criar uma ideia de oferta a partir do assunto/ocasião — você revisa antes de postar"
-                className="shrink-0 rounded-md border border-linha px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40"
-              >
-                {sugerindo ? "Gerando…" : "🔄 Variar com IA"}
-              </button>
-            </div>
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique pra preencher)</p>
             <div className="flex flex-wrap gap-2">
               {MODELOS_PROMOCAO.map((m) => (
                 <button
@@ -368,7 +368,18 @@ export function PublicacoesAba({
               <input value={validade} onChange={(e) => setValidade(e.target.value)} placeholder="Ex: Válido até 30/06" className="input-base" />
             </label>
             <label className="text-xs text-muted sm:col-span-2">
-              O que está incluso <span className="text-muted/70">(um item por linha — aparece como lista na arte)</span>
+              <span className="flex items-center justify-between gap-2">
+                <span>O que está incluso <span className="text-muted/70">(um item por linha — aparece como lista na arte)</span></span>
+                <button
+                  type="button"
+                  onClick={handleVariarPromocao}
+                  disabled={sugerindo}
+                  title="Deixa a IA criar uma ideia de oferta completa a partir do assunto/ocasião — você revisa antes de postar"
+                  className="shrink-0 rounded-md border border-linha px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40"
+                >
+                  {sugerindo ? "Gerando…" : "🔄 Variar com IA"}
+                </button>
+              </span>
               <textarea value={inclui} onChange={(e) => setInclui(e.target.value)} rows={4} placeholder={"Ex:\n2h de salão\nMonitor incluso\nDecoração temática"} className="input-base resize-y" />
             </label>
             <label className="text-xs text-muted sm:col-span-2">
@@ -434,6 +445,41 @@ export function PublicacoesAba({
                 {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
               </select>
             </label>
+          </div>
+        )}
+
+        {template === "mosaico" && (
+          <div className="mb-3">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique preenche título, selo e a categoria das fotos)</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {MODELOS_MOSAICO.map((m) => (
+                <button
+                  key={m.rotulo}
+                  type="button"
+                  onClick={() => { setTema(m.assunto); setOferta(m.oferta); setValidade(m.validade); setCategoriaFoto(m.categoria); }}
+                  className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white"
+                >
+                  {m.rotulo}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-xs text-muted">
+                Selo / destaque <span className="text-muted/70">(opcional — carimbo na arte)</span>
+                <input value={oferta} onChange={(e) => setOferta(e.target.value)} placeholder="Ex: CONDIÇÃO ESPECIAL" className="input-base" />
+              </label>
+              <label className="text-xs text-muted">
+                Período / condição <span className="text-muted/70">(opcional)</span>
+                <input value={validade} onChange={(e) => setValidade(e.target.value)} placeholder="Ex: Datas de julho" className="input-base" />
+              </label>
+              <label className="text-xs text-muted sm:col-span-2">
+                Fotos do banco <span className="text-muted/70">(de qual categoria puxar as 4 fotos reais)</span>
+                <select value={categoriaFoto} onChange={(e) => setCategoriaFoto(e.target.value)} className="input-base">
+                  {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="mt-1 text-[11px] text-amber-400/90">🖼️ Usa 4 fotos REAIS do seu Banco de Imagens (em rodízio). Suba fotos na aba <strong>Imagens</strong> se ainda não tiver. Selo/período vazios = sem carimbo.</p>
           </div>
         )}
 

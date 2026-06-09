@@ -7,14 +7,15 @@ import { estaLogado } from "@/lib/auth";
 import { publicar, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
-import { sortearImagemBanco } from "@/app/actions/imagens";
+import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
 import type { Marca } from "@prisma/client";
 
 type SlideTexto = {
-  tipo: "capa" | "conteudo" | "cta" | "aniv-capa" | "aniv";
+  tipo: "capa" | "conteudo" | "cta" | "aniv-capa" | "aniv" | "mosaico";
   titulo: string;
   texto?: string;
   imagemUrl?: string;
+  fotos?: string[]; // tipo "mosaico": as 4 fotos reais do banco que vão nos círculos
 };
 type Gerado = { titulo: string; slides: SlideTexto[]; legenda: string; hashtags: string };
 
@@ -110,12 +111,23 @@ async function gerarFotoFundo(marca: Marca, descricao: string, ref: string): Pro
 // banco está vazio. O sorteio do banco é SEQUENCIAL (pro contador de rodízio
 // equilibrar entre os slides); a geração de IA, que é lenta, roda em paralelo.
 async function comFotosDeIA(marca: Marca, id: string, slides: SlideTexto[]): Promise<SlideTexto[]> {
+  // O slide "mosaico" traz suas próprias 4 fotos (nos círculos) — não recebe foto única.
   const doBanco: (string | null)[] = [];
-  for (let i = 0; i < slides.length; i++) doBanco.push(await sortearImagemBanco(marca.id));
+  for (let i = 0; i < slides.length; i++) doBanco.push(slides[i].tipo === "mosaico" ? null : await sortearImagemBanco(marca.id));
   const fotos = await Promise.all(
-    slides.map(async (s, i) => doBanco[i] || (await gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`))),
+    slides.map(async (s, i) => (s.tipo === "mosaico" ? null : doBanco[i] || (await gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`)))),
   );
   return slides.map((s, i) => (fotos[i] ? { ...s, imagemUrl: fotos[i]! } : s));
+}
+
+// Transforma a CAPA (slide 0) num Mosaico de 4 fotos reais do banco. Se o banco
+// estiver vazio, deixa a capa como veio (a IA cuida com fundo abstrato). O título
+// gerado pela IA é mantido — só o visual da capa muda.
+async function aplicarMosaicoCapa(marca: Marca, slides: SlideTexto[]): Promise<SlideTexto[]> {
+  if (!slides.length) return slides;
+  const fotos = await sortearImagensBanco(marca.id, 4);
+  if (!fotos.length) return slides;
+  return slides.map((s, i) => (i === 0 ? { ...s, tipo: "mosaico", fotos, imagemUrl: undefined } : s));
 }
 
 export async function gerarCarrossel(input: {
@@ -123,6 +135,7 @@ export async function gerarCarrossel(input: {
   tema: string;
   data: string; // YYYY-MM-DD
   nSlides?: number;
+  mosaico?: boolean; // capa em Mosaico de fotos reais (em vez da capa padrão)
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
@@ -155,8 +168,11 @@ export async function gerarCarrossel(input: {
       status: "a_postar",
     },
   });
+  // Capa em Mosaico (opcional): troca a capa pelas 4 fotos reais ANTES de preencher
+  // as fotos dos demais slides (assim a capa-mosaico não recebe foto única).
+  const slidesBase = input.mosaico ? await aplicarMosaicoCapa(marca, gerado.slides) : gerado.slides;
   // Gera foto de IA pra cada slide. Se alguma falhar, aquele slide fica em cor sólida.
-  const slidesFinais = await comFotosDeIA(marca, criado.id, gerado.slides);
+  const slidesFinais = await comFotosDeIA(marca, criado.id, slidesBase);
   const slides = JSON.stringify(slidesFinais.map((_, i) => `/api/slide/${criado.id}/${i + 1}`));
   await prisma.conteudo.update({
     where: { id: criado.id },
@@ -227,6 +243,13 @@ export async function regerarCarrossel(id: string) {
     }
   })();
 
+  // Se a capa atual já era um Mosaico, mantém a capa em mosaico ao regerar.
+  let eraMosaico = false;
+  try {
+    const arr = JSON.parse(atual.slidesTexto || "[]") as SlideTexto[];
+    eraMosaico = arr[0]?.tipo === "mosaico";
+  } catch {}
+
   let gerado: Gerado;
   try {
     gerado = await gerarConteudo(atual.marca, atual.tema, nSlides);
@@ -234,7 +257,8 @@ export async function regerarCarrossel(id: string) {
     console.error("Erro ao regerar:", e);
     return { ok: false as const, erro: "Não consegui regerar agora." };
   }
-  const slidesFinais = await comFotosDeIA(atual.marca, id, gerado.slides);
+  const slidesBase = eraMosaico ? await aplicarMosaicoCapa(atual.marca, gerado.slides) : gerado.slides;
+  const slidesFinais = await comFotosDeIA(atual.marca, id, slidesBase);
   const slides = JSON.stringify(slidesFinais.map((_, i) => `/api/slide/${id}/${i + 1}`));
   await prisma.conteudo.update({
     where: { id },

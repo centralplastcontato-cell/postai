@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string } = {};
+  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[] } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -60,6 +60,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (p.template === "divulgacao") {
     return new ImageResponse(
       LayoutDivulgacao({ ...base, diferenciais: extra.diferenciais, corFundo: extra.corFundo }),
+      { width: 1080, height: 1350, fonts, headers: CACHE }
+    );
+  }
+
+  if (p.template === "mosaico") {
+    return new ImageResponse(
+      LayoutMosaico({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, fotos: extra.fotos }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
