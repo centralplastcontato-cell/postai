@@ -5,6 +5,11 @@ import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, t
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+// Cache forte: as URLs no painel levam ?v=<hash do conteúdo>, então a arte já
+// renderizada vem do cache (CDN/navegador) e o ?v= troca quando o conteúdo muda.
+const CACHE = { "cache-control": "public, max-age=31536000, immutable" };
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -16,7 +21,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!p) {
     return new ImageResponse(
       <div style={{ width: "1080px", height: "1350px", display: "flex", backgroundColor: "#2196F3" }} />,
-      { width: 1080, height: 1350, fonts }
+      { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
 
@@ -41,27 +46,27 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (p.template === "promocao") {
     return new ImageResponse(
       LayoutPromocao({ ...base, oferta: extra.oferta, validade: extra.validade, inclui: extra.inclui, regras: extra.regras, corFundo: extra.corFundo }),
-      { width: 1080, height: 1350, fonts }
+      { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
 
   if (p.template === "data-comemorativa") {
     return new ImageResponse(
       LayoutDataComemorativa({ ...base, selo: extra.selo, corFundo: extra.corFundo, imagemUrl: p.imagemUrl || undefined }),
-      { width: 1080, height: 1350, fonts }
+      { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
 
   if (p.template === "divulgacao") {
     return new ImageResponse(
       LayoutDivulgacao({ ...base, diferenciais: extra.diferenciais, corFundo: extra.corFundo }),
-      { width: 1080, height: 1350, fonts }
+      { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
 
   // dica e templates legados: foto de IA (ou cor sólida se ainda não tem foto)
   return new ImageResponse(
     LayoutFoto({ ...base, imagemUrl: p.imagemUrl || undefined }),
-    { width: 1080, height: 1350, fonts }
+    { width: 1080, height: 1350, fonts, headers: CACHE }
   );
 }

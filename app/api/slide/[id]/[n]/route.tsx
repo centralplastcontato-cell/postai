@@ -5,6 +5,12 @@ import { LayoutAnivCapa, LayoutAnivCard } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+// Cache forte: as URLs no painel levam ?v=<hash do conteúdo>, então uma arte já
+// renderizada é servida do cache (CDN/navegador) — instantânea ao reabrir — e o
+// ?v= troca sozinho quando o conteúdo muda.
+const CACHE = { "cache-control": "public, max-age=31536000, immutable" };
 
 type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string };
 
@@ -17,7 +23,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
   let cor = "#7C3AED";
   let fundo = "#0E0E0E";
   let marcaTexto = "POSTAÍ";
-  let logoUrl = "";
   let site = "";
   let telefone = "";
   let paleta: string[] = [];
@@ -28,7 +33,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       cor = c.marca.corPrimaria || cor;
       fundo = c.marca.corFundo || fundo;
       marcaTexto = (c.marca.logoTexto || c.marca.nome).toUpperCase();
-      logoUrl = c.marca.logoUrl || "";
       site = c.marca.site || "";
       telefone = c.marca.telefone || "";
       paleta = paletaDaMarca(c.marca.paleta, c.marca.corPrimaria);
@@ -46,7 +50,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       slide.tipo === "aniv-capa"
         ? LayoutAnivCapa({ ...dados, textoApoio: slide.texto })
         : LayoutAnivCard({ ...dados, nome: slide.titulo, idade: slide.texto, fotoUrl: slide.imagemUrl });
-    return new ImageResponse(el, { width: 1080, height: 1350, fonts });
+    return new ImageResponse(el, { width: 1080, height: 1350, fonts, headers: CACHE });
   }
 
   const tipo = slide.tipo ?? "conteudo";
@@ -56,10 +60,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
   const CINZA = "#C9C9C9";
 
   // Faixa da marca: logo (se houver) ou o texto. `claro` = sobre fundo colorido.
+  // Usa logoSrc (servido via /api/marca-logo) — o logoUrl cru é base64 e não
+  // renderiza no next/og (por isso o logo não aparecia no carrossel).
   const marcaEl = (claro: boolean) =>
-    logoUrl ? (
+    logoSrc ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={logoUrl} height={72} style={{ height: "72px", width: "auto", objectFit: "contain" }} />
+      <img src={logoSrc} width={Math.round(72 * 1.76)} height={72} style={{ objectFit: "contain" }} />
     ) : (
       <span style={{ fontSize: 34, fontWeight: 700, letterSpacing: 2, color: claro ? "#ffffff" : cor }}>{marcaTexto}</span>
     );
@@ -103,7 +109,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
           </div>
         </div>
       ),
-      { width: 1080, height: 1350 }
+      { width: 1080, height: 1350, headers: CACHE }
     );
   }
 
@@ -126,6 +132,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
         </div>
       </div>
     ),
-    { width: 1080, height: 1350 }
+    { width: 1080, height: 1350, headers: CACHE }
   );
 }

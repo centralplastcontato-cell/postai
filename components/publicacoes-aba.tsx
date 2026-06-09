@@ -17,6 +17,17 @@ import { ConfirmDialog } from "./confirm-dialog";
 
 type Confirmacao = { titulo: string; descricao?: string; textoConfirmar: string; acao: () => void };
 
+// Modelos prontos de Divulgação/Institucional (clique preenche Assunto + Diferenciais).
+// Tom do Castelo da Diversão (buffet infantil) — o dono ajusta o que quiser.
+const MODELOS_DIVULGACAO: { rotulo: string; assunto: string; diferenciais: string[] }[] = [
+  { rotulo: "🏰 Experiência completa", assunto: "a festa dos sonhos do seu filho", diferenciais: ["Monitores treinados", "Buffet completo e fresquinho", "Brinquedos pra toda idade", "Ambiente seguro e limpo"] },
+  { rotulo: "🛡️ Segurança", assunto: "diversão com segurança pra você relaxar", diferenciais: ["Equipe atenta o tempo todo", "Espaço climatizado", "Brinquedos higienizados", "Área confortável pros pais"] },
+  { rotulo: "😌 Tudo incluso", assunto: "você comemora, a gente cuida de tudo", diferenciais: ["Decoração temática inclusa", "Cardápio que as crianças amam", "Som e animação", "Limpeza por nossa conta"] },
+  { rotulo: "✨ Memórias", assunto: "momentos que viram lembrança pra vida toda", diferenciais: ["Recreação animada", "Atendimento caloroso", "Festa do tamanho do seu sonho", "Sorriso garantido da criançada"] },
+  { rotulo: "⭐ Confiança", assunto: "famílias que confiam e sempre voltam", diferenciais: ["Experiência comprovada", "Famílias que voltam sempre", "Equipe apaixonada pelo que faz", "Cada detalhe pensado com carinho"] },
+  { rotulo: "🎨 Personalização", assunto: "cada festa do jeitinho que vocês sonham", diferenciais: ["Temas personalizados", "Pacotes flexíveis", "Do intimista ao grande", "Orçamento sem compromisso"] },
+];
+
 export type PublicacaoView = {
   id: string;
   slug: string;
@@ -257,6 +268,19 @@ export function PublicacoesAba({
 
         {template === "divulgacao" && (
           <div className="mb-3">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique pra preencher)</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {MODELOS_DIVULGACAO.map((m) => (
+                <button
+                  key={m.rotulo}
+                  type="button"
+                  onClick={() => { setTema(m.assunto); setDiferenciais(m.diferenciais.join("\n")); }}
+                  className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white"
+                >
+                  {m.rotulo}
+                </button>
+              ))}
+            </div>
             <label className="text-xs text-muted">
               Diferenciais <span className="text-muted/70">(um por linha — viram a lista de “por que escolher”, máx. 4)</span>
               <textarea value={diferenciais} onChange={(e) => setDiferenciais(e.target.value)} rows={4} placeholder={"Ex:\nMonitores treinados\nBuffet completo\nDecoração temática"} className="input-base resize-y" />
