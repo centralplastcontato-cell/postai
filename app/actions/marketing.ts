@@ -105,14 +105,15 @@ async function gerarFotoFundo(marca: Marca, descricao: string, ref: string): Pro
   }
 }
 
-// Preenche a foto de cada slide: prioriza FOTO REAL do banco da marca; só cai na
-// IA (fundo decorativo abstrato) quando o banco está vazio. Roda em paralelo.
+// Preenche a foto de cada slide: prioriza FOTO REAL do banco da marca (em rodízio,
+// sem repetir na mesma leva); só cai na IA (fundo decorativo abstrato) quando o
+// banco está vazio. O sorteio do banco é SEQUENCIAL (pro contador de rodízio
+// equilibrar entre os slides); a geração de IA, que é lenta, roda em paralelo.
 async function comFotosDeIA(marca: Marca, id: string, slides: SlideTexto[]): Promise<SlideTexto[]> {
+  const doBanco: (string | null)[] = [];
+  for (let i = 0; i < slides.length; i++) doBanco.push(await sortearImagemBanco(marca.id));
   const fotos = await Promise.all(
-    slides.map(async (s, i) => {
-      const real = await sortearImagemBanco(marca.id);
-      return real || (await gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`));
-    })
+    slides.map(async (s, i) => doBanco[i] || (await gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`))),
   );
   return slides.map((s, i) => (fotos[i] ? { ...s, imagemUrl: fotos[i]! } : s));
 }

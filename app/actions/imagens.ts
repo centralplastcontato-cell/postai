@@ -24,16 +24,27 @@ export async function removerImagemMarca(id: string) {
   return { ok: true as const };
 }
 
-// Sorteia uma foto REAL do banco da marca. Tenta a categoria pedida; se ela não
-// tiver fotos, cai pro banco inteiro. Devolve a URL ou null (banco vazio).
+// Escolhe uma foto REAL do banco da marca em RODÍZIO: pega sempre a MENOS usada
+// (desempate pela mais antiga), e incrementa o contador. Assim percorre todas as
+// fotos uma vez antes de repetir qualquer uma — nada de cair sempre na mesma.
+// Tenta a categoria pedida; se ela não tiver fotos, cai pro banco inteiro.
 export async function sortearImagemBanco(marcaId: string, categoria?: string): Promise<string | null> {
   const where = categoria && categoria !== "geral" ? { marcaId, categoria } : { marcaId };
-  let imgs = await prisma.imagemMarca.findMany({ where, select: { url: true } });
-  if (imgs.length === 0 && categoria) {
-    imgs = await prisma.imagemMarca.findMany({ where: { marcaId }, select: { url: true } });
+  let img = await prisma.imagemMarca.findFirst({
+    where,
+    orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
+    select: { id: true, url: true },
+  });
+  if (!img && categoria) {
+    img = await prisma.imagemMarca.findFirst({
+      where: { marcaId },
+      orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
+      select: { id: true, url: true },
+    });
   }
-  if (imgs.length === 0) return null;
-  return imgs[Math.floor(Math.random() * imgs.length)].url;
+  if (!img) return null;
+  await prisma.imagemMarca.update({ where: { id: img.id }, data: { usos: { increment: 1 } } });
+  return img.url;
 }
 
 // Versão server-action da anterior (pra o botão "🎲 Foto do banco" no painel).

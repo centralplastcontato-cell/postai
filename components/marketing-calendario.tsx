@@ -17,6 +17,21 @@ import {
 } from "@/app/actions/marketing";
 import { ConfirmDialog } from "./confirm-dialog";
 
+// Temas prontos de carrossel (clique preenche o campo Tema). Ângulos que funcionam
+// pro público de um buffet infantil — o dono ajusta ou pede "Sugerir temas com IA".
+const MODELOS_CARROSSEL: { rotulo: string; tema: string }[] = [
+  { rotulo: "🏰 Conheça o espaço", tema: "um tour pelo nosso espaço e tudo que ele oferece pra festa" },
+  { rotulo: "🎠 Nossos brinquedos", tema: "os brinquedos e atrações que fazem a alegria da criançada" },
+  { rotulo: "📋 Festa perfeita", tema: "passo a passo pra organizar a festa infantil perfeita" },
+  { rotulo: "🍰 O que está incluso", tema: "tudo o que está incluso no nosso pacote de festa" },
+  { rotulo: "❓ Dúvidas frequentes", tema: "respostas pras dúvidas mais comuns de quem vai contratar a festa" },
+  { rotulo: "🎈 Ideias de tema", tema: "ideias de temas criativos para a festa do seu filho" },
+  { rotulo: "😌 Festa sem stress", tema: "como ter uma festa tranquila enquanto a gente cuida de tudo" },
+  { rotulo: "🛡️ Segurança", tema: "os cuidados de segurança e higiene com as crianças" },
+  { rotulo: "📅 Como reservar", tema: "como reservar a sua data com a gente, do orçamento à festa" },
+  { rotulo: "⭐ Por que escolher", tema: "por que tantas famílias escolhem e voltam a comemorar com a gente" },
+];
+
 export type Post = {
   id: string;
   slug: string;
@@ -232,7 +247,22 @@ export function MarketingCalendario({
 
       {/* Gerar carrossel */}
       <div className="mb-8 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <p className="mb-3 text-sm font-semibold text-white">Gerar carrossel com IA</p>
+        <p className="mb-1 text-sm font-semibold text-white">Gerar carrossel com IA</p>
+        <div className="mb-3">
+          <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Temas prontos (clique pra preencher)</p>
+          <div className="flex flex-wrap gap-2">
+            {MODELOS_CARROSSEL.map((m) => (
+              <button
+                key={m.rotulo}
+                type="button"
+                onClick={() => setTema(m.tema)}
+                className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white"
+              >
+                {m.rotulo}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <label className="flex-1 text-xs text-muted">
             Tema

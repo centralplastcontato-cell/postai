@@ -10,9 +10,11 @@ import {
   gerarImagemPublicacao,
   definirImagemPublicacao,
   removerImagemPublicacao,
+  sugerirDiferenciais,
 } from "@/app/actions/feed";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
+import { CATEGORIAS, CATEGORIA_LABEL } from "@/lib/categorias-imagem";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
 
@@ -27,19 +29,28 @@ const MODELOS_DIVULGACAO: { rotulo: string; assunto: string; diferenciais: strin
   { rotulo: "✨ Memórias", assunto: "momentos que viram lembrança pra vida toda", diferenciais: ["Recreação animada", "Atendimento caloroso", "Festa do tamanho do seu sonho", "Sorriso garantido da criançada"] },
   { rotulo: "⭐ Confiança", assunto: "famílias que confiam e sempre voltam", diferenciais: ["Experiência comprovada", "Famílias que voltam sempre", "Equipe apaixonada pelo que faz", "Cada detalhe pensado com carinho"] },
   { rotulo: "🎨 Personalização", assunto: "cada festa do jeitinho que vocês sonham", diferenciais: ["Temas personalizados", "Pacotes flexíveis", "Do intimista ao grande", "Orçamento sem compromisso"] },
+  { rotulo: "🏰 Estrutura completa", assunto: "uma estrutura pensada nos mínimos detalhes", diferenciais: ["Espaço amplo e climatizado", "Brinquedos pra toda idade", "Área exclusiva pros pais", "Estacionamento fácil"] },
+  { rotulo: "🍔 Buffet que agrada", assunto: "comida boa que criança e adulto aprovam", diferenciais: ["Cardápio variado", "Salgados fresquinhos", "Opções pros adultos", "Bolo e doces inclusos"] },
+  { rotulo: "💸 Custo-benefício", assunto: "festa completa que cabe no seu bolso", diferenciais: ["Pacotes que cabem no bolso", "Tudo incluso, sem surpresa", "Parcelamento facilitado", "Você economiza tempo"] },
+  { rotulo: "🤝 Atendimento", assunto: "um atendimento que cuida de cada detalhe", diferenciais: ["Equipe atenciosa", "Resposta rápida", "Acompanhamento do início ao fim", "Você relaxa, a gente resolve"] },
+  { rotulo: "🧼 Higiene", assunto: "limpeza e higiene em primeiro lugar", diferenciais: ["Brinquedos higienizados", "Ambiente sempre limpo", "Equipe treinada", "Segurança pra criançada"] },
+  { rotulo: "🎉 Diversão sem fim", assunto: "diversão garantida do começo ao fim", diferenciais: ["Recreação animada", "Brinquedos incríveis", "Monitores dedicados", "Sorriso garantido"] },
 ];
 
-// Modelos prontos de Dica/Conteúdo (clique preenche o Assunto; a IA escreve a dica).
+// Modelos prontos de Dica/Conteúdo (clique preenche o Assunto E a categoria da foto;
+// a IA escreve a dica e a foto vem da categoria certa do banco — ex: cardápio → comida).
 // Temas úteis pro público de um buffet infantil — o dono ajusta o que quiser.
-const MODELOS_DICA: { rotulo: string; assunto: string }[] = [
-  { rotulo: "🎂 Planejar a festa", assunto: "como organizar a festa infantil com antecedência e sem stress" },
-  { rotulo: "📋 Checklist", assunto: "o que não pode faltar numa festa infantil de sucesso" },
-  { rotulo: "🎈 Escolher o tema", assunto: "como escolher o tema da festa do jeito que a criança ama" },
-  { rotulo: "👶 Por idade", assunto: "brincadeiras e atrações ideais para cada idade na festa" },
-  { rotulo: "🍰 Cardápio", assunto: "como montar um cardápio que agrada crianças e adultos" },
-  { rotulo: "🎁 Lembrancinhas", assunto: "ideias de lembrancinhas que encantam a criançada" },
-  { rotulo: "😌 Buffet x casa", assunto: "vantagens de comemorar no buffet em vez de fazer em casa" },
-  { rotulo: "📅 Melhor data", assunto: "como escolher o melhor dia e horário para a festa" },
+const MODELOS_DICA: { rotulo: string; assunto: string; categoria: string }[] = [
+  { rotulo: "🎠 Brinquedos", assunto: "as atrações e brinquedos que fazem a festa ser inesquecível", categoria: "brinquedos" },
+  { rotulo: "👶 Por idade", assunto: "brincadeiras e atrações ideais para cada idade na festa", categoria: "brinquedos" },
+  { rotulo: "🍰 Cardápio", assunto: "como montar um cardápio que agrada crianças e adultos", categoria: "comida" },
+  { rotulo: "🏰 Conheça o espaço", assunto: "o que torna o nosso espaço perfeito para a festa do seu filho", categoria: "espaco" },
+  { rotulo: "🎈 Escolher o tema", assunto: "como escolher o tema da festa do jeito que a criança ama", categoria: "festa" },
+  { rotulo: "🎂 Planejar a festa", assunto: "como organizar a festa infantil com antecedência e sem stress", categoria: "festa" },
+  { rotulo: "📋 Checklist", assunto: "o que não pode faltar numa festa infantil de sucesso", categoria: "festa" },
+  { rotulo: "🎁 Lembrancinhas", assunto: "ideias de lembrancinhas que encantam a criançada", categoria: "festa" },
+  { rotulo: "😌 Buffet x casa", assunto: "vantagens de comemorar no buffet em vez de fazer em casa", categoria: "espaco" },
+  { rotulo: "📅 Melhor data", assunto: "como escolher o melhor dia e horário para a festa", categoria: "geral" },
 ];
 
 export type PublicacaoView = {
@@ -54,6 +65,7 @@ export type PublicacaoView = {
   imagemUrl: string | null;
   status: string;
   tema: string | null;
+  categoria?: string | null; // categoria do banco pra foto (template dica)
 };
 
 function hashCurto(s: string): string {
@@ -93,6 +105,8 @@ export function PublicacoesAba({
   const [inclui, setInclui] = useState("");
   const [regras, setRegras] = useState("");
   const [diferenciais, setDiferenciais] = useState("");
+  const [categoriaFoto, setCategoriaFoto] = useState("geral");
+  const [sugerindo, setSugerindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
@@ -113,7 +127,7 @@ export function PublicacoesAba({
     startTransition(async () => {
       const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: template === "dica" ? categoriaFoto : undefined });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -121,10 +135,22 @@ export function PublicacoesAba({
         setInclui("");
         setRegras("");
         setDiferenciais("");
+        setCategoriaFoto("geral");
         onGerado?.();
         router.refresh();
       } else setErro(r.erro);
     });
+  }
+  async function handleVariarDiferenciais() {
+    setErro(null);
+    setSugerindo(true);
+    try {
+      const r = await sugerirDiferenciais(marcaId, tema);
+      if (r.ok) setDiferenciais(r.diferenciais.join("\n"));
+      else setErro(r.erro);
+    } finally {
+      setSugerindo(false);
+    }
   }
   function handleRegerar(id: string) {
     setErro(null);
@@ -176,11 +202,11 @@ export function PublicacoesAba({
       setProc(null);
     });
   }
-  function handleBanco(id: string) {
+  function handleBanco(id: string, categoria?: string) {
     setErro(null);
     setProc(id);
     startTransition(async () => {
-      const r = await sortearImagemBancoAction(marcaId);
+      const r = await sortearImagemBancoAction(marcaId, categoria);
       if (!r.ok) {
         setErro(r.erro);
         setProc(null);
@@ -312,28 +338,45 @@ export function PublicacoesAba({
               ))}
             </div>
             <label className="text-xs text-muted">
-              Diferenciais <span className="text-muted/70">(um por linha — viram a lista de “por que escolher”, máx. 4)</span>
+              <span className="flex items-center justify-between gap-2">
+                <span>Diferenciais <span className="text-muted/70">(um por linha — viram a lista de “por que escolher”, máx. 4)</span></span>
+                <button
+                  type="button"
+                  onClick={handleVariarDiferenciais}
+                  disabled={sugerindo}
+                  title="Deixa a IA escrever/variar os diferenciais a partir do assunto escolhido"
+                  className="shrink-0 rounded-md border border-linha px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40"
+                >
+                  {sugerindo ? "Gerando…" : "🔄 Variar com IA"}
+                </button>
+              </span>
               <textarea value={diferenciais} onChange={(e) => setDiferenciais(e.target.value)} rows={4} placeholder={"Ex:\nMonitores treinados\nBuffet completo\nDecoração temática"} className="input-base resize-y" />
             </label>
-            <p className="mt-1 text-[11px] text-amber-400/90">⚠ Se deixar vazio, a IA sugere os diferenciais — confira antes de postar.</p>
+            <p className="mt-1 text-[11px] text-amber-400/90">⚠ Se deixar vazio, a IA sugere os diferenciais — confira antes de postar. Use “🔄 Variar com IA” pra gerar versões novas do assunto escolhido.</p>
           </div>
         )}
 
         {template === "dica" && (
           <div className="mb-3">
-            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique pra preencher o assunto)</p>
-            <div className="flex flex-wrap gap-2">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique preenche o assunto + a foto certa)</p>
+            <div className="mb-3 flex flex-wrap gap-2">
               {MODELOS_DICA.map((m) => (
                 <button
                   key={m.rotulo}
                   type="button"
-                  onClick={() => setTema(m.assunto)}
+                  onClick={() => { setTema(m.assunto); setCategoriaFoto(m.categoria); }}
                   className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white"
                 >
                   {m.rotulo}
                 </button>
               ))}
             </div>
+            <label className="text-xs text-muted">
+              Foto do banco <span className="text-muted/70">(de qual categoria puxar a imagem real)</span>
+              <select value={categoriaFoto} onChange={(e) => setCategoriaFoto(e.target.value)} className="input-base">
+                {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
+              </select>
+            </label>
           </div>
         )}
 
@@ -386,7 +429,7 @@ export function PublicacoesAba({
                   <button onClick={() => handleRegerar(p.id)} disabled={ocupado} title="Regerar texto" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻ Regerar</button>
                   <a href={arte} download={`feed-${p.slug}.png`} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">⬇ Baixar</a>
                   <button onClick={() => copiar(p)} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">{copiadoId === p.id ? "✓ Copiado" : "Copiar texto"}</button>
-                  <button onClick={() => handleBanco(p.id)} disabled={ocupado} title="Sortear foto real do seu banco de imagens" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲 Banco</button>
+                  <button onClick={() => handleBanco(p.id, p.categoria ?? undefined)} disabled={ocupado} title="Sortear foto real do seu banco de imagens" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲 Banco</button>
                   <button onClick={() => handleGerarImagem(p.id)} disabled={ocupado} title="Fundo decorativo abstrato com IA (não mostra ambiente real)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🖼️ IA</button>
                   <label className="cursor-pointer rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
                     📤 Foto

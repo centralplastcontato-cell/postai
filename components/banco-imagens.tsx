@@ -3,17 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { adicionarImagemMarca, removerImagemMarca } from "@/app/actions/imagens";
-import { CATEGORIAS } from "@/lib/categorias-imagem";
+import { CATEGORIAS, CATEGORIA_LABEL as ROTULO } from "@/lib/categorias-imagem";
 
 export type ImagemView = { id: string; url: string; categoria: string };
-
-const ROTULO: Record<string, string> = {
-  espaco: "🏰 Espaço",
-  brinquedos: "🎠 Brinquedos",
-  festa: "🎉 Festa",
-  comida: "🍰 Comida",
-  geral: "📷 Geral",
-};
 
 // 🏰 Banco de fotos REAIS do negócio. O dono sobe fotos do espaço/brinquedos/festas
 // e os posts usam elas no lugar de imagens de IA — nada de espaço "fake".
@@ -86,7 +78,7 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
             <div key={img.id} className="group relative overflow-hidden rounded-lg border border-linha">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img.url} alt={img.categoria} className="aspect-square w-full object-cover" />
-              <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{ROTULO[img.categoria] ?? img.categoria}</span>
+              <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{ROTULO[img.categoria as keyof typeof ROTULO] ?? img.categoria}</span>
               <button
                 type="button"
                 onClick={() => remover(img.id)}

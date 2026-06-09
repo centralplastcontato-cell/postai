@@ -18,7 +18,7 @@ type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: 
 
 // Monta o JSON do campo `extra` conforme o template (dados específicos da arte).
 // `travas` são valores digitados pelo usuário — usados exatos e preservados no regerar.
-function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, travas?: Travas): string | null {
+function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, travas?: Travas, categoria?: string): string | null {
   if (template === "promocao") {
     const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
     const oferta = travas?.oferta || g.oferta?.trim() || "";
@@ -52,6 +52,12 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
       // Mantém fixos os diferenciais digitados ao regerar o texto.
       diferenciaisTravados: manuais.length ? manuais : undefined,
     });
+  }
+  if (template === "dica") {
+    // Guarda a categoria do banco escolhida pra foto, pra o botão "🎲 Banco" sortear
+    // da mesma categoria depois (ex: dica de cardápio → foto de comida).
+    const cat = categoria && categoria !== "geral" ? categoria : "";
+    return cat ? JSON.stringify({ categoria: cat }) : null;
   }
   return null;
 }
@@ -196,6 +202,7 @@ export async function gerarPublicacao(input: {
   inclui?: string[];
   regras?: string;
   diferenciais?: string[];
+  categoria?: string; // categoria do banco pra puxar a foto (templates com foto)
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
@@ -236,15 +243,16 @@ export async function gerarPublicacao(input: {
       texto: gerado.texto || "",
       legenda: gerado.legenda || "",
       hashtags: gerado.hashtags || "",
-      extra: montarExtra(marca, template, gerado, Date.now(), travas),
+      extra: montarExtra(marca, template, gerado, Date.now(), travas, input.categoria),
       tema: input.tema?.trim() || null,
       status: "a_postar",
     },
   });
-  // Templates com foto: prioriza FOTO REAL do banco da marca; só se o banco estiver
-  // vazio é que a IA gera um fundo decorativo abstrato. (Promoção/Divulgação usam fundo colorido.)
+  // Templates com foto: prioriza FOTO REAL do banco da marca (da categoria pedida,
+  // ex: dica de cardápio → foto de comida); só se o banco estiver vazio é que a IA
+  // gera um fundo decorativo abstrato. (Promoção/Divulgação usam fundo colorido.)
   if (USA_FOTO[template]) {
-    const real = await sortearImagemBanco(marca.id);
+    const real = await sortearImagemBanco(marca.id, input.categoria);
     if (real) await definirImagemPublicacao({ id: criado.id, url: real }).catch(() => {});
     else await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
   }
@@ -260,6 +268,7 @@ export async function regerarPublicacao(id: string) {
 
   // Recupera o que o usuário havia fixado pra manter a oferta/validade no regerar.
   let travas: Travas = {};
+  let categoria: string | undefined;
   try {
     const ex = JSON.parse(p.extra || "{}");
     travas = {
@@ -269,6 +278,7 @@ export async function regerarPublicacao(id: string) {
       regras: ex.regras || undefined,
       diferenciais: Array.isArray(ex.diferenciaisTravados) ? ex.diferenciaisTravados : [],
     };
+    categoria = typeof ex.categoria === "string" ? ex.categoria : undefined;
   } catch {}
 
   let gerado: Gerado;
@@ -286,12 +296,48 @@ export async function regerarPublicacao(id: string) {
       texto: gerado.texto || "",
       legenda: gerado.legenda || "",
       hashtags: gerado.hashtags || "",
-      extra: montarExtra(p.marca, template, gerado, seed, travas),
+      extra: montarExtra(p.marca, template, gerado, seed, travas, categoria),
       status: "a_postar",
     },
   });
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const };
+}
+
+// Sugere 3-4 diferenciais ("por que escolher") via IA, a partir do assunto/modelo
+// escolhido — pra preencher/variar o campo ANTES de gerar a publicação (template
+// Divulgação). Cada clique traz uma versão nova (temperatura alta).
+export async function sugerirDiferenciais(marcaId: string, tema?: string) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  const angulo = tema?.trim() ? `Foco/assunto: "${tema.trim()}".` : "Escolha um ângulo de valor novo e relevante.";
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        response_format: { type: "json_object" },
+        temperature: 0.95,
+        messages: [
+          { role: "system", content: sistema(marca, "divulgacao") },
+          { role: "user", content: `Liste de 3 a 4 DIFERENCIAIS ("por que escolher a gente") BEM curtos (2 a 4 palavras cada, ex: "Monitores treinados"). ${angulo} Traga uma combinação fresca, evite o lugar-comum. Responda só com JSON: {"diferenciais": ["...", "..."]}` },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+    const data = await resp.json();
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { diferenciais?: string[] };
+    const lista = (j.diferenciais ?? []).map((s) => s.trim()).filter(Boolean).slice(0, 4);
+    if (lista.length === 0) throw new Error("Resposta vazia.");
+    return { ok: true as const, diferenciais: lista };
+  } catch (e) {
+    console.error("Erro ao sugerir diferenciais:", e);
+    return { ok: false as const, erro: "Não consegui sugerir agora. Confira a chave da OpenAI." };
+  }
 }
 
 export async function excluirPublicacao(id: string) {

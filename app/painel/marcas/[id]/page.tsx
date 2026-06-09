@@ -66,6 +66,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     imagemUrl: p.imagemUrl,
     status: p.status,
     tema: p.tema,
+    categoria: (() => { try { return JSON.parse(p.extra || "{}").categoria ?? null; } catch { return null; } })(),
   }));
 
   const imgs = await prisma.imagemMarca.findMany({
