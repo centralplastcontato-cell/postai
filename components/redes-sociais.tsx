@@ -4,7 +4,11 @@ import { useState } from "react";
 import { MarketingCalendario, type Post } from "./marketing-calendario";
 import { PublicacoesAba, type PublicacaoView } from "./publicacoes-aba";
 import { CalendarioRedes, type SelecaoRede } from "./calendario-redes";
-import { dataComemorativaDe } from "@/lib/datas-comemorativas";
+import { AniversariantesForm } from "./aniversariantes-form";
+
+function parseDias(s: string): number[] {
+  return s.split(",").map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
+}
 
 export function RedesSociais({
   marcaId,
@@ -23,16 +27,23 @@ export function RedesSociais({
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
   const [dataAlvo, setDataAlvo] = useState<string | null>(null);
 
+  const planoCar = parseDias(diasCarrossel);
+  const planoFeed = parseDias(diasFeed);
+
   function aoSelecionar(s: SelecaoRede) {
     setSelecao(s);
     setSubaba(s.tipo === "carrossel" ? "carrosseis" : "publicacoes");
   }
 
-  // Dia comemorativo é coisa de publicação (saudação em imagem única), não de
-  // carrossel: ao escolher um, já leva pra aba Publicações pra mostrar a sugestão.
+  // Empurrão pela PROGRAMAÇÃO da agenda (Configurações): ao escolher um dia, leva
+  // pra aba do tipo daquele dia — carrossel (laranja) ou feed/publicação (azul) —
+  // pra confirmar o que é pra criar ali. Dia sem programação não empurra.
   function aoSelecionarDia(iso: string) {
     setDataAlvo(iso);
-    if (dataComemorativaDe(iso)) setSubaba("publicacoes");
+    const [y, m, d] = iso.split("-").map(Number);
+    const dow = new Date(y, m - 1, d).getDay();
+    if (planoCar.includes(dow)) setSubaba("carrosseis");
+    else if (planoFeed.includes(dow)) setSubaba("publicacoes");
   }
 
   const cls = (ativa: boolean, ativoCor = "bg-vermelho") =>
@@ -59,14 +70,17 @@ export function RedesSociais({
       </div>
 
       {subaba === "carrosseis" && (
-        <MarketingCalendario
-          marcaId={marcaId}
-          posts={posts}
-          selId={selecao?.tipo === "carrossel" ? selecao.id : null}
-          onSelId={(id) => setSelecao(id ? { tipo: "carrossel", id } : null)}
-          dataAlvo={dataAlvo}
-          onGerado={() => setDataAlvo(null)}
-        />
+        <>
+          <MarketingCalendario
+            marcaId={marcaId}
+            posts={posts}
+            selId={selecao?.tipo === "carrossel" ? selecao.id : null}
+            onSelId={(id) => setSelecao(id ? { tipo: "carrossel", id } : null)}
+            dataAlvo={dataAlvo}
+            onGerado={() => setDataAlvo(null)}
+          />
+          <AniversariantesForm marcaId={marcaId} dataAlvo={dataAlvo} onGerado={() => setDataAlvo(null)} />
+        </>
       )}
 
       {subaba === "publicacoes" && (

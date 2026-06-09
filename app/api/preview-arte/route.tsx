@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, LayoutAnivCapa, LayoutAnivCard, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,6 +45,20 @@ export async function GET(req: Request) {
       ...base,
       titulo: montarTituloColorido(tituloParam || "A festa dos sonhos começa aqui", paleta),
       diferenciais: ["Monitores treinados", "Buffet completo", "Decoração temática", "Espaço seguro"],
+    });
+  } else if (template === "aniv-capa") {
+    elemento = LayoutAnivCapa({
+      ...base,
+      titulo: montarTituloColorido("Aniversariantes da Semana", paleta),
+      textoApoio: "Semana de 08 a 14 de junho",
+    });
+  } else if (template === "aniv") {
+    elemento = LayoutAnivCard({
+      ...base,
+      titulo: [],
+      nome: tituloParam || "Murilo",
+      idade: "8 aninhos",
+      fotoUrl: imagemUrl || "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=800&q=80",
     });
   } else {
     elemento = LayoutPromocao({

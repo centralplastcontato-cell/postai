@@ -1,14 +1,17 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
+import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
+import { LayoutAnivCapa, LayoutAnivCard } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string };
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: string }> }) {
   const { id, n } = await ctx.params;
   const idx = Math.max(1, parseInt(n, 10) || 1) - 1;
+  const origin = new URL(req.url).origin;
 
   let slide: Slide = { tipo: "capa", titulo: "Postaí", texto: "" };
   let cor = "#7C3AED";
@@ -17,6 +20,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
   let logoUrl = "";
   let site = "";
   let telefone = "";
+  let paleta: string[] = [];
+  let logoSrc = "";
   try {
     const c = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
     if (c) {
@@ -26,10 +31,23 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string; n:
       logoUrl = c.marca.logoUrl || "";
       site = c.marca.site || "";
       telefone = c.marca.telefone || "";
+      paleta = paletaDaMarca(c.marca.paleta, c.marca.corPrimaria);
+      logoSrc = c.marca.logoUrl ? logoUrlMarca(origin, c.marca.id) : "";
       const arr = JSON.parse(c.slidesTexto || "[]") as Slide[];
       if (arr[idx]) slide = arr[idx];
     }
   } catch {}
+
+  // Slides festivos (Aniversariantes da Semana): layout colorido com a cara da marca.
+  if (slide.tipo === "aniv-capa" || slide.tipo === "aniv") {
+    const fonts = carregarFontes();
+    const dados = { paleta, logoSrc, site, telefone, titulo: montarTituloColorido(slide.titulo || "Aniversariantes da Semana", paleta) };
+    const el =
+      slide.tipo === "aniv-capa"
+        ? LayoutAnivCapa({ ...dados, textoApoio: slide.texto })
+        : LayoutAnivCard({ ...dados, nome: slide.titulo, idade: slide.texto, fotoUrl: slide.imagemUrl });
+    return new ImageResponse(el, { width: 1080, height: 1350, fonts });
+  }
 
   const tipo = slide.tipo ?? "conteudo";
   const isCapa = tipo === "capa";

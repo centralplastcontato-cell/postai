@@ -10,7 +10,7 @@ import { baseUrl, APP_NAME } from "@/lib/config";
 import type { Marca } from "@prisma/client";
 
 type SlideTexto = {
-  tipo: "capa" | "conteudo" | "cta";
+  tipo: "capa" | "conteudo" | "cta" | "aniv-capa" | "aniv";
   titulo: string;
   texto?: string;
   imagemUrl?: string;
@@ -157,6 +157,54 @@ export async function gerarCarrossel(input: {
     data: { slides, slidesTexto: JSON.stringify(slidesFinais) },
   });
 
+  revalidatePath(`/painel/marcas/${marca.id}`);
+  return { ok: true as const, id: criado.id };
+}
+
+// Carrossel "Aniversariantes da Semana": montado MANUALMENTE a partir das fotos +
+// nomes + idades que o usuário sobe (não é gerado por IA, então não tem "regerar").
+export async function criarAniversariantes(input: {
+  marcaId: string;
+  data: string; // YYYY-MM-DD
+  semana?: string;
+  aniversariantes: { nome: string; idade?: string; fotoUrl: string }[];
+}) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+
+  const lista = (input.aniversariantes || [])
+    .map((a) => ({ nome: (a.nome || "").trim(), idade: (a.idade || "").trim(), fotoUrl: (a.fotoUrl || "").trim() }))
+    .filter((a) => a.nome && a.fotoUrl);
+  if (lista.length === 0) return { ok: false as const, erro: "Adicione pelo menos um aniversariante com foto e nome." };
+
+  const slides: SlideTexto[] = [
+    { tipo: "aniv-capa", titulo: "Aniversariantes da Semana", texto: input.semana?.trim() || undefined },
+    ...lista.map((a): SlideTexto => ({ tipo: "aniv", titulo: a.nome, texto: a.idade || undefined, imagemUrl: a.fotoUrl })),
+  ];
+
+  const nomes = lista.map((a) => a.nome).join(", ");
+  const legenda = `🎉 Parabéns aos aniversariantes da semana! 🎂\n\nUm viva pra: ${nomes}! 🥳\n\nQue esse novo ciclo seja cheio de alegria, sorrisos e muita diversão. Felicidades!\n\nQuer comemorar com a gente? Chama no WhatsApp! 📲`;
+  const hashtags = "#aniversario #aniversariantes #festainfantil #parabens #felizaniversario #buffetinfantil #festa #diversao";
+
+  const data = new Date(`${input.data}T12:00:00-03:00`);
+  const slug = `${marca.slug}-aniversariantes-${Date.now().toString(36).slice(-4)}`;
+  const criado = await prisma.conteudo.create({
+    data: {
+      marcaId: marca.id,
+      slug,
+      data,
+      titulo: "Aniversariantes da Semana",
+      legenda,
+      hashtags,
+      slides: "[]",
+      slidesTexto: JSON.stringify(slides),
+      tema: null, // não foi gerado por IA → não aparece o botão "Regerar"
+      status: "a_postar",
+    },
+  });
+  const urls = JSON.stringify(slides.map((_, i) => `/api/slide/${criado.id}/${i + 1}`));
+  await prisma.conteudo.update({ where: { id: criado.id }, data: { slides: urls } });
   revalidatePath(`/painel/marcas/${marca.id}`);
   return { ok: true as const, id: criado.id };
 }

@@ -277,3 +277,106 @@ export function LayoutDivulgacao(d: DadosArte) {
     </div>
   );
 }
+
+// 🎂 Aniversariantes da Semana — CAPA do carrossel festivo (fundo colorido + confete).
+export function LayoutAnivCapa(d: DadosArte) {
+  const [c1, c2, c3, c4, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[3] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || c4;
+  const logoW = Math.round(96 * 1.76);
+  return (
+    <div
+      style={{
+        width: "1080px",
+        height: "1350px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "space-between",
+        position: "relative",
+        backgroundColor: fundo,
+        backgroundImage: "radial-gradient(circle at 50% 34%, rgba(255,255,255,0.24), rgba(0,0,0,0.16) 72%)",
+        fontFamily: "Baloo",
+        padding: "96px 70px",
+      }}
+    >
+      <Confete cores={[c2, c3, c5, c1]} />
+
+      {d.logoSrc ? (
+        <div style={{ display: "flex" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={d.logoSrc} width={logoW} height={96} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.5))" }} />
+        </div>
+      ) : <div style={{ display: "flex" }} />}
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 104 : 120} />
+        {d.textoApoio ? (
+          <div style={{ display: "flex", marginTop: 28, fontFamily: "Fredoka", fontSize: 42, color: PRETO, backgroundColor: c3, padding: "12px 38px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.22)" }}>
+            {d.textoApoio}
+          </div>
+        ) : null}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", fontFamily: "Fredoka", fontSize: 34, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>
+        {d.site}{d.site ? "   ·   " : ""}arraste →
+      </div>
+    </div>
+  );
+}
+
+// 🎂 Aniversariantes da Semana — CARD de um aniversariante (foto + nome + idade).
+export function LayoutAnivCard(d: DadosArte & { nome?: string; idade?: string; fotoUrl?: string }) {
+  const [c1, c2, c3, c4, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[3] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || c4;
+  const logoW = Math.round(72 * 1.76);
+  return (
+    <div
+      style={{
+        width: "1080px",
+        height: "1350px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        position: "relative",
+        backgroundColor: fundo,
+        backgroundImage: "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.22), rgba(0,0,0,0.16) 72%)",
+        fontFamily: "Baloo",
+        padding: "70px 60px",
+      }}
+    >
+      <Confete cores={[c2, c3, c5, c1]} />
+
+      {d.logoSrc ? (
+        <div style={{ display: "flex" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={d.logoSrc} width={logoW} height={72} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.5))" }} />
+        </div>
+      ) : <div style={{ display: "flex", height: 72 }} />}
+
+      {/* Foto do aniversariante num quadro arredondado com borda colorida */}
+      <div style={{ display: "flex", marginTop: 46, width: 640, height: 640, borderRadius: 50, overflow: "hidden", border: `14px solid ${c3}`, boxShadow: "0 14px 0 rgba(0,0,0,0.18)" }}>
+        {d.fotoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={d.fotoUrl} width={640} height={640} style={{ width: "640px", height: "640px", objectFit: "cover" }} />
+        ) : (
+          <div style={{ display: "flex", width: "640px", height: "640px", backgroundColor: "rgba(0,0,0,0.25)" }} />
+        )}
+      </div>
+
+      {/* Nome */}
+      <div style={{ display: "flex", marginTop: 44, fontFamily: "Fredoka", fontSize: 96, color: BRANCO, textShadow: contorno(), letterSpacing: 1, textAlign: "center" }}>
+        {d.nome}
+      </div>
+
+      {/* Idade (selo) */}
+      {d.idade ? (
+        <div style={{ display: "flex", marginTop: 20, fontFamily: "Fredoka", fontSize: 48, color: PRETO, backgroundColor: c2, padding: "12px 40px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.22)" }}>
+          {d.idade}
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", flexGrow: 1 }} />
+      <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 28, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.5)" }}>{d.site}</div>
+    </div>
+  );
+}
