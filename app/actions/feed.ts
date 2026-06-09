@@ -340,6 +340,47 @@ export async function sugerirDiferenciais(marcaId: string, tema?: string) {
   }
 }
 
+// Sugere uma OFERTA/PROMOÇÃO completa via IA (oferta + validade + itens inclusos +
+// regras), a partir da ocasião/assunto — pra servir de INSPIRAÇÃO ao criar promoções.
+// O dono revisa tudo antes de postar (são só ideias, ele ajusta os números/condições).
+export async function sugerirPromocao(marcaId: string, tema?: string) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  const angulo = tema?.trim() ? `Ocasião/foco: "${tema.trim()}".` : "Crie uma oportunidade atraente e realista pro negócio.";
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        response_format: { type: "json_object" },
+        temperature: 0.95,
+        messages: [
+          { role: "system", content: sistema(marca, "promocao") },
+          { role: "user", content: `Crie uma IDEIA de oferta/promoção realista e atraente pro negócio. ${angulo} Nada exagerado nem irreal. Responda só com JSON: {"oferta":"benefício curtíssimo em CAIXA ALTA (ex: 10 CRIANÇAS GRÁTIS, 15% OFF)","validade":"condição/validade curta (ex: Para contratos deste mês)","inclui":["3 a 4 itens curtos do que está incluso"],"regras":"condições em letras miúdas curtas (ex: Mediante reserva, não cumulativo)"}` },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+    const data = await resp.json();
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { oferta?: string; validade?: string; inclui?: string[]; regras?: string };
+    const inclui = (j.inclui ?? []).map((s) => s.trim()).filter(Boolean).slice(0, 5);
+    return {
+      ok: true as const,
+      oferta: (j.oferta ?? "").trim(),
+      validade: (j.validade ?? "").trim(),
+      inclui,
+      regras: (j.regras ?? "").trim(),
+    };
+  } catch (e) {
+    console.error("Erro ao sugerir promoção:", e);
+    return { ok: false as const, erro: "Não consegui sugerir agora. Confira a chave da OpenAI." };
+  }
+}
+
 export async function excluirPublicacao(id: string) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const p = await prisma.publicacao.findUnique({ where: { id } });

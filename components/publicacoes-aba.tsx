@@ -11,6 +11,7 @@ import {
   definirImagemPublicacao,
   removerImagemPublicacao,
   sugerirDiferenciais,
+  sugerirPromocao,
 } from "@/app/actions/feed";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
@@ -35,6 +36,18 @@ const MODELOS_DIVULGACAO: { rotulo: string; assunto: string; diferenciais: strin
   { rotulo: "🤝 Atendimento", assunto: "um atendimento que cuida de cada detalhe", diferenciais: ["Equipe atenciosa", "Resposta rápida", "Acompanhamento do início ao fim", "Você relaxa, a gente resolve"] },
   { rotulo: "🧼 Higiene", assunto: "limpeza e higiene em primeiro lugar", diferenciais: ["Brinquedos higienizados", "Ambiente sempre limpo", "Equipe treinada", "Segurança pra criançada"] },
   { rotulo: "🎉 Diversão sem fim", assunto: "diversão garantida do começo ao fim", diferenciais: ["Recreação animada", "Brinquedos incríveis", "Monitores dedicados", "Sorriso garantido"] },
+];
+
+// Modelos prontos de Promoção/Oferta (clique preenche oferta/validade/incluso/regras).
+// Pontos de partida pra buffet infantil — o dono ajusta números e condições.
+const MODELOS_PROMOCAO: { rotulo: string; assunto: string; oferta: string; validade: string; inclui: string[]; regras: string }[] = [
+  { rotulo: "🎉 Crianças grátis", assunto: "oferta de crianças grátis na festa", oferta: "10 CRIANÇAS GRÁTIS", validade: "Para contratos fechados este mês", inclui: ["2h de salão exclusivo", "Monitores de recreação", "Decoração temática"], regras: "Mediante reserva · não cumulativo" },
+  { rotulo: "💰 Desconto à vista", assunto: "condição especial para pagamento à vista", oferta: "10% OFF À VISTA", validade: "Pagamento à vista", inclui: ["Pacote completo de festa", "Buffet incluso", "Equipe de apoio"], regras: "Não cumulativo com outras ofertas" },
+  { rotulo: "📅 Especial de férias", assunto: "oportunidade especial para festas nas férias", oferta: "CONDIÇÃO ESPECIAL DE FÉRIAS", validade: "Datas de julho", inclui: ["Salão decorado", "Brinquedos liberados", "Monitores inclusos"], regras: "Sujeito à disponibilidade de data" },
+  { rotulo: "🏃 Últimas datas", assunto: "urgência: poucas datas disponíveis no mês", oferta: "ÚLTIMAS DATAS DO MÊS", validade: "Enquanto houver vaga", inclui: ["Festa completa", "Decoração temática", "Recreação animada"], regras: "Mediante disponibilidade" },
+  { rotulo: "🎁 Brinde especial", assunto: "um brinde especial pra quem fechar a festa", oferta: "GANHE UM BRINDE ESPECIAL", validade: "Contratos deste mês", inclui: ["Bolo cenográfico", "Lembrancinhas", "Decoração temática"], regras: "Mediante reserva confirmada" },
+  { rotulo: "👶 Primeira festa", assunto: "pacote especial para a primeira festa do bebê", oferta: "PACOTE PRIMEIRO ANINHO", validade: "Consulte datas", inclui: ["Decoração de smash the cake", "Espaço baby seguro", "Buffet completo"], regras: "Sob consulta de disponibilidade" },
+  { rotulo: "🤝 Indique e ganhe", assunto: "indique um amigo e ganhe um benefício", oferta: "INDIQUE E GANHE", validade: "Indicação que fechar festa", inclui: ["Desconto na sua próxima festa", "Brinde especial", "Atendimento VIP"], regras: "Válido após a festa indicada ser realizada" },
 ];
 
 // Modelos prontos de Dica/Conteúdo (clique preenche o Assunto E a categoria da foto;
@@ -148,6 +161,21 @@ export function PublicacoesAba({
       const r = await sugerirDiferenciais(marcaId, tema);
       if (r.ok) setDiferenciais(r.diferenciais.join("\n"));
       else setErro(r.erro);
+    } finally {
+      setSugerindo(false);
+    }
+  }
+  async function handleVariarPromocao() {
+    setErro(null);
+    setSugerindo(true);
+    try {
+      const r = await sugerirPromocao(marcaId, tema);
+      if (r.ok) {
+        setOferta(r.oferta);
+        setValidade(r.validade);
+        setInclui(r.inclui.join("\n"));
+        setRegras(r.regras);
+      } else setErro(r.erro);
     } finally {
       setSugerindo(false);
     }
@@ -297,6 +325,35 @@ export function PublicacoesAba({
                 🥳 Usar template Data Comemorativa
               </button>
             )}
+          </div>
+        )}
+
+        {template === "promocao" && (
+          <div className="mb-3">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <p className="text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique pra preencher)</p>
+              <button
+                type="button"
+                onClick={handleVariarPromocao}
+                disabled={sugerindo}
+                title="Deixa a IA criar uma ideia de oferta a partir do assunto/ocasião — você revisa antes de postar"
+                className="shrink-0 rounded-md border border-linha px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40"
+              >
+                {sugerindo ? "Gerando…" : "🔄 Variar com IA"}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {MODELOS_PROMOCAO.map((m) => (
+                <button
+                  key={m.rotulo}
+                  type="button"
+                  onClick={() => { setTema(m.assunto); setOferta(m.oferta); setValidade(m.validade); setInclui(m.inclui.join("\n")); setRegras(m.regras); }}
+                  className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white"
+                >
+                  {m.rotulo}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
