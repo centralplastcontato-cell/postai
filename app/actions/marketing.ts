@@ -7,6 +7,7 @@ import { estaLogado } from "@/lib/auth";
 import { publicar, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
+import { sortearImagemBanco } from "@/app/actions/imagens";
 import type { Marca } from "@prisma/client";
 
 type SlideTexto = {
@@ -80,9 +81,9 @@ async function gerarConteudo(marca: Marca, tema: string, nSlides: number): Promi
 async function gerarFotoFundo(marca: Marca, descricao: string, ref: string): Promise<string | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
-  const prompt = `Fotografia profissional, realista e limpa para a marca "${marca.nome}" (${
-    marca.descricao || "negócio local"
-  }). Tema: ${descricao}. Iluminação de estúdio, alta qualidade, formato vertical. NÃO inclua nenhum texto, letra, número ou logotipo na imagem.`;
+  // Fundo DECORATIVO ABSTRATO — nunca um ambiente/cena realista (pra não fingir
+  // ser o espaço real do negócio). O espaço de verdade vem do banco de fotos reais.
+  const prompt = `Fundo decorativo abstrato para um post de rede social da marca "${marca.nome}". Estilo: textura/padrão festivo e colorido — bokeh, confete, balões, formas geométricas suaves, gradiente alegre. NÃO é uma fotografia de ambiente, lugar, espaço, comida, objetos ou pessoas reais; é apenas um fundo artístico abstrato. Formato vertical. SEM texto, letras, números, logotipos, pessoas, rostos ou cenários reconhecíveis.`;
   try {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
@@ -104,10 +105,14 @@ async function gerarFotoFundo(marca: Marca, descricao: string, ref: string): Pro
   }
 }
 
-// Gera as fotos de todos os slides em paralelo e devolve o array com imagemUrl preenchida.
+// Preenche a foto de cada slide: prioriza FOTO REAL do banco da marca; só cai na
+// IA (fundo decorativo abstrato) quando o banco está vazio. Roda em paralelo.
 async function comFotosDeIA(marca: Marca, id: string, slides: SlideTexto[]): Promise<SlideTexto[]> {
   const fotos = await Promise.all(
-    slides.map((s, i) => gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`))
+    slides.map(async (s, i) => {
+      const real = await sortearImagemBanco(marca.id);
+      return real || (await gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`));
+    })
   );
   return slides.map((s, i) => (fotos[i] ? { ...s, imagemUrl: fotos[i]! } : s));
 }

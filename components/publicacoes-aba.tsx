@@ -11,6 +11,7 @@ import {
   definirImagemPublicacao,
   removerImagemPublicacao,
 } from "@/app/actions/feed";
+import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
@@ -158,6 +159,22 @@ export function PublicacoesAba({
     startTransition(async () => {
       const r = await gerarImagemPublicacao({ id });
       if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  function handleBanco(id: string) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await sortearImagemBancoAction(marcaId);
+      if (!r.ok) {
+        setErro(r.erro);
+        setProc(null);
+        return;
+      }
+      const d = await definirImagemPublicacao({ id, url: r.url });
+      if (!d.ok) setErro(d.erro);
       router.refresh();
       setProc(null);
     });
@@ -338,7 +355,8 @@ export function PublicacoesAba({
                   <button onClick={() => handleRegerar(p.id)} disabled={ocupado} title="Regerar texto" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻ Regerar</button>
                   <a href={arte} download={`feed-${p.slug}.png`} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">⬇ Baixar</a>
                   <button onClick={() => copiar(p)} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">{copiadoId === p.id ? "✓ Copiado" : "Copiar texto"}</button>
-                  <button onClick={() => handleGerarImagem(p.id)} disabled={ocupado} title="Gerar foto de fundo com IA" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🖼️ IA</button>
+                  <button onClick={() => handleBanco(p.id)} disabled={ocupado} title="Sortear foto real do seu banco de imagens" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲 Banco</button>
+                  <button onClick={() => handleGerarImagem(p.id)} disabled={ocupado} title="Fundo decorativo abstrato com IA (não mostra ambiente real)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🖼️ IA</button>
                   <label className="cursor-pointer rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
                     📤 Foto
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUpload(p.id, e.target.files?.[0])} />

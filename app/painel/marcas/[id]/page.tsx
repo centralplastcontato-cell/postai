@@ -5,6 +5,7 @@ import { MarcaHub } from "@/components/marca-hub";
 import { type Post } from "@/components/marketing-calendario";
 import { type PublicacaoView } from "@/components/publicacoes-aba";
 import { type MarcaView } from "@/components/marca-form";
+import { type ImagemView } from "@/components/banco-imagens";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,12 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     tema: p.tema,
   }));
 
+  const imgs = await prisma.imagemMarca.findMany({
+    where: { marcaId: id },
+    orderBy: { criadoEm: "desc" },
+  });
+  const imagens: ImagemView[] = imgs.map((i) => ({ id: i.id, url: i.url, categoria: i.categoria }));
+
   const marcaView: MarcaView = {
     id: marca.id,
     nome: marca.nome,
@@ -92,6 +99,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         marca={marcaView}
         posts={posts}
         publicacoes={publicacoes}
+        imagens={imagens}
         conectada={marcaConectada(marca)}
       />
     </div>

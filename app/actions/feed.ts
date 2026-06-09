@@ -8,6 +8,7 @@ import { publicar, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
+import { sortearImagemBanco } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import type { Marca } from "@prisma/client";
 
@@ -240,8 +241,13 @@ export async function gerarPublicacao(input: {
       status: "a_postar",
     },
   });
-  // Só os templates com foto (ex: dica) geram imagem de IA; promoção usa fundo colorido.
-  if (USA_FOTO[template]) await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
+  // Templates com foto: prioriza FOTO REAL do banco da marca; só se o banco estiver
+  // vazio é que a IA gera um fundo decorativo abstrato. (Promoção/Divulgação usam fundo colorido.)
+  if (USA_FOTO[template]) {
+    const real = await sortearImagemBanco(marca.id);
+    if (real) await definirImagemPublicacao({ id: criado.id, url: real }).catch(() => {});
+    else await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
+  }
   revalidatePath(`/painel/marcas/${marca.id}`);
   return { ok: true as const, id: criado.id };
 }
@@ -303,10 +309,9 @@ export async function gerarImagemPublicacao(input: { id: string; descricao?: str
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
-  const base = input.descricao?.trim() || `${p.titulo}. ${p.texto ?? ""}`;
-  const prompt = `Fotografia profissional, realista e limpa para a marca "${p.marca.nome}" (${
-    p.marca.descricao || "negócio local"
-  }). Tema: ${base}. Iluminação de estúdio, alta qualidade, formato vertical. NÃO inclua nenhum texto, letra, número ou logotipo na imagem.`;
+  // Fundo DECORATIVO ABSTRATO — nunca um ambiente/cena realista (pra não fingir
+  // ser o espaço real do negócio). O espaço de verdade vem do banco de fotos reais.
+  const prompt = `Fundo decorativo abstrato para um post de rede social da marca "${p.marca.nome}". Estilo: textura/padrão festivo e colorido — bokeh, confete, balões, formas geométricas suaves, gradiente alegre. NÃO é uma fotografia de ambiente, lugar, espaço, comida, objetos ou pessoas reais; é apenas um fundo artístico abstrato. Formato vertical. SEM texto, letras, números, logotipos, pessoas, rostos ou cenários reconhecíveis.`;
   let b64: string | undefined;
   try {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {

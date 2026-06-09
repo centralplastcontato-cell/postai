@@ -3,6 +3,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
+import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import {
   gerarCarrossel,
   regerarCarrossel,
@@ -133,6 +134,22 @@ export function MarketingCalendario({
     startTransition(async () => {
       const r = await gerarImagemSlide({ id, indice });
       if (!r.ok) setErro(r.erro);
+      else router.refresh();
+      setSlideProcessando(null);
+    });
+  }
+  function handleBancoSlide(id: string, indice: number) {
+    setErro(null);
+    setSlideProcessando(indice);
+    startTransition(async () => {
+      const r = await sortearImagemBancoAction(marcaId);
+      if (!r.ok) {
+        setErro(r.erro);
+        setSlideProcessando(null);
+        return;
+      }
+      const d = await definirImagemSlide({ id, indice, url: r.url });
+      if (!d.ok) setErro(d.erro);
       else router.refresh();
       setSlideProcessando(null);
     });
@@ -272,7 +289,8 @@ export function MarketingCalendario({
                 </button>
                 <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
                   <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Regerar texto" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🔄</button>
-                  <button type="button" onClick={() => handleGerarImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Imagem com IA" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🖼️</button>
+                  <button type="button" onClick={() => handleBancoSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Sortear foto real do banco" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲</button>
+                  <button type="button" onClick={() => handleGerarImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Fundo abstrato com IA (não mostra ambiente real)" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🖼️</button>
                   <label title="Enviar foto" className="cursor-pointer rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white">📤<input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImagem(selecionado.id, i, e.target.files?.[0])} /></label>
                   {selecionado.imagensSlides?.[i] && (
                     <button type="button" onClick={() => handleRemoverImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Remover imagem" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">✕</button>

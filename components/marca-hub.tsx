@@ -6,16 +6,19 @@ import { RedesSociais } from "./redes-sociais";
 import { MarcaForm, type MarcaView } from "./marca-form";
 import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
+import { type ImagemView } from "./banco-imagens";
 
 export function MarcaHub({
   marca,
   posts,
   publicacoes,
+  imagens,
   conectada,
 }: {
   marca: MarcaView;
   posts: Post[];
   publicacoes: PublicacaoView[];
+  imagens: ImagemView[];
   conectada: boolean;
 }) {
   const [aba, setAba] = useState<"redes" | "config">("redes");
@@ -56,7 +59,7 @@ export function MarcaHub({
 
       <div className="mt-6">
         {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} />}
-        {aba === "config" && <MarcaForm marca={marca} />}
+        {aba === "config" && <MarcaForm marca={marca} imagens={imagens} />}
       </div>
     </div>
   );

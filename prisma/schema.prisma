@@ -38,6 +38,20 @@ model Marca {
 
   conteudos   Conteudo[]
   publicacoes Publicacao[]
+  imagens     ImagemMarca[]
+}
+
+// Banco de fotos REAIS do negócio (ex: espaço, brinquedos, festas do buffet).
+// Usadas nas artes no lugar de imagens de IA — pra nunca mostrar espaço "fake".
+model ImagemMarca {
+  id        String   @id @default(cuid())
+  marcaId   String
+  marca     Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  url       String
+  categoria String   @default("geral") // espaco | brinquedos | festa | comida | geral
+  criadoEm  DateTime @default(now())
+
+  @@index([marcaId, categoria])
 }
 
 // Carrossel (2 a 10 artes) agendado pra uma marca.
