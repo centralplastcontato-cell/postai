@@ -67,6 +67,7 @@ export function PublicacoesAba({
   const [validade, setValidade] = useState("");
   const [inclui, setInclui] = useState("");
   const [regras, setRegras] = useState("");
+  const [diferenciais, setDiferenciais] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
@@ -86,13 +87,15 @@ export function PublicacoesAba({
     setErro(null);
     startTransition(async () => {
       const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras });
+      const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs });
       if (r.ok) {
         setTema("");
         setOferta("");
         setValidade("");
         setInclui("");
         setRegras("");
+        setDiferenciais("");
         onGerado?.();
         router.refresh();
       } else setErro(r.erro);
@@ -249,6 +252,16 @@ export function PublicacoesAba({
               <input value={regras} onChange={(e) => setRegras(e.target.value)} placeholder="Ex: Válido seg a qui, mediante reserva, não cumulativo" className="input-base" />
             </label>
             <p className="text-[11px] text-amber-400/90 sm:col-span-2">⚠ Oferta vazia: a IA sugere — confira antes de postar. Itens inclusos e regras são só seus (a IA não inventa).</p>
+          </div>
+        )}
+
+        {template === "divulgacao" && (
+          <div className="mb-3">
+            <label className="text-xs text-muted">
+              Diferenciais <span className="text-muted/70">(um por linha — viram a lista de “por que escolher”, máx. 4)</span>
+              <textarea value={diferenciais} onChange={(e) => setDiferenciais(e.target.value)} rows={4} placeholder={"Ex:\nMonitores treinados\nBuffet completo\nDecoração temática"} className="input-base resize-y" />
+            </label>
+            <p className="mt-1 text-[11px] text-amber-400/90">⚠ Se deixar vazio, a IA sugere os diferenciais — confira antes de postar.</p>
           </div>
         )}
 

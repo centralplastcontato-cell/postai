@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutDataComemorativa, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,6 +39,12 @@ export async function GET(req: Request) {
       textoApoio: "Que essa data seja cheia de alegria e diversão pra toda a família!",
       selo: "25 de Dezembro",
       imagemUrl,
+    });
+  } else if (template === "divulgacao") {
+    elemento = LayoutDivulgacao({
+      ...base,
+      titulo: montarTituloColorido(tituloParam || "A festa dos sonhos começa aqui", paleta),
+      diferenciais: ["Monitores treinados", "Buffet completo", "Decoração temática", "Espaço seguro"],
     });
   } else {
     elemento = LayoutPromocao({

@@ -13,7 +13,7 @@ import type { Marca } from "@prisma/client";
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
 // `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
-type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string };
+type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[] };
 
 // Monta o JSON do campo `extra` conforme o template (dados específicos da arte).
 // `travas` são valores digitados pelo usuário — usados exatos e preservados no regerar.
@@ -60,6 +60,8 @@ const GUIA: Record<Template, string> = {
     'Crie uma PROMOÇÃO/OFERTA irresistível pro público da marca. O "titulo" é a chamada principal (curta e forte); preencha "oferta" com o benefício em destaque e "validade" com a condição, quando fizer sentido.',
   "data-comemorativa":
     'Crie uma SAUDAÇÃO calorosa para a data comemorativa indicada (ex: Natal, Dia das Crianças, Páscoa). O "titulo" é a saudação principal, curta e festiva (ex: "Feliz Natal!"); preencha "selo" com o nome/data da comemoração e "texto" com uma mensagem afetuosa que conecte a data com a marca. NÃO ofereça promoção aqui — é puro carinho/celebração.',
+  divulgacao:
+    'Crie uma DIVULGAÇÃO INSTITUCIONAL ("por que escolher a gente"). O "titulo" é uma chamada de valor, curta e convidativa (ex: "A festa dos sonhos começa aqui"); preencha "diferenciais" com 3 ou 4 pontos fortes BEM curtos (2 a 4 palavras cada, ex: "Monitores treinados", "Buffet completo"). Foco em confiança e qualidade — NÃO ofereça desconto/promoção aqui.',
   dica: 'Faça uma DICA prática e útil pro público da marca. O "titulo" é a dica em si, direta.',
 };
 
@@ -78,6 +80,13 @@ const FORMATO_JSON: Record<Template, string> = {
   "selo": "nome/data curta da comemoração (ex: 25 de Dezembro, Dia das Crianças) — ou vazio",
   "texto": "mensagem afetuosa curta (até ~16 palavras) ligando a data à marca",
   "legenda": "legenda do post (3-5 linhas com \\n), tom caloroso, termina com um convite leve",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
+  divulgacao: `{
+  "titulo": "chamada de valor curta e convidativa (3 a 6 palavras) — vai GRANDE na arte",
+  "diferenciais": ["3 a 4 pontos fortes, cada um com 2 a 4 palavras (ex: Monitores treinados)"],
+  "texto": "1 frase de apoio curta (até ~16 palavras) — usada só se não houver diferenciais",
+  "legenda": "legenda do post (3-5 linhas com \\n), termina com convite à ação no WhatsApp",
   "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
 }`,
   dica: `{
@@ -101,10 +110,10 @@ ${FORMATO_JSON[template]}
 Português do Brasil.`;
 }
 
-type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; selo?: string; legenda: string; hashtags: string };
+type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; selo?: string; diferenciais?: string[]; legenda: string; hashtags: string };
 
 // Templates que usam foto de IA de fundo (os de fundo colorido não geram foto).
-const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, dica: true };
+const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true };
 
 function slugify(s: string): string {
   return s
@@ -151,6 +160,8 @@ async function gerarTexto(marca: Marca, template: Template, tema?: string, trava
   const itensInclui = (travas?.inclui || []).map((s) => s.trim()).filter(Boolean);
   if (itensInclui.length) fixos.push(`a oferta inclui: ${itensInclui.join(", ")}`);
   if (travas?.regras) fixos.push(`as regras/condições são: "${travas.regras}"`);
+  const difs = (travas?.diferenciais || []).map((s) => s.trim()).filter(Boolean);
+  if (difs.length) fixos.push(`os diferenciais a destacar são EXATAMENTE: ${difs.join(", ")}`);
   if (fixos.length) {
     pedido += ` IMPORTANTE: ${fixos.join("; ")}. Use esses dados sem alterar e escreva o título e a legenda de forma coerente com eles. NÃO invente outros valores, descontos, itens ou condições.`;
   }
@@ -183,21 +194,25 @@ export async function gerarPublicacao(input: {
   validade?: string;
   inclui?: string[];
   regras?: string;
+  diferenciais?: string[];
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const template = (TEMPLATES as readonly string[]).includes(input.template) ? input.template : "dica";
 
-  // Oferta/validade/inclui/regras só fazem sentido na promoção; ignorados nos demais.
-  const travas: Travas = template === "promocao"
-    ? {
-        oferta: input.oferta?.trim() || undefined,
-        validade: input.validade?.trim() || undefined,
-        inclui: (input.inclui || []).map((s) => s.trim()).filter(Boolean),
-        regras: input.regras?.trim() || undefined,
-      }
-    : {};
+  // Cada template fixa só os campos que fazem sentido pra ele (ignorados nos demais).
+  let travas: Travas = {};
+  if (template === "promocao") {
+    travas = {
+      oferta: input.oferta?.trim() || undefined,
+      validade: input.validade?.trim() || undefined,
+      inclui: (input.inclui || []).map((s) => s.trim()).filter(Boolean),
+      regras: input.regras?.trim() || undefined,
+    };
+  } else if (template === "divulgacao") {
+    travas = { diferenciais: (input.diferenciais || []).map((s) => s.trim()).filter(Boolean) };
+  }
 
   let gerado: Gerado;
   try {
@@ -246,6 +261,7 @@ export async function regerarPublicacao(id: string) {
       validade: ex.validadeTravada || undefined,
       inclui: Array.isArray(ex.inclui) ? ex.inclui : [],
       regras: ex.regras || undefined,
+      diferenciais: Array.isArray(ex.diferenciaisTravados) ? ex.diferenciaisTravados : [],
     };
   } catch {}
 
