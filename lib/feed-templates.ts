@@ -7,7 +7,7 @@ export type Template = (typeof TEMPLATES)[number];
 
 export const TEMPLATE_LABEL: Record<Template, string> = {
   promocao: "🎉 Promoção / Oferta",
-  "data-comemorativa": "🎄 Data Comemorativa",
+  "data-comemorativa": "🥳 Data Comemorativa",
   divulgacao: "⭐ Divulgação / Institucional",
   dica: "💡 Dica / Conteúdo",
 };

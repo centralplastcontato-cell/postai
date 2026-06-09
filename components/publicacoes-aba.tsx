@@ -224,7 +224,7 @@ export function PublicacoesAba({
               <span className="text-xs font-semibold text-green-300">✓ usando o template de data comemorativa</span>
             ) : (
               <button type="button" onClick={usarTemplateData} className="rounded-md border border-yellow-400/60 bg-yellow-400/10 px-3 py-1 text-xs font-semibold text-yellow-100 transition hover:bg-yellow-400/20">
-                🎄 Usar template Data Comemorativa
+                🥳 Usar template Data Comemorativa
               </button>
             )}
           </div>
