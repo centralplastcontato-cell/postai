@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adicionarImagemMarca, removerImagemMarca, CATEGORIAS } from "@/app/actions/imagens";
+import { adicionarImagemMarca, removerImagemMarca } from "@/app/actions/imagens";
+import { CATEGORIAS } from "@/lib/categorias-imagem";
 
 export type ImagemView = { id: string; url: string; categoria: string };
 

@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { estaLogado } from "@/lib/auth";
-
-// Categorias do banco de fotos reais (pra o post pegar a foto certa pro contexto).
-export const CATEGORIAS = ["espaco", "brinquedos", "festa", "comida", "geral"] as const;
-export type CategoriaImagem = (typeof CATEGORIAS)[number];
+import { CATEGORIAS } from "@/lib/categorias-imagem";
 
 export async function adicionarImagemMarca(input: { marcaId: string; url: string; categoria?: string }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };

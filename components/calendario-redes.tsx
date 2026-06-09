@@ -162,11 +162,16 @@ export function CalendarioRedes({
               : "bg-sky-600 hover:bg-sky-500";
 
           return (
-            <button
+            // div (não button) porque tem o DeleteButton dentro — button aninhado
+            // em button quebra a hidratação do React.
+            <div
               key={i}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelecionar({ tipo, id: item.id })}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelecionar({ tipo, id: item.id }); }}
               title={comemorativa ? undefined : `${icone} ${item.titulo}`}
-              className={`group relative flex h-11 items-center justify-center rounded-md text-sm font-bold text-white transition sm:h-12 sm:text-base ${cor} ${
+              className={`group relative flex h-11 cursor-pointer items-center justify-center rounded-md text-sm font-bold text-white transition sm:h-12 sm:text-base ${cor} ${
                 selecionado ? "ring-2 ring-white" : ehHoje ? "ring-2 ring-amber-400" : comemorativa ? "ring-2 ring-yellow-400/70" : ""
               }`}
             >
@@ -176,7 +181,7 @@ export function CalendarioRedes({
               {comemorativa && <TooltipData emoji={comemorativa.emoji} nome={comemorativa.nome} rodape={item.titulo} />}
               {/* Delete button */}
               <DeleteButton tipo={tipo} id={item.id} />
-            </button>
+            </div>
           );
         })}
       </div>
