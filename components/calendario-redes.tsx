@@ -43,7 +43,7 @@ export function CalendarioRedes({
   posts: Post[];
   publicacoes: PublicacaoView[];
   selecao: SelecaoRede | null;
-  onSelecionar: (s: SelecaoRede) => void;
+  onSelecionar: (s: SelecaoRede, iso: string) => void;
   dataAlvo: string | null;
   onSelecionarDia: (iso: string) => void;
   diasCarrossel: string;
@@ -168,8 +168,8 @@ export function CalendarioRedes({
               key={i}
               role="button"
               tabIndex={0}
-              onClick={() => onSelecionar({ tipo, id: item.id })}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelecionar({ tipo, id: item.id }); }}
+              onClick={() => onSelecionar({ tipo, id: item.id }, chave)}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelecionar({ tipo, id: item.id }, chave); }}
               title={comemorativa ? undefined : `${icone} ${item.titulo}`}
               className={`group relative flex h-11 cursor-pointer items-center justify-center rounded-md text-sm font-bold text-white transition sm:h-12 sm:text-base ${cor} ${
                 selecionado ? "ring-2 ring-white" : ehHoje ? "ring-2 ring-amber-400" : comemorativa ? "ring-2 ring-yellow-400/70" : ""

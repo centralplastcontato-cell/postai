@@ -30,9 +30,10 @@ export function RedesSociais({
   const planoCar = parseDias(diasCarrossel);
   const planoFeed = parseDias(diasFeed);
 
-  function aoSelecionar(s: SelecaoRede) {
+  function aoSelecionar(s: SelecaoRede, iso: string) {
     setSelecao(s);
     setSubaba(s.tipo === "carrossel" ? "carrosseis" : "publicacoes");
+    setDataAlvo(iso); // o dia clicado também filtra a lista da aba
   }
 
   // Empurrão pela PROGRAMAÇÃO da agenda (Configurações): ao escolher um dia, leva
@@ -90,6 +91,7 @@ export function RedesSociais({
           destacarId={selecao?.tipo === "feed" ? selecao.id : null}
           dataAlvo={dataAlvo}
           onGerado={() => setDataAlvo(null)}
+          onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
         />
       )}
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   gerarPublicacao,
@@ -107,18 +107,27 @@ function dataBR(iso: string): string {
   });
 }
 
+// Chave do dia (YYYY-MM-DD) no fuso de SP — pra casar com o dia clicado no calendário.
+function chaveDiaSP(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
+
+const POR_PAGINA = 6;
+
 export function PublicacoesAba({
   marcaId,
   publicacoes,
   destacarId,
   dataAlvo,
   onGerado,
+  onLimparDia,
 }: {
   marcaId: string;
   publicacoes: PublicacaoView[];
   destacarId?: string | null;
   dataAlvo?: string | null;
   onGerado?: () => void;
+  onLimparDia?: () => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -134,6 +143,15 @@ export function PublicacoesAba({
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(1);
+  // Volta pra página 1 quando muda o filtro de dia ou a lista cresce/encolhe.
+  useEffect(() => { setPagina(1); }, [dataAlvo, publicacoes.length]);
+  // Filtro por dia (clicar num dia do calendário) + paginação, pra não virar
+  // rolagem infinita no mobile. Sem dia = mostra tudo, de POR_PAGINA em POR_PAGINA.
+  const filtradas = dataAlvo ? publicacoes.filter((p) => chaveDiaSP(p.data) === dataAlvo) : publicacoes;
+  const totalPaginas = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
+  const pagAtual = Math.min(pagina, totalPaginas);
+  const visiveis = dataAlvo ? filtradas : filtradas.slice((pagAtual - 1) * POR_PAGINA, pagAtual * POR_PAGINA);
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
   const [legendaAbertaId, setLegendaAbertaId] = useState<string | null>(null);
   const [confirmacao, setConfirmacao] = useState<Confirmacao | null>(null);
@@ -495,11 +513,35 @@ export function PublicacoesAba({
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
       </div>
 
+      {/* Filtro por dia + paginação (clique num dia do calendário pra ver só ele) */}
+      {publicacoes.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          {dataAlvo ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-200">
+              📅 {dataBR(`${dataAlvo}T12:00:00-03:00`)} · só esse dia
+            </span>
+          ) : (
+            <span className="text-xs text-muted">{filtradas.length} {filtradas.length === 1 ? "publicação" : "publicações"}</span>
+          )}
+          {dataAlvo ? (
+            <button type="button" onClick={() => onLimparDia?.()} className="rounded-md border border-linha px-3 py-1 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">📋 Ver todas</button>
+          ) : totalPaginas > 1 ? (
+            <div className="flex items-center gap-2 text-xs">
+              <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagAtual <= 1} className="rounded-md border border-linha px-2.5 py-1 text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">◀</button>
+              <span className="text-muted">Página {pagAtual}/{totalPaginas}</span>
+              <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagAtual >= totalPaginas} className="rounded-md border border-linha px-2.5 py-1 text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">▶</button>
+            </div>
+          ) : null}
+        </div>
+      )}
+
       {publicacoes.length === 0 ? (
         <p className="rounded-xl border border-dashed border-linha bg-preto-card p-8 text-center text-sm text-muted">Nenhuma publicação ainda. Escolha um template acima e clique em Gerar.</p>
+      ) : filtradas.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-linha bg-preto-card p-8 text-center text-sm text-muted">Nenhuma publicação nesse dia. <button type="button" onClick={() => onLimparDia?.()} className="font-semibold text-sky-300 underline">Ver todas</button> ou gere uma acima.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {publicacoes.map((p) => {
+          {visiveis.map((p) => {
             const v = hashCurto(`${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}`);
             const arte = `/api/feed/${p.id}?v=${v}`;
             const postado = p.status === "postado";
@@ -552,6 +594,15 @@ export function PublicacoesAba({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Paginação no rodapé (só quando mostrando todas e há mais de uma página) */}
+      {!dataAlvo && totalPaginas > 1 && (
+        <div className="mt-5 flex items-center justify-center gap-3 text-sm">
+          <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagAtual <= 1} className="rounded-md border border-linha px-3 py-1.5 font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">◀ Anterior</button>
+          <span className="text-muted">Página {pagAtual} de {totalPaginas}</span>
+          <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagAtual >= totalPaginas} className="rounded-md border border-linha px-3 py-1.5 font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">Próxima ▶</button>
         </div>
       )}
 
