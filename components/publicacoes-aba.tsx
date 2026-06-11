@@ -225,6 +225,9 @@ export function PublicacoesAba({
     startTransition(async () => {
       const r = comoNova ? await regerarComoNova(id) : await regerarPublicacao(id);
       if (!r.ok) setErro(r.erro);
+      // A nova versão vai pra OUTRA data (próxima livre). Se a lista estiver filtrada
+      // por um dia, limpa o filtro pra a nova aparecer (senão parece que não criou).
+      else if (comoNova) onLimparDia?.();
       router.refresh();
       setProc(null);
     });

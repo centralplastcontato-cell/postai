@@ -119,6 +119,8 @@ export function MarketingCalendario({
     startTransition(async () => {
       const r = comoNova ? await regerarCarrosselComoNova(id) : await regerarCarrossel(id);
       if (!r.ok) setErro(r.erro);
+      // O novo carrossel vai pra outra data — já seleciona ele pra aparecer na hora.
+      else if (comoNova && r.id) onSelId(r.id);
       router.refresh();
     });
   }
