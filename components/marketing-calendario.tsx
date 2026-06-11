@@ -7,6 +7,7 @@ import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import {
   gerarCarrossel,
   regerarCarrossel,
+  regerarCarrosselComoNova,
   regerarSlide,
   gerarImagemSlide,
   definirImagemSlide,
@@ -85,6 +86,7 @@ export function MarketingCalendario({
   const [temasIA, setTemasIA] = useState<string[]>([]);
   const [sugerindo, setSugerindo] = useState(false);
   const [postarAlvo, setPostarAlvo] = useState<Post | null>(null);
+  const [regerarPostado, setRegerarPostado] = useState<Post | null>(null);
 
   const selecionado = posts.find((p) => p.id === selId) ?? null;
 
@@ -112,13 +114,21 @@ export function MarketingCalendario({
       } else setErro(r.erro);
     });
   }
-  function handleRegerar(id: string) {
+  function regerarCarr(id: string, comoNova: boolean) {
     setErro(null);
     startTransition(async () => {
-      const r = await regerarCarrossel(id);
+      const r = comoNova ? await regerarCarrosselComoNova(id) : await regerarCarrossel(id);
       if (!r.ok) setErro(r.erro);
       router.refresh();
     });
+  }
+  function handleRegerar(p: Post) {
+    // Carrossel já no Instagram: não sobrescreve. Avisa e cria um novo ao lado.
+    if (p.status === "postado") {
+      setRegerarPostado(p);
+      return;
+    }
+    regerarCarr(p.id, false);
   }
   function handleSugerirTemas() {
     setErro(null);
@@ -329,6 +339,7 @@ export function MarketingCalendario({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={src} alt={`Slide ${i + 1}`} className="h-auto w-[100px] sm:w-[120px]" />
                 </button>
+                {selecionado.status !== "postado" && (
                 <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
                   <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Regerar texto" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🔄</button>
                   <button type="button" onClick={() => handleBancoSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Sortear foto real do banco" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲</button>
@@ -338,6 +349,7 @@ export function MarketingCalendario({
                     <button type="button" onClick={() => handleRemoverImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Remover imagem" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">✕</button>
                   )}
                 </div>
+                )}
                 {slideProcessando === i && <p className="mt-1 text-center text-[10px] text-muted">Processando…</p>}
               </div>
             ))}
@@ -354,7 +366,7 @@ export function MarketingCalendario({
             <button onClick={() => baixarTodas(selecionado)} disabled={baixando} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">{baixando ? "Baixando…" : "⬇ Baixar (.zip)"}</button>
             <button onClick={() => copiar(selecionado)} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho">{copiado ? "✓ Copiado!" : "Copiar texto"}</button>
             {selecionado.tema && (
-              <button onClick={() => handleRegerar(selecionado.id)} disabled={isPending} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho disabled:opacity-50">↻ Regerar</button>
+              <button onClick={() => handleRegerar(selecionado)} disabled={isPending} title={selecionado.status === "postado" ? "Já postado — cria um novo ao lado" : "Regerar"} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho disabled:opacity-50">↻ Regerar</button>
             )}
             {selecionado.status !== "postado" && (
               <button onClick={() => handlePostar(selecionado)} disabled={postando} className="rounded-lg bg-[#C13584] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50">{postando ? "Postando…" : "📷 Postar no Instagram"}</button>
@@ -379,6 +391,18 @@ export function MarketingCalendario({
           setPostarAlvo(null);
         }}
         onCancelar={() => setPostarAlvo(null)}
+      />
+
+      <ConfirmDialog
+        aberto={!!regerarPostado}
+        titulo="Esse carrossel já está no Instagram"
+        descricao="Regenerar NÃO substitui o que já foi postado (o Postaí não edita posts publicados). Quer criar um NOVO carrossel ao lado, pra postar depois? O original fica intacto."
+        textoConfirmar="Criar novo ao lado"
+        onConfirmar={() => {
+          if (regerarPostado) regerarCarr(regerarPostado.id, true);
+          setRegerarPostado(null);
+        }}
+        onCancelar={() => setRegerarPostado(null)}
       />
     </div>
   );
