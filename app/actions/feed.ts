@@ -363,6 +363,36 @@ export async function regerarPublicacao(id: string) {
   return { ok: true as const };
 }
 
+// Quando a publicação JÁ foi postada no Instagram, "regerar" não deve sobrescrever
+// (o post no Insta não muda e perderíamos o registro do que foi publicado). Em vez
+// disso, cria uma NOVA publicação AO LADO — mesmo template/tema, com as travas/cor
+// que o usuário havia fixado — preservando a postada intacta. Vai pra próxima data
+// livre da agenda (reusa gerarPublicacao, que cuida de texto + foto).
+export async function regerarComoNova(id: string) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const p = await prisma.publicacao.findUnique({ where: { id } });
+  if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  const template: Template = (TEMPLATES as readonly string[]).includes(p.template) ? (p.template as Template) : "dica";
+  let ex: Record<string, unknown> = {};
+  try {
+    ex = JSON.parse(p.extra || "{}");
+  } catch {}
+  const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]) : undefined);
+  const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+  return gerarPublicacao({
+    marcaId: p.marcaId,
+    template,
+    tema: p.tema ?? undefined,
+    oferta: str(ex.ofertaTravada),
+    validade: str(ex.validadeTravada),
+    inclui: arr(ex.inclui),
+    regras: str(ex.regras),
+    diferenciais: arr(ex.diferenciaisTravados),
+    categoria: str(ex.categoria),
+    corFundo: str(ex.corFundoTravada),
+  });
+}
+
 // Sugere 3-4 diferenciais ("por que escolher") via IA, a partir do assunto/modelo
 // escolhido — pra preencher/variar o campo ANTES de gerar a publicação (template
 // Divulgação). Cada clique traz uma versão nova (temperatura alta).

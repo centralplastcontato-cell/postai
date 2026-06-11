@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   gerarPublicacao,
   regerarPublicacao,
+  regerarComoNova,
   postarPublicacao,
   excluirPublicacao,
   gerarImagemPublicacao,
@@ -218,15 +219,28 @@ export function PublicacoesAba({
       setSugerindo(false);
     }
   }
-  function handleRegerar(id: string) {
+  function regerar(id: string, comoNova: boolean) {
     setErro(null);
     setProc(id);
     startTransition(async () => {
-      const r = await regerarPublicacao(id);
+      const r = comoNova ? await regerarComoNova(id) : await regerarPublicacao(id);
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
     });
+  }
+  function handleRegerar(p: PublicacaoView) {
+    // Post já no Instagram: não sobrescreve (não muda lá). Avisa e cria uma NOVA ao lado.
+    if (p.status === "postado") {
+      setConfirmacao({
+        titulo: "Essa publicação já está no Instagram",
+        descricao: "Regenerar NÃO substitui a que já foi postada (o Postaí não edita posts publicados). Quer criar uma NOVA versão ao lado, pra postar depois? A original fica intacta.",
+        textoConfirmar: "Criar nova versão",
+        acao: () => regerar(p.id, true),
+      });
+      return;
+    }
+    regerar(p.id, false);
   }
   function handleExcluir(id: string) {
     setConfirmacao({
@@ -608,7 +622,7 @@ export function PublicacoesAba({
                 {ocupado && <p className="mt-1 text-[11px] text-muted">Processando…</p>}
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <button onClick={() => handleRegerar(p.id)} disabled={ocupado} title="Regerar texto" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻ Regerar</button>
+                  <button onClick={() => handleRegerar(p)} disabled={ocupado} title={postado ? "Já postado — cria uma nova versão ao lado" : "Regerar texto"} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻ Regerar</button>
                   <a href={arte} download={`feed-${p.slug}.png`} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">⬇ Baixar</a>
                   <button onClick={() => copiar(p)} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">{copiadoId === p.id ? "✓ Copiado" : "Copiar texto"}</button>
                   <button onClick={() => handleBanco(p.id, p.categoria ?? undefined)} disabled={ocupado} title="Sortear foto real do seu banco de imagens" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲 Banco</button>
