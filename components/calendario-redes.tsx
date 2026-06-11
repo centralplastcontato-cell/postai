@@ -54,10 +54,21 @@ export function CalendarioRedes({
   const planoCar = parseDias(diasCarrossel);
   const planoFeed = parseDias(diasFeed);
 
+  // Um dia pode ter mais de um item (ex: regerar um postado cria uma nova versão no
+  // mesmo dia). O calendário mostra 1 cor por dia, então PRIORIZA o "postado" — se há
+  // qualquer publicação já postada no dia, ele aparece verde (não some no "a postar").
   const carrosselPorDia = new Map<string, Post>();
-  for (const p of posts) carrosselPorDia.set(chaveData(p.data), p);
+  for (const p of posts) {
+    const k = chaveData(p.data);
+    const a = carrosselPorDia.get(k);
+    if (!a || (a.status !== "postado" && p.status === "postado")) carrosselPorDia.set(k, p);
+  }
   const feedPorDia = new Map<string, PublicacaoView>();
-  for (const p of publicacoes) feedPorDia.set(chaveData(p.data), p);
+  for (const p of publicacoes) {
+    const k = chaveData(p.data);
+    const a = feedPorDia.get(k);
+    if (!a || (a.status !== "postado" && p.status === "postado")) feedPorDia.set(k, p);
+  }
 
   function mudarMes(delta: number) {
     setView((v) => {
