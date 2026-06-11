@@ -379,10 +379,14 @@ export async function regerarComoNova(id: string) {
   } catch {}
   const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]) : undefined);
   const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+  // A nova versão cai em HOJE (data BRT), do lado do original — mesmo que o dia já
+  // tenha outro post (decisão do dono: ver a nova na hora, sem ir pra data distante).
+  const hojeBRT = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   return gerarPublicacao({
     marcaId: p.marcaId,
     template,
     tema: p.tema ?? undefined,
+    data: hojeBRT,
     oferta: str(ex.ofertaTravada),
     validade: str(ex.validadeTravada),
     inclui: arr(ex.inclui),

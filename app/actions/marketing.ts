@@ -275,28 +275,9 @@ export async function regerarCarrossel(id: string) {
   return { ok: true as const, id };
 }
 
-// Próxima data livre de carrossel (dias da agenda da marca ainda sem conteúdo).
-async function proximaDataCarrossel(marca: Marca): Promise<string> {
-  const dias = marca.diasCarrossel.split(",").map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
-  const usadas = new Set(
-    (await prisma.conteudo.findMany({ where: { marcaId: marca.id }, select: { data: true } })).map((c) => c.data.toISOString().slice(0, 10)),
-  );
-  const hoje = new Date();
-  for (let i = 0; i < 60; i++) {
-    const d = new Date(hoje);
-    d.setDate(hoje.getDate() + i);
-    if (dias.length && !dias.includes(d.getDay())) continue;
-    const iso = d.toISOString().slice(0, 10);
-    if (!usadas.has(iso)) return iso;
-  }
-  const amanha = new Date(hoje);
-  amanha.setDate(hoje.getDate() + 1);
-  return amanha.toISOString().slice(0, 10);
-}
-
 // Carrossel JÁ postado: "regerar" não deve sobrescrever (não muda no Insta). Cria um
-// NOVO carrossel ao lado — mesmo tema, nº de slides e capa-mosaico — na próxima data
-// livre, preservando o postado. Reusa gerarCarrossel (texto + fotos).
+// NOVO carrossel ao lado — mesmo tema, nº de slides e capa-mosaico — em HOJE (data
+// BRT), preservando o postado. Reusa gerarCarrossel (texto + fotos).
 export async function regerarCarrosselComoNova(id: string) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const atual = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
@@ -308,7 +289,7 @@ export async function regerarCarrosselComoNova(id: string) {
     nSlides = arr.length || 7;
     eraMosaico = arr[0]?.tipo === "mosaico";
   } catch {}
-  const data = await proximaDataCarrossel(atual.marca);
+  const data = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   return gerarCarrossel({ marcaId: atual.marcaId, tema: atual.tema, data, nSlides, mosaico: eraMosaico });
 }
 
