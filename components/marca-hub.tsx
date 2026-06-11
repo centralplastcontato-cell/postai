@@ -59,7 +59,7 @@ export function MarcaHub({
       </div>
 
       <div className="mt-6">
-        {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} />}
+        {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} paleta={marca.paleta} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
         {aba === "config" && <MarcaForm marca={marca} />}
       </div>

@@ -88,8 +88,9 @@ export async function GET(req: Request) {
       titulo: montarTituloColorido(tituloParam || "Festeje a Copa 2026!", paleta),
       oferta: "10 CRIANÇAS GRÁTIS",
       inclui: ["2h de salão exclusivo", "Monitor de recreação", "Decoração temática", "Bolo e docinhos"],
-      validade: "Válido até 30/06",
+      validade: url.searchParams.get("validade") || "30/06/2026",
       regras: "Seg a qui · mediante reserva · não cumulativo",
+      corFundo: url.searchParams.get("cor") || undefined,
     });
   }
 

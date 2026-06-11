@@ -19,6 +19,14 @@ export type DadosArte = {
   corFundo?: string; // cor de fundo (default: azul da paleta)
 };
 
+// Dá contexto à validade: se for uma DATA pura (ex: "30/06/2026", "30/06"),
+// prefixa "Válido até" — senão (ex: "Datas de julho", "Enquanto durar") deixa igual.
+export function rotularValidade(v?: string): string {
+  const s = (v || "").trim();
+  if (!s) return "";
+  return /^\d{1,2}[/.\-]\d{1,2}([/.\-]\d{2,4})?$/.test(s) ? `Válido até ${s}` : s;
+}
+
 // 🎉 Promoção / Oferta — fundo colorido festa + selo + CTA WhatsApp.
 export function LayoutPromocao(d: DadosArte) {
   const [c1, c2, c3, c4, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[3] || d.paleta[0], d.paleta[4] || d.paleta[0]];
@@ -42,7 +50,7 @@ export function LayoutPromocao(d: DadosArte) {
       {(() => {
         const itens = (d.inclui || []).filter((s) => s && s.trim()).slice(0, 5);
         const temLista = itens.length > 0;
-        const rodape = [d.validade, d.regras].filter((s) => s && s.trim()).join("  ·  ");
+        const rodape = [rotularValidade(d.validade), d.regras].filter((s) => s && s.trim()).join("  ·  ");
         return (
           <div style={{ display: "flex", flexDirection: "column", padding: "0 80px", marginTop: temLista ? 300 : 360, flexGrow: 1 }}>
             <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 96 : 112} />

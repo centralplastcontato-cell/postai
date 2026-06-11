@@ -16,6 +16,7 @@ import {
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
 import { CATEGORIAS, CATEGORIA_LABEL } from "@/lib/categorias-imagem";
+import { parsePaleta, coresDeFundo } from "@/lib/cores-fundo";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
 
@@ -121,6 +122,7 @@ export function PublicacoesAba({
   dataAlvo,
   onGerado,
   onLimparDia,
+  paleta,
 }: {
   marcaId: string;
   publicacoes: PublicacaoView[];
@@ -128,6 +130,7 @@ export function PublicacoesAba({
   dataAlvo?: string | null;
   onGerado?: () => void;
   onLimparDia?: () => void;
+  paleta?: string; // JSON array de hex da marca (pro seletor de cor de fundo)
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -139,7 +142,12 @@ export function PublicacoesAba({
   const [regras, setRegras] = useState("");
   const [diferenciais, setDiferenciais] = useState("");
   const [categoriaFoto, setCategoriaFoto] = useState("geral");
+  const [corFundo, setCorFundo] = useState(""); // "" = automático (sorteia da paleta)
   const [sugerindo, setSugerindo] = useState(false);
+  // Cores da marca que servem de fundo (escuras). Vazio se a marca não tem paleta.
+  const coresFundo = coresDeFundo(parsePaleta(paleta));
+  // Templates de fundo COLORIDO (onde escolher a cor faz sentido — os com foto não).
+  const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico"];
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
@@ -169,7 +177,7 @@ export function PublicacoesAba({
     startTransition(async () => {
       const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: template === "dica" || template === "mosaico" ? categoriaFoto : undefined });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: template === "dica" || template === "mosaico" ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -178,6 +186,7 @@ export function PublicacoesAba({
         setRegras("");
         setDiferenciais("");
         setCategoriaFoto("geral");
+        setCorFundo("");
         onGerado?.();
         router.refresh();
       } else setErro(r.erro);
@@ -498,6 +507,34 @@ export function PublicacoesAba({
               </label>
             </div>
             <p className="mt-1 text-[11px] text-amber-400/90">🖼️ Usa 4 fotos REAIS do seu Banco de Imagens (em rodízio). Suba fotos na aba <strong>Imagens</strong> se ainda não tiver. Selo/período vazios = sem carimbo.</p>
+          </div>
+        )}
+
+        {/* Seletor de cor de fundo — só pros templates de fundo colorido e se a marca tem paleta */}
+        {TEMPLATES_COR.includes(template) && coresFundo.length > 0 && (
+          <div className="mb-3">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">🎨 Cor de fundo</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCorFundo("")}
+                title="A cor é sorteada da paleta da marca a cada post"
+                className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${corFundo === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}
+              >
+                🎲 Automático
+              </button>
+              {coresFundo.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setCorFundo(c)}
+                  title={c}
+                  aria-label={`Cor ${c}`}
+                  className={`h-9 w-9 rounded-lg border-2 transition ${corFundo.toLowerCase() === c.toLowerCase() ? "border-white ring-2 ring-white/40" : "border-linha hover:border-white/60"}`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
           </div>
         )}
 

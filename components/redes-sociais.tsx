@@ -16,12 +16,14 @@ export function RedesSociais({
   publicacoes,
   diasCarrossel,
   diasFeed,
+  paleta,
 }: {
   marcaId: string;
   posts: Post[];
   publicacoes: PublicacaoView[];
   diasCarrossel: string;
   diasFeed: string;
+  paleta: string; // JSON array de hex da marca (pro seletor de cor)
 }) {
   const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
@@ -92,6 +94,7 @@ export function RedesSociais({
           dataAlvo={dataAlvo}
           onGerado={() => setDataAlvo(null)}
           onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
+          paleta={paleta}
         />
       )}
     </div>

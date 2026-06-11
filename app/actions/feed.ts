@@ -14,7 +14,7 @@ import type { Marca } from "@prisma/client";
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
 // `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
-type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[] };
+type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string };
 
 // Monta o JSON do campo `extra` conforme o template (dados específicos da arte).
 // `travas` são valores digitados pelo usuário — usados exatos e preservados no regerar.
@@ -29,7 +29,8 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
       validade,
       inclui,
       regras: travas?.regras || "",
-      corFundo: escolherFundoFesta(paleta, seed),
+      corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
+      corFundoTravada: travas?.corFundo || undefined,
       // Guarda o que foi digitado pra manter fixo quando o usuário regerar o texto.
       ofertaTravada: travas?.oferta || undefined,
       validadeTravada: travas?.validade || undefined,
@@ -39,7 +40,8 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
     const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
     return JSON.stringify({
       selo: g.selo?.trim() || "",
-      corFundo: escolherFundoFesta(paleta, seed),
+      corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
+      corFundoTravada: travas?.corFundo || undefined,
     });
   }
   if (template === "divulgacao") {
@@ -48,7 +50,8 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
     const diferenciais = (manuais.length ? manuais : g.diferenciais || []).map((s) => s.trim()).filter(Boolean).slice(0, 4);
     return JSON.stringify({
       diferenciais,
-      corFundo: escolherFundoFesta(paleta, seed),
+      corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
+      corFundoTravada: travas?.corFundo || undefined,
       // Mantém fixos os diferenciais digitados ao regerar o texto.
       diferenciaisTravados: manuais.length ? manuais : undefined,
     });
@@ -70,7 +73,8 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
       oferta,
       validade,
       categoria: cat || undefined,
-      corFundo: escolherFundoFesta(paleta, seed),
+      corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
+      corFundoTravada: travas?.corFundo || undefined,
       ofertaTravada: travas?.oferta || undefined,
       validadeTravada: travas?.validade || undefined,
     });
@@ -245,6 +249,7 @@ export async function gerarPublicacao(input: {
   regras?: string;
   diferenciais?: string[];
   categoria?: string; // categoria do banco pra puxar a foto (templates com foto)
+  corFundo?: string; // cor de fundo escolhida (vazio = automático/sorteio)
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
@@ -265,6 +270,8 @@ export async function gerarPublicacao(input: {
   } else if (template === "mosaico") {
     travas = { oferta: input.oferta?.trim() || undefined, validade: input.validade?.trim() || undefined };
   }
+  // Cor de fundo escolhida pelo usuário (vale pra todos os templates de fundo colorido).
+  travas.corFundo = input.corFundo?.trim() || undefined;
 
   let gerado: Gerado;
   try {
@@ -324,6 +331,7 @@ export async function regerarPublicacao(id: string) {
       inclui: Array.isArray(ex.inclui) ? ex.inclui : [],
       regras: ex.regras || undefined,
       diferenciais: Array.isArray(ex.diferenciaisTravados) ? ex.diferenciaisTravados : [],
+      corFundo: typeof ex.corFundoTravada === "string" ? ex.corFundoTravada : undefined,
     };
     categoria = typeof ex.categoria === "string" ? ex.categoria : undefined;
   } catch {}
