@@ -16,6 +16,7 @@ import {
   sugerirTemas,
   marcarConteudo,
 } from "@/app/actions/marketing";
+import { excluirConteudo } from "@/app/actions/excluir";
 import { ConfirmDialog } from "./confirm-dialog";
 
 // Temas prontos de carrossel (clique preenche o campo Tema). Ângulos que funcionam
@@ -55,6 +56,12 @@ function dataBR(iso: string): string {
   });
 }
 
+const POR_PAGINA = 6;
+
+function chaveDiaSP(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
+}
+
 export function MarketingCalendario({
   marcaId,
   posts,
@@ -62,6 +69,7 @@ export function MarketingCalendario({
   onSelId,
   dataAlvo,
   onGerado,
+  onLimparDia,
 }: {
   marcaId: string;
   posts: Post[];
@@ -69,6 +77,7 @@ export function MarketingCalendario({
   onSelId: (id: string | null) => void;
   dataAlvo: string | null;
   onGerado: () => void;
+  onLimparDia?: () => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -87,8 +96,19 @@ export function MarketingCalendario({
   const [sugerindo, setSugerindo] = useState(false);
   const [postarAlvo, setPostarAlvo] = useState<Post | null>(null);
   const [regerarPostado, setRegerarPostado] = useState<Post | null>(null);
+  const [excluirAlvo, setExcluirAlvo] = useState<Post | null>(null);
+  const [pagina, setPagina] = useState(1);
+  const [legendaCardId, setLegendaCardId] = useState<string | null>(null);
+  const [copiadoId, setCopiadoId] = useState<string | null>(null);
 
   const selecionado = posts.find((p) => p.id === selId) ?? null;
+
+  // Grade de cards: filtra por dia clicado (se houver) e pagina o resto — mesma cara
+  // das Publicações, pra ambas as abas serem iguais.
+  const filtrados = dataAlvo ? posts.filter((p) => chaveDiaSP(p.data) === dataAlvo) : posts;
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
+  const pagAtual = Math.min(pagina, totalPaginas);
+  const visiveis = dataAlvo ? filtrados : filtrados.slice((pagAtual - 1) * POR_PAGINA, pagAtual * POR_PAGINA);
 
   // Ao escolher um dia comemorativo, já sugere o tema do carrossel com a data
   // (ex: "Dia dos Namorados"). O dono ajusta ou gera direto.
@@ -155,6 +175,20 @@ export function MarketingCalendario({
     } finally {
       setPostando(false);
     }
+  }
+  function confirmarExcluir(p: Post) {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.append("id", p.id);
+      await excluirConteudo(fd);
+      if (selId === p.id) onSelId(null);
+      router.refresh();
+    });
+  }
+  function copiarCard(p: Post) {
+    navigator.clipboard.writeText(`${p.legenda}\n\n${p.hashtags}`);
+    setCopiadoId(p.id);
+    setTimeout(() => setCopiadoId((c) => (c === p.id ? null : c)), 1500);
   }
   function handleGerarImagem(id: string, indice: number) {
     setErro(null);
@@ -323,7 +357,75 @@ export function MarketingCalendario({
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
       </div>
 
-      {/* Detalhe do post selecionado */}
+      {/* Grade de cards (mesma cara das Publicações): filtro por dia + paginação */}
+      {posts.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          {dataAlvo ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/40 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-200">📅 {dataBR(`${dataAlvo}T12:00:00-03:00`)} · só esse dia</span>
+          ) : (
+            <span className="text-xs text-muted">{filtrados.length} {filtrados.length === 1 ? "carrossel" : "carrosséis"}</span>
+          )}
+          {dataAlvo ? (
+            <button type="button" onClick={() => onLimparDia?.()} className="rounded-md border border-linha px-3 py-1 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">📋 Ver todos</button>
+          ) : totalPaginas > 1 ? (
+            <div className="flex items-center gap-2 text-xs">
+              <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagAtual <= 1} className="rounded-md border border-linha px-2.5 py-1 text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">◀</button>
+              <span className="text-muted">Página {pagAtual}/{totalPaginas}</span>
+              <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={pagAtual >= totalPaginas} className="rounded-md border border-linha px-2.5 py-1 text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">▶</button>
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {posts.length === 0 ? (
+        <p className="mb-8 rounded-xl border border-dashed border-linha bg-preto-card p-8 text-center text-sm text-muted">Nenhum carrossel ainda. Escolha um tema acima e clique em Gerar.</p>
+      ) : filtrados.length === 0 ? (
+        <p className="mb-8 rounded-xl border border-dashed border-linha bg-preto-card p-8 text-center text-sm text-muted">Nenhum carrossel nesse dia. <button type="button" onClick={() => onLimparDia?.()} className="font-semibold text-orange-300 underline">Ver todos</button> ou gere um acima.</p>
+      ) : (
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {visiveis.map((p) => {
+            const postado = p.status === "postado";
+            const aberto = selId === p.id;
+            const capa = p.slides[0];
+            return (
+              <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${aberto ? "border-orange-500 ring-2 ring-orange-500/50" : "border-linha"}`}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-xs text-muted">{dataBR(p.data)}</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
+                </div>
+                <button type="button" onClick={() => onSelId(aberto ? null : p.id)} title={aberto ? "Fechar detalhe" : "Abrir / editar slides"} className="overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
+                  {capa ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={capa} alt={p.titulo} className="aspect-[4/5] w-full object-cover" />
+                  ) : (
+                    <div className="flex aspect-[4/5] w-full items-center justify-center bg-preto text-xs text-muted">sem capa</div>
+                  )}
+                </button>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted">🖼️ Carrossel · {p.slides.length} slides</p>
+                <p className="line-clamp-2 text-sm text-white">{p.titulo}</p>
+
+                <div className="mt-2">
+                  <button type="button" onClick={() => setLegendaCardId((c) => (c === p.id ? null : p.id))} className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted transition hover:text-white"><span>{legendaCardId === p.id ? "▾" : "▸"}</span> Legenda + hashtags</button>
+                  {legendaCardId === p.id && (
+                    <pre className="scroll-bonito mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-linha bg-preto p-2.5 text-xs text-white">{p.legenda}{p.hashtags ? `\n\n${p.hashtags}` : ""}</pre>
+                  )}
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <button onClick={() => onSelId(aberto ? null : p.id)} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">{aberto ? "▾ Fechar" : "✏️ Editar slides"}</button>
+                  {p.tema && <button onClick={() => handleRegerar(p)} disabled={isPending} title={postado ? "Já postado — cria um novo ao lado" : "Regerar"} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻ Regerar</button>}
+                  <button onClick={() => baixarTodas(p)} disabled={baixando} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">⬇ Baixar</button>
+                  <button onClick={() => copiarCard(p)} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">{copiadoId === p.id ? "✓ Copiado" : "Copiar"}</button>
+                  {!postado && <button onClick={() => handlePostar(p)} disabled={postando} className="rounded-md bg-[#C13584] px-2.5 py-1 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50">📷 Postar</button>}
+                  <button onClick={() => setExcluirAlvo(p)} title="Excluir carrossel" className="rounded-md border border-red-900 px-2 py-1 text-xs text-red-400 transition hover:bg-red-950/40">🗑</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Detalhe do post selecionado (abre ao clicar num card) */}
       {selecionado && (
         <div className="mb-8 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -405,6 +507,18 @@ export function MarketingCalendario({
           setRegerarPostado(null);
         }}
         onCancelar={() => setRegerarPostado(null)}
+      />
+
+      <ConfirmDialog
+        aberto={!!excluirAlvo}
+        titulo="Excluir este carrossel?"
+        descricao={excluirAlvo ? `"${excluirAlvo.titulo}" será apagado daqui. (Não remove do Instagram se já foi postado.)` : undefined}
+        textoConfirmar="Excluir"
+        onConfirmar={() => {
+          if (excluirAlvo) confirmarExcluir(excluirAlvo);
+          setExcluirAlvo(null);
+        }}
+        onCancelar={() => setExcluirAlvo(null)}
       />
     </div>
   );

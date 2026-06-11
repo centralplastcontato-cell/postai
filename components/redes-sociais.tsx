@@ -81,6 +81,7 @@ export function RedesSociais({
             onSelId={(id) => setSelecao(id ? { tipo: "carrossel", id } : null)}
             dataAlvo={dataAlvo}
             onGerado={() => setDataAlvo(null)}
+            onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
           />
           <AniversariantesForm marcaId={marcaId} dataAlvo={dataAlvo} onGerado={() => setDataAlvo(null)} />
         </>
