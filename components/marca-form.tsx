@@ -103,8 +103,24 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
     setTeste(null);
     setTestando(true);
     try {
-      const r = await testarConexao({ igUserId: f.igUserId, accessToken: f.accessToken });
-      setTeste(r.ok ? `✓ Conectado: @${r.username}` : `✕ ${r.erro}`);
+      const igUserId = f.igUserId.trim();
+      const accessToken = f.accessToken.trim();
+      const r = await testarConexao({ igUserId, accessToken });
+      if (!r.ok) {
+        setTeste(`✕ ${r.erro}`);
+        return;
+      }
+      // Conexão válida: GRAVA na hora. Sem isso, se o usuário trocar de aba (o
+      // formulário é desmontado pelo MarcaHub) o que ele colou se perde, e um
+      // "Salvar" posterior gravaria os valores antigos do banco.
+      const s = await salvarMarca({ id: f.id, igUserId, accessToken });
+      if (s?.ok) {
+        setF((cur) => ({ ...cur, igUserId, accessToken }));
+        setTeste(`✓ Conectado e salvo: @${r.username}`);
+        router.refresh();
+      } else {
+        setTeste(`✓ Conectado, mas não consegui salvar: ${s?.erro || "erro"}`);
+      }
     } finally {
       setTestando(false);
     }
@@ -231,13 +247,13 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
       {/* Conexão Instagram */}
       <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
         <h3 className="mb-1 text-sm font-semibold text-white">Conexão com o Instagram</h3>
-        <p className="mb-3 text-xs text-muted">Cole o IG User ID e o token do Usuário do Sistema desta conta (com permissão de publicar).</p>
+        <p className="mb-3 text-xs text-muted">Cole o IG User ID e o token do Usuário do Sistema desta conta (com permissão de publicar). Ao testar com sucesso, a conexão é <strong className="text-white">salva na hora</strong> — não precisa clicar em Salvar embaixo.</p>
         <div className="grid grid-cols-1 gap-3">
-          <label className="text-xs text-muted">IG User ID<input value={f.igUserId} onChange={(e) => set("igUserId", e.target.value)} placeholder="17841400000000000" className={inp} /></label>
-          <label className="text-xs text-muted">Access Token<input value={f.accessToken} onChange={(e) => set("accessToken", e.target.value)} placeholder="EAA..." className={inp} /></label>
+          <label className="text-xs text-muted">IG User ID<input value={f.igUserId} onChange={(e) => set("igUserId", e.target.value)} placeholder="17841400000000000" autoComplete="off" className={inp} /></label>
+          <label className="text-xs text-muted">Access Token<input value={f.accessToken} onChange={(e) => set("accessToken", e.target.value)} placeholder="EAA..." autoComplete="off" className={inp} /></label>
         </div>
         <div className="mt-3 flex items-center gap-3">
-          <button onClick={handleTestar} disabled={testando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho disabled:opacity-50">{testando ? "Testando…" : "Testar conexão"}</button>
+          <button onClick={handleTestar} disabled={testando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho disabled:opacity-50">{testando ? "Testando…" : "Testar e salvar conexão"}</button>
           {teste && <span className={`text-sm ${teste.startsWith("✓") ? "text-green-400" : "text-red-400"}`}>{teste}</span>}
         </div>
       </section>
