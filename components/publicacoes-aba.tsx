@@ -627,7 +627,7 @@ export function PublicacoesAba({
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-muted">{dataBR(p.data)}</span>
                   <div className="flex items-center gap-1.5">
-                    {p.aprovado && <span title="Você já revisou este post" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Revisado</span>}
+                    {p.aprovado && <span title="Você já aprovou este post" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Aprovado</span>}
                     <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
                   </div>
                 </div>
