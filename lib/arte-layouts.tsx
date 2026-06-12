@@ -403,6 +403,9 @@ export function LayoutMosaico(d: DadosArte & { fotos?: string[]; arraste?: boole
   const fundo = d.corFundo || escolherFundoFesta(d.paleta);
   const fotos = (d.fotos || []).filter(Boolean).slice(0, 4);
   const logoW = Math.round(80 * 1.76);
+  // Fonte do selo encolhe conforme o texto cresce, pra não cortar dentro do círculo.
+  const ofLen = (d.oferta || "").length;
+  const ofFont = ofLen > 30 ? 33 : ofLen > 18 ? 39 : 46;
   // Círculos das fotos (maior primeiro): coluna à direita estilo capa de buffet.
   const slots = [
     { size: 400, top: 60, left: 600 },
@@ -456,8 +459,8 @@ export function LayoutMosaico(d: DadosArte & { fotos?: string[]; arraste?: boole
 
       {/* Selo de oferta (carimbo circular) — só quando há oferta */}
       {d.oferta ? (
-        <div style={{ position: "absolute", top: 560, left: 70, width: 250, height: 250, borderRadius: 9999, backgroundColor: "#fff", border: `6px solid ${c1}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", transform: "rotate(-7deg)", boxShadow: "0 10px 24px rgba(0,0,0,0.3)", padding: 18 }}>
-          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 42, color: c1, textAlign: "center", lineHeight: 1.0 }}>{d.oferta}</div>
+        <div style={{ position: "absolute", top: 540, left: 56, width: 320, height: 320, borderRadius: 9999, backgroundColor: "#fff", border: `6px solid ${c1}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", transform: "rotate(-7deg)", boxShadow: "0 10px 24px rgba(0,0,0,0.3)", padding: 42 }}>
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: ofFont, color: c1, textAlign: "center", lineHeight: 1.05 }}>{d.oferta}</div>
           {d.validade ? <div style={{ display: "flex", marginTop: 12, fontFamily: "Fredoka", fontSize: 22, color: PRETO, textAlign: "center", lineHeight: 1.1 }}>{d.validade}</div> : null}
         </div>
       ) : null}
