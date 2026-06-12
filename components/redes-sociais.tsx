@@ -67,6 +67,20 @@ export function RedesSociais({
         />
       </div>
 
+      {/* Filtro de DIA (global): vem do calendário e vale pras DUAS abas. Fica aqui em
+          cima, único, pra deixar claro que "Ver todos os dias" tira o filtro de data —
+          não tem a ver com "carrosséis vs publicações" (cada aba mostra seu tipo). */}
+      {dataAlvo && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-orange-500/40 bg-orange-500/10 px-3 py-2">
+          <span className="text-xs font-semibold text-orange-200">
+            📅 Mostrando só {new Date(`${dataAlvo}T12:00:00-03:00`).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "short" })} · vale pras duas abas
+          </span>
+          <button onClick={() => { setDataAlvo(null); setSelecao(null); }} className="rounded-md border border-linha bg-preto px-3 py-1 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">
+            📋 Ver todos os dias
+          </button>
+        </div>
+      )}
+
       <div className="mb-5 flex gap-2">
         <button onClick={() => setSubaba("carrosseis")} className={cls(subaba === "carrosseis", "bg-orange-500")}>🖼️ Carrosséis</button>
         <button onClick={() => setSubaba("publicacoes")} className={cls(subaba === "publicacoes", "bg-sky-600")}>📱 Publicações</button>

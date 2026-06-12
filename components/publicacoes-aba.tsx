@@ -589,19 +589,12 @@ export function PublicacoesAba({
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
       </div>
 
-      {/* Filtro por dia + paginação (clique num dia do calendário pra ver só ele) */}
+      {/* Contagem + paginação (o filtro por dia + "Ver todos" agora ficam no topo,
+          acima das abas, pois são globais — ver redes-sociais.tsx). */}
       {publicacoes.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          {dataAlvo ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-200">
-              📅 {dataBR(`${dataAlvo}T12:00:00-03:00`)} · só esse dia
-            </span>
-          ) : (
-            <span className="text-xs text-muted">{filtradas.length} {filtradas.length === 1 ? "publicação" : "publicações"}</span>
-          )}
-          {dataAlvo ? (
-            <button type="button" onClick={() => onLimparDia?.()} className="rounded-md border border-linha px-3 py-1 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">📋 Ver todas</button>
-          ) : totalPaginas > 1 ? (
+          <span className="text-xs text-muted">{filtradas.length} {filtradas.length === 1 ? "publicação" : "publicações"}{dataAlvo ? " nesse dia" : ""}</span>
+          {!dataAlvo && totalPaginas > 1 ? (
             <div className="flex items-center gap-2 text-xs">
               <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagAtual <= 1} className="rounded-md border border-linha px-2.5 py-1 text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">◀</button>
               <span className="text-muted">Página {pagAtual}/{totalPaginas}</span>

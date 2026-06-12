@@ -428,17 +428,12 @@ export function MarketingCalendario({
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
       </div>
 
-      {/* Grade de cards (mesma cara das Publicações): filtro por dia + paginação */}
+      {/* Contagem + paginação (o filtro por dia + "Ver todos" agora ficam no topo,
+          acima das abas, pois são globais — ver redes-sociais.tsx). */}
       {posts.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          {dataAlvo ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/40 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-200">📅 {dataBR(`${dataAlvo}T12:00:00-03:00`)} · só esse dia</span>
-          ) : (
-            <span className="text-xs text-muted">{filtrados.length} {filtrados.length === 1 ? "carrossel" : "carrosséis"}</span>
-          )}
-          {dataAlvo ? (
-            <button type="button" onClick={() => onLimparDia?.()} className="rounded-md border border-linha px-3 py-1 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">📋 Ver todos</button>
-          ) : totalPaginas > 1 ? (
+          <span className="text-xs text-muted">{filtrados.length} {filtrados.length === 1 ? "carrossel" : "carrosséis"}{dataAlvo ? " nesse dia" : ""}</span>
+          {!dataAlvo && totalPaginas > 1 ? (
             <div className="flex items-center gap-2 text-xs">
               <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagAtual <= 1} className="rounded-md border border-linha px-2.5 py-1 text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">◀</button>
               <span className="text-muted">Página {pagAtual}/{totalPaginas}</span>
