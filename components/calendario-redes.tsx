@@ -1,9 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { excluirConteudo, excluirPublicacao } from "@/app/actions/excluir";
-import { ConfirmDialog } from "./confirm-dialog";
+import { useState } from "react";
 import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
@@ -174,8 +171,6 @@ export function CalendarioRedes({
               : "bg-sky-600 hover:bg-sky-500";
 
           return (
-            // div (não button) porque tem o DeleteButton dentro — button aninhado
-            // em button quebra a hidratação do React.
             <div
               key={i}
               role="button"
@@ -192,8 +187,6 @@ export function CalendarioRedes({
               {item.aprovado && <span title="Você já revisou este dia" className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white text-[9px] font-bold leading-none text-green-600">✓</span>}
               {diaCel}
               {comemorativa && <TooltipData emoji={comemorativa.emoji} nome={comemorativa.nome} rodape={item.titulo} />}
-              {/* Delete button */}
-              <DeleteButton tipo={tipo} id={item.id} />
             </div>
           );
         })}
@@ -216,44 +209,3 @@ function TooltipData({ emoji, nome, rodape }: { emoji: string; nome: string; rod
   );
 }
 
-function DeleteButton({ tipo, id }: { tipo: "carrossel" | "feed"; id: string }) {
-  const router = useRouter();
-  const [aberto, setAberto] = useState(false);
-  const [ocupado, startTransition] = useTransition();
-
-  function confirmar() {
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.append("id", id);
-      if (tipo === "carrossel") await excluirConteudo(fd);
-      else await excluirPublicacao(fd);
-      setAberto(false);
-      router.refresh();
-    });
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={(ev) => {
-          ev.stopPropagation();
-          setAberto(true);
-        }}
-        title="Excluir"
-        className="absolute right-1 top-1 z-10 rounded bg-black/30 px-1.5 py-0.5 text-xs text-red-400 opacity-90 hover:bg-red-900/30"
-      >
-        🗑
-      </button>
-      <ConfirmDialog
-        aberto={aberto}
-        titulo={tipo === "carrossel" ? "Excluir este carrossel?" : "Excluir esta publicação?"}
-        descricao="A ação não pode ser desfeita."
-        textoConfirmar="Excluir"
-        onConfirmar={confirmar}
-        onCancelar={() => setAberto(false)}
-        ocupado={ocupado}
-      />
-    </>
-  );
-}
