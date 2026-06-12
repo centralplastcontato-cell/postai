@@ -156,8 +156,12 @@ export function MarketingCalendario({
   // Data comemorativa do dia escolhido (ex: 24/jun = São João). Mostra um aviso e
   // deixa o dono ATIVAR o tema da data (não sobrescreve mais sozinho o que ele digita).
   const comemorativa = dataAlvo ? dataComemorativaDe(dataAlvo) : undefined;
+  // Ativar a data: além do tema, já deixa a capa no estilo Colorida (festivo) — dá
+  // mais "cara de comemoração" à arte. O dono pode trocar o estilo/cor depois.
   function usarTemaData() {
-    if (comemorativa?.sugestao) setTema(comemorativa.sugestao);
+    if (!comemorativa?.sugestao) return;
+    setTema(comemorativa.sugestao);
+    setEstiloCapa("festiva");
   }
 
   function handleGerar() {
@@ -378,10 +382,11 @@ export function MarketingCalendario({
               <button
                 type="button"
                 onClick={usarTemaData}
-                disabled={tema.trim() === comemorativa.sugestao}
+                disabled={tema.trim() === comemorativa.sugestao && estiloCapa === "festiva"}
+                title="Preenche o tema da data e deixa a capa no estilo Colorida (festivo)"
                 className="rounded-md border border-amber-500/50 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/25 disabled:opacity-50"
               >
-                {tema.trim() === comemorativa.sugestao ? "✓ Tema da data ativo" : `Usar tema: ${comemorativa.sugestao}`}
+                {tema.trim() === comemorativa.sugestao && estiloCapa === "festiva" ? "✓ Data ativada (tema + capa festiva)" : `🎉 Ativar data: ${comemorativa.sugestao}`}
               </button>
             )}
           </div>
