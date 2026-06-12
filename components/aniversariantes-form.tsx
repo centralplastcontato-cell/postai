@@ -28,7 +28,7 @@ export function AniversariantesForm({
 }: {
   marcaId: string;
   dataAlvo: string | null;
-  onGerado: () => void;
+  onGerado: (dia?: string) => void;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -76,7 +76,7 @@ export function AniversariantesForm({
       if (r.ok) {
         setItens([novoItem()]);
         setSemana("");
-        onGerado();
+        onGerado(dataAlvo ?? undefined); // filtra a lista no dia gerado (não abre todos)
         router.refresh();
       } else setErro(r.erro);
     });

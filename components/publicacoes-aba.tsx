@@ -131,7 +131,7 @@ export function PublicacoesAba({
   publicacoes: PublicacaoView[];
   destacarId?: string | null;
   dataAlvo?: string | null;
-  onGerado?: () => void;
+  onGerado?: (dia?: string) => void;
   onLimparDia?: () => void;
   paleta?: string; // JSON array de hex da marca (pro seletor de cor de fundo)
 }) {
@@ -190,7 +190,7 @@ export function PublicacoesAba({
         setDiferenciais("");
         setCategoriaFoto("geral");
         setCorFundo("");
-        onGerado?.();
+        onGerado?.(r.dia); // filtra a lista no dia da nova publicação (não abre todas)
         router.refresh();
       } else setErro(r.erro);
     });

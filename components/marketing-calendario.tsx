@@ -88,7 +88,7 @@ export function MarketingCalendario({
   selId: string | null;
   onSelId: (id: string | null) => void;
   dataAlvo: string | null;
-  onGerado: () => void;
+  onGerado: (dia?: string) => void;
   onLimparDia?: () => void;
 }) {
   const router = useRouter();
@@ -141,7 +141,7 @@ export function MarketingCalendario({
       if (r.ok) {
         setTema("");
         onSelId(r.id);
-        onGerado();
+        onGerado(dataAlvo ?? undefined); // filtra a lista no dia gerado (não abre todos)
         router.refresh();
       } else setErro(r.erro);
     });

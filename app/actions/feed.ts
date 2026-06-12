@@ -311,7 +311,10 @@ export async function gerarPublicacao(input: {
     await aplicarFotosMosaico(criado.id, marca.id, input.categoria).catch(() => {});
   }
   revalidatePath(`/painel/marcas/${marca.id}`);
-  return { ok: true as const, id: criado.id };
+  // Devolve o DIA (chave SP) da publicação criada — a UI usa pra filtrar a lista só
+  // nesse dia (em vez de abrir tudo). Ver mais é só clicar em "Ver todas".
+  const dia = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(data);
+  return { ok: true as const, id: criado.id, dia };
 }
 
 export async function regerarPublicacao(id: string) {

@@ -80,10 +80,10 @@ export function RedesSociais({
             selId={selecao?.tipo === "carrossel" ? selecao.id : null}
             onSelId={(id) => setSelecao(id ? { tipo: "carrossel", id } : null)}
             dataAlvo={dataAlvo}
-            onGerado={() => setDataAlvo(null)}
+            onGerado={(dia) => setDataAlvo(dia ?? null)}
             onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
           />
-          <AniversariantesForm marcaId={marcaId} dataAlvo={dataAlvo} onGerado={() => setDataAlvo(null)} />
+          <AniversariantesForm marcaId={marcaId} dataAlvo={dataAlvo} onGerado={(dia) => setDataAlvo(dia ?? null)} />
         </>
       )}
 
@@ -93,7 +93,7 @@ export function RedesSociais({
           publicacoes={publicacoes}
           destacarId={selecao?.tipo === "feed" ? selecao.id : null}
           dataAlvo={dataAlvo}
-          onGerado={() => setDataAlvo(null)}
+          onGerado={(dia) => setDataAlvo(dia ?? null)}
           onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
           paleta={paleta}
         />
