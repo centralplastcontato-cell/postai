@@ -130,11 +130,23 @@ export function Confete({ cores }: { cores: string[] }) {
   );
 }
 
-export function TituloMulticolor({ linhas, fontSize = 100 }: { linhas: { t: string; c: string }[]; fontSize?: number }) {
+// Garante legibilidade: se a cor do texto "some" no fundo (contraste de luminância
+// baixo, ex: verde sobre verde), troca por branco (fundo escuro) ou preto (claro).
+// Razão de contraste estilo WCAG; abaixo de ~2 o texto fica ilegível mesmo grande.
+export function corContraste(cor: string, fundo?: string): string {
+  if (!fundo) return cor;
+  const lc = luminancia(cor) + 0.05;
+  const lf = luminancia(fundo) + 0.05;
+  const razao = Math.max(lc, lf) / Math.min(lc, lf);
+  if (razao >= 2) return cor;
+  return luminancia(fundo) < 0.5 ? BRANCO : PRETO;
+}
+
+export function TituloMulticolor({ linhas, fontSize = 100, fundo }: { linhas: { t: string; c: string }[]; fontSize?: number; fundo?: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", fontFamily: "Fredoka" }}>
       {linhas.map((l, i) => (
-        <div key={i} style={{ display: "flex", fontSize, color: l.c, lineHeight: 1.0, textShadow: contorno(), letterSpacing: 1 }}>
+        <div key={i} style={{ display: "flex", fontSize, color: corContraste(l.c, fundo), lineHeight: 1.0, textShadow: contorno(), letterSpacing: 1 }}>
           {l.t}
         </div>
       ))}

@@ -1,7 +1,7 @@
 // Layouts completos (canvas 1080x1350) por template, reaproveitados pelo route de
 // produção e pela rota de preview. Cada função recebe os dados já prontos e
 // devolve o JSX para o ImageResponse.
-import { Confete, OndaBase, TituloMulticolor, CtaWhatsApp, LogoSolto, escolherFundoFesta, contorno, BRANCO, PRETO } from "@/lib/arte";
+import { Confete, OndaBase, TituloMulticolor, CtaWhatsApp, LogoSolto, escolherFundoFesta, contorno, corContraste, BRANCO, PRETO } from "@/lib/arte";
 
 export type DadosArte = {
   paleta: string[];
@@ -58,7 +58,7 @@ export function LayoutPromocao(d: DadosArte) {
         const margemTopo = Math.max(120, (nLinhas >= 4 ? 200 : nLinhas === 3 ? 270 : 350) - (temLista ? 50 : 0) - itens.length * 12);
         return (
           <div style={{ display: "flex", flexDirection: "column", padding: "0 80px", marginTop: margemTopo, flexGrow: 1 }}>
-            <TituloMulticolor linhas={d.titulo} fontSize={fonteTitulo} />
+            <TituloMulticolor linhas={d.titulo} fontSize={fonteTitulo} fundo={fundo} />
 
             {d.oferta ? (
               <div style={{ display: "flex", marginTop: 30 }}>
@@ -209,7 +209,7 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Fredoka" }}>
             {d.titulo.map((l, i) => (
-              <div key={i} style={{ display: "flex", fontSize: d.titulo.length >= 3 ? 104 : 124, color: l.c, lineHeight: 1.0, textShadow: contorno(), letterSpacing: 1, textAlign: "center" }}>
+              <div key={i} style={{ display: "flex", fontSize: d.titulo.length >= 3 ? 104 : 124, color: corContraste(l.c, d.imagemUrl ? undefined : fundo), lineHeight: 1.0, textShadow: contorno(), letterSpacing: 1, textAlign: "center" }}>
                 {l.t}
               </div>
             ))}
@@ -257,7 +257,7 @@ export function LayoutDivulgacao(d: DadosArte) {
       {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
 
       <div style={{ display: "flex", flexDirection: "column", padding: "0 80px", marginTop: 300, flexGrow: 1 }}>
-        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 92 : 108} />
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 92 : 108} fundo={fundo} />
 
         {d.textoApoio && itens.length === 0 ? (
           <div style={{ display: "flex", marginTop: 26, fontSize: 42, color: BRANCO, lineHeight: 1.25, textShadow: "0 2px 6px rgba(0,0,0,0.45)", maxWidth: 840 }}>
@@ -322,7 +322,7 @@ export function LayoutAnivCapa(d: DadosArte) {
       ) : <div style={{ display: "flex" }} />}
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 104 : 120} />
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 104 : 120} fundo={fundo} />
         {d.textoApoio ? (
           <div style={{ display: "flex", marginTop: 28, fontFamily: "Fredoka", fontSize: 42, color: PRETO, backgroundColor: c3, padding: "12px 38px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.22)" }}>
             {d.textoApoio}
@@ -451,7 +451,7 @@ export function LayoutMosaico(d: DadosArte & { fotos?: string[]; arraste?: boole
 
       {/* Título multicolor (canto superior esquerdo) */}
       <div style={{ position: "absolute", top: 200, left: 64, display: "flex", flexDirection: "column", maxWidth: 480 }}>
-        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 76 : 92} />
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 76 : 92} fundo={fundo} />
       </div>
 
       {/* Selo de oferta (carimbo circular) — só quando há oferta */}
@@ -497,7 +497,7 @@ export function LayoutCapaFestiva(d: DadosArte & { arraste?: boolean }) {
       {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "0 80px", flexGrow: 1 }}>
-        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 104 : 124} />
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 104 : 124} fundo={fundo} />
         {d.textoApoio ? (
           <div style={{ display: "flex", marginTop: 30, maxWidth: 880, fontSize: 44, color: BRANCO, lineHeight: 1.25, textAlign: "center", textShadow: "0 2px 6px rgba(0,0,0,0.45)" }}>
             {d.textoApoio}
@@ -593,7 +593,7 @@ export function LayoutCapaMoldura(d: DadosArte & { arraste?: boolean }) {
           boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
         }}
       >
-        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 86 : 102} />
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 86 : 102} fundo={fundo} />
         {d.textoApoio ? (
           <div style={{ display: "flex", marginTop: 24, fontSize: 38, color: BRANCO, lineHeight: 1.25, textAlign: "center", textShadow: "0 2px 6px rgba(0,0,0,0.45)", maxWidth: 740 }}>{d.textoApoio}</div>
         ) : null}
@@ -638,7 +638,7 @@ export function LayoutCapaFaixa(d: DadosArte & { imagemUrl?: string; arraste?: b
         }}
       >
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0 60px" }}>
-          <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 78 : 94} />
+          <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 78 : 94} fundo={fundo} />
         </div>
       </div>
       <div style={{ position: "absolute", bottom: 56, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.75)" }}>
