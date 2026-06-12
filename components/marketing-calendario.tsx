@@ -25,7 +25,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 const MODELOS_CARROSSEL: { rotulo: string; tema: string }[] = [
   { rotulo: "🏰 Conheça o espaço", tema: "um tour pelo nosso espaço e tudo que ele oferece pra festa" },
   { rotulo: "🎠 Nossos brinquedos", tema: "os brinquedos e atrações que fazem a alegria da criançada" },
-  { rotulo: "📋 Festa perfeita", tema: "passo a passo pra organizar a festa infantil perfeita" },
+  { rotulo: "📋 Festa perfeita", tema: "os detalhes que tornam a festa perfeita quando é comemorada com a gente, com tudo pronto pra família só aproveitar" },
   { rotulo: "🍰 O que está incluso", tema: "tudo o que está incluso no nosso pacote de festa" },
   { rotulo: "❓ Dúvidas frequentes", tema: "respostas pras dúvidas mais comuns de quem vai contratar a festa" },
   { rotulo: "🎈 Ideias de tema", tema: "ideias de temas criativos para a festa do seu filho" },
