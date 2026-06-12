@@ -10,6 +10,7 @@
  */
 
 import { put } from "@vercel/blob";
+import { marcaTemFacebook, publicarFacebook, type ResultadoFB } from "./facebook";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -81,28 +82,24 @@ async function graphRetry(
   throw ultimo instanceof Error ? ultimo : new Error("Falha ao criar mídia na Meta.");
 }
 
+/** Materializa várias artes (renderiza 1x cada e salva PNG estático no Blob). */
+export async function materializarArtes(urls: string[]): Promise<string[]> {
+  return Promise.all(urls.slice(0, 10).map((u) => materializar(u)));
+}
+
 /**
  * Publica um carrossel (2 a 10 imagens) ou imagem única (1) no Instagram da marca.
+ * Recebe URLs JÁ MATERIALIZADAS (PNG estático) — ver publicarNasRedes.
  */
 export async function publicar(
   conn: ConexaoIG,
-  igUrls: string[],
+  urls: string[],
   legenda: string
 ): Promise<ResultadoPostagem> {
   if (!marcaConectada(conn)) {
     return { ok: false, erro: "Marca sem conexão com o Instagram (falta IG User ID e token)." };
   }
-  const igUrlsLimit = igUrls.slice(0, 10);
-  if (igUrlsLimit.length === 0) return { ok: false, erro: "Nada pra postar (sem imagens)." };
-
-  // Materializa as artes (renderiza 1x e salva PNG estático no Blob) pra a Meta baixar
-  // instantâneo — sem o render lento da capa-mosaico nem timeout do lado dela.
-  let urls: string[];
-  try {
-    urls = await Promise.all(igUrlsLimit.map((u) => materializar(u)));
-  } catch (e) {
-    return { ok: false, erro: e instanceof Error ? `Não consegui preparar as artes: ${e.message}` : "Falha ao preparar as artes." };
-  }
+  if (urls.length === 0) return { ok: false, erro: "Nada pra postar (sem imagens)." };
 
   try {
     let containerId: string;
@@ -163,6 +160,33 @@ export async function publicar(
   } catch (e) {
     return { ok: false, erro: e instanceof Error ? e.message : "Erro desconhecido na Meta API." };
   }
+}
+
+export type ResultadoRedes = { ig: ResultadoPostagem; fb?: ResultadoFB };
+
+/**
+ * Publica a arte no Instagram e — se a marca tiver a Página do Facebook conectada —
+ * também no Facebook. Materializa as artes UMA vez (render pesado, ex: mosaico) e
+ * reaproveita pros dois. O FB é "best-effort": se falhar, o IG já foi e não trava.
+ */
+export async function publicarNasRedes(
+  marca: { igUserId: string; accessToken: string; fbPageId?: string },
+  urlsAbsolutas: string[],
+  legenda: string
+): Promise<ResultadoRedes> {
+  let estaticas: string[];
+  try {
+    estaticas = await materializarArtes(urlsAbsolutas);
+  } catch (e) {
+    const erro = e instanceof Error ? `Não consegui preparar as artes: ${e.message}` : "Falha ao preparar as artes.";
+    return { ig: { ok: false, erro } };
+  }
+  const ig = await publicar({ igUserId: marca.igUserId, accessToken: marca.accessToken }, estaticas, legenda);
+  let fb: ResultadoFB | undefined;
+  if (marcaTemFacebook(marca)) {
+    fb = await publicarFacebook(marca.fbPageId!, marca.accessToken, estaticas, legenda);
+  }
+  return { ig, fb };
 }
 
 /** Monta URLs públicas absolutas a partir de caminhos relativos (/api/...). */

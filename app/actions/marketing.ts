@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { estaLogado } from "@/lib/auth";
-import { publicar, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
+import { publicarNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
@@ -404,17 +404,14 @@ export async function postarInstagram(id: string) {
   if (urls.length < 1) return { ok: false as const, erro: "Carrossel sem imagens." };
 
   const legenda = `${c.legenda}\n\n${c.hashtags}`.trim().slice(0, 2200);
-  const r = await publicar(
-    { igUserId: c.marca.igUserId, accessToken: c.marca.accessToken },
-    urls,
-    legenda
-  );
-  if (!r.ok) return { ok: false as const, erro: r.erro };
+  const r = await publicarNasRedes(c.marca, urls, legenda);
+  if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
 
   await prisma.conteudo.update({ where: { id }, data: { status: "postado" } });
-  await registrarAtividade(APP_NAME, `Postei "${c.titulo}" no @ de ${c.marca.nome}.`, c.marcaId);
+  const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
+  await registrarAtividade(APP_NAME, `Postei "${c.titulo}" no ${onde} de ${c.marca.nome}.`, c.marcaId);
   revalidatePath(`/painel/marcas/${c.marcaId}`);
-  return { ok: true as const, permalink: r.permalink };
+  return { ok: true as const, permalink: r.ig.permalink, facebook: r.fb?.ok ?? null, erroFacebook: r.fb && !r.fb.ok ? r.fb.erro : undefined };
 }
 
 // ---- Imagens nos slides (IA ou upload) ----

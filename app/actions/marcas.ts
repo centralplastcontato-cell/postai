@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { estaLogado } from "@/lib/auth";
+import { listarPaginas } from "@/lib/facebook";
 
 function slugify(s: string): string {
   return s
@@ -50,6 +51,7 @@ type DadosMarca = {
   telefone?: string;
   igUserId?: string;
   accessToken?: string;
+  fbPageId?: string;
   diasCarrossel?: string;
   diasFeed?: string;
   horaPost?: number;
@@ -172,5 +174,20 @@ export async function testarConexao(input: { igUserId: string; accessToken: stri
       ok: false as const,
       erro: e instanceof Error ? e.message : "Falha ao falar com a Meta.",
     };
+  }
+}
+
+// Lista as Páginas do Facebook que o token administra — pra escolher qual conectar.
+export async function buscarPaginasFacebook(accessToken: string) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  if (!accessToken) return { ok: false as const, erro: "Conecte o Instagram (token) primeiro." };
+  try {
+    const paginas = await listarPaginas(accessToken);
+    if (paginas.length === 0) {
+      return { ok: false as const, erro: "Nenhuma Página encontrada. Confira se o token tem a permissão pages_show_list / pages_manage_posts." };
+    }
+    return { ok: true as const, paginas };
+  } catch (e) {
+    return { ok: false as const, erro: e instanceof Error ? e.message : "Falha ao buscar Páginas na Meta." };
   }
 }

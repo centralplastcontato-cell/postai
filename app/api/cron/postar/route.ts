@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { publicar, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
+import { publicarNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 
@@ -34,7 +34,6 @@ export async function GET(req: Request) {
 
   for (const m of marcas) {
     if (!marcaConectada(m)) continue;
-    const conn = { igUserId: m.igUserId, accessToken: m.accessToken };
 
     // Carrossel
     const c = await prisma.conteudo.findFirst({
@@ -49,12 +48,13 @@ export async function GET(req: Request) {
       const urls = urlsAbsolutas(base, caminhos);
       if (urls.length >= 1) {
         const legenda = `${c.legenda}\n\n${c.hashtags}`.trim().slice(0, 2200);
-        const r = await publicar(conn, urls, legenda);
-        if (r.ok) {
+        const r = await publicarNasRedes(m, urls, legenda);
+        if (r.ig.ok) {
           await prisma.conteudo.update({ where: { id: c.id }, data: { status: "postado" } });
-          await registrarAtividade(APP_NAME, `Postei "${c.titulo}" no @ de ${m.nome} (auto).`, m.id);
+          const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
+          await registrarAtividade(APP_NAME, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id);
         }
-        resultados.push({ marca: m.nome, tipo: "carrossel", titulo: c.titulo, ok: r.ok, erro: r.ok ? undefined : r.erro });
+        resultados.push({ marca: m.nome, tipo: "carrossel", titulo: c.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
       }
     }
 
@@ -65,12 +65,13 @@ export async function GET(req: Request) {
     });
     if (p) {
       const legenda = `${p.legenda}\n\n${p.hashtags}`.trim().slice(0, 2200);
-      const r = await publicar(conn, [`${base}/api/feed/${p.id}`], legenda);
-      if (r.ok) {
+      const r = await publicarNasRedes(m, [`${base}/api/feed/${p.id}`], legenda);
+      if (r.ig.ok) {
         await prisma.publicacao.update({ where: { id: p.id }, data: { status: "postado" } });
-        await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no @ de ${m.nome} (auto).`, m.id);
+        const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
+        await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id);
       }
-      resultados.push({ marca: m.nome, tipo: "feed", titulo: p.titulo, ok: r.ok, erro: r.ok ? undefined : r.erro });
+      resultados.push({ marca: m.nome, tipo: "feed", titulo: p.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
     }
   }
 

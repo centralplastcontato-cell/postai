@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { estaLogado } from "@/lib/auth";
-import { publicar, marcaConectada } from "@/lib/instagram";
+import { publicarNasRedes, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
@@ -592,14 +592,11 @@ export async function postarPublicacao(id: string) {
     return { ok: false as const, erro: `Conecte o Instagram da marca "${p.marca.nome}" primeiro.` };
   }
   const legenda = `${p.legenda}\n\n${p.hashtags}`.trim().slice(0, 2200);
-  const r = await publicar(
-    { igUserId: p.marca.igUserId, accessToken: p.marca.accessToken },
-    [`${baseUrl()}/api/feed/${id}`],
-    legenda
-  );
-  if (!r.ok) return { ok: false as const, erro: r.erro };
+  const r = await publicarNasRedes(p.marca, [`${baseUrl()}/api/feed/${id}`], legenda);
+  if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
   await prisma.publicacao.update({ where: { id }, data: { status: "postado" } });
-  await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no @ de ${p.marca.nome}.`, p.marcaId);
+  const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
+  await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no ${onde} de ${p.marca.nome}.`, p.marcaId);
   revalidatePath(`/painel/marcas/${p.marcaId}`);
-  return { ok: true as const, permalink: r.permalink };
+  return { ok: true as const, permalink: r.ig.permalink, facebook: r.fb?.ok ?? null, erroFacebook: r.fb && !r.fb.ok ? r.fb.erro : undefined };
 }

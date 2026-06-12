@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { salvarMarca, excluirMarca, testarConexao, extrairCoresLogo } from "@/app/actions/marcas";
+import { salvarMarca, excluirMarca, testarConexao, extrairCoresLogo, buscarPaginasFacebook } from "@/app/actions/marcas";
 import { ConfirmDialog } from "./confirm-dialog";
 
 export type MarcaView = {
@@ -17,6 +17,7 @@ export type MarcaView = {
   telefone: string;
   igUserId: string;
   accessToken: string;
+  fbPageId: string;
   diasCarrossel: string;
   diasFeed: string;
   horaPost: number;
@@ -47,6 +48,9 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
   const [erro, setErro] = useState<string | null>(null);
   const [teste, setTeste] = useState<string | null>(null);
   const [testando, setTestando] = useState(false);
+  const [paginasFB, setPaginasFB] = useState<{ id: string; nome: string }[] | null>(null);
+  const [buscandoFB, setBuscandoFB] = useState(false);
+  const [fbMsg, setFbMsg] = useState<string | null>(null);
   const [subindoLogo, setSubindoLogo] = useState(false);
   const [lendoCores, setLendoCores] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -125,6 +129,43 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
       }
     } finally {
       setTestando(false);
+    }
+  }
+  async function handleBuscarPaginas() {
+    setFbMsg(null);
+    setBuscandoFB(true);
+    try {
+      const r = await buscarPaginasFacebook(f.accessToken.trim());
+      if (!r.ok) {
+        setFbMsg(`✕ ${r.erro}`);
+        setPaginasFB(null);
+        return;
+      }
+      setPaginasFB(r.paginas);
+      if (r.paginas.length === 0) setFbMsg("Nenhuma Página encontrada nesse token.");
+    } finally {
+      setBuscandoFB(false);
+    }
+  }
+  async function escolherPagina(pageId: string, nome: string) {
+    setFbMsg(null);
+    const s = await salvarMarca({ id: f.id, fbPageId: pageId });
+    if (s?.ok) {
+      setF((cur) => ({ ...cur, fbPageId: pageId }));
+      setPaginasFB(null);
+      setFbMsg(`✓ Página conectada: ${nome}`);
+      router.refresh();
+    } else {
+      setFbMsg(`✕ Não consegui salvar: ${s?.erro || "erro"}`);
+    }
+  }
+  async function desconectarFacebook() {
+    const s = await salvarMarca({ id: f.id, fbPageId: "" });
+    if (s?.ok) {
+      setF((cur) => ({ ...cur, fbPageId: "" }));
+      setPaginasFB(null);
+      setFbMsg("Facebook desconectado.");
+      router.refresh();
     }
   }
   async function handleUploadLogo(file: File | undefined) {
@@ -258,6 +299,33 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
           <button onClick={handleTestar} disabled={testando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho disabled:opacity-50">{testando ? "Testando…" : "Testar e salvar conexão"}</button>
           {teste && <span className={`text-sm ${teste.startsWith("✓") ? "text-green-400" : "text-red-400"}`}>{teste}</span>}
         </div>
+      </section>
+
+      {/* Conexão Facebook (opcional) — se conectar a Página, posta também no Facebook */}
+      <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
+        <h3 className="mb-1 text-sm font-semibold text-white">Conexão com o Facebook <span className="font-normal text-muted">(opcional)</span></h3>
+        <p className="mb-3 text-xs text-muted">Conecte a <strong className="text-white">Página do Facebook</strong> desta marca pra publicar nos dois ao mesmo tempo. Usa o mesmo token do Instagram (precisa da permissão <code className="text-amber-300">pages_manage_posts</code> no app Meta).</p>
+
+        {f.fbPageId ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-green-500/40 bg-green-500/15 px-3 py-1 text-xs font-semibold text-green-300">✓ Página conectada (ID: {f.fbPageId})</span>
+            <button onClick={desconectarFacebook} className="rounded-md border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">Desconectar</button>
+          </div>
+        ) : (
+          <button onClick={handleBuscarPaginas} disabled={buscandoFB || !f.accessToken.trim()} title={!f.accessToken.trim() ? "Conecte o Instagram (token) primeiro" : undefined} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho disabled:opacity-50">{buscandoFB ? "Buscando…" : "🔎 Buscar minhas Páginas"}</button>
+        )}
+
+        {paginasFB && paginasFB.length > 0 && (
+          <div className="mt-3">
+            <p className="mb-1.5 text-xs text-muted">Escolha a Página desta marca:</p>
+            <div className="flex flex-wrap gap-2">
+              {paginasFB.map((p) => (
+                <button key={p.id} onClick={() => escolherPagina(p.id, p.nome)} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho hover:bg-preto">{p.nome}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {fbMsg && <p className={`mt-2 text-sm ${fbMsg.startsWith("✓") ? "text-green-400" : fbMsg.startsWith("✕") ? "text-red-400" : "text-muted"}`}>{fbMsg}</p>}
       </section>
 
       {/* Agenda */}

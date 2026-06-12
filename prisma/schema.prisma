@@ -27,6 +27,7 @@ model Marca {
   // Conexão com o Instagram (Meta Graph API) — própria de cada marca
   igUserId    String   @default("") // IG User ID da conta
   accessToken String   @default("") // token do Usuário do Sistema com permissão de postar
+  fbPageId    String   @default("") // ID da Página do Facebook — se preenchido, posta também no FB
   // Agenda automática: dias da semana (0=dom … 6=sáb) de cada tipo + hora (BRT)
   diasCarrossel String @default("1,3,5") // seg/qua/sex
   diasFeed      String @default("2,4,6") // ter/qui/sáb

@@ -92,6 +92,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     telefone: marca.telefone,
     igUserId: marca.igUserId,
     accessToken: marca.accessToken,
+    fbPageId: marca.fbPageId,
     diasCarrossel: marca.diasCarrossel,
     diasFeed: marca.diasFeed,
     horaPost: marca.horaPost,
