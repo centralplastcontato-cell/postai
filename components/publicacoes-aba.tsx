@@ -658,7 +658,7 @@ export function PublicacoesAba({
                   {!postado && (
                     <>
                       <button onClick={() => handleBanco(p.id, p.categoria ?? undefined)} disabled={ocupado} title="Sortear foto real do seu banco de imagens" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲 Banco</button>
-                      <button onClick={() => handleGerarImagem(p.id)} disabled={ocupado} title="Fundo decorativo abstrato com IA (não mostra ambiente real)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🖼️ IA</button>
+                      <button onClick={() => handleGerarImagem(p.id)} disabled={ocupado} title="Fundo decorativo abstrato com IA (não mostra ambiente real)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🤖 IA</button>
                       <label className="cursor-pointer rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
                         📤 Foto
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUpload(p.id, e.target.files?.[0])} />

@@ -31,9 +31,11 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       slides = JSON.parse(c.slides);
     } catch {}
     let imagensSlides: (string | null)[] = [];
+    let tiposSlides: (string | undefined)[] = [];
     try {
-      const st = JSON.parse(c.slidesTexto || "[]") as { imagemUrl?: string }[];
+      const st = JSON.parse(c.slidesTexto || "[]") as { imagemUrl?: string; tipo?: string }[];
       imagensSlides = st.map((s) => s?.imagemUrl ?? null);
+      tiposSlides = st.map((s) => s?.tipo);
     } catch {}
     const v = hashCurto(c.slidesTexto || "");
     return {
@@ -48,6 +50,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       tema: c.tema,
       aprovado: c.aprovado,
       imagensSlides,
+      tiposSlides,
     };
   });
 

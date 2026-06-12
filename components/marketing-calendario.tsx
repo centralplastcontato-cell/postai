@@ -61,7 +61,12 @@ export type Post = {
   tema?: string | null;
   aprovado: boolean; // revisão interna do dono (não vai pra rede)
   imagensSlides?: (string | null)[];
+  tiposSlides?: (string | undefined)[]; // tipo de cada slide (capa/conteudo/mosaico/capa-*)
 };
+
+// Capas de estilo (Mosaico/Colorida/Foto/Moldura/Faixa): têm visual próprio e NÃO
+// usam foto de fundo — então os botões de foto (banco/IA/upload) não têm efeito ali.
+const ehCapaEstilo = (tipo?: string) => tipo === "mosaico" || (tipo?.startsWith("capa-") ?? false);
 
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", {
@@ -513,23 +518,29 @@ export function MarketingCalendario({
                         <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🔄</button>
                         <DicaSlide>Regerar texto</DicaSlide>
                       </div>
-                      <div className="group relative">
-                        <button type="button" onClick={() => handleBancoSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🎲</button>
-                        <DicaSlide>Foto do banco</DicaSlide>
-                      </div>
-                      <div className="group relative">
-                        <button type="button" onClick={() => handleGerarImagem(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🖼️</button>
-                        <DicaSlide>Fundo com IA</DicaSlide>
-                      </div>
-                      <label className="group relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card">📤
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImagem(selecionado.id, i, e.target.files?.[0])} />
-                        <DicaSlide>Enviar foto</DicaSlide>
-                      </label>
-                      {selecionado.imagensSlides?.[i] && (
-                        <div className="group relative">
-                          <button type="button" onClick={() => handleRemoverImagem(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-red-900/60 bg-preto text-sm text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕</button>
-                          <DicaSlide>Remover imagem</DicaSlide>
-                        </div>
+                      {/* Botões de FOTO: só nos slides que usam foto de fundo. A capa de
+                          estilo (mosaico/capa-*) tem visual próprio — foto ali não tem efeito. */}
+                      {!ehCapaEstilo(selecionado.tiposSlides?.[i]) && (
+                        <>
+                          <div className="group relative">
+                            <button type="button" onClick={() => handleBancoSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🎲</button>
+                            <DicaSlide>Foto do banco</DicaSlide>
+                          </div>
+                          <div className="group relative">
+                            <button type="button" onClick={() => handleGerarImagem(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🤖</button>
+                            <DicaSlide>Fundo com IA</DicaSlide>
+                          </div>
+                          <label className="group relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card">📤
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImagem(selecionado.id, i, e.target.files?.[0])} />
+                            <DicaSlide>Enviar foto</DicaSlide>
+                          </label>
+                          {selecionado.imagensSlides?.[i] && (
+                            <div className="group relative">
+                              <button type="button" onClick={() => handleRemoverImagem(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-red-900/60 bg-preto text-sm text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕</button>
+                              <DicaSlide>Remover imagem</DicaSlide>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   )}
