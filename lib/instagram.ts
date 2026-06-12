@@ -42,6 +42,28 @@ async function graph(
 
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Cria mídia na Meta com algumas tentativas: a Meta às vezes devolve erro "transient"
+// (code 2 / "An unexpected error... retry later") quando demora pra baixar a image_url
+// — comum em arte pesada de renderizar, como a capa-mosaico (várias fotos reais).
+// Esperar e repetir costuma resolver (a essa altura a arte já está renderizada/cacheada).
+async function graphRetry(
+  conn: ConexaoIG,
+  path: string,
+  params: Record<string, string>,
+  tentativas = 4
+): Promise<Record<string, unknown>> {
+  let ultimo: unknown;
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      return await graph(conn, path, params);
+    } catch (e) {
+      ultimo = e;
+      if (i < tentativas - 1) await espera(5000 * (i + 1)); // 5s, 10s, 15s...
+    }
+  }
+  throw ultimo instanceof Error ? ultimo : new Error("Falha ao criar mídia na Meta.");
+}
+
 /**
  * Publica um carrossel (2 a 10 imagens) ou imagem única (1) no Instagram da marca.
  */
@@ -56,11 +78,17 @@ export async function publicar(
   const urls = igUrls.slice(0, 10);
   if (urls.length === 0) return { ok: false, erro: "Nada pra postar (sem imagens)." };
 
+  // Pré-aquece as artes: o next/og pode levar segundos no 1º render (sobretudo a
+  // capa-mosaico, com várias fotos reais). A Meta tem timeout curto ao baixar a
+  // image_url, então renderizamos antes — assim já vêm prontas/cacheadas quando a
+  // Meta for buscar. (Falha de pré-aquecimento é ignorada; o retry abaixo cobre.)
+  await Promise.all(urls.map((u) => fetch(u).catch(() => {})));
+
   try {
     let containerId: string;
 
     if (urls.length === 1) {
-      const c = await graph(conn, `${conn.igUserId}/media`, {
+      const c = await graphRetry(conn, `${conn.igUserId}/media`, {
         image_url: urls[0],
         caption: legenda,
       });
@@ -68,13 +96,13 @@ export async function publicar(
     } else {
       const childIds: string[] = [];
       for (const url of urls) {
-        const child = await graph(conn, `${conn.igUserId}/media`, {
+        const child = await graphRetry(conn, `${conn.igUserId}/media`, {
           image_url: url,
           is_carousel_item: "true",
         });
         childIds.push(String(child.id));
       }
-      const pai = await graph(conn, `${conn.igUserId}/media`, {
+      const pai = await graphRetry(conn, `${conn.igUserId}/media`, {
         media_type: "CAROUSEL",
         children: childIds.join(","),
         caption: legenda,

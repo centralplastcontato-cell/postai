@@ -1,4 +1,7 @@
 {
   "framework": "nextjs",
-  "regions": ["gru1"]
+  "regions": ["gru1"],
+  "functions": {
+    "app/**": { "maxDuration": 60 }
+  }
 }
