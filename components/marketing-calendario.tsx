@@ -64,6 +64,16 @@ function chaveDiaSP(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 }
 
+// Tooltip estilizado (tema escuro) que aparece à esquerda do botão no hover —
+// substitui o title nativo do navegador (aquele branco cru).
+function DicaSlide({ children }: { children: string }) {
+  return (
+    <span className="pointer-events-none absolute right-full top-1/2 z-50 mr-2 hidden -translate-y-1/2 whitespace-nowrap rounded-md border border-linha bg-preto-card px-2 py-1 text-[11px] font-medium text-white shadow-xl group-hover:block">
+      {children}
+    </span>
+  );
+}
+
 export function MarketingCalendario({
   marcaId,
   posts,
@@ -451,21 +461,38 @@ export function MarketingCalendario({
           <div className="scroll-bonito mt-4 flex gap-3 overflow-x-auto pb-3">
             {selecionado.slides.map((src, i) => (
               <div key={src} className="shrink-0">
-                <button type="button" onClick={() => setImgExpandida(src)} title="Ampliar" className="block overflow-hidden rounded-md border border-linha transition hover:border-vermelho">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={src} alt={`Slide ${i + 1}`} className="h-auto w-[100px] sm:w-[120px]" />
-                </button>
-                {selecionado.status !== "postado" && (
-                <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
-                  <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Regerar texto" className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🔄</button>
-                  <button type="button" onClick={() => handleBancoSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Sortear foto real do banco" className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🎲</button>
-                  <button type="button" onClick={() => handleGerarImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Fundo abstrato com IA (não mostra ambiente real)" className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🖼️</button>
-                  <label title="Enviar foto" className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card">📤<input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImagem(selecionado.id, i, e.target.files?.[0])} /></label>
-                  {selecionado.imagensSlides?.[i] && (
-                    <button type="button" onClick={() => handleRemoverImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Remover imagem" className="flex h-8 w-8 items-center justify-center rounded-md border border-red-900/60 bg-preto text-sm text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕</button>
+                <div className="flex items-start gap-1.5">
+                  <button type="button" onClick={() => setImgExpandida(src)} title="Ampliar" className="block overflow-hidden rounded-md border border-linha transition hover:border-vermelho">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={src} alt={`Slide ${i + 1}`} className="h-auto w-[100px] sm:w-[120px]" />
+                  </button>
+                  {selecionado.status !== "postado" && (
+                    <div className="flex flex-col gap-1.5">
+                      <div className="group relative">
+                        <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🔄</button>
+                        <DicaSlide>Regerar texto</DicaSlide>
+                      </div>
+                      <div className="group relative">
+                        <button type="button" onClick={() => handleBancoSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🎲</button>
+                        <DicaSlide>Foto do banco</DicaSlide>
+                      </div>
+                      <div className="group relative">
+                        <button type="button" onClick={() => handleGerarImagem(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🖼️</button>
+                        <DicaSlide>Fundo com IA</DicaSlide>
+                      </div>
+                      <label className="group relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card">📤
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImagem(selecionado.id, i, e.target.files?.[0])} />
+                        <DicaSlide>Enviar foto</DicaSlide>
+                      </label>
+                      {selecionado.imagensSlides?.[i] && (
+                        <div className="group relative">
+                          <button type="button" onClick={() => handleRemoverImagem(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-red-900/60 bg-preto text-sm text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕</button>
+                          <DicaSlide>Remover imagem</DicaSlide>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-                )}
                 {slideProcessando === i && <p className="mt-1 text-center text-[10px] text-muted">Processando…</p>}
               </div>
             ))}
