@@ -153,13 +153,12 @@ export function MarketingCalendario({
   const pagAtual = Math.min(pagina, totalPaginas);
   const visiveis = dataAlvo ? filtrados : filtrados.slice((pagAtual - 1) * POR_PAGINA, pagAtual * POR_PAGINA);
 
-  // Ao escolher um dia comemorativo, já sugere o tema do carrossel com a data
-  // (ex: "Dia dos Namorados"). O dono ajusta ou gera direto.
-  useEffect(() => {
-    if (!dataAlvo) return;
-    const dc = dataComemorativaDe(dataAlvo);
-    if (dc?.sugestao) setTema(dc.sugestao);
-  }, [dataAlvo]);
+  // Data comemorativa do dia escolhido (ex: 24/jun = São João). Mostra um aviso e
+  // deixa o dono ATIVAR o tema da data (não sobrescreve mais sozinho o que ele digita).
+  const comemorativa = dataAlvo ? dataComemorativaDe(dataAlvo) : undefined;
+  function usarTemaData() {
+    if (comemorativa?.sugestao) setTema(comemorativa.sugestao);
+  }
 
   function handleGerar() {
     setErro(null);
@@ -369,6 +368,24 @@ export function MarketingCalendario({
             ))}
           </div>
         </div>
+        {/* Aviso de data comemorativa no dia escolhido — o dono ativa o tema da data. */}
+        {comemorativa && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+            <span className="text-xs font-semibold text-amber-200">
+              {comemorativa.emoji} Este dia é <span className="text-white">{comemorativa.nome}</span> — que tal um carrossel temático?
+            </span>
+            {comemorativa.sugestao && (
+              <button
+                type="button"
+                onClick={usarTemaData}
+                disabled={tema.trim() === comemorativa.sugestao}
+                className="rounded-md border border-amber-500/50 bg-amber-500/15 px-3 py-1 text-xs font-semibold text-amber-100 transition hover:bg-amber-500/25 disabled:opacity-50"
+              >
+                {tema.trim() === comemorativa.sugestao ? "✓ Tema da data ativo" : `Usar tema: ${comemorativa.sugestao}`}
+              </button>
+            )}
+          </div>
+        )}
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <label className="flex-1 text-xs text-muted">
             Tema
