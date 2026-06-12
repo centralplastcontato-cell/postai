@@ -50,7 +50,7 @@ async function graphRetry(
   conn: ConexaoIG,
   path: string,
   params: Record<string, string>,
-  tentativas = 4
+  tentativas = 3
 ): Promise<Record<string, unknown>> {
   let ultimo: unknown;
   for (let i = 0; i < tentativas; i++) {
@@ -58,7 +58,9 @@ async function graphRetry(
       return await graph(conn, path, params);
     } catch (e) {
       ultimo = e;
-      if (i < tentativas - 1) await espera(5000 * (i + 1)); // 5s, 10s, 15s...
+      // Backoff curto: se a Meta seguir com erro transitório, o cron tenta de novo na
+      // PRÓXIMA hora — não vale travar a execução inteira esperando aqui.
+      if (i < tentativas - 1) await espera(2000 * (i + 1)); // 2s, 4s
     }
   }
   throw ultimo instanceof Error ? ultimo : new Error("Falha ao criar mídia na Meta.");
