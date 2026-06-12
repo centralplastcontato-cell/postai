@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useState, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
@@ -134,6 +134,13 @@ export function MarketingCalendario({
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
 
   const selecionado = posts.find((p) => p.id === selId) ?? null;
+
+  // Ao abrir um card (selId muda), rola suave até a tela de edição de slides — assim
+  // clicar no card leva direto pra "tela de edição", igual a entrar pela agenda.
+  const detalheRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selId) detalheRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [selId]);
 
   // Grade de cards: filtra por dia clicado (se houver) e pagina o resto — mesma cara
   // das Publicações, pra ambas as abas serem iguais.
@@ -495,7 +502,7 @@ export function MarketingCalendario({
 
       {/* Detalhe do post selecionado (abre ao clicar num card) */}
       {selecionado && (
-        <div className="mb-8 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
+        <div ref={detalheRef} className="mb-8 scroll-mt-4 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs uppercase tracking-wider text-muted">{dataBR(selecionado.data)}</p>
