@@ -21,6 +21,7 @@ import { CATEGORIAS, CATEGORIA_LABEL } from "@/lib/categorias-imagem";
 import { parsePaleta, coresDeFundo } from "@/lib/cores-fundo";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
+import { CaixaPostando } from "./caixa-postando";
 
 type Confirmacao = { titulo: string; descricao?: string; textoConfirmar: string; acao: () => void };
 
@@ -126,6 +127,7 @@ export function PublicacoesAba({
   onGerado,
   onLimparDia,
   paleta,
+  temFacebook,
 }: {
   marcaId: string;
   publicacoes: PublicacaoView[];
@@ -134,8 +136,10 @@ export function PublicacoesAba({
   onGerado?: (dia?: string) => void;
   onLimparDia?: () => void;
   paleta?: string; // JSON array de hex da marca (pro seletor de cor de fundo)
+  temFacebook?: boolean; // posta também no Facebook → reflete na caixinha "Estamos postando"
 }) {
   const router = useRouter();
+  const redesTexto = temFacebook ? "no Instagram e Facebook" : "no Instagram";
   const [isPending, startTransition] = useTransition();
   const [template, setTemplate] = useState<Template>("dica");
   const [tema, setTema] = useState("");
@@ -154,6 +158,7 @@ export function PublicacoesAba({
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
+  const [postandoId, setPostandoId] = useState<string | null>(null); // card publicando agora (caixinha)
   const [pagina, setPagina] = useState(1);
   // Volta pra página 1 quando muda o filtro de dia ou a lista cresce/encolhe.
   useEffect(() => { setPagina(1); }, [dataAlvo, publicacoes.length]);
@@ -270,17 +275,19 @@ export function PublicacoesAba({
   }
   function handlePostar(p: PublicacaoView) {
     setConfirmacao({
-      titulo: "Postar no Instagram agora?",
-      descricao: `"${p.titulo}" vai ao ar de verdade no perfil da marca.`,
+      titulo: temFacebook ? "Postar no Instagram e Facebook agora?" : "Postar no Instagram agora?",
+      descricao: `"${p.titulo}" vai ao ar de verdade ${redesTexto}.`,
       textoConfirmar: "Postar agora",
       acao: async () => {
         setProc(p.id);
+        setPostandoId(p.id);
         try {
           const r = await postarPublicacao(p.id);
           if (!r.ok) setErro(r.erro);
           router.refresh();
         } finally {
           setProc(null);
+          setPostandoId(null);
         }
       },
     });
@@ -624,10 +631,13 @@ export function PublicacoesAba({
                     <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
                   </div>
                 </div>
-                <button type="button" onClick={() => setImgExpandida(arte)} title="Ampliar" className="overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={arte} alt={p.titulo} className="aspect-[4/5] w-full object-cover" />
-                </button>
+                <div className="relative">
+                  <button type="button" onClick={() => setImgExpandida(arte)} title="Ampliar" className="block overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={arte} alt={p.titulo} className="aspect-[4/5] w-full object-cover" />
+                  </button>
+                  {postandoId === p.id && <CaixaPostando redes={redesTexto} />}
+                </div>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted">{TEMPLATE_LABEL[p.template as Template] ?? p.template}</p>
                 <p className="line-clamp-2 text-sm text-white">{p.titulo}</p>
 

@@ -20,6 +20,7 @@ import {
 } from "@/app/actions/marketing";
 import { excluirConteudo } from "@/app/actions/excluir";
 import { ConfirmDialog } from "./confirm-dialog";
+import { CaixaPostando } from "./caixa-postando";
 
 // Temas prontos de carrossel (clique preenche o campo Tema). Ângulos que funcionam
 // pro público de um buffet infantil — o dono ajusta ou pede "Sugerir temas com IA".
@@ -102,6 +103,7 @@ export function MarketingCalendario({
   dataAlvo,
   onGerado,
   onLimparDia,
+  temFacebook,
 }: {
   marcaId: string;
   posts: Post[];
@@ -110,8 +112,10 @@ export function MarketingCalendario({
   dataAlvo: string | null;
   onGerado: (dia?: string) => void;
   onLimparDia?: () => void;
+  temFacebook?: boolean; // posta também no Facebook → reflete na caixinha "Estamos postando"
 }) {
   const router = useRouter();
+  const redesTexto = temFacebook ? "no Instagram e Facebook" : "no Instagram";
   const [isPending, startTransition] = useTransition();
   const [tema, setTema] = useState("");
   const [nSlides, setNSlides] = useState(7);
@@ -127,6 +131,7 @@ export function MarketingCalendario({
   const [baixando, setBaixando] = useState(false);
   const [slideProcessando, setSlideProcessando] = useState<number | null>(null);
   const [postando, setPostando] = useState(false);
+  const [postandoId, setPostandoId] = useState<string | null>(null); // card publicando agora (caixinha)
   const [erroPost, setErroPost] = useState<string | null>(null);
   const [temasIA, setTemasIA] = useState<string[]>([]);
   const [sugerindo, setSugerindo] = useState(false);
@@ -214,12 +219,14 @@ export function MarketingCalendario({
   async function confirmarPostar(p: Post) {
     setErroPost(null);
     setPostando(true);
+    setPostandoId(p.id);
     try {
       const r = await postarInstagram(p.id);
       if (!r.ok) setErroPost(r.erro);
       router.refresh();
     } finally {
       setPostando(false);
+      setPostandoId(null);
     }
   }
   function handleAprovar(p: Post) {
@@ -498,14 +505,17 @@ export function MarketingCalendario({
                     <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
                   </div>
                 </div>
-                <button type="button" onClick={() => onSelId(aberto ? null : p.id)} title={aberto ? "Fechar detalhe" : "Abrir / editar slides"} className="overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
-                  {capa ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={capa} alt={p.titulo} className="aspect-[4/5] w-full object-cover" />
-                  ) : (
-                    <div className="flex aspect-[4/5] w-full items-center justify-center bg-preto text-xs text-muted">sem capa</div>
-                  )}
-                </button>
+                <div className="relative">
+                  <button type="button" onClick={() => onSelId(aberto ? null : p.id)} title={aberto ? "Fechar detalhe" : "Abrir / editar slides"} className="block w-full overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
+                    {capa ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={capa} alt={p.titulo} className="aspect-[4/5] w-full object-cover" />
+                    ) : (
+                      <div className="flex aspect-[4/5] w-full items-center justify-center bg-preto text-xs text-muted">sem capa</div>
+                    )}
+                  </button>
+                  {postandoId === p.id && <CaixaPostando redes={redesTexto} />}
+                </div>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted">🖼️ Carrossel · {p.slides.length} slides</p>
                 <p className="line-clamp-2 text-sm text-white">{p.titulo}</p>
 
@@ -628,7 +638,7 @@ export function MarketingCalendario({
               <button onClick={() => handleRegerar(selecionado)} disabled={isPending} title={selecionado.status === "postado" ? "Já postado — cria um novo ao lado" : "Regerar"} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho disabled:opacity-50">↻ Regerar</button>
             )}
             {selecionado.status !== "postado" && (
-              <button onClick={() => handlePostar(selecionado)} disabled={postando} className="rounded-lg bg-[#C13584] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50">{postando ? "Postando…" : "📷 Postar no Instagram"}</button>
+              <button onClick={() => handlePostar(selecionado)} disabled={postando} className="rounded-lg bg-[#C13584] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50">{postando ? "Postando…" : temFacebook ? "📷 Postar (Instagram + Facebook)" : "📷 Postar no Instagram"}</button>
             )}
             <form action={marcarConteudo}>
               <input type="hidden" name="id" value={selecionado.id} />
@@ -642,8 +652,8 @@ export function MarketingCalendario({
 
       <ConfirmDialog
         aberto={!!postarAlvo}
-        titulo="Postar no Instagram agora?"
-        descricao={postarAlvo ? `"${postarAlvo.titulo}" vai ao ar de verdade no perfil da marca.` : undefined}
+        titulo={temFacebook ? "Postar no Instagram e Facebook agora?" : "Postar no Instagram agora?"}
+        descricao={postarAlvo ? `"${postarAlvo.titulo}" vai ao ar de verdade ${redesTexto}.` : undefined}
         textoConfirmar="Postar agora"
         onConfirmar={() => {
           if (postarAlvo) confirmarPostar(postarAlvo);

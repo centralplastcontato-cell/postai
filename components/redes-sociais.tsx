@@ -17,6 +17,7 @@ export function RedesSociais({
   diasCarrossel,
   diasFeed,
   paleta,
+  temFacebook,
 }: {
   marcaId: string;
   posts: Post[];
@@ -24,6 +25,7 @@ export function RedesSociais({
   diasCarrossel: string;
   diasFeed: string;
   paleta: string; // JSON array de hex da marca (pro seletor de cor)
+  temFacebook: boolean; // marca com Página do Facebook conectada → posta nos dois
 }) {
   const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
@@ -96,6 +98,7 @@ export function RedesSociais({
             dataAlvo={dataAlvo}
             onGerado={(dia) => setDataAlvo(dia ?? null)}
             onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
+            temFacebook={temFacebook}
           />
           <AniversariantesForm marcaId={marcaId} dataAlvo={dataAlvo} onGerado={(dia) => setDataAlvo(dia ?? null)} />
         </>
@@ -110,6 +113,7 @@ export function RedesSociais({
           onGerado={(dia) => setDataAlvo(dia ?? null)}
           onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
           paleta={paleta}
+          temFacebook={temFacebook}
         />
       )}
     </div>
