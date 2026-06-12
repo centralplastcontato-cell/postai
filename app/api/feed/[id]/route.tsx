@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, LayoutCapaMoldura, LayoutCapaFaixa, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -67,6 +67,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (p.template === "mosaico") {
     return new ImageResponse(
       LayoutMosaico({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, fotos: extra.fotos }),
+      { width: 1080, height: 1350, fonts, headers: CACHE }
+    );
+  }
+
+  if (p.template === "moldura") {
+    return new ImageResponse(
+      LayoutCapaMoldura({ ...base, corFundo: extra.corFundo }),
+      { width: 1080, height: 1350, fonts, headers: CACHE }
+    );
+  }
+
+  if (p.template === "faixa") {
+    return new ImageResponse(
+      LayoutCapaFaixa({ ...base, corFundo: extra.corFundo, imagemUrl: p.imagemUrl || undefined }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }

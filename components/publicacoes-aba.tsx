@@ -150,7 +150,7 @@ export function PublicacoesAba({
   // Cores da marca que servem de fundo (escuras). Vazio se a marca não tem paleta.
   const coresFundo = coresDeFundo(parsePaleta(paleta));
   // Templates de fundo COLORIDO (onde escolher a cor faz sentido — os com foto não).
-  const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico"];
+  const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico", "moldura", "faixa"];
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
@@ -180,7 +180,7 @@ export function PublicacoesAba({
     startTransition(async () => {
       const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: template === "dica" || template === "mosaico" ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: template === "dica" || template === "mosaico" || template === "faixa" ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -534,6 +534,18 @@ export function PublicacoesAba({
               </label>
             </div>
             <p className="mt-1 text-[11px] text-amber-400/90">🖼️ Usa 4 fotos REAIS do seu Banco de Imagens (em rodízio). Suba fotos na aba <strong>Imagens</strong> se ainda não tiver. Selo/período vazios = sem carimbo.</p>
+          </div>
+        )}
+
+        {template === "faixa" && (
+          <div className="mb-3">
+            <label className="text-xs text-muted">
+              Foto do banco <span className="text-muted/70">(de qual categoria puxar a imagem de fundo)</span>
+              <select value={categoriaFoto} onChange={(e) => setCategoriaFoto(e.target.value)} className="input-base">
+                {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
+              </select>
+            </label>
+            <p className="mt-1 text-[11px] text-amber-400/90">📐 Usa 1 foto REAL do seu Banco de Imagens de fundo. Suba fotos na aba <strong>Imagens</strong> se ainda não tiver — sem foto, vira um fundo colorido.</p>
           </div>
         )}
 

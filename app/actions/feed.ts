@@ -62,6 +62,17 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
     const cat = categoria && categoria !== "geral" ? categoria : "";
     return cat ? JSON.stringify({ categoria: cat }) : null;
   }
+  if (template === "moldura" || template === "faixa") {
+    // Visuais "capa": só a cor de fundo (moldura) / cor da faixa (faixa). A faixa
+    // também usa foto real do banco (tratada via USA_FOTO), por isso guarda a categoria.
+    const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    const cat = categoria && categoria !== "geral" ? categoria : "";
+    return JSON.stringify({
+      corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
+      corFundoTravada: travas?.corFundo || undefined,
+      categoria: cat || undefined,
+    });
+  }
   if (template === "mosaico") {
     // As 4 fotos reais NÃO entram aqui (são sorteadas e mescladas depois, em
     // aplicarFotosMosaico). Aqui só o selo opcional, a categoria e a cor de fundo.
@@ -106,6 +117,10 @@ const GUIA: Record<Template, string> = {
   dica: 'Faça uma DICA prática e útil pro público da marca. O "titulo" é a dica em si, direta.',
   mosaico:
     'Crie uma CAPA do tipo "mostre seu espaço" — um post que exibe FOTOS REAIS do lugar/produtos. O "titulo" é uma chamada curta e atraente (2 a 5 palavras, ex: "Especial de Férias", "Conheça nosso espaço"). Se fizer sentido um chamariz leve, preencha "oferta" com um selo CURTÍSSIMO (ex: CONDIÇÃO ESPECIAL) e "validade" com o período; senão deixe vazios. NÃO invente preço/desconto.',
+  moldura:
+    'Crie um POST de DESTAQUE com o título numa moldura lúdica. O "titulo" é uma chamada curta e forte (2 a 5 palavras) que vai GRANDE dentro da moldura; "texto" é uma frase de apoio curta. Tom festivo e convidativo. NÃO invente promoção/preço.',
+  faixa:
+    'Crie um POST com FOTO de fundo e o título numa faixa diagonal. O "titulo" é uma chamada curta e impactante (2 a 5 palavras) que vai na faixa; "texto" é uma frase de apoio curta. Tom convidativo. NÃO invente promoção/preço.',
 };
 
 // Formato de JSON esperado por template (a Promoção pede oferta/validade).
@@ -146,6 +161,18 @@ const FORMATO_JSON: Record<Template, string> = {
   "legenda": "legenda do post (3-5 linhas com \\n), convida a conhecer o espaço e chamar no WhatsApp",
   "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
 }`,
+  moldura: `{
+  "titulo": "chamada curta e forte (2 a 5 palavras) — vai GRANDE dentro da moldura",
+  "texto": "1 frase de apoio curta (até ~14 palavras)",
+  "legenda": "legenda do post (3-5 linhas com \\n), termina com um convite leve",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
+  faixa: `{
+  "titulo": "chamada curta e impactante (2 a 5 palavras) — vai na faixa diagonal",
+  "texto": "1 frase de apoio curta (até ~14 palavras)",
+  "legenda": "legenda do post (3-5 linhas com \\n), termina com um convite leve",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
 };
 
 function sistema(marca: Marca, template: Template): string {
@@ -166,7 +193,7 @@ type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: stri
 // Templates que usam foto de IA de fundo (os de fundo colorido não geram foto).
 // O Mosaico também usa fotos reais, mas precisa de VÁRIAS (tratadas à parte em
 // aplicarFotosMosaico), por isso fica fora do fluxo de foto única do USA_FOTO.
-const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false };
+const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false, moldura: false, faixa: true };
 
 function slugify(s: string): string {
   return s
