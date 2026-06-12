@@ -3,11 +3,26 @@
  * Diferente do projeto de origem (1 conta no .env), aqui o token e o IG User ID
  * vêm da Marca, então o Postaí posta em várias contas, cada uma com sua conexão.
  *
- * As imagens (artes) são servidas por rotas públicas do próprio app
- * (/api/slide/... e /api/feed/...), que a Meta busca por URL.
+ * As artes são rotas que renderizam "ao vivo" (next/og). Como a capa-mosaico pode
+ * levar ~8s (baixa várias fotos) e a Meta tem timeout curto ao buscar a image_url,
+ * antes de postar a gente MATERIALIZA cada arte: renderiza 1x e salva como PNG
+ * estático no Blob, e manda essa URL pra Meta — que baixa instantâneo, sem timeout.
  */
 
+import { put } from "@vercel/blob";
+
 const GRAPH = "https://graph.facebook.com/v21.0";
+
+// Renderiza a arte (rota next/og) e salva como PNG estático no Blob; devolve a URL
+// estática (rápida pra Meta baixar). Joga erro se a arte não puder ser renderizada.
+async function materializar(url: string): Promise<string> {
+  const resp = await fetch(url, { cache: "no-store" });
+  if (!resp.ok) throw new Error(`Arte indisponível (${resp.status})`);
+  const buf = Buffer.from(await resp.arrayBuffer());
+  const nome = `posts/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.png`;
+  const blob = await put(nome, buf, { access: "public", contentType: "image/png" });
+  return blob.url;
+}
 
 export type ResultadoPostagem =
   | { ok: true; mediaId: string; permalink: string | null }
@@ -77,14 +92,17 @@ export async function publicar(
   if (!marcaConectada(conn)) {
     return { ok: false, erro: "Marca sem conexão com o Instagram (falta IG User ID e token)." };
   }
-  const urls = igUrls.slice(0, 10);
-  if (urls.length === 0) return { ok: false, erro: "Nada pra postar (sem imagens)." };
+  const igUrlsLimit = igUrls.slice(0, 10);
+  if (igUrlsLimit.length === 0) return { ok: false, erro: "Nada pra postar (sem imagens)." };
 
-  // Pré-aquece as artes: o next/og pode levar segundos no 1º render (sobretudo a
-  // capa-mosaico, com várias fotos reais). A Meta tem timeout curto ao baixar a
-  // image_url, então renderizamos antes — assim já vêm prontas/cacheadas quando a
-  // Meta for buscar. (Falha de pré-aquecimento é ignorada; o retry abaixo cobre.)
-  await Promise.all(urls.map((u) => fetch(u).catch(() => {})));
+  // Materializa as artes (renderiza 1x e salva PNG estático no Blob) pra a Meta baixar
+  // instantâneo — sem o render lento da capa-mosaico nem timeout do lado dela.
+  let urls: string[];
+  try {
+    urls = await Promise.all(igUrlsLimit.map((u) => materializar(u)));
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? `Não consegui preparar as artes: ${e.message}` : "Falha ao preparar as artes." };
+  }
 
   try {
     let containerId: string;
