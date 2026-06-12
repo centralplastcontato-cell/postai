@@ -69,6 +69,7 @@ model Conteudo {
   slidesTexto String? // JSON: texto de cada slide
   tema        String?
   status      String   @default("a_postar") // a_postar | postado
+  aprovado    Boolean  @default(false) // revisão INTERNA do dono (não vai pra rede) — só marca "eu já revisei"
   createdAt   DateTime @default(now())
 
   @@index([marcaId, data])
@@ -90,6 +91,7 @@ model Publicacao {
   extra     String? // JSON com dados específicos do template (oferta, validade, selo, linhas do título, cor de fundo...)
   tema      String?
   status    String   @default("a_postar") // a_postar | postado
+  aprovado  Boolean  @default(false) // revisão INTERNA do dono (não vai pra rede) — só marca "eu já revisei"
   createdAt DateTime @default(now())
 
   @@index([marcaId, data])

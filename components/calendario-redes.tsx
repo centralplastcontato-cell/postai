@@ -99,6 +99,7 @@ export function CalendarioRedes({
         <span><span className="text-amber-300">Amarelo</span> = hoje</span>
         <span>🎉 <span className="text-yellow-300">data comemorativa</span></span>
         <span><span className="text-muted/70">tracejado</span> = agenda (criar aqui)</span>
+        <span><span className="text-green-300">✓</span> = revisado</span>
         <span>dia cheio = ver · dia vazio = gerar nele</span>
       </div>
 
@@ -188,6 +189,7 @@ export function CalendarioRedes({
             >
               <span className="absolute left-0.5 top-0.5 text-[10px] leading-none">{icone}</span>
               {comemorativa && <span className="absolute bottom-0.5 left-0.5 text-[10px] leading-none">🎉</span>}
+              {item.aprovado && <span title="Você já revisou este dia" className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white text-[9px] font-bold leading-none text-green-600">✓</span>}
               {diaCel}
               {comemorativa && <TooltipData emoji={comemorativa.emoji} nome={comemorativa.nome} rodape={item.titulo} />}
               {/* Delete button */}

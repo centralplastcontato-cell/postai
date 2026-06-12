@@ -541,6 +541,16 @@ export async function removerImagemPublicacao(id: string) {
   return { ok: true as const };
 }
 
+// Marca/desmarca "✓ Aprovado" — revisão INTERNA do dono (não vai pra rede social).
+export async function alternarAprovacao(id: string) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const p = await prisma.publicacao.findUnique({ where: { id }, select: { aprovado: true, marcaId: true } });
+  if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  await prisma.publicacao.update({ where: { id }, data: { aprovado: !p.aprovado } });
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const, aprovado: !p.aprovado };
+}
+
 export async function postarPublicacao(id: string) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });

@@ -293,6 +293,16 @@ export async function regerarCarrosselComoNova(id: string) {
   return gerarCarrossel({ marcaId: atual.marcaId, tema: atual.tema, data, nSlides, mosaico: eraMosaico });
 }
 
+// Marca/desmarca "✓ Aprovado" do carrossel — revisão INTERNA (não vai pra rede).
+export async function alternarAprovacaoCarrossel(id: string) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const c = await prisma.conteudo.findUnique({ where: { id }, select: { aprovado: true, marcaId: true } });
+  if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
+  await prisma.conteudo.update({ where: { id }, data: { aprovado: !c.aprovado } });
+  revalidatePath(`/painel/marcas/${c.marcaId}`);
+  return { ok: true as const, aprovado: !c.aprovado };
+}
+
 export async function sugerirTemas(marcaId: string) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId } });

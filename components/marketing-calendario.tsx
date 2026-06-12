@@ -8,6 +8,7 @@ import {
   gerarCarrossel,
   regerarCarrossel,
   regerarCarrosselComoNova,
+  alternarAprovacaoCarrossel,
   regerarSlide,
   gerarImagemSlide,
   definirImagemSlide,
@@ -44,6 +45,7 @@ export type Post = {
   slides: string[];
   status: string;
   tema?: string | null;
+  aprovado: boolean; // revisão interna do dono (não vai pra rede)
   imagensSlides?: (string | null)[];
 };
 
@@ -175,6 +177,12 @@ export function MarketingCalendario({
     } finally {
       setPostando(false);
     }
+  }
+  function handleAprovar(p: Post) {
+    startTransition(async () => {
+      await alternarAprovacaoCarrossel(p.id);
+      router.refresh();
+    });
   }
   function confirmarExcluir(p: Post) {
     startTransition(async () => {
@@ -391,7 +399,10 @@ export function MarketingCalendario({
               <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${aberto ? "border-orange-500 ring-2 ring-orange-500/50" : "border-linha"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-muted">{dataBR(p.data)}</span>
-                  <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
+                  <div className="flex items-center gap-1.5">
+                    {p.aprovado && <span title="Você já revisou este carrossel" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Revisado</span>}
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
+                  </div>
                 </div>
                 <button type="button" onClick={() => onSelId(aberto ? null : p.id)} title={aberto ? "Fechar detalhe" : "Abrir / editar slides"} className="overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
                   {capa ? (
@@ -412,6 +423,7 @@ export function MarketingCalendario({
                 </div>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
+                  <button onClick={() => handleAprovar(p)} disabled={isPending} title={p.aprovado ? "Você já revisou — clique pra desmarcar" : "Marcar como revisado (interno, não vai pra rede)"} className={`rounded-md px-2 py-1 text-xs font-semibold transition disabled:opacity-40 ${p.aprovado ? "bg-green-600 text-white hover:bg-green-500" : "border border-linha text-muted hover:border-green-500 hover:text-white"}`}>{p.aprovado ? "✓ Aprovado" : "Aprovar"}</button>
                   <button onClick={() => onSelId(aberto ? null : p.id)} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">{aberto ? "▾ Fechar" : "✏️ Editar slides"}</button>
                   {p.tema && <button onClick={() => handleRegerar(p)} disabled={isPending} title={postado ? "Já postado — cria um novo ao lado" : "Regerar"} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻ Regerar</button>}
                   <button onClick={() => baixarTodas(p)} disabled={baixando} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">⬇ Baixar</button>

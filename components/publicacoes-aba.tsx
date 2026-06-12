@@ -6,6 +6,7 @@ import {
   gerarPublicacao,
   regerarPublicacao,
   regerarComoNova,
+  alternarAprovacao,
   postarPublicacao,
   excluirPublicacao,
   gerarImagemPublicacao,
@@ -91,6 +92,7 @@ export type PublicacaoView = {
   imagemUrl: string | null;
   status: string;
   tema: string | null;
+  aprovado: boolean; // revisão interna do dono (não vai pra rede)
   categoria?: string | null; // categoria do banco pra foto (template dica)
 };
 
@@ -244,6 +246,14 @@ export function PublicacoesAba({
       return;
     }
     regerar(p.id, false);
+  }
+  function handleAprovar(id: string) {
+    setProc(id);
+    startTransition(async () => {
+      await alternarAprovacao(id);
+      router.refresh();
+      setProc(null);
+    });
   }
   function handleExcluir(id: string) {
     setConfirmacao({
@@ -604,7 +614,10 @@ export function PublicacoesAba({
               <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${destacarId === p.id ? "border-sky-500 ring-2 ring-sky-500/50" : "border-linha"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="text-xs text-muted">{dataBR(p.data)}</span>
-                  <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
+                  <div className="flex items-center gap-1.5">
+                    {p.aprovado && <span title="Você já revisou este post" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Revisado</span>}
+                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
+                  </div>
                 </div>
                 <button type="button" onClick={() => setImgExpandida(arte)} title="Ampliar" className="overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -646,6 +659,7 @@ export function PublicacoesAba({
                 </div>
 
                 <div className="mt-2 flex flex-wrap gap-1.5">
+                  <button onClick={() => handleAprovar(p.id)} disabled={ocupado} title={p.aprovado ? "Você já revisou — clique pra desmarcar" : "Marcar como revisado (interno, não vai pra rede)"} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${p.aprovado ? "bg-green-600 text-white hover:bg-green-500" : "border border-linha text-muted hover:border-green-500 hover:text-white"}`}>{p.aprovado ? "✓ Aprovado" : "Aprovar"}</button>
                   {!postado && (
                     <button onClick={() => handlePostar(p)} disabled={ocupado} className="rounded-md bg-[#C13584] px-2.5 py-1 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50">📷 Postar</button>
                   )}

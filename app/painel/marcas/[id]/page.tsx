@@ -46,6 +46,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       slides: slides.map((s) => `${s}?v=${v}`),
       status: c.status,
       tema: c.tema,
+      aprovado: c.aprovado,
       imagensSlides,
     };
   });
@@ -66,6 +67,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     imagemUrl: p.imagemUrl,
     status: p.status,
     tema: p.tema,
+    aprovado: p.aprovado,
     categoria: (() => { try { return JSON.parse(p.extra || "{}").categoria ?? null; } catch { return null; } })(),
   }));
 
