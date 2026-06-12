@@ -469,3 +469,176 @@ export function LayoutMosaico(d: DadosArte & { fotos?: string[]; arraste?: boole
     </div>
   );
 }
+
+// 🎨 Capa de carrossel COLORIDA FESTIVA — fundo de cor vibrante, título multicolor
+// centralizado, confete e logo. SEM foto. Limpa, chamativa, com "arraste →".
+export function LayoutCapaFestiva(d: DadosArte & { arraste?: boolean }) {
+  const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || escolherFundoFesta(d.paleta);
+  return (
+    <div
+      style={{
+        width: "1080px",
+        height: "1350px",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        backgroundColor: fundo,
+        backgroundImage: "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.26), rgba(0,0,0,0.18) 72%)",
+        fontFamily: "Baloo",
+      }}
+    >
+      <Confete cores={[c2, c3, c5, c1]} />
+      {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "0 80px", flexGrow: 1 }}>
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 104 : 124} />
+        {d.textoApoio ? (
+          <div style={{ display: "flex", marginTop: 30, maxWidth: 880, fontSize: 44, color: BRANCO, lineHeight: 1.25, textAlign: "center", textShadow: "0 2px 6px rgba(0,0,0,0.45)" }}>
+            {d.textoApoio}
+          </div>
+        ) : null}
+      </div>
+
+      <OndaBase cor={c1} />
+      <div style={{ position: "absolute", bottom: 58, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
+        {d.site}{d.site && d.arraste ? "   ·   " : ""}{d.arraste ? "arraste →" : ""}
+      </div>
+    </div>
+  );
+}
+
+// 📸 Capa FOTO EM DESTAQUE — foto real cobrindo a capa, gradiente pra leitura, título
+// multicolor por cima. Impactante e mostra o espaço de verdade.
+export function LayoutCapaFoto(d: DadosArte & { imagemUrl?: string; arraste?: boolean }) {
+  const c1 = d.paleta[0];
+  const logoW = Math.round(80 * 1.76);
+  return (
+    <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative", backgroundColor: d.corFundo || c1, fontFamily: "Baloo" }}>
+      {d.imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={d.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
+      ) : null}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "1080px",
+          height: "1350px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          padding: "70px",
+          backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.05) 24%, rgba(0,0,0,0) 44%, rgba(0,0,0,0.6) 72%, rgba(0,0,0,0.93) 100%)",
+        }}
+      >
+        {d.logoSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={d.logoSrc} width={logoW} height={80} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.6))" }} />
+        ) : <div style={{ display: "flex" }} />}
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 96 : 116} />
+          {d.textoApoio ? (
+            <div style={{ display: "flex", marginTop: 18, fontSize: 40, color: BRANCO, lineHeight: 1.2, textShadow: "0 2px 8px rgba(0,0,0,0.85)", maxWidth: 900 }}>{d.textoApoio}</div>
+          ) : null}
+          <div style={{ display: "flex", marginTop: 28, fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.85)" }}>
+            {d.site}{d.site && d.arraste ? "   ·   " : ""}{d.arraste ? "arraste →" : ""}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 🎈 Capa MOLDURA LÚDICA — fundo de cor festa + o título dentro de uma moldura branca
+// arredondada (cara de quadro de festa), confete e logo.
+export function LayoutCapaMoldura(d: DadosArte & { arraste?: boolean }) {
+  const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || escolherFundoFesta(d.paleta);
+  return (
+    <div
+      style={{
+        width: "1080px",
+        height: "1350px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+        backgroundColor: fundo,
+        backgroundImage: "radial-gradient(circle at 50% 35%, rgba(255,255,255,0.22), rgba(0,0,0,0.18) 72%)",
+        fontFamily: "Baloo",
+      }}
+    >
+      <Confete cores={[c2, c3, c5, c1]} />
+      {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          width: 880,
+          padding: "72px 56px",
+          borderRadius: 52,
+          backgroundColor: "rgba(255,255,255,0.10)",
+          border: "10px solid #fff",
+          boxShadow: "0 16px 40px rgba(0,0,0,0.35)",
+        }}
+      >
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 86 : 102} />
+        {d.textoApoio ? (
+          <div style={{ display: "flex", marginTop: 24, fontSize: 38, color: BRANCO, lineHeight: 1.25, textAlign: "center", textShadow: "0 2px 6px rgba(0,0,0,0.45)", maxWidth: 740 }}>{d.textoApoio}</div>
+        ) : null}
+      </div>
+      <div style={{ position: "absolute", bottom: 58, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 4px rgba(0,0,0,0.45)" }}>
+        {d.site}{d.site && d.arraste ? "   ·   " : ""}{d.arraste ? "arraste →" : ""}
+      </div>
+    </div>
+  );
+}
+
+// 🔳 Capa FAIXA DIAGONAL — foto de fundo + faixa colorida na diagonal com o título.
+// Estilo moderno de anúncio/catálogo.
+export function LayoutCapaFaixa(d: DadosArte & { imagemUrl?: string; arraste?: boolean }) {
+  const c1 = d.paleta[0];
+  const fundo = d.corFundo || c1;
+  const logoW = Math.round(72 * 1.76);
+  return (
+    <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative", backgroundColor: fundo, fontFamily: "Baloo", overflow: "hidden" }}>
+      {d.imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={d.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
+      ) : null}
+      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", backgroundColor: "rgba(0,0,0,0.22)", display: "flex" }} />
+      {d.logoSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={d.logoSrc} width={logoW} height={72} style={{ position: "absolute", top: 60, left: 60, objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.6))" }} />
+      ) : null}
+      <div
+        style={{
+          position: "absolute",
+          top: 540,
+          left: -100,
+          width: 1280,
+          padding: "44px 0",
+          backgroundColor: fundo,
+          transform: "rotate(-8deg)",
+          boxShadow: "0 16px 44px rgba(0,0,0,0.45)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "0 60px" }}>
+          <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 78 : 94} />
+        </div>
+      </div>
+      <div style={{ position: "absolute", bottom: 56, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.75)" }}>
+        {d.site}{d.site && d.arraste ? "   ·   " : ""}{d.arraste ? "arraste →" : ""}
+      </div>
+    </div>
+  );
+}

@@ -11,12 +11,17 @@ import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
 import type { Marca } from "@prisma/client";
 
 type SlideTexto = {
-  tipo: "capa" | "conteudo" | "cta" | "aniv-capa" | "aniv" | "mosaico";
+  tipo: "capa" | "conteudo" | "cta" | "aniv-capa" | "aniv" | "mosaico" | "capa-festiva" | "capa-foto" | "capa-moldura" | "capa-faixa";
   titulo: string;
   texto?: string;
   imagemUrl?: string;
   fotos?: string[]; // tipo "mosaico": as 4 fotos reais do banco que vão nos círculos
+  corFundo?: string; // cor de fundo escolhida pra capa (templates de capa)
 };
+
+// Estilos de CAPA de carrossel que o usuário pode escolher (ou "aleatorio" sorteia).
+const ESTILOS_CAPA = ["festiva", "foto", "moldura", "faixa", "mosaico"] as const;
+const ehCapaEstilo = (t: string) => t === "mosaico" || t.startsWith("capa-");
 type Gerado = { titulo: string; slides: SlideTexto[]; legenda: string; hashtags: string };
 
 // Monta o "system prompt" no tom da marca (a partir do cadastro dela).
@@ -111,23 +116,44 @@ async function gerarFotoFundo(marca: Marca, descricao: string, ref: string): Pro
 // banco está vazio. O sorteio do banco é SEQUENCIAL (pro contador de rodízio
 // equilibrar entre os slides); a geração de IA, que é lenta, roda em paralelo.
 async function comFotosDeIA(marca: Marca, id: string, slides: SlideTexto[]): Promise<SlideTexto[]> {
-  // O slide "mosaico" traz suas próprias 4 fotos (nos círculos) — não recebe foto única.
+  // As CAPAS de estilo (mosaico/capa-*) já trazem suas próprias fotos/cor — não recebem foto única.
   const doBanco: (string | null)[] = [];
-  for (let i = 0; i < slides.length; i++) doBanco.push(slides[i].tipo === "mosaico" ? null : await sortearImagemBanco(marca.id));
+  for (let i = 0; i < slides.length; i++) doBanco.push(ehCapaEstilo(slides[i].tipo) ? null : await sortearImagemBanco(marca.id));
   const fotos = await Promise.all(
-    slides.map(async (s, i) => (s.tipo === "mosaico" ? null : doBanco[i] || (await gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`)))),
+    slides.map(async (s, i) => (ehCapaEstilo(s.tipo) ? null : doBanco[i] || (await gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`)))),
   );
   return slides.map((s, i) => (fotos[i] ? { ...s, imagemUrl: fotos[i]! } : s));
 }
 
-// Transforma a CAPA (slide 0) num Mosaico de 4 fotos reais do banco. Se o banco
-// estiver vazio, deixa a capa como veio (a IA cuida com fundo abstrato). O título
-// gerado pela IA é mantido — só o visual da capa muda.
-async function aplicarMosaicoCapa(marca: Marca, slides: SlideTexto[]): Promise<SlideTexto[]> {
+// Transforma a CAPA (slide 0) no ESTILO escolhido (ou sorteia se "aleatorio"). Os
+// estilos com foto (foto/faixa/mosaico) puxam do banco; festiva/moldura são só cor.
+// O título gerado pela IA é mantido — só o visual da capa muda. corFundo = cor da capa.
+async function aplicarEstiloCapa(marca: Marca, slides: SlideTexto[], estilo: string, corFundo?: string): Promise<SlideTexto[]> {
   if (!slides.length) return slides;
-  const fotos = await sortearImagensBanco(marca.id, 4);
-  if (!fotos.length) return slides;
-  return slides.map((s, i) => (i === 0 ? { ...s, tipo: "mosaico", fotos, imagemUrl: undefined } : s));
+  let est = estilo;
+  if (!(ESTILOS_CAPA as readonly string[]).includes(est)) est = ESTILOS_CAPA[Math.floor(Math.random() * ESTILOS_CAPA.length)];
+  if (est === "mosaico") {
+    const fotos = await sortearImagensBanco(marca.id, 4);
+    if (!fotos.length) est = "festiva"; // sem banco, cai pra capa colorida (sem foto)
+    else return slides.map((s, i) => (i === 0 ? { ...s, tipo: "mosaico", fotos, corFundo, imagemUrl: undefined } : s));
+  }
+  if (est === "foto" || est === "faixa") {
+    const foto = await sortearImagemBanco(marca.id);
+    if (!foto) est = "festiva"; // sem banco, cai pra capa colorida
+    else return slides.map((s, i) => (i === 0 ? { ...s, tipo: `capa-${est}` as SlideTexto["tipo"], imagemUrl: foto, corFundo, fotos: undefined } : s));
+  }
+  // festiva, moldura (só cor, sem foto)
+  return slides.map((s, i) => (i === 0 ? { ...s, tipo: `capa-${est}` as SlideTexto["tipo"], corFundo, imagemUrl: undefined, fotos: undefined } : s));
+}
+
+// Lê o estilo e a cor da CAPA atual (slide 0), pra preservar no regerar.
+function estiloDaCapa(slidesTexto: string | null): { estilo: string; corFundo?: string } {
+  try {
+    const c = (JSON.parse(slidesTexto || "[]") as SlideTexto[])[0];
+    if (c?.tipo === "mosaico") return { estilo: "mosaico", corFundo: c.corFundo };
+    if (c?.tipo?.startsWith("capa-")) return { estilo: c.tipo.replace("capa-", ""), corFundo: c.corFundo };
+  } catch {}
+  return { estilo: "aleatorio" };
 }
 
 export async function gerarCarrossel(input: {
@@ -135,7 +161,8 @@ export async function gerarCarrossel(input: {
   tema: string;
   data: string; // YYYY-MM-DD
   nSlides?: number;
-  mosaico?: boolean; // capa em Mosaico de fotos reais (em vez da capa padrão)
+  estiloCapa?: string; // festiva | foto | moldura | faixa | mosaico | aleatorio
+  corFundo?: string; // cor de fundo da capa (ou vazio = automático)
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
@@ -169,9 +196,9 @@ export async function gerarCarrossel(input: {
       status: "a_postar",
     },
   });
-  // Capa em Mosaico (opcional): troca a capa pelas 4 fotos reais ANTES de preencher
-  // as fotos dos demais slides (assim a capa-mosaico não recebe foto única).
-  const slidesBase = input.mosaico ? await aplicarMosaicoCapa(marca, gerado.slides) : gerado.slides;
+  // Aplica o ESTILO da capa (slide 0) ANTES de preencher as fotos dos demais slides.
+  // Default = aleatório (variedade automática). corFundo vazio = automático (da paleta).
+  const slidesBase = await aplicarEstiloCapa(marca, gerado.slides, input.estiloCapa || "aleatorio", input.corFundo || undefined);
   // Gera foto de IA pra cada slide. Se alguma falhar, aquele slide fica em cor sólida.
   const slidesFinais = await comFotosDeIA(marca, criado.id, slidesBase);
   const slides = JSON.stringify(slidesFinais.map((_, i) => `/api/slide/${criado.id}/${i + 1}`));
@@ -245,12 +272,8 @@ export async function regerarCarrossel(id: string) {
     }
   })();
 
-  // Se a capa atual já era um Mosaico, mantém a capa em mosaico ao regerar.
-  let eraMosaico = false;
-  try {
-    const arr = JSON.parse(atual.slidesTexto || "[]") as SlideTexto[];
-    eraMosaico = arr[0]?.tipo === "mosaico";
-  } catch {}
+  // Preserva o ESTILO e a COR da capa atual ao regerar.
+  const cap = estiloDaCapa(atual.slidesTexto);
 
   let gerado: Gerado;
   try {
@@ -259,7 +282,7 @@ export async function regerarCarrossel(id: string) {
     console.error("Erro ao regerar:", e);
     return { ok: false as const, erro: "Não consegui regerar agora." };
   }
-  const slidesBase = eraMosaico ? await aplicarMosaicoCapa(atual.marca, gerado.slides) : gerado.slides;
+  const slidesBase = await aplicarEstiloCapa(atual.marca, gerado.slides, cap.estilo, cap.corFundo);
   const slidesFinais = await comFotosDeIA(atual.marca, id, slidesBase);
   const slides = JSON.stringify(slidesFinais.map((_, i) => `/api/slide/${id}/${i + 1}`));
   await prisma.conteudo.update({
@@ -285,14 +308,12 @@ export async function regerarCarrosselComoNova(id: string) {
   const atual = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
   if (!atual?.tema) return { ok: false as const, erro: "Esse carrossel não foi gerado por IA." };
   let nSlides = 7;
-  let eraMosaico = false;
   try {
-    const arr = JSON.parse(atual.slidesTexto || "[]") as SlideTexto[];
-    nSlides = arr.length || 7;
-    eraMosaico = arr[0]?.tipo === "mosaico";
+    nSlides = (JSON.parse(atual.slidesTexto || "[]") as SlideTexto[]).length || 7;
   } catch {}
+  const cap = estiloDaCapa(atual.slidesTexto);
   const data = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
-  return gerarCarrossel({ marcaId: atual.marcaId, tema: atual.tema, data, nSlides, mosaico: eraMosaico });
+  return gerarCarrossel({ marcaId: atual.marcaId, tema: atual.tema, data, nSlides, estiloCapa: cap.estilo, corFundo: cap.corFundo });
 }
 
 // Marca/desmarca "✓ Aprovado" do carrossel — revisão INTERNA (não vai pra rede).

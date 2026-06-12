@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, LayoutAnivCapa, LayoutAnivCard, LayoutMosaico, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, LayoutAnivCapa, LayoutAnivCard, LayoutMosaico, LayoutCapaFestiva, LayoutCapaFoto, LayoutCapaMoldura, LayoutCapaFaixa, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,6 +73,34 @@ export async function GET(req: Request) {
       fotos,
       // ?arraste=1 mostra o "arraste →" (como fica de CAPA de carrossel).
       arraste: url.searchParams.get("arraste") === "1",
+    });
+  } else if (template === "capa-festiva") {
+    elemento = LayoutCapaFestiva({
+      ...base,
+      titulo: montarTituloColorido(tituloParam || "Especial de Férias", paleta),
+      textoApoio: "Diversão garantida pra criançada!",
+      arraste: true,
+      corFundo: url.searchParams.get("cor") || undefined,
+    });
+  } else if (template === "capa-foto" || template === "capa-faixa") {
+    const banco = marca ? await prisma.imagemMarca.findFirst({ where: { marcaId: marca.id }, orderBy: { criadoEm: "asc" }, select: { url: true } }) : null;
+    const foto = banco?.url || "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=900&q=80";
+    const dados = {
+      ...base,
+      titulo: montarTituloColorido(tituloParam || "Conheça nosso espaço", paleta),
+      textoApoio: "Diversão garantida pra criançada!",
+      imagemUrl: foto,
+      arraste: true,
+      corFundo: url.searchParams.get("cor") || undefined,
+    };
+    elemento = template === "capa-foto" ? LayoutCapaFoto(dados) : LayoutCapaFaixa(dados);
+  } else if (template === "capa-moldura") {
+    elemento = LayoutCapaMoldura({
+      ...base,
+      titulo: montarTituloColorido(tituloParam || "Festa dos Sonhos", paleta),
+      textoApoio: "Diversão garantida pra criançada!",
+      arraste: true,
+      corFundo: url.searchParams.get("cor") || undefined,
     });
   } else if (template === "aniv") {
     elemento = LayoutAnivCard({

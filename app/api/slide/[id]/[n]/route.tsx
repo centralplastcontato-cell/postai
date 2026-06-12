@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutAnivCapa, LayoutAnivCard, LayoutMosaico } from "@/lib/arte-layouts";
+import { LayoutAnivCapa, LayoutAnivCard, LayoutMosaico, LayoutCapaFestiva, LayoutCapaFoto, LayoutCapaMoldura, LayoutCapaFaixa } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const maxDuration = 60;
 // ?v= troca sozinho quando o conteúdo muda.
 const CACHE = { "cache-control": "public, max-age=31536000, immutable" };
 
-type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string; fotos?: string[] };
+type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string; fotos?: string[]; corFundo?: string };
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: string }> }) {
   const { id, n } = await ctx.params;
@@ -55,6 +55,32 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       fotos: slide.fotos,
       arraste: true,
     });
+    return new ImageResponse(el, { width: 1080, height: 1350, fonts, headers: CACHE });
+  }
+
+  // Capas de ESTILO (festiva/foto/moldura/faixa): a capa do carrossel num visual
+  // próprio. corFundo = cor escolhida (ou automático). arraste:true = é capa.
+  if (slide.tipo === "capa-festiva" || slide.tipo === "capa-foto" || slide.tipo === "capa-moldura" || slide.tipo === "capa-faixa") {
+    const fonts = carregarFontes();
+    const dados = {
+      paleta,
+      logoSrc,
+      site,
+      telefone,
+      titulo: montarTituloColorido(slide.titulo || "Conheça nosso espaço", paleta),
+      textoApoio: slide.texto || undefined,
+      imagemUrl: slide.imagemUrl,
+      corFundo: slide.corFundo,
+      arraste: true,
+    };
+    const el =
+      slide.tipo === "capa-festiva"
+        ? LayoutCapaFestiva(dados)
+        : slide.tipo === "capa-foto"
+          ? LayoutCapaFoto(dados)
+          : slide.tipo === "capa-moldura"
+            ? LayoutCapaMoldura(dados)
+            : LayoutCapaFaixa(dados);
     return new ImageResponse(el, { width: 1080, height: 1350, fonts, headers: CACHE });
   }
 

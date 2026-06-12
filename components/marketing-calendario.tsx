@@ -35,6 +35,20 @@ const MODELOS_CARROSSEL: { rotulo: string; tema: string }[] = [
   { rotulo: "⭐ Por que escolher", tema: "por que tantas famílias escolhem e voltam a comemorar com a gente" },
 ];
 
+// Estilos de CAPA do carrossel. 🎲 Surpresa sorteia entre os 5; os demais fixam o
+// visual. O conteúdo dos slides segue sempre gerado pela IA.
+const ESTILOS_CAPA: { valor: string; emoji: string; nome: string; dica: string }[] = [
+  { valor: "aleatorio", emoji: "🎲", nome: "Surpresa", dica: "Sorteia um estilo de capa diferente a cada geração." },
+  { valor: "festiva", emoji: "🎨", nome: "Colorida", dica: "Capa colorida festiva, com o título em destaque (sem foto)." },
+  { valor: "foto", emoji: "📷", nome: "Foto", dica: "Uma foto real do seu banco ocupa a capa inteira, com o título por cima." },
+  { valor: "mosaico", emoji: "🖼️", nome: "Mosaico", dica: "4 fotos reais do seu banco em círculos — mostra o espaço de verdade." },
+  { valor: "moldura", emoji: "🪟", nome: "Moldura", dica: "Título dentro de uma moldura branca lúdica, sobre fundo festivo." },
+  { valor: "faixa", emoji: "📐", nome: "Faixa", dica: "Foto de fundo com uma faixa diagonal trazendo o título." },
+];
+
+// Paleta de cores pra capa (além do 🎲 Auto, que usa a cor da marca).
+const CORES_CAPA = ["#FF4F4F", "#FF7A00", "#FFC400", "#22C55E", "#06B6D4", "#3B82F6", "#8B5CF6", "#EC4899", "#111827"];
+
 export type Post = {
   id: string;
   slug: string;
@@ -95,7 +109,8 @@ export function MarketingCalendario({
   const [isPending, startTransition] = useTransition();
   const [tema, setTema] = useState("");
   const [nSlides, setNSlides] = useState(7);
-  const [mosaico, setMosaico] = useState(false);
+  const [estiloCapa, setEstiloCapa] = useState("aleatorio");
+  const [corCapa, setCorCapa] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [legendaAberta, setLegendaAberta] = useState(true);
@@ -137,7 +152,7 @@ export function MarketingCalendario({
       return;
     }
     startTransition(async () => {
-      const r = await gerarCarrossel({ marcaId, tema, data: dataAlvo, nSlides, mosaico });
+      const r = await gerarCarrossel({ marcaId, tema, data: dataAlvo, nSlides, estiloCapa, corFundo: corCapa || undefined });
       if (r.ok) {
         setTema("");
         onSelId(r.id);
@@ -350,15 +365,41 @@ export function MarketingCalendario({
           </button>
         </div>
         <div className="mt-3">
-          <button
-            type="button"
-            onClick={() => setMosaico((v) => !v)}
-            title="A capa do carrossel vira um mosaico com 4 fotos REAIS do seu banco de imagens (mostra o espaço de verdade). O conteúdo segue gerado pela IA."
-            className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${mosaico ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}
-          >
-            <span className={`flex h-4 w-4 items-center justify-center rounded border ${mosaico ? "border-vermelho bg-vermelho text-white" : "border-linha"}`}>{mosaico ? "✓" : ""}</span>
-            🖼️ Capa em mosaico (fotos reais do banco)
-          </button>
+          <div className="text-xs text-muted">Estilo da capa</div>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {ESTILOS_CAPA.map((e) => (
+              <button
+                key={e.valor}
+                type="button"
+                onClick={() => setEstiloCapa(e.valor)}
+                title={e.dica}
+                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${estiloCapa === e.valor ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}
+              >
+                {e.emoji} {e.nome}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs text-muted">Cor:</span>
+            <button
+              type="button"
+              onClick={() => setCorCapa("")}
+              title="Deixa o Postaí escolher uma cor da marca"
+              className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${corCapa === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}
+            >
+              🎲 Auto
+            </button>
+            {CORES_CAPA.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setCorCapa(c)}
+                title={c}
+                className={`h-7 w-7 rounded-full border-2 transition ${corCapa === c ? "border-white scale-110" : "border-linha hover:border-white/60"}`}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
         </div>
         <div className="mt-3">
           <button type="button" onClick={handleSugerirTemas} disabled={sugerindo} className="flex items-center gap-1 text-xs uppercase tracking-wider text-amber-300 transition hover:text-amber-200 disabled:opacity-50">
