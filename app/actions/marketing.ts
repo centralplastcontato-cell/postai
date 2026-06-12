@@ -152,7 +152,8 @@ export async function gerarCarrossel(input: {
     return { ok: false as const, erro: "Não consegui gerar agora. Confira a chave da OpenAI." };
   }
 
-  const data = new Date(`${input.data}T12:00:00-03:00`);
+  const horaC = String(marca.horaCarrossel ?? 10).padStart(2, "0");
+  const data = new Date(`${input.data}T${horaC}:00:00-03:00`);
   const slug = `${marca.slug}-${slugify(tema)}-${Date.now().toString(36).slice(-4)}`;
   const criado = await prisma.conteudo.create({
     data: {
@@ -209,7 +210,8 @@ export async function criarAniversariantes(input: {
   const legenda = `🎉 Parabéns aos aniversariantes da semana! 🎂\n\nUm viva pra: ${nomes}! 🥳\n\nQue esse novo ciclo seja cheio de alegria, sorrisos e muita diversão. Felicidades!\n\nQuer comemorar com a gente? Chama no WhatsApp! 📲`;
   const hashtags = "#aniversario #aniversariantes #festainfantil #parabens #felizaniversario #buffetinfantil #festa #diversao";
 
-  const data = new Date(`${input.data}T12:00:00-03:00`);
+  const horaC = String(marca.horaCarrossel ?? 10).padStart(2, "0");
+  const data = new Date(`${input.data}T${horaC}:00:00-03:00`);
   const slug = `${marca.slug}-aniversariantes-${Date.now().toString(36).slice(-4)}`;
   const criado = await prisma.conteudo.create({
     data: {

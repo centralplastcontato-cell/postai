@@ -92,6 +92,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     diasCarrossel: marca.diasCarrossel,
     diasFeed: marca.diasFeed,
     horaPost: marca.horaPost,
+    horaCarrossel: marca.horaCarrossel,
     descricao: marca.descricao,
     ativa: marca.ativa,
   };

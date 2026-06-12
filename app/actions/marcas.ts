@@ -53,6 +53,7 @@ type DadosMarca = {
   diasCarrossel?: string;
   diasFeed?: string;
   horaPost?: number;
+  horaCarrossel?: number;
   descricao?: string;
   ativa?: boolean;
 };

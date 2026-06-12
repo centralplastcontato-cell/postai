@@ -20,6 +20,7 @@ export type MarcaView = {
   diasCarrossel: string;
   diasFeed: string;
   horaPost: number;
+  horaCarrossel: number;
   descricao: string;
   ativa: boolean;
 };
@@ -90,6 +91,7 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         diasCarrossel: f.diasCarrossel,
         diasFeed: f.diasFeed,
         horaPost: f.horaPost,
+        horaCarrossel: f.horaCarrossel,
         descricao: f.descricao,
         ativa: f.ativa,
       });
@@ -269,11 +271,19 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         <div className="mb-3 flex flex-wrap gap-1.5">
           {DIAS.map((d) => <button key={d.n} type="button" onClick={() => toggleDia("diasFeed", d.n)} className={diaBtn(diasFeed.includes(d.n))}>{d.l}</button>)}
         </div>
-        <label className="text-xs text-muted">Hora de postar (BRT)
-          <select value={f.horaPost} onChange={(e) => set("horaPost", Number(e.target.value))} className="input-base">
-            {Array.from({ length: 24 }, (_, h) => h).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
-          </select>
-        </label>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="text-xs text-muted">🖼️ Hora do carrossel (BRT)
+            <select value={f.horaCarrossel} onChange={(e) => set("horaCarrossel", Number(e.target.value))} className="input-base">
+              {Array.from({ length: 24 }, (_, h) => h).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-muted">📱 Hora do feed (BRT)
+            <select value={f.horaPost} onChange={(e) => set("horaPost", Number(e.target.value))} className="input-base">
+              {Array.from({ length: 24 }, (_, h) => h).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+            </select>
+          </label>
+        </div>
+        <p className="mt-1.5 text-[11px] text-muted">⏰ O piloto automático posta cada um na sua hora (de hora em hora). Ative o despertador no Supabase pra valer.</p>
         <label className="mt-3 flex items-center gap-2 text-sm text-white">
           <input type="checkbox" checked={f.ativa} onChange={(e) => set("ativa", e.target.checked)} /> Piloto automático ativo
         </label>

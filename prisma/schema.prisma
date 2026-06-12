@@ -30,7 +30,8 @@ model Marca {
   // Agenda automática: dias da semana (0=dom … 6=sáb) de cada tipo + hora (BRT)
   diasCarrossel String @default("1,3,5") // seg/qua/sex
   diasFeed      String @default("2,4,6") // ter/qui/sáb
-  horaPost      Int    @default(10)
+  horaPost      Int    @default(10) // hora do FEED (BRT) — nome mantido por compatibilidade
+  horaCarrossel Int    @default(10) // hora do CARROSSEL (BRT)
   // Contexto pra IA escrever no tom da marca
   descricao   String   @default("") // o que é o negócio, público, produtos
   ativa       Boolean  @default(true)
