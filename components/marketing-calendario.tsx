@@ -6,6 +6,7 @@ import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import {
   gerarCarrossel,
+  trocarCapaCarrossel,
   regerarCarrossel,
   regerarCarrosselComoNova,
   alternarAprovacaoCarrossel,
@@ -116,6 +117,9 @@ export function MarketingCalendario({
   const [nSlides, setNSlides] = useState(7);
   const [estiloCapa, setEstiloCapa] = useState("aleatorio");
   const [corCapa, setCorCapa] = useState("");
+  const [trocaEstilo, setTrocaEstilo] = useState("aleatorio"); // troca SÓ a capa (na tela de edição)
+  const [trocaCor, setTrocaCor] = useState("");
+  const [trocandoCapa, setTrocandoCapa] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [legendaAberta, setLegendaAberta] = useState(true);
@@ -234,6 +238,16 @@ export function MarketingCalendario({
     navigator.clipboard.writeText(`${p.legenda}\n\n${p.hashtags}`);
     setCopiadoId(p.id);
     setTimeout(() => setCopiadoId((c) => (c === p.id ? null : c)), 1500);
+  }
+  function handleTrocarCapa(id: string) {
+    setErro(null);
+    setTrocandoCapa(true);
+    startTransition(async () => {
+      const r = await trocarCapaCarrossel({ id, estiloCapa: trocaEstilo, corFundo: trocaCor || undefined });
+      if (!r.ok) setErro(r.erro);
+      else router.refresh();
+      setTrocandoCapa(false);
+    });
   }
   function handleGerarImagem(id: string, indice: number) {
     setErro(null);
@@ -505,6 +519,30 @@ export function MarketingCalendario({
             </div>
             <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${selecionado.status === "postado" ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{selecionado.status === "postado" ? "Postado" : "A postar"}</span>
           </div>
+
+          {/* Trocar SÓ a capa (estilo + cor), sem regerar o carrossel inteiro. */}
+          {selecionado.status !== "postado" && (
+            <div className="mt-4 rounded-lg border border-linha bg-preto p-3">
+              <p className="text-xs font-semibold text-white">🎨 Trocar a capa <span className="font-normal text-muted">— muda só o 1º slide, mantém o resto</span></p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {ESTILOS_CAPA.map((e) => (
+                  <button key={e.valor} type="button" onClick={() => setTrocaEstilo(e.valor)} title={e.dica} className={`flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${trocaEstilo === e.valor ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>
+                    {e.emoji} {e.nome}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-xs text-muted">Cor:</span>
+                <button type="button" onClick={() => setTrocaCor("")} title="Cor automática da marca" className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${trocaCor === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>🎲 Auto</button>
+                {CORES_CAPA.map((c) => (
+                  <button key={c} type="button" onClick={() => setTrocaCor(c)} title={c} className={`h-6 w-6 rounded-full border-2 transition ${trocaCor === c ? "border-white scale-110" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
+                ))}
+                <button type="button" onClick={() => handleTrocarCapa(selecionado.id)} disabled={trocandoCapa} className="ml-auto rounded-lg bg-vermelho px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
+                  {trocandoCapa ? "Trocando…" : "Aplicar à capa"}
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="scroll-bonito mt-4 flex gap-3 overflow-x-auto pb-3">
             {selecionado.slides.map((src, i) => (

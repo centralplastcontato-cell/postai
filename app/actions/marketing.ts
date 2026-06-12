@@ -262,6 +262,21 @@ export async function criarAniversariantes(input: {
   return { ok: true as const, id: criado.id };
 }
 
+// Troca SÓ a capa (slide 0) do carrossel — estilo e cor — sem mexer no conteúdo dos
+// outros slides nem no texto. Reaproveita aplicarEstiloCapa, que só altera o slide 0
+// (mantém título/texto da capa; re-sorteia fotos no mosaico/foto/faixa).
+export async function trocarCapaCarrossel(input: { id: string; estiloCapa: string; corFundo?: string }) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const c = await prisma.conteudo.findUnique({ where: { id: input.id }, include: { marca: true } });
+  if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
+  const slides = lerSlides(c.slidesTexto);
+  if (!slides?.length) return { ok: false as const, erro: "Esse carrossel não tem slides." };
+  const novos = await aplicarEstiloCapa(c.marca, slides, input.estiloCapa || "aleatorio", input.corFundo || undefined);
+  await prisma.conteudo.update({ where: { id: input.id }, data: { slidesTexto: JSON.stringify(novos) } });
+  revalidatePath(`/painel/marcas/${c.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function regerarCarrossel(id: string) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const atual = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
