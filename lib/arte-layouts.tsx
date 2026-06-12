@@ -51,9 +51,14 @@ export function LayoutPromocao(d: DadosArte) {
         const itens = (d.inclui || []).filter((s) => s && s.trim()).slice(0, 5);
         const temLista = itens.length > 0;
         const rodape = [rotularValidade(d.validade), d.regras].filter((s) => s && s.trim()).join("  ·  ");
+        // Título longo (3-4 linhas) + lista ocupam muito: encolhe a fonte e sobe a
+        // margem do topo pra TUDO (inclusive o telefone) caber ACIMA da onda (top 1110).
+        const nLinhas = d.titulo.length;
+        const fonteTitulo = nLinhas >= 4 ? 82 : nLinhas === 3 ? 94 : 112;
+        const margemTopo = Math.max(120, (nLinhas >= 4 ? 200 : nLinhas === 3 ? 270 : 350) - (temLista ? 50 : 0) - itens.length * 12);
         return (
-          <div style={{ display: "flex", flexDirection: "column", padding: "0 80px", marginTop: temLista ? 300 : 360, flexGrow: 1 }}>
-            <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 96 : 112} />
+          <div style={{ display: "flex", flexDirection: "column", padding: "0 80px", marginTop: margemTopo, flexGrow: 1 }}>
+            <TituloMulticolor linhas={d.titulo} fontSize={fonteTitulo} />
 
             {d.oferta ? (
               <div style={{ display: "flex", marginTop: 30 }}>
