@@ -456,13 +456,13 @@ export function MarketingCalendario({
                   <img src={src} alt={`Slide ${i + 1}`} className="h-auto w-[100px] sm:w-[120px]" />
                 </button>
                 {selecionado.status !== "postado" && (
-                <div className="mt-1 flex flex-wrap items-center justify-center gap-1">
-                  <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Regerar texto" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🔄</button>
-                  <button type="button" onClick={() => handleBancoSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Sortear foto real do banco" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲</button>
-                  <button type="button" onClick={() => handleGerarImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Fundo abstrato com IA (não mostra ambiente real)" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🖼️</button>
-                  <label title="Enviar foto" className="cursor-pointer rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white">📤<input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImagem(selecionado.id, i, e.target.files?.[0])} /></label>
+                <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
+                  <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Regerar texto" className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🔄</button>
+                  <button type="button" onClick={() => handleBancoSlide(selecionado.id, i)} disabled={slideProcessando !== null} title="Sortear foto real do banco" className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🎲</button>
+                  <button type="button" onClick={() => handleGerarImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Fundo abstrato com IA (não mostra ambiente real)" className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🖼️</button>
+                  <label title="Enviar foto" className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card">📤<input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadImagem(selecionado.id, i, e.target.files?.[0])} /></label>
                   {selecionado.imagensSlides?.[i] && (
-                    <button type="button" onClick={() => handleRemoverImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Remover imagem" className="rounded border border-linha px-1.5 py-0.5 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">✕</button>
+                    <button type="button" onClick={() => handleRemoverImagem(selecionado.id, i)} disabled={slideProcessando !== null} title="Remover imagem" className="flex h-8 w-8 items-center justify-center rounded-md border border-red-900/60 bg-preto text-sm text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕</button>
                   )}
                 </div>
                 )}
