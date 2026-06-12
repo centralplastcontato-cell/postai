@@ -30,14 +30,12 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     try {
       slides = JSON.parse(c.slides);
     } catch {}
-    let imagensSlides: (string | null)[] = [];
-    let tiposSlides: (string | undefined)[] = [];
+    let st: { imagemUrl?: string; tipo?: string }[] = [];
     try {
-      const st = JSON.parse(c.slidesTexto || "[]") as { imagemUrl?: string; tipo?: string }[];
-      imagensSlides = st.map((s) => s?.imagemUrl ?? null);
-      tiposSlides = st.map((s) => s?.tipo);
+      st = JSON.parse(c.slidesTexto || "[]") as { imagemUrl?: string; tipo?: string }[];
     } catch {}
-    const v = hashCurto(c.slidesTexto || "");
+    const imagensSlides: (string | null)[] = st.map((s) => s?.imagemUrl ?? null);
+    const tiposSlides: (string | undefined)[] = st.map((s) => s?.tipo);
     return {
       id: c.id,
       slug: c.slug,
@@ -45,7 +43,9 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       titulo: c.titulo,
       legenda: c.legenda,
       hashtags: c.hashtags,
-      slides: slides.map((s) => `${s}?v=${v}`),
+      // ?v= POR SLIDE (hash só do conteúdo daquele slide): mudar um slide não troca a
+      // URL dos outros, então só o slide alterado recarrega — o resto não "pisca".
+      slides: slides.map((s, i) => `${s}?v=${hashCurto(JSON.stringify(st[i] ?? {}))}`),
       status: c.status,
       tema: c.tema,
       aprovado: c.aprovado,
