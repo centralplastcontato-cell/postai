@@ -53,6 +53,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       titulo: montarTituloColorido(slide.titulo || "Conheça nosso espaço", paleta),
       oferta: slide.texto || undefined,
       fotos: slide.fotos,
+      corFundo: slide.corFundo,
       arraste: true,
     });
     return new ImageResponse(el, { width: 1080, height: 1350, fonts, headers: CACHE });
