@@ -454,12 +454,12 @@ export function LayoutMosaico(d: DadosArte & { fotos?: string[]; arraste?: boole
 
       {/* Título multicolor (canto superior esquerdo) */}
       <div style={{ position: "absolute", top: 200, left: 64, display: "flex", flexDirection: "column", maxWidth: 480 }}>
-        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 76 : 92} fundo={fundo} />
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 64 : 84} fundo={fundo} />
       </div>
 
       {/* Selo de oferta (carimbo circular) — só quando há oferta */}
       {d.oferta ? (
-        <div style={{ position: "absolute", top: 540, left: 56, width: 320, height: 320, borderRadius: 9999, backgroundColor: "#fff", border: `6px solid ${c1}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", transform: "rotate(-7deg)", boxShadow: "0 10px 24px rgba(0,0,0,0.3)", padding: 42 }}>
+        <div style={{ position: "absolute", top: 650, left: 56, width: 310, height: 310, borderRadius: 9999, backgroundColor: "#fff", border: `6px solid ${c1}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", transform: "rotate(-7deg)", boxShadow: "0 10px 24px rgba(0,0,0,0.3)", padding: 42 }}>
           <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: ofFont, color: c1, textAlign: "center", lineHeight: 1.05 }}>{d.oferta}</div>
           {d.validade ? <div style={{ display: "flex", marginTop: 12, fontFamily: "Fredoka", fontSize: 22, color: PRETO, textAlign: "center", lineHeight: 1.1 }}>{d.validade}</div> : null}
         </div>
