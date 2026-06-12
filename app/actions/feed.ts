@@ -183,6 +183,8 @@ function sistema(marca: Marca, template: Template): string {
 
 Tom: profissional, próximo e confiável. Sem jargão de guru, sem "prezado cliente", no máximo 1 emoji no texto.
 
+REGRA CRÍTICA (nunca quebrar): a marca É o próprio local/espaço da festa. NUNCA escreva nada que mande o cliente "escolher o local", "reservar um espaço", "encontrar/procurar/comparar local, salão ou buffet", nem dicas genéricas que sugiram buscar outro lugar — isso manda o cliente pra longe e é um erro grave. Todo conteúdo posiciona a marca como O lugar onde a festa acontece; o convite é sempre comemorar/fechar a festa COM a marca, não procurar local por aí.
+
 Devolva SEMPRE um JSON válido:
 ${FORMATO_JSON[template]}
 Português do Brasil.`;
