@@ -507,13 +507,15 @@ export function MarketingCalendario({
           <div className="scroll-bonito mt-4 flex gap-3 overflow-x-auto pb-3">
             {selecionado.slides.map((src, i) => (
               <div key={src} className="shrink-0">
-                <div className="flex items-start gap-1.5">
+                <div className="flex items-stretch gap-1.5">
                   <button type="button" onClick={() => setImgExpandida(src)} title="Ampliar" className="block overflow-hidden rounded-md border border-linha transition hover:border-vermelho">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={src} alt={`Slide ${i + 1}`} className="h-auto w-[100px] sm:w-[120px]" />
+                    <img src={src} alt={`Slide ${i + 1}`} className="h-auto w-[150px] sm:w-[168px]" />
                   </button>
                   {selecionado.status !== "postado" && (
-                    <div className="flex flex-col gap-1.5">
+                    // justify-between estica a coluna à altura da imagem: 1º botão no topo,
+                    // último (✕) alinhado com a BASE da imagem, sem vazar pra fora.
+                    <div className="flex flex-col justify-between gap-1.5">
                       <div className="group relative">
                         <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">✍️</button>
                         <DicaSlide>Regerar texto do slide</DicaSlide>
