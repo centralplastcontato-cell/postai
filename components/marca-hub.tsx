@@ -52,7 +52,7 @@ export function MarcaHub({
         </p>
       )}
 
-      <div className="mt-5 flex gap-2">
+      <div className="mt-5 flex flex-wrap gap-2">
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
         <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
         <button onClick={() => setAba("config")} className={cls(aba === "config")}>⚙️ Configurações</button>
