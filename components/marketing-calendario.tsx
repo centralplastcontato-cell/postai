@@ -515,8 +515,8 @@ export function MarketingCalendario({
                   {selecionado.status !== "postado" && (
                     <div className="flex flex-col gap-1.5">
                       <div className="group relative">
-                        <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🔄</button>
-                        <DicaSlide>Regerar texto</DicaSlide>
+                        <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">✍️</button>
+                        <DicaSlide>Regerar texto do slide</DicaSlide>
                       </div>
                       {/* Botões de FOTO: só nos slides que usam foto de fundo. A capa de
                           estilo (mosaico/capa-*) tem visual próprio — foto ali não tem efeito. */}

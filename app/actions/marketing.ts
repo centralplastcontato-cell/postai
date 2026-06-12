@@ -484,7 +484,9 @@ export async function regerarSlide(input: { id: string; indice: number }) {
     if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
     const data = await resp.json();
     const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { titulo?: string; texto?: string };
-    slides[input.indice] = { tipo: slide.tipo, titulo: j.titulo || slide.titulo, texto: j.texto };
+    // Mantém TODO o resto do slide (imagemUrl, fotos do mosaico, corFundo) — só o
+    // texto muda. Antes substituía o slide inteiro e a foto/cor sumiam ao regerar.
+    slides[input.indice] = { ...slide, titulo: j.titulo || slide.titulo, texto: j.texto };
     await prisma.conteudo.update({ where: { id: input.id }, data: { slidesTexto: JSON.stringify(slides) } });
     revalidatePath(`/painel/marcas/${c.marcaId}`);
     return { ok: true as const };
