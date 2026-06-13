@@ -193,7 +193,7 @@ export function PublicacoesAba({
     setErro(null);
     setGerandoExemplo(true);
     startTransition(async () => {
-      const r = await sugerirDepoimento(marcaId);
+      const r = await sugerirDepoimento(marcaId, destaqueFb.trim() || undefined);
       if (r.ok) {
         setDepoimento(r.depoimento);
         if (r.autor) setAutorFb(r.autor);
@@ -606,10 +606,15 @@ export function PublicacoesAba({
                 Nome do cliente <span className="text-muted/70">(opcional)</span>
                 <input value={autorFb} onChange={(e) => setAutorFb(e.target.value)} placeholder="Ex: Mariana S." className="input-base" />
               </label>
-              <label className="text-xs text-muted">
+              <div className="text-xs text-muted">
                 Frase de destaque <span className="text-muted/70">(vazio = IA cria)</span>
                 <input value={destaqueFb} onChange={(e) => setDestaqueFb(e.target.value)} placeholder="Ex: Excelente atendimento!" className="input-base" />
-              </label>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {["Excelente atendimento!", "Festa inesquecível!", "Tudo perfeito!", "Equipe nota 10!", "Espaço incrível!", "Recomendo demais!"].map((s) => (
+                    <button key={s} type="button" onClick={() => setDestaqueFb(s)} className={`rounded-full border px-2.5 py-0.5 text-[11px] transition ${destaqueFb === s ? "border-amber-400 bg-amber-400/10 text-amber-200" : "border-linha text-muted hover:border-amber-400/60 hover:text-white"}`}>{s}</button>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>

@@ -566,12 +566,18 @@ export async function sugerirPromocao(marcaId: string, tema?: string) {
 // Gera um EXEMPLO de depoimento (rascunho) pra o dono testar o template / ter um ponto
 // de partida. NÃO substitui um depoimento real — a ideia é o dono colar o feedback
 // verdadeiro do cliente na hora de postar. Cada clique traz uma variação (temp alta).
-export async function sugerirDepoimento(marcaId: string) {
+export async function sugerirDepoimento(marcaId: string, destaque?: string) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  // Se o dono já escolheu uma frase de destaque, o depoimento é gerado COERENTE com ela
+  // (e o destaque escolhido é mantido). Senão, a IA cria também o destaque.
+  const dest = (destaque || "").trim();
+  const userMsg = dest
+    ? `Escreva um EXEMPLO realista de depoimento de um cliente satisfeito (pai ou mãe que fez a festa do filho) sobre "${marca.nome}", que combine e justifique este elogio em destaque: "${dest}". ${marca.descricao || ""} Tom natural, espontâneo e específico, sem exagero. 3 a 5 frases. Responda só com JSON: {"depoimento":"o texto","autor":"primeiro nome + inicial do sobrenome (ex: Mariana S.)"}`
+    : `Escreva um EXEMPLO realista de depoimento de um cliente satisfeito (um pai ou mãe que fez a festa do filho) sobre "${marca.nome}". ${marca.descricao || ""} Tom natural, espontâneo e específico (cite atendimento, espaço, equipe ou a alegria das crianças) — sem soar publicitário nem exagerado. 3 a 5 frases. Responda só com JSON: {"depoimento":"o texto do depoimento","autor":"primeiro nome + inicial do sobrenome (ex: Mariana S.)","destaque":"frase BEM curta de 2 a 4 palavras que resume o elogio (ex: Festa inesquecível!)"}`;
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -582,7 +588,7 @@ export async function sugerirDepoimento(marcaId: string) {
         temperature: 1,
         messages: [
           { role: "system", content: sistema(marca, "feedback") },
-          { role: "user", content: `Escreva um EXEMPLO realista de depoimento de um cliente satisfeito (um pai ou mãe que fez a festa do filho) sobre "${marca.nome}". ${marca.descricao || ""} Tom natural, espontâneo e específico (cite atendimento, espaço, equipe ou a alegria das crianças) — sem soar publicitário nem exagerado. 3 a 5 frases. Responda só com JSON: {"depoimento":"o texto do depoimento","autor":"primeiro nome + inicial do sobrenome (ex: Mariana S.)","destaque":"frase BEM curta de 2 a 4 palavras que resume o elogio (ex: Festa inesquecível!)"}` },
+          { role: "user", content: userMsg },
         ],
       }),
     });
@@ -591,7 +597,7 @@ export async function sugerirDepoimento(marcaId: string) {
     const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { depoimento?: string; autor?: string; destaque?: string };
     const depoimento = (j.depoimento ?? "").trim();
     if (!depoimento) throw new Error("Resposta vazia.");
-    return { ok: true as const, depoimento, autor: (j.autor ?? "").trim(), destaque: (j.destaque ?? "").trim() };
+    return { ok: true as const, depoimento, autor: (j.autor ?? "").trim(), destaque: dest || (j.destaque ?? "").trim() };
   } catch (e) {
     console.error("Erro ao sugerir depoimento:", e);
     return { ok: false as const, erro: "Não consegui criar o exemplo agora. Confira a chave da OpenAI." };
