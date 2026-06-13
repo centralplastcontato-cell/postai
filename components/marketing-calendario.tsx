@@ -7,6 +7,7 @@ import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import {
   gerarCarrossel,
   trocarCapaCarrossel,
+  reagendarCarrossel,
   regerarCarrossel,
   regerarCarrosselComoNova,
   alternarAprovacaoCarrossel,
@@ -78,6 +79,12 @@ function dataHoraBR(iso: string): string {
 // Capas de estilo (Mosaico/Colorida/Foto/Moldura/Faixa): têm visual próprio e NÃO
 // usam foto de fundo — então os botões de foto (banco/IA/upload) não têm efeito ali.
 const ehCapaEstilo = (tipo?: string) => tipo === "mosaico" || (tipo?.startsWith("capa-") ?? false);
+
+// Hora (0-23) de uma data ISO no fuso de São Paulo — pro seletor de hora do card.
+function horaSP(iso: string): number {
+  const h = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(new Date(iso));
+  return parseInt(h, 10) || 0;
+}
 
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", {
@@ -214,6 +221,15 @@ export function MarketingCalendario({
       return;
     }
     regerarCarr(p.id, false);
+  }
+  // Muda a HORA de um carrossel já programado (mantém o dia) — pelo próprio card.
+  function handleReagendar(id: string, hora: number) {
+    setErro(null);
+    startTransition(async () => {
+      const r = await reagendarCarrossel(id, hora);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+    });
   }
   function handleSugerirTemas() {
     setErro(null);
@@ -517,7 +533,14 @@ export function MarketingCalendario({
             return (
               <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${aberto ? "border-orange-500 ring-2 ring-orange-500/50" : "border-linha"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted">{dataBR(p.data)}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted">{dataBR(p.data)}</span>
+                    {!postado && (
+                      <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={isPending} title="Hora da postagem (o piloto posta nesse horário) — permite vários posts no mesmo dia" className="rounded border border-linha bg-preto px-1 py-0.5 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
+                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {String(h).padStart(2, "0")}:00</option>)}
+                      </select>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     {p.aprovado && <span title="Você já aprovou este carrossel" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Aprovado</span>}
                     <span title={postado && p.postadoEm ? `Publicado em ${dataHoraBR(p.postadoEm)}` : undefined} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>

@@ -278,6 +278,21 @@ export async function trocarCapaCarrossel(input: { id: string; estiloCapa: strin
   return { ok: true as const };
 }
 
+// Muda só a HORA de um carrossel já programado (mantém o dia). Bloqueia se já postado.
+// Permite o dono espalhar vários posts do mesmo dia em horários diferentes pelo card.
+export async function reagendarCarrossel(id: string, hora: number) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const c = await prisma.conteudo.findUnique({ where: { id }, select: { data: true, marcaId: true, status: true } });
+  if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
+  if (c.status === "postado") return { ok: false as const, erro: "Esse carrossel já foi publicado." };
+  const h = Math.max(0, Math.min(23, Math.floor(hora)));
+  const diaSP = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(c.data);
+  const novaData = new Date(`${diaSP}T${String(h).padStart(2, "0")}:00:00-03:00`);
+  await prisma.conteudo.update({ where: { id }, data: { data: novaData } });
+  revalidatePath(`/painel/marcas/${c.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function regerarCarrossel(id: string) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const atual = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });

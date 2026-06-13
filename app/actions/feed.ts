@@ -26,6 +26,27 @@ function formatarBR(n: number): string {
   return n.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 }
 
+// REDE DE SEGURANÇA do template de PREÇO. A IA NUNCA pode citar na legenda um valor em
+// R$ que o dono não digitou (erro gravíssimo: preço errado no post). Coleta os valores
+// permitidos (Por / De / parcelas / economia digitada / economia calculada De−Por) e
+// troca qualquer "R$ <outro número>" pelo preço principal — assim nunca sai preço errado.
+function blindarPrecoLegenda(texto: string, travas?: Travas): string {
+  const por = valorBR(travas?.precoPor);
+  if (!por || !texto) return texto;
+  const de = valorBR(travas?.precoDe);
+  const permitidos = new Set<number>();
+  for (const v of [travas?.precoPor, travas?.precoDe, travas?.parcelas, travas?.economia]) {
+    for (const m of (v || "").matchAll(/\d[\d.]*(?:,\d{1,2})?/g)) {
+      const n = valorBR(m[0]);
+      if (n > 0) permitidos.add(n);
+    }
+  }
+  // Economia calculada automaticamente (De − Por), que a IA pode citar legitimamente.
+  if ((travas?.modoPreco || "promo") === "promo" && de > por) permitidos.add(de - por);
+  const principal = `R$ ${formatarBR(por)}`;
+  return texto.replace(/R\$\s*\d[\d.]*(?:,\d{1,2})?/g, (m) => (permitidos.has(valorBR(m)) ? m : principal));
+}
+
 // Monta o JSON do campo `extra` conforme o template (dados específicos da arte).
 // `travas` são valores digitados pelo usuário — usados exatos e preservados no regerar.
 function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, travas?: Travas, categoria?: string): string | null {
@@ -325,6 +346,22 @@ async function gerarTexto(marca: Marca, template: Template, tema?: string, trava
     const quem = travas?.autor?.trim() ? ` O cliente se chama "${travas.autor.trim()}".` : "";
     pedido += ` DEPOIMENTO REAL DO CLIENTE (não altere, não invente além disso): """${travas.depoimento.trim()}""".${quem} Gere o "destaque" e a "legenda" baseados SOMENTE nesse depoimento.`;
   }
+  // PREÇO: os valores são do dono e a IA JAMAIS pode citar outro número na legenda.
+  // Sem isso a IA inventava um preço (ex: usuário põe R$ 5.990, legenda saía R$ 1.200).
+  if (template === "preco" && travas?.precoPor?.trim()) {
+    const modo = travas.modoPreco || "promo";
+    const partes: string[] = [];
+    if (modo === "promo" && travas.precoDe?.trim()) partes.push(`preço ANTES (de): R$ ${travas.precoDe.trim()}`);
+    partes.push(`${modo === "apartir" ? "preço A PARTIR DE" : "preço"}: R$ ${travas.precoPor.trim()}`);
+    if (travas.parcelas?.trim()) partes.push(`parcelamento: ${travas.parcelas.trim()}`);
+    if (modo === "promo") {
+      const eco = travas.economia?.trim() || (valorBR(travas.precoDe) > valorBR(travas.precoPor) ? formatarBR(valorBR(travas.precoDe) - valorBR(travas.precoPor)) : "");
+      if (eco) partes.push(`economia: R$ ${eco}`);
+    }
+    if ((travas.condicoes || []).filter((s) => s.trim()).length) partes.push(`condições: ${travas.condicoes!.filter((s) => s.trim()).join(", ")}`);
+    if (travas.validade?.trim()) partes.push(`validade: ${travas.validade.trim()}`);
+    pedido += ` VALORES OFICIAIS (use EXATAMENTE estes na legenda — é PROIBIDO citar qualquer outro número de preço, desconto ou parcela): ${partes.join("; ")}.`;
+  }
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -342,7 +379,13 @@ async function gerarTexto(marca: Marca, template: Template, tema?: string, trava
   const data = await resp.json();
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("Resposta vazia da OpenAI.");
-  return JSON.parse(content) as Gerado;
+  const g = JSON.parse(content) as Gerado;
+  // Blindagem final: garante que nenhum preço inventado escape pra legenda/título.
+  if (template === "preco") {
+    g.legenda = blindarPrecoLegenda(g.legenda, travas);
+    if (g.titulo) g.titulo = blindarPrecoLegenda(g.titulo, travas);
+  }
+  return g;
 }
 
 // Campos manuais que o usuário fornece por template (mesmos no gerar e no editar).
