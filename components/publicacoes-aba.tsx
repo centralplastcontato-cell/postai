@@ -134,6 +134,7 @@ export function PublicacoesAba({
   publicacoes,
   destacarId,
   dataAlvo,
+  horaPadrao,
   onGerado,
   onLimparDia,
   paleta,
@@ -143,6 +144,7 @@ export function PublicacoesAba({
   publicacoes: PublicacaoView[];
   destacarId?: string | null;
   dataAlvo?: string | null;
+  horaPadrao: number; // hora padrão do feed (BRT) — default do seletor de hora
   onGerado?: (dia?: string) => void;
   onLimparDia?: () => void;
   paleta?: string; // JSON array de hex da marca (pro seletor de cor de fundo)
@@ -152,6 +154,7 @@ export function PublicacoesAba({
   const redesTexto = temFacebook ? "no Instagram e Facebook" : "no Instagram";
   const [isPending, startTransition] = useTransition();
   const [template, setTemplate] = useState<Template>("dica");
+  const [hora, setHora] = useState(horaPadrao); // hora do post (BRT) — vários no mesmo dia
   const [tema, setTema] = useState("");
   const [oferta, setOferta] = useState("");
   const [validade, setValidade] = useState("");
@@ -228,7 +231,7 @@ export function PublicacoesAba({
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
       const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback";
       const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, hora });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -429,15 +432,23 @@ export function PublicacoesAba({
           ))}
         </div>
 
-        <div className="mb-3 text-xs text-muted">
-          Dia do post
-          <div className="mt-1 rounded-md border border-linha bg-preto px-3 py-2 text-sm">
-            {dataAlvo ? (
-              <span className="font-semibold text-white">📅 {dataBR(`${dataAlvo}T12:00:00-03:00`)}</span>
-            ) : (
-              <span className="text-muted">Clique num dia livre no calendário ↑ (senão, vai pra próxima data livre da agenda)</span>
-            )}
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1 text-xs text-muted">
+            Dia do post
+            <div className="mt-1 rounded-md border border-linha bg-preto px-3 py-2 text-sm">
+              {dataAlvo ? (
+                <span className="font-semibold text-white">📅 {dataBR(`${dataAlvo}T12:00:00-03:00`)}</span>
+              ) : (
+                <span className="text-muted">Clique num dia livre ↑ (senão vai pra próxima data livre)</span>
+              )}
+            </div>
           </div>
+          <label className="text-xs text-muted">
+            Hora <span className="text-muted/70">(BRT)</span>
+            <select value={hora} onChange={(e) => setHora(Number(e.target.value))} className="input-base" title="Permite vários posts no mesmo dia em horas diferentes (ex: 10h, 16h, 20h)">
+              {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+            </select>
+          </label>
         </div>
 
         {comemorativa && (

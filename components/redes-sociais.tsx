@@ -16,6 +16,8 @@ export function RedesSociais({
   publicacoes,
   diasCarrossel,
   diasFeed,
+  horaPost,
+  horaCarrossel,
   paleta,
   temFacebook,
 }: {
@@ -24,6 +26,8 @@ export function RedesSociais({
   publicacoes: PublicacaoView[];
   diasCarrossel: string;
   diasFeed: string;
+  horaPost: number; // hora padrão do feed (BRT)
+  horaCarrossel: number; // hora padrão do carrossel (BRT)
   paleta: string; // JSON array de hex da marca (pro seletor de cor)
   temFacebook: boolean; // marca com Página do Facebook conectada → posta nos dois
 }) {
@@ -96,6 +100,7 @@ export function RedesSociais({
             selId={selecao?.tipo === "carrossel" ? selecao.id : null}
             onSelId={(id) => setSelecao(id ? { tipo: "carrossel", id } : null)}
             dataAlvo={dataAlvo}
+            horaPadrao={horaCarrossel}
             onGerado={(dia) => setDataAlvo(dia ?? null)}
             onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
             temFacebook={temFacebook}
@@ -110,6 +115,7 @@ export function RedesSociais({
           publicacoes={publicacoes}
           destacarId={selecao?.tipo === "feed" ? selecao.id : null}
           dataAlvo={dataAlvo}
+          horaPadrao={horaPost}
           onGerado={(dia) => setDataAlvo(dia ?? null)}
           onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
           paleta={paleta}

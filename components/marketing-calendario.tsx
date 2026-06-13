@@ -110,6 +110,7 @@ export function MarketingCalendario({
   selId,
   onSelId,
   dataAlvo,
+  horaPadrao,
   onGerado,
   onLimparDia,
   temFacebook,
@@ -119,6 +120,7 @@ export function MarketingCalendario({
   selId: string | null;
   onSelId: (id: string | null) => void;
   dataAlvo: string | null;
+  horaPadrao: number; // hora padrão do carrossel (BRT) — default do seletor de hora
   onGerado: (dia?: string) => void;
   onLimparDia?: () => void;
   temFacebook?: boolean; // posta também no Facebook → reflete na caixinha "Estamos postando"
@@ -128,6 +130,7 @@ export function MarketingCalendario({
   const [isPending, startTransition] = useTransition();
   const [tema, setTema] = useState("");
   const [nSlides, setNSlides] = useState(7);
+  const [hora, setHora] = useState(horaPadrao); // hora do post (BRT) — vários no mesmo dia
   const [estiloCapa, setEstiloCapa] = useState("aleatorio");
   const [corCapa, setCorCapa] = useState("");
   const [trocaEstilo, setTrocaEstilo] = useState("aleatorio"); // troca SÓ a capa (na tela de edição)
@@ -185,7 +188,7 @@ export function MarketingCalendario({
       return;
     }
     startTransition(async () => {
-      const r = await gerarCarrossel({ marcaId, tema, data: dataAlvo, nSlides, estiloCapa, corFundo: corCapa || undefined });
+      const r = await gerarCarrossel({ marcaId, tema, data: dataAlvo, nSlides, estiloCapa, corFundo: corCapa || undefined, hora });
       if (r.ok) {
         setTema("");
         onSelId(r.id);
@@ -418,6 +421,12 @@ export function MarketingCalendario({
               {dataAlvo ? <span className="font-semibold text-white">📅 {dataBR(`${dataAlvo}T12:00:00-03:00`)}</span> : <span className="text-muted">Clique num dia livre ↑</span>}
             </div>
           </div>
+          <label className="text-xs text-muted">
+            Hora <span className="text-muted/70">(BRT)</span>
+            <select value={hora} onChange={(e) => setHora(Number(e.target.value))} className="input-base" title="Permite vários posts no mesmo dia em horas diferentes (ex: 13h, 18h)">
+              {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+            </select>
+          </label>
           <div className="text-xs text-muted">
             Nº de artes
             <select value={nSlides} onChange={(e) => setNSlides(Number(e.target.value))} className="input-base">

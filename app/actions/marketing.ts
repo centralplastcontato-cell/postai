@@ -165,6 +165,7 @@ export async function gerarCarrossel(input: {
   nSlides?: number;
   estiloCapa?: string; // festiva | foto | moldura | faixa | mosaico | aleatorio
   corFundo?: string; // cor de fundo da capa (ou vazio = automático)
+  hora?: number; // hora do post (BRT) — permite vários posts no mesmo dia em horas diferentes
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
@@ -181,7 +182,7 @@ export async function gerarCarrossel(input: {
     return { ok: false as const, erro: "Não consegui gerar agora. Confira a chave da OpenAI." };
   }
 
-  const horaC = String(marca.horaCarrossel ?? 10).padStart(2, "0");
+  const horaC = String(typeof input.hora === "number" ? input.hora : (marca.horaCarrossel ?? 10)).padStart(2, "0");
   const data = new Date(`${input.data}T${horaC}:00:00-03:00`);
   const slug = `${marca.slug}-${slugify(tema)}-${Date.now().toString(36).slice(-4)}`;
   const criado = await prisma.conteudo.create({

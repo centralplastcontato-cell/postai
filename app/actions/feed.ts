@@ -369,6 +369,7 @@ export async function gerarPublicacao(input: {
   economia?: string; // preco: vazio = calcula De − Por automaticamente
   condicoes?: string[]; // preco: condições (ex: "Seg a Sex", "50 a 70 convidados")
   modoPreco?: string; // preco: "promo" (De→Por) | "unico" | "apartir"
+  hora?: number; // hora do post (BRT) — permite vários posts no mesmo dia em horas diferentes
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
@@ -420,8 +421,9 @@ export async function gerarPublicacao(input: {
     console.error("Erro ao gerar publicação:", e);
     return { ok: false as const, erro: "Não consegui gerar agora. Confira a chave da OpenAI." };
   }
+  const horaFeed = typeof input.hora === "number" ? input.hora : marca.horaPost;
   const data = input.data
-    ? new Date(`${input.data}T${String(marca.horaPost).padStart(2, "0")}:00:00-03:00`)
+    ? new Date(`${input.data}T${String(horaFeed).padStart(2, "0")}:00:00-03:00`)
     : await proximaDataFeed(marca);
   const slug = `${marca.slug}-${template}-${slugify(gerado.titulo || template)}-${Date.now().toString(36).slice(-4)}`;
   const criado = await prisma.publicacao.create({
