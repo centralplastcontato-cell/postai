@@ -14,7 +14,17 @@ import type { Marca } from "@prisma/client";
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
 // `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
-type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string };
+type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[] };
+
+// Parse/format de valores em R$ no formato brasileiro ("12.000" / "8.500,00").
+// Usado pra calcular a economia (De − Por) automaticamente no template de preço.
+function valorBR(s?: string): number {
+  const n = parseFloat((s || "").replace(/[^\d,]/g, "").replace(/\./g, "").replace(",", "."));
+  return isNaN(n) ? 0 : n;
+}
+function formatarBR(n: number): string {
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
 
 // Monta o JSON do campo `extra` conforme o template (dados específicos da arte).
 // `travas` são valores digitados pelo usuário — usados exatos e preservados no regerar.
@@ -61,6 +71,33 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
     // da mesma categoria depois (ex: dica de cardápio → foto de comida).
     const cat = categoria && categoria !== "geral" ? categoria : "";
     return cat ? JSON.stringify({ categoria: cat }) : null;
+  }
+  if (template === "preco") {
+    const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    const de = valorBR(travas?.precoDe);
+    const por = valorBR(travas?.precoPor);
+    // Economia: usa a digitada ou calcula De − Por automaticamente (se fizer sentido).
+    const economia = travas?.economia?.trim() || (de > por && por > 0 ? formatarBR(de - por) : "");
+    const conds = (travas?.condicoes || []).map((s) => s.trim()).filter(Boolean).slice(0, 3);
+    return JSON.stringify({
+      precoDe: travas?.precoDe || "",
+      precoPor: travas?.precoPor || "",
+      labelPor: travas?.labelPor || "",
+      parcelas: travas?.parcelas || "",
+      economia,
+      condicoes: conds,
+      validade: travas?.validade || "",
+      corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
+      corFundoTravada: travas?.corFundo || undefined,
+      // Travados — preservados ao regerar (só título/legenda da IA mudam).
+      precoDeTravado: travas?.precoDe || undefined,
+      precoPorTravado: travas?.precoPor || undefined,
+      labelPorTravado: travas?.labelPor || undefined,
+      parcelasTravado: travas?.parcelas || undefined,
+      economiaTravada: travas?.economia || undefined,
+      condicoesTravadas: conds.length ? conds : undefined,
+      validadeTravada: travas?.validade || undefined,
+    });
   }
   if (template === "feedback") {
     // O DEPOIMENTO é real (do cliente) — sempre travado, nunca inventado pela IA.
@@ -142,6 +179,8 @@ const GUIA: Record<Template, string> = {
     'Crie um POST com FOTO de fundo e o título numa faixa diagonal. O "titulo" é uma chamada curta e impactante (2 a 5 palavras) que vai na faixa; "texto" é uma frase de apoio curta. Tom convidativo. NÃO invente promoção/preço.',
   feedback:
     'Você está criando um post de DEPOIMENTO de um cliente REAL. O texto do depoimento JÁ EXISTE (é fornecido) e NÃO pode ser alterado nem inventado. Sua tarefa: (1) "destaque" = uma frase BEM curta (2 a 4 palavras) que capture o elogio principal do depoimento (ex: "Excelente atendimento!", "Festa inesquecível!"); (2) "legenda" = um agradecimento caloroso e humano ao cliente, sem exagerar além do que ele escreveu. Baseie TUDO no depoimento fornecido. Nunca invente elogios.',
+  preco:
+    'Crie um post de OFERTA/PACOTE com PREÇO em destaque. Os VALORES (preços, parcelas, economia) são fornecidos e NÃO podem ser alterados nem inventados. O "titulo" é a chamada da promoção, curta e irresistível (ex: "Promoção Especial da Copa", "Pacote Imperdível"). Escreva a "legenda" destacando a oportunidade e convidando a fechar — sem inventar valores ou condições além dos fornecidos.',
 };
 
 // Formato de JSON esperado por template (a Promoção pede oferta/validade).
@@ -199,6 +238,11 @@ const FORMATO_JSON: Record<Template, string> = {
   "legenda": "legenda do post (3-5 linhas com \\n) agradecendo o cliente de forma calorosa e humana, convidando outras famílias a viverem a experiência. NÃO invente nada além do que o cliente escreveu",
   "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
 }`,
+  preco: `{
+  "titulo": "chamada da promoção curta e irresistível (2 a 5 palavras) — vai GRANDE na arte (ex: Promoção Especial da Copa)",
+  "legenda": "legenda do post (3-5 linhas com \\n) destacando a oportunidade e convidando a fechar no WhatsApp. NÃO invente valores nem condições",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
 };
 
 function sistema(marca: Marca, template: Template): string {
@@ -221,7 +265,7 @@ type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: stri
 // Templates que usam foto de IA de fundo (os de fundo colorido não geram foto).
 // O Mosaico também usa fotos reais, mas precisa de VÁRIAS (tratadas à parte em
 // aplicarFotosMosaico), por isso fica fora do fluxo de foto única do USA_FOTO.
-const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false, moldura: false, faixa: true, feedback: true };
+const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false, moldura: false, faixa: true, feedback: true, preco: false };
 
 function slugify(s: string): string {
   return s
@@ -315,6 +359,12 @@ export async function gerarPublicacao(input: {
   estrelas?: number; // feedback: nota 1-5
   destaque?: string; // feedback: frase de destaque (vazio = IA extrai do depoimento)
   corCard?: string; // feedback: cor do balão (vazio = branco)
+  precoDe?: string; // preco: valor antigo (riscado) — opcional
+  precoPor?: string; // preco: valor da oferta (obrigatório)
+  labelPor?: string; // preco: forma (ex: "À vista")
+  parcelas?: string; // preco: ex "5x de R$ 9.000"
+  economia?: string; // preco: vazio = calcula De − Por automaticamente
+  condicoes?: string[]; // preco: condições (ex: "Seg a Sex", "50 a 70 convidados")
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
@@ -342,6 +392,17 @@ export async function gerarPublicacao(input: {
       estrelas: typeof input.estrelas === "number" ? Math.max(1, Math.min(5, input.estrelas)) : 5,
       destaque: input.destaque?.trim() || undefined,
       corCard: input.corCard?.trim() || undefined,
+    };
+  } else if (template === "preco") {
+    if (!input.precoPor?.trim()) return { ok: false as const, erro: "Informe ao menos o preço da oferta (Por R$)." };
+    travas = {
+      precoDe: input.precoDe?.trim() || undefined,
+      precoPor: input.precoPor.trim(),
+      labelPor: input.labelPor?.trim() || undefined,
+      parcelas: input.parcelas?.trim() || undefined,
+      economia: input.economia?.trim() || undefined,
+      condicoes: (input.condicoes || []).map((s) => s.trim()).filter(Boolean),
+      validade: input.validade?.trim() || undefined,
     };
   }
   // Cor de fundo escolhida pelo usuário (vale pra todos os templates de fundo colorido).
@@ -415,6 +476,13 @@ export async function regerarPublicacao(id: string) {
       estrelas: typeof ex.estrelasTravada === "number" ? ex.estrelasTravada : undefined,
       destaque: typeof ex.destaqueTravado === "string" ? ex.destaqueTravado : undefined,
       corCard: typeof ex.corCardTravada === "string" ? ex.corCardTravada : undefined,
+      // Preço: os valores são preservados ao regerar (só título/legenda da IA mudam).
+      precoDe: typeof ex.precoDeTravado === "string" ? ex.precoDeTravado : undefined,
+      precoPor: typeof ex.precoPorTravado === "string" ? ex.precoPorTravado : undefined,
+      labelPor: typeof ex.labelPorTravado === "string" ? ex.labelPorTravado : undefined,
+      parcelas: typeof ex.parcelasTravado === "string" ? ex.parcelasTravado : undefined,
+      economia: typeof ex.economiaTravada === "string" ? ex.economiaTravada : undefined,
+      condicoes: Array.isArray(ex.condicoesTravadas) ? ex.condicoesTravadas : undefined,
     };
     categoria = typeof ex.categoria === "string" ? ex.categoria : undefined;
   } catch {}
@@ -483,6 +551,12 @@ export async function regerarComoNova(id: string) {
     estrelas: num(ex.estrelasTravada),
     destaque: str(ex.destaqueTravado),
     corCard: str(ex.corCardTravada),
+    precoDe: str(ex.precoDeTravado),
+    precoPor: str(ex.precoPorTravado),
+    labelPor: str(ex.labelPorTravado),
+    parcelas: str(ex.parcelasTravado),
+    economia: str(ex.economiaTravada),
+    condicoes: arr(ex.condicoesTravadas),
   });
 }
 

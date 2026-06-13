@@ -168,10 +168,17 @@ export function PublicacoesAba({
   const [destaqueFb, setDestaqueFb] = useState(""); // vazio = IA extrai do depoimento
   const [corCard, setCorCard] = useState(""); // "" = card branco
   const [gerandoExemplo, setGerandoExemplo] = useState(false);
+  // Preço / Pacote — valores SEMPRE do dono (a IA não inventa preço).
+  const [precoDe, setPrecoDe] = useState("");
+  const [precoPor, setPrecoPor] = useState("");
+  const [labelPor, setLabelPor] = useState("À vista");
+  const [parcelas, setParcelas] = useState("");
+  const [economiaInput, setEconomiaInput] = useState(""); // vazio = calcula De − Por
+  const [condicoesTxt, setCondicoesTxt] = useState(""); // uma condição por linha
   // Cores da marca que servem de fundo (escuras). Vazio se a marca não tem paleta.
   const coresFundo = coresDeFundo(parsePaleta(paleta));
   // Templates de fundo COLORIDO (onde escolher a cor faz sentido — os com foto não).
-  const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico", "moldura", "faixa"];
+  const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico", "moldura", "faixa", "preco"];
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
@@ -219,7 +226,8 @@ export function PublicacoesAba({
       const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
       const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback";
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard });
+      const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -234,6 +242,12 @@ export function PublicacoesAba({
         setEstrelasFb(5);
         setDestaqueFb("");
         setCorCard("");
+        setPrecoDe("");
+        setPrecoPor("");
+        setLabelPor("À vista");
+        setParcelas("");
+        setEconomiaInput("");
+        setCondicoesTxt("");
         onGerado?.(r.dia); // filtra a lista no dia da nova publicação (não abre todas)
         router.refresh();
       } else setErro(r.erro);
@@ -595,6 +609,44 @@ export function PublicacoesAba({
           </div>
         )}
 
+        {template === "preco" && (
+          <div className="mb-3 flex flex-col gap-3">
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
+              <p className="text-[11px] text-amber-300/90">💰 Os <strong>valores são seus</strong> (a IA não inventa preço). A <strong>economia é calculada sozinha</strong> (De − Por) se você deixar em branco.</p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-xs text-muted">
+                De R$ <span className="text-muted/70">(preço antigo, riscado — opcional)</span>
+                <input value={precoDe} onChange={(e) => setPrecoDe(e.target.value)} placeholder="Ex: 12.000" className="input-base" />
+              </label>
+              <label className="text-xs text-muted">
+                Por R$ <span className="text-red-400">*</span> <span className="text-muted/70">(preço da oferta)</span>
+                <input value={precoPor} onChange={(e) => setPrecoPor(e.target.value)} placeholder="Ex: 8.500,00" className="input-base" />
+              </label>
+              <label className="text-xs text-muted">
+                Forma de pagamento <span className="text-muted/70">(opcional)</span>
+                <input value={labelPor} onChange={(e) => setLabelPor(e.target.value)} placeholder="Ex: À vista" className="input-base" />
+              </label>
+              <label className="text-xs text-muted">
+                Parcelas <span className="text-muted/70">(opcional)</span>
+                <input value={parcelas} onChange={(e) => setParcelas(e.target.value)} placeholder="Ex: 5x de R$ 9.000" className="input-base" />
+              </label>
+              <label className="text-xs text-muted">
+                Economia R$ <span className="text-muted/70">(vazio = calcula sozinho)</span>
+                <input value={economiaInput} onChange={(e) => setEconomiaInput(e.target.value)} placeholder="Auto: De − Por" className="input-base" />
+              </label>
+              <label className="text-xs text-muted">
+                Validade <span className="text-muted/70">(opcional — selo "ATÉ")</span>
+                <input value={validade} onChange={(e) => setValidade(e.target.value)} placeholder="Ex: 30/06" className="input-base" />
+              </label>
+            </div>
+            <label className="block text-xs text-muted">
+              Condições <span className="text-muted/70">(uma por linha — ex: Seg a Sex / 50 a 70 convidados)</span>
+              <textarea value={condicoesTxt} onChange={(e) => setCondicoesTxt(e.target.value)} rows={2} placeholder={"Seg a Sex\n50 a 70 convidados"} className="input-base resize-none" />
+            </label>
+          </div>
+        )}
+
         {template === "feedback" && (
           <div className="mb-3 flex flex-col gap-3">
             <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
@@ -687,7 +739,7 @@ export function PublicacoesAba({
             Assunto (opcional — se vazio, a IA escolhe)
             <input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: novidade da semana" className="input-base" />
           </label>
-          <button onClick={handleGerar} disabled={isPending || (template === "feedback" && !depoimento.trim())} title={template === "feedback" && !depoimento.trim() ? "Cole o depoimento do cliente primeiro" : undefined} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
+          <button onClick={handleGerar} disabled={isPending || (template === "feedback" && !depoimento.trim()) || (template === "preco" && !precoPor.trim())} title={template === "feedback" && !depoimento.trim() ? "Cole o depoimento do cliente primeiro" : template === "preco" && !precoPor.trim() ? "Informe o preço da oferta (Por R$)" : undefined} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
             {isPending ? "Gerando…" : "Gerar"}
           </button>
         </div>
