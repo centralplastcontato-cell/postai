@@ -62,9 +62,18 @@ export type Post = {
   status: string;
   tema?: string | null;
   aprovado: boolean; // revisão interna do dono (não vai pra rede)
+  postadoEm?: string | null; // ISO do momento real da publicação (null = não postado)
   imagensSlides?: (string | null)[];
   tiposSlides?: (string | undefined)[]; // tipo de cada slide (capa/conteudo/mosaico/capa-*)
 };
+
+// Formata o horário de publicação: "13/jun às 14:05" (fuso de São Paulo).
+function dataHoraBR(iso: string): string {
+  const d = new Date(iso);
+  const dm = d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "short" }).replace(".", "");
+  const hm = d.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  return `${dm} às ${hm}`;
+}
 
 // Capas de estilo (Mosaico/Colorida/Foto/Moldura/Faixa): têm visual próprio e NÃO
 // usam foto de fundo — então os botões de foto (banco/IA/upload) não têm efeito ali.
@@ -502,9 +511,10 @@ export function MarketingCalendario({
                   <span className="text-xs text-muted">{dataBR(p.data)}</span>
                   <div className="flex items-center gap-1.5">
                     {p.aprovado && <span title="Você já aprovou este carrossel" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Aprovado</span>}
-                    <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
+                    <span title={postado && p.postadoEm ? `Publicado em ${dataHoraBR(p.postadoEm)}` : undefined} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
                   </div>
                 </div>
+                {postado && p.postadoEm && <p className="-mt-1 mb-2 text-[11px] text-green-400/80">📢 Publicado {dataHoraBR(p.postadoEm)}</p>}
                 <div className="relative">
                   <button type="button" onClick={() => onSelId(aberto ? null : p.id)} title={aberto ? "Fechar detalhe" : "Abrir / editar slides"} className="block w-full overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
                     {capa ? (

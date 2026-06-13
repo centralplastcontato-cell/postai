@@ -692,7 +692,7 @@ export async function postarPublicacao(id: string) {
   const legenda = `${p.legenda}\n\n${p.hashtags}`.trim().slice(0, 2200);
   const r = await publicarNasRedes(p.marca, [`${baseUrl()}/api/feed/${id}`], legenda);
   if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
-  await prisma.publicacao.update({ where: { id }, data: { status: "postado" } });
+  await prisma.publicacao.update({ where: { id }, data: { status: "postado", postadoEm: new Date() } });
   const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
   await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no ${onde} de ${p.marca.nome}.`, p.marcaId);
   revalidatePath(`/painel/marcas/${p.marcaId}`);

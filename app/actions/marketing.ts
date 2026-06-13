@@ -407,7 +407,7 @@ export async function postarInstagram(id: string) {
   const r = await publicarNasRedes(c.marca, urls, legenda);
   if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
 
-  await prisma.conteudo.update({ where: { id }, data: { status: "postado" } });
+  await prisma.conteudo.update({ where: { id }, data: { status: "postado", postadoEm: new Date() } });
   const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
   await registrarAtividade(APP_NAME, `Postei "${c.titulo}" no ${onde} de ${c.marca.nome}.`, c.marcaId);
   revalidatePath(`/painel/marcas/${c.marcaId}`);
@@ -516,6 +516,7 @@ export async function marcarConteudo(formData: FormData) {
   const status = String(formData.get("status") || "");
   const c = await prisma.conteudo.findUnique({ where: { id } });
   if (!c) return;
-  await prisma.conteudo.update({ where: { id }, data: { status } });
+  // Marcar manualmente como postado registra o horário; desmarcar limpa.
+  await prisma.conteudo.update({ where: { id }, data: { status, postadoEm: status === "postado" ? new Date() : null } });
   revalidatePath(`/painel/marcas/${c.marcaId}`);
 }

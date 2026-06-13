@@ -72,6 +72,7 @@ model Conteudo {
   tema        String?
   status      String   @default("a_postar") // a_postar | postado
   aprovado    Boolean  @default(false) // revisão INTERNA do dono (não vai pra rede) — só marca "eu já revisei"
+  postadoEm   DateTime? // momento REAL em que foi publicado (null = ainda não postado)
   createdAt   DateTime @default(now())
 
   @@index([marcaId, data])
@@ -94,6 +95,7 @@ model Publicacao {
   tema      String?
   status    String   @default("a_postar") // a_postar | postado
   aprovado  Boolean  @default(false) // revisão INTERNA do dono (não vai pra rede) — só marca "eu já revisei"
+  postadoEm DateTime? // momento REAL em que foi publicado (null = ainda não postado)
   createdAt DateTime @default(now())
 
   @@index([marcaId, data])

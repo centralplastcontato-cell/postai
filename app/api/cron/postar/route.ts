@@ -50,7 +50,7 @@ export async function GET(req: Request) {
         const legenda = `${c.legenda}\n\n${c.hashtags}`.trim().slice(0, 2200);
         const r = await publicarNasRedes(m, urls, legenda);
         if (r.ig.ok) {
-          await prisma.conteudo.update({ where: { id: c.id }, data: { status: "postado" } });
+          await prisma.conteudo.update({ where: { id: c.id }, data: { status: "postado", postadoEm: new Date() } });
           const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
           await registrarAtividade(APP_NAME, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id);
         }
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
       const legenda = `${p.legenda}\n\n${p.hashtags}`.trim().slice(0, 2200);
       const r = await publicarNasRedes(m, [`${base}/api/feed/${p.id}`], legenda);
       if (r.ig.ok) {
-        await prisma.publicacao.update({ where: { id: p.id }, data: { status: "postado" } });
+        await prisma.publicacao.update({ where: { id: p.id }, data: { status: "postado", postadoEm: new Date() } });
         const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
         await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id);
       }
