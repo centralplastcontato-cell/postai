@@ -14,7 +14,7 @@ import type { Marca } from "@prisma/client";
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
 // `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
-type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[] };
+type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string };
 
 // Parse/format de valores em R$ no formato brasileiro ("12.000" / "8.500,00").
 // Usado pra calcular a economia (De − Por) automaticamente no template de preço.
@@ -74,12 +74,14 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
   }
   if (template === "preco") {
     const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    const modoPreco = travas?.modoPreco || "promo";
     const de = valorBR(travas?.precoDe);
     const por = valorBR(travas?.precoPor);
-    // Economia: usa a digitada ou calcula De − Por automaticamente (se fizer sentido).
-    const economia = travas?.economia?.trim() || (de > por && por > 0 ? formatarBR(de - por) : "");
+    // Economia (só no modo promoção): usa a digitada ou calcula De − Por automaticamente.
+    const economia = modoPreco === "promo" ? (travas?.economia?.trim() || (de > por && por > 0 ? formatarBR(de - por) : "")) : "";
     const conds = (travas?.condicoes || []).map((s) => s.trim()).filter(Boolean).slice(0, 3);
     return JSON.stringify({
+      modoPreco,
       precoDe: travas?.precoDe || "",
       precoPor: travas?.precoPor || "",
       labelPor: travas?.labelPor || "",
@@ -90,6 +92,7 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
       corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
       corFundoTravada: travas?.corFundo || undefined,
       // Travados — preservados ao regerar (só título/legenda da IA mudam).
+      modoPrecoTravado: modoPreco,
       precoDeTravado: travas?.precoDe || undefined,
       precoPorTravado: travas?.precoPor || undefined,
       labelPorTravado: travas?.labelPor || undefined,
@@ -365,6 +368,7 @@ export async function gerarPublicacao(input: {
   parcelas?: string; // preco: ex "5x de R$ 9.000"
   economia?: string; // preco: vazio = calcula De − Por automaticamente
   condicoes?: string[]; // preco: condições (ex: "Seg a Sex", "50 a 70 convidados")
+  modoPreco?: string; // preco: "promo" (De→Por) | "unico" | "apartir"
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
@@ -396,6 +400,7 @@ export async function gerarPublicacao(input: {
   } else if (template === "preco") {
     if (!input.precoPor?.trim()) return { ok: false as const, erro: "Informe ao menos o preço da oferta (Por R$)." };
     travas = {
+      modoPreco: input.modoPreco || "promo",
       precoDe: input.precoDe?.trim() || undefined,
       precoPor: input.precoPor.trim(),
       labelPor: input.labelPor?.trim() || undefined,
@@ -477,6 +482,7 @@ export async function regerarPublicacao(id: string) {
       destaque: typeof ex.destaqueTravado === "string" ? ex.destaqueTravado : undefined,
       corCard: typeof ex.corCardTravada === "string" ? ex.corCardTravada : undefined,
       // Preço: os valores são preservados ao regerar (só título/legenda da IA mudam).
+      modoPreco: typeof ex.modoPrecoTravado === "string" ? ex.modoPrecoTravado : undefined,
       precoDe: typeof ex.precoDeTravado === "string" ? ex.precoDeTravado : undefined,
       precoPor: typeof ex.precoPorTravado === "string" ? ex.precoPorTravado : undefined,
       labelPor: typeof ex.labelPorTravado === "string" ? ex.labelPorTravado : undefined,
@@ -551,6 +557,7 @@ export async function regerarComoNova(id: string) {
     estrelas: num(ex.estrelasTravada),
     destaque: str(ex.destaqueTravado),
     corCard: str(ex.corCardTravada),
+    modoPreco: str(ex.modoPrecoTravado),
     precoDe: str(ex.precoDeTravado),
     precoPor: str(ex.precoPorTravado),
     labelPor: str(ex.labelPorTravado),

@@ -738,17 +738,23 @@ export function LayoutFeedback(
 // 💰 Preço / Pacote — oferta com VALORES em destaque: de/por, forma de pagamento,
 // parcelas e economia. Os números são SEMPRE do dono (a IA não inventa preço).
 export function LayoutPreco(
-  d: DadosArte & { precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; validade?: string }
+  d: DadosArte & { precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; validade?: string; modoPreco?: string }
 ) {
   const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
   const fundo = d.corFundo || escolherFundoFesta(d.paleta);
   const conds = (d.condicoes || []).map((s) => s.trim()).filter(Boolean).slice(0, 3);
   const por = (d.precoPor || "").trim();
   const porFont = por.length > 9 ? 104 : por.length > 6 ? 124 : 142;
+  // Modo de exibição do preço: "promo" (De→Por + economia), "unico" (só o valor) ou
+  // "apartir" (A partir de). De/riscado e economia só aparecem no modo promoção.
+  const modo = d.modoPreco || "promo";
+  const ehPromo = modo === "promo";
+  const chamada = modo === "apartir" ? "A PARTIR DE" : ehPromo ? "POR APENAS" : "";
   // Margem do topo e fonte do título adaptam ao nº de linhas pra TUDO (card + economia
-  // + CTA) caber ACIMA da onda (top 1110) — senão o selo de economia/CTA é cortado.
+  // + CTA) caber ACIMA da onda (top 1110). +extra quando há selo de validade no canto,
+  // pra o título começar ABAIXO dele (senão o texto fica em cima do "ATÉ").
   const nLinhas = d.titulo.length;
-  const margemTopo = nLinhas >= 3 ? 130 : nLinhas === 2 ? 185 : 235;
+  const margemTopo = (nLinhas >= 3 ? 130 : nLinhas === 2 ? 185 : 235) + (d.validade ? 100 : 0);
   const tFont = nLinhas >= 3 ? 74 : nLinhas === 2 ? 88 : 102;
   return (
     <div
@@ -768,9 +774,9 @@ export function LayoutPreco(
 
       {/* Selo de validade (carimbo no canto superior esquerdo) */}
       {d.validade ? (
-        <div style={{ position: "absolute", top: 70, left: 60, width: 196, height: 196, borderRadius: 9999, backgroundColor: "#fff", border: `5px solid ${c1}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", transform: "rotate(-8deg)", boxShadow: "0 10px 24px rgba(0,0,0,0.3)", padding: 16 }}>
-          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 22, color: PRETO }}>ATÉ</div>
-          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 44, color: c1, lineHeight: 1.0, textAlign: "center" }}>{d.validade}</div>
+        <div style={{ position: "absolute", top: 52, left: 52, width: 172, height: 172, borderRadius: 9999, backgroundColor: "#fff", border: `5px solid ${c1}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", transform: "rotate(-8deg)", boxShadow: "0 10px 24px rgba(0,0,0,0.3)", padding: 14 }}>
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 20, color: PRETO }}>ATÉ</div>
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 40, color: c1, lineHeight: 1.0, textAlign: "center" }}>{d.validade}</div>
         </div>
       ) : null}
 
@@ -789,10 +795,12 @@ export function LayoutPreco(
 
         {/* Card de PREÇO */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 24, backgroundColor: "#fff", borderRadius: 38, padding: "26px 56px 30px", boxShadow: "0 22px 60px rgba(0,0,0,0.4)", minWidth: 700 }}>
-          {d.precoDe ? (
+          {ehPromo && d.precoDe ? (
             <div style={{ display: "flex", alignItems: "center", fontFamily: "Fredoka", fontSize: 36, color: "#9a9a9a", textDecoration: "line-through" }}>De R$ {d.precoDe}</div>
           ) : null}
-          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 30, color: PRETO, marginTop: d.precoDe ? 2 : 0 }}>POR APENAS</div>
+          {chamada ? (
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 30, color: PRETO, marginTop: ehPromo && d.precoDe ? 2 : 0 }}>{chamada}</div>
+          ) : null}
           <div style={{ display: "flex", alignItems: "flex-start", marginTop: 2 }}>
             <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 46, color: c1, marginTop: 16, marginRight: 6 }}>R$</div>
             <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: porFont, color: c1, lineHeight: 1.0 }}>{por}</div>
@@ -805,8 +813,8 @@ export function LayoutPreco(
           ) : null}
         </div>
 
-        {/* Economia */}
-        {d.economia ? (
+        {/* Economia (só no modo promoção De→Por) */}
+        {ehPromo && d.economia ? (
           <div style={{ display: "flex", alignItems: "center", marginTop: 18, fontFamily: "Fredoka", fontSize: 32, color: PRETO, backgroundColor: c3, padding: "10px 32px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.2)" }}>
             ⭐ ECONOMIA DE R$ {d.economia}
           </div>

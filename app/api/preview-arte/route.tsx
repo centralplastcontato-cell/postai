@@ -98,6 +98,7 @@ export async function GET(req: Request) {
     elemento = LayoutPreco({
       ...base,
       titulo: montarTituloColorido(tituloParam || "Promoção Especial da Copa", paleta),
+      modoPreco: url.searchParams.get("modo") || "promo",
       precoDe: "12.000",
       precoPor: "8.500,00",
       labelPor: "À VISTA",
