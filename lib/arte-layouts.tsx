@@ -815,16 +815,16 @@ export function LayoutPreco(
 
         {/* Economia (só no modo promoção De→Por) */}
         {ehPromo && d.economia ? (
-          <div style={{ display: "flex", alignItems: "center", marginTop: 18, fontFamily: "Fredoka", fontSize: 32, color: PRETO, backgroundColor: c3, padding: "10px 32px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", marginTop: 14, fontFamily: "Fredoka", fontSize: 30, color: PRETO, backgroundColor: c3, padding: "9px 30px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.2)" }}>
             ⭐ ECONOMIA DE R$ {d.economia}
           </div>
         ) : null}
 
         {/* CTA WhatsApp */}
-        {d.telefone ? <div style={{ display: "flex", marginTop: 18 }}><CtaWhatsApp telefone={d.telefone} /></div> : null}
+        {d.telefone ? <div style={{ display: "flex", marginTop: 12 }}><CtaWhatsApp telefone={d.telefone} /></div> : null}
       </div>
 
-      <OndaBase cor={c1} />
+      <OndaBase cor={c1} top={1190} />
       <div style={{ position: "absolute", bottom: 58, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
         {d.site}
       </div>
