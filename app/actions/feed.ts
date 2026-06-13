@@ -501,6 +501,21 @@ export async function editarPublicacao(input: {
   return { ok: true as const };
 }
 
+// Reagenda a HORA de um post já criado (mantém o dia, troca só a hora). Permite
+// ajustar o horário de postagens já programadas sem refazer nada.
+export async function reagendarPublicacao(id: string, hora: number) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const p = await prisma.publicacao.findUnique({ where: { id }, select: { data: true, marcaId: true, status: true } });
+  if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  if (p.status === "postado") return { ok: false as const, erro: "Esse post já foi publicado." };
+  const h = Math.max(0, Math.min(23, Math.floor(hora)));
+  const diaSP = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(p.data);
+  const novaData = new Date(`${diaSP}T${String(h).padStart(2, "0")}:00:00-03:00`);
+  await prisma.publicacao.update({ where: { id }, data: { data: novaData } });
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function regerarPublicacao(id: string) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });

@@ -16,6 +16,7 @@ import {
   sugerirPromocao,
   sugerirDepoimento,
   editarPublicacao,
+  reagendarPublicacao,
 } from "@/app/actions/feed";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
@@ -107,6 +108,12 @@ function dataHoraBR(iso: string): string {
   const dm = d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "short" }).replace(".", "");
   const hm = d.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
   return `${dm} às ${hm}`;
+}
+
+// Hora (0-23) de uma data ISO no fuso de São Paulo — pro seletor de hora do card.
+function horaSP(iso: string): number {
+  const h = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(new Date(iso));
+  return parseInt(h, 10) || 0;
 }
 
 function hashCurto(s: string): string {
@@ -234,6 +241,18 @@ export function PublicacoesAba({
   }
 
   const formRef = useRef<HTMLDivElement>(null);
+
+  // Muda a HORA de um post já programado (mantém o dia).
+  function handleReagendar(id: string, hora: number) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await reagendarPublicacao(id, hora);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
 
   // Carrega os valores de um post nos campos do formulário e entra em MODO EDIÇÃO.
   function handleEditar(p: PublicacaoView) {
@@ -924,7 +943,14 @@ export function PublicacoesAba({
             return (
               <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${destacarId === p.id ? "border-sky-500 ring-2 ring-sky-500/50" : "border-linha"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted">{dataBR(p.data)}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted">{dataBR(p.data)}</span>
+                    {!postado && (
+                      <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={ocupado} title="Hora da postagem (muda quando o piloto posta)" className="rounded border border-linha bg-preto px-1 py-0.5 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
+                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {String(h).padStart(2, "0")}:00</option>)}
+                      </select>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     {p.aprovado && <span title="Você já aprovou este post" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Aprovado</span>}
                     <span title={postado && p.postadoEm ? `Publicado em ${dataHoraBR(p.postadoEm)}` : undefined} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
