@@ -734,3 +734,87 @@ export function LayoutFeedback(
     </div>
   );
 }
+
+// 💰 Preço / Pacote — oferta com VALORES em destaque: de/por, forma de pagamento,
+// parcelas e economia. Os números são SEMPRE do dono (a IA não inventa preço).
+export function LayoutPreco(
+  d: DadosArte & { precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; validade?: string }
+) {
+  const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || escolherFundoFesta(d.paleta);
+  const conds = (d.condicoes || []).map((s) => s.trim()).filter(Boolean).slice(0, 3);
+  const por = (d.precoPor || "").trim();
+  const porFont = por.length > 9 ? 118 : por.length > 6 ? 138 : 158;
+  return (
+    <div
+      style={{
+        width: "1080px",
+        height: "1350px",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        backgroundColor: fundo,
+        backgroundImage: "radial-gradient(circle at 50% 30%, rgba(255,255,255,0.26), rgba(0,0,0,0.18) 72%)",
+        fontFamily: "Baloo",
+      }}
+    >
+      <Confete cores={[c2, c3, c5, c1]} />
+      {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
+
+      {/* Selo de validade (carimbo no canto superior esquerdo) */}
+      {d.validade ? (
+        <div style={{ position: "absolute", top: 70, left: 60, width: 196, height: 196, borderRadius: 9999, backgroundColor: "#fff", border: `5px solid ${c1}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", transform: "rotate(-8deg)", boxShadow: "0 10px 24px rgba(0,0,0,0.3)", padding: 16 }}>
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 22, color: PRETO }}>ATÉ</div>
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 44, color: c1, lineHeight: 1.0, textAlign: "center" }}>{d.validade}</div>
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 70px", marginTop: 250, flexGrow: 1 }}>
+        {/* Título (chamada da promoção) */}
+        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 84 : 100} fundo={fundo} />
+
+        {/* Condições (pílulas) */}
+        {conds.length ? (
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: 22 }}>
+            {conds.map((cnd, i) => (
+              <div key={i} style={{ display: "flex", marginLeft: i === 0 ? 0 : 12, marginTop: 8, fontFamily: "Fredoka", fontSize: 28, color: PRETO, backgroundColor: "rgba(255,255,255,0.92)", padding: "8px 22px", borderRadius: 999 }}>{cnd}</div>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Card de PREÇO */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 30, backgroundColor: "#fff", borderRadius: 40, padding: "34px 60px 40px", boxShadow: "0 22px 60px rgba(0,0,0,0.4)", minWidth: 720 }}>
+          {d.precoDe ? (
+            <div style={{ display: "flex", alignItems: "center", fontFamily: "Fredoka", fontSize: 40, color: "#9a9a9a", textDecoration: "line-through" }}>De R$ {d.precoDe}</div>
+          ) : null}
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 34, color: PRETO, marginTop: d.precoDe ? 4 : 0 }}>POR APENAS</div>
+          <div style={{ display: "flex", alignItems: "flex-start", marginTop: 2 }}>
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 52, color: c1, marginTop: 18, marginRight: 6 }}>R$</div>
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: porFont, color: c1, lineHeight: 1.0 }}>{por}</div>
+          </div>
+          {d.labelPor ? (
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 36, color: "#fff", backgroundColor: c1, padding: "6px 30px", borderRadius: 999, marginTop: 6, letterSpacing: 2 }}>{d.labelPor}</div>
+          ) : null}
+          {d.parcelas ? (
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 34, color: PRETO, marginTop: 16 }}>ou {d.parcelas}</div>
+          ) : null}
+        </div>
+
+        {/* Economia */}
+        {d.economia ? (
+          <div style={{ display: "flex", alignItems: "center", marginTop: 22, fontFamily: "Fredoka", fontSize: 36, color: PRETO, backgroundColor: c3, padding: "12px 36px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.2)" }}>
+            ⭐ ECONOMIA DE R$ {d.economia}
+          </div>
+        ) : null}
+
+        {/* CTA WhatsApp */}
+        {d.telefone ? <div style={{ display: "flex", marginTop: 26 }}><CtaWhatsApp telefone={d.telefone} /></div> : null}
+      </div>
+
+      <OndaBase cor={c1} />
+      <div style={{ position: "absolute", bottom: 58, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 4px rgba(0,0,0,0.4)" }}>
+        {d.site}
+      </div>
+    </div>
+  );
+}

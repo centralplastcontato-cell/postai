@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, LayoutAnivCapa, LayoutAnivCard, LayoutMosaico, LayoutCapaFestiva, LayoutCapaFoto, LayoutCapaMoldura, LayoutCapaFaixa, LayoutFeedback, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, LayoutAnivCapa, LayoutAnivCard, LayoutMosaico, LayoutCapaFestiva, LayoutCapaFoto, LayoutCapaMoldura, LayoutCapaFaixa, LayoutFeedback, LayoutPreco, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,6 +94,19 @@ export async function GET(req: Request) {
       corFundo: url.searchParams.get("cor") || undefined,
     };
     elemento = template === "capa-foto" ? LayoutCapaFoto(dados) : LayoutCapaFaixa(dados);
+  } else if (template === "preco") {
+    elemento = LayoutPreco({
+      ...base,
+      titulo: montarTituloColorido(tituloParam || "Promoção Especial da Copa", paleta),
+      precoDe: "12.000",
+      precoPor: "8.500,00",
+      labelPor: "À VISTA",
+      parcelas: "5x de R$ 9.000",
+      economia: "3.500,00",
+      condicoes: ["Seg a Sex", "50 a 70 convidados"],
+      validade: "30/06",
+      corFundo: url.searchParams.get("cor") || undefined,
+    });
   } else if (template === "feedback") {
     const banco = marca ? await prisma.imagemMarca.findFirst({ where: { marcaId: marca.id }, orderBy: { criadoEm: "asc" }, select: { url: true } }) : null;
     const foto = banco?.url || "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1000&q=80";
