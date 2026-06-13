@@ -151,6 +151,12 @@ export function PublicacoesAba({
   const [categoriaFoto, setCategoriaFoto] = useState("geral");
   const [corFundo, setCorFundo] = useState(""); // "" = automático (sorteia da paleta)
   const [sugerindo, setSugerindo] = useState(false);
+  // Feedback / Depoimento: o texto é REAL (colado pelo dono), nunca inventado pela IA.
+  const [depoimento, setDepoimento] = useState("");
+  const [autorFb, setAutorFb] = useState("");
+  const [estrelasFb, setEstrelasFb] = useState(5);
+  const [destaqueFb, setDestaqueFb] = useState(""); // vazio = IA extrai do depoimento
+  const [corCard, setCorCard] = useState(""); // "" = card branco
   // Cores da marca que servem de fundo (escuras). Vazio se a marca não tem paleta.
   const coresFundo = coresDeFundo(parsePaleta(paleta));
   // Templates de fundo COLORIDO (onde escolher a cor faz sentido — os com foto não).
@@ -185,7 +191,8 @@ export function PublicacoesAba({
     startTransition(async () => {
       const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: template === "dica" || template === "mosaico" || template === "faixa" ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined });
+      const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback";
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -195,6 +202,11 @@ export function PublicacoesAba({
         setDiferenciais("");
         setCategoriaFoto("geral");
         setCorFundo("");
+        setDepoimento("");
+        setAutorFb("");
+        setEstrelasFb(5);
+        setDestaqueFb("");
+        setCorCard("");
         onGerado?.(r.dia); // filtra a lista no dia da nova publicação (não abre todas)
         router.refresh();
       } else setErro(r.erro);
@@ -556,6 +568,54 @@ export function PublicacoesAba({
           </div>
         )}
 
+        {template === "feedback" && (
+          <div className="mb-3 flex flex-col gap-3">
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
+              <p className="text-[11px] text-amber-300/90">⭐ Cole um depoimento <strong>REAL</strong> de cliente. A IA <strong>não inventa</strong> nada — ela só escreve o agradecimento e destaca a frase principal.</p>
+            </div>
+            <label className="block text-xs text-muted">
+              Depoimento do cliente <span className="text-red-400">*</span>
+              <textarea value={depoimento} onChange={(e) => setDepoimento(e.target.value)} rows={4} placeholder="Cole aqui exatamente o que o cliente escreveu…" className="input-base resize-none" />
+            </label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-xs text-muted">
+                Nome do cliente <span className="text-muted/70">(opcional)</span>
+                <input value={autorFb} onChange={(e) => setAutorFb(e.target.value)} placeholder="Ex: Mariana S." className="input-base" />
+              </label>
+              <label className="text-xs text-muted">
+                Frase de destaque <span className="text-muted/70">(vazio = IA cria)</span>
+                <input value={destaqueFb} onChange={(e) => setDestaqueFb(e.target.value)} placeholder="Ex: Excelente atendimento!" className="input-base" />
+              </label>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <span className="text-xs text-muted">Nota</span>
+                <div className="mt-1 flex gap-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <button key={s} type="button" onClick={() => setEstrelasFb(s)} title={`${s} estrela${s > 1 ? "s" : ""}`} className={`text-2xl leading-none transition ${s <= estrelasFb ? "text-amber-400" : "text-muted/40 hover:text-amber-300"}`}>★</button>
+                  ))}
+                </div>
+              </div>
+              <label className="text-xs text-muted">
+                Foto de fundo <span className="text-muted/70">(do espaço, do seu banco)</span>
+                <select value={categoriaFoto} onChange={(e) => setCategoriaFoto(e.target.value)} className="input-base">
+                  {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
+                </select>
+              </label>
+            </div>
+            <div>
+              <span className="text-xs text-muted">Cor do balão</span>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <button type="button" onClick={() => setCorCard("")} className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${corCard === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>⬜ Branco</button>
+                {["#C1121F", "#1D4ED8", "#047857", "#7C3AED", "#DB2777", "#EA580C", "#0E7490", "#111827"].map((c) => (
+                  <button key={c} type="button" onClick={() => setCorCard(c)} title={c} className={`h-7 w-7 rounded-full border-2 transition ${corCard === c ? "border-white scale-110" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
+                ))}
+              </div>
+            </div>
+            <p className="text-[11px] text-amber-400/90">⭐ Usa 1 foto REAL do seu Banco (rodízio) — você troca depois se não ficar boa. Sem foto, fica um fundo colorido.</p>
+          </div>
+        )}
+
         {/* Seletor de cor de fundo — só pros templates de fundo colorido e se a marca tem paleta */}
         {TEMPLATES_COR.includes(template) && coresFundo.length > 0 && (
           <div className="mb-3">
@@ -589,7 +649,7 @@ export function PublicacoesAba({
             Assunto (opcional — se vazio, a IA escolhe)
             <input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: novidade da semana" className="input-base" />
           </label>
-          <button onClick={handleGerar} disabled={isPending} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
+          <button onClick={handleGerar} disabled={isPending || (template === "feedback" && !depoimento.trim())} title={template === "feedback" && !depoimento.trim() ? "Cole o depoimento do cliente primeiro" : undefined} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
             {isPending ? "Gerando…" : "Gerar"}
           </button>
         </div>

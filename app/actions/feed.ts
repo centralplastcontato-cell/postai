@@ -14,7 +14,7 @@ import type { Marca } from "@prisma/client";
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
 // `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
-type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string };
+type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string };
 
 // Monta o JSON do campo `extra` conforme o template (dados específicos da arte).
 // `travas` são valores digitados pelo usuário — usados exatos e preservados no regerar.
@@ -61,6 +61,25 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
     // da mesma categoria depois (ex: dica de cardápio → foto de comida).
     const cat = categoria && categoria !== "geral" ? categoria : "";
     return cat ? JSON.stringify({ categoria: cat }) : null;
+  }
+  if (template === "feedback") {
+    // O DEPOIMENTO é real (do cliente) — sempre travado, nunca inventado pela IA.
+    // O "destaque" usa o digitado pelo dono ou, se vazio, a frase curta que a IA extraiu.
+    const cat = categoria && categoria !== "geral" ? categoria : "";
+    return JSON.stringify({
+      depoimento: travas?.depoimento || "",
+      autor: travas?.autor || "",
+      estrelas: typeof travas?.estrelas === "number" ? travas.estrelas : 5,
+      destaque: travas?.destaque || g.destaque || "",
+      corCard: travas?.corCard || "",
+      categoria: cat || undefined,
+      // Travados — preservados ao regerar (só a legenda/destaque-IA mudam).
+      depoimentoTravado: travas?.depoimento || undefined,
+      autorTravado: travas?.autor || undefined,
+      estrelasTravada: typeof travas?.estrelas === "number" ? travas.estrelas : undefined,
+      destaqueTravado: travas?.destaque || undefined,
+      corCardTravada: travas?.corCard || undefined,
+    });
   }
   if (template === "moldura" || template === "faixa") {
     // Visuais "capa": só a cor de fundo (moldura) / cor da faixa (faixa). A faixa
@@ -121,6 +140,8 @@ const GUIA: Record<Template, string> = {
     'Crie um POST de DESTAQUE com o título numa moldura lúdica. O "titulo" é uma chamada curta e forte (2 a 5 palavras) que vai GRANDE dentro da moldura; "texto" é uma frase de apoio curta. Tom festivo e convidativo. NÃO invente promoção/preço.',
   faixa:
     'Crie um POST com FOTO de fundo e o título numa faixa diagonal. O "titulo" é uma chamada curta e impactante (2 a 5 palavras) que vai na faixa; "texto" é uma frase de apoio curta. Tom convidativo. NÃO invente promoção/preço.',
+  feedback:
+    'Você está criando um post de DEPOIMENTO de um cliente REAL. O texto do depoimento JÁ EXISTE (é fornecido) e NÃO pode ser alterado nem inventado. Sua tarefa: (1) "destaque" = uma frase BEM curta (2 a 4 palavras) que capture o elogio principal do depoimento (ex: "Excelente atendimento!", "Festa inesquecível!"); (2) "legenda" = um agradecimento caloroso e humano ao cliente, sem exagerar além do que ele escreveu. Baseie TUDO no depoimento fornecido. Nunca invente elogios.',
 };
 
 // Formato de JSON esperado por template (a Promoção pede oferta/validade).
@@ -173,6 +194,11 @@ const FORMATO_JSON: Record<Template, string> = {
   "legenda": "legenda do post (3-5 linhas com \\n), termina com um convite leve",
   "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
 }`,
+  feedback: `{
+  "destaque": "frase BEM curta (2 a 4 palavras) que resume o elogio do depoimento (ex: Excelente atendimento!) — vai GRANDE na arte",
+  "legenda": "legenda do post (3-5 linhas com \\n) agradecendo o cliente de forma calorosa e humana, convidando outras famílias a viverem a experiência. NÃO invente nada além do que o cliente escreveu",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
 };
 
 function sistema(marca: Marca, template: Template): string {
@@ -190,12 +216,12 @@ ${FORMATO_JSON[template]}
 Português do Brasil.`;
 }
 
-type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; selo?: string; diferenciais?: string[]; legenda: string; hashtags: string };
+type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; selo?: string; diferenciais?: string[]; destaque?: string; legenda: string; hashtags: string };
 
 // Templates que usam foto de IA de fundo (os de fundo colorido não geram foto).
 // O Mosaico também usa fotos reais, mas precisa de VÁRIAS (tratadas à parte em
 // aplicarFotosMosaico), por isso fica fora do fluxo de foto única do USA_FOTO.
-const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false, moldura: false, faixa: true };
+const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false, moldura: false, faixa: true, feedback: true };
 
 function slugify(s: string): string {
   return s
@@ -247,6 +273,11 @@ async function gerarTexto(marca: Marca, template: Template, tema?: string, trava
   if (fixos.length) {
     pedido += ` IMPORTANTE: ${fixos.join("; ")}. Use esses dados sem alterar e escreva o título e a legenda de forma coerente com eles. NÃO invente outros valores, descontos, itens ou condições.`;
   }
+  // Feedback: o depoimento REAL do cliente é a base de tudo — a IA só resume/agradece.
+  if (template === "feedback" && travas?.depoimento?.trim()) {
+    const quem = travas?.autor?.trim() ? ` O cliente se chama "${travas.autor.trim()}".` : "";
+    pedido += ` DEPOIMENTO REAL DO CLIENTE (não altere, não invente além disso): """${travas.depoimento.trim()}""".${quem} Gere o "destaque" e a "legenda" baseados SOMENTE nesse depoimento.`;
+  }
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -279,6 +310,11 @@ export async function gerarPublicacao(input: {
   diferenciais?: string[];
   categoria?: string; // categoria do banco pra puxar a foto (templates com foto)
   corFundo?: string; // cor de fundo escolhida (vazio = automático/sorteio)
+  depoimento?: string; // feedback: o depoimento REAL do cliente (obrigatório)
+  autor?: string; // feedback: nome do cliente
+  estrelas?: number; // feedback: nota 1-5
+  destaque?: string; // feedback: frase de destaque (vazio = IA extrai do depoimento)
+  corCard?: string; // feedback: cor do balão (vazio = branco)
 }) {
   if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
@@ -298,6 +334,15 @@ export async function gerarPublicacao(input: {
     travas = { diferenciais: (input.diferenciais || []).map((s) => s.trim()).filter(Boolean) };
   } else if (template === "mosaico") {
     travas = { oferta: input.oferta?.trim() || undefined, validade: input.validade?.trim() || undefined };
+  } else if (template === "feedback") {
+    if (!input.depoimento?.trim()) return { ok: false as const, erro: "Cole o depoimento do cliente pra gerar o feedback." };
+    travas = {
+      depoimento: input.depoimento.trim(),
+      autor: input.autor?.trim() || undefined,
+      estrelas: typeof input.estrelas === "number" ? Math.max(1, Math.min(5, input.estrelas)) : 5,
+      destaque: input.destaque?.trim() || undefined,
+      corCard: input.corCard?.trim() || undefined,
+    };
   }
   // Cor de fundo escolhida pelo usuário (vale pra todos os templates de fundo colorido).
   travas.corFundo = input.corFundo?.trim() || undefined;
@@ -364,6 +409,12 @@ export async function regerarPublicacao(id: string) {
       regras: ex.regras || undefined,
       diferenciais: Array.isArray(ex.diferenciaisTravados) ? ex.diferenciaisTravados : [],
       corFundo: typeof ex.corFundoTravada === "string" ? ex.corFundoTravada : undefined,
+      // Feedback: o depoimento, autor, nota e cor do card são preservados ao regerar.
+      depoimento: typeof ex.depoimentoTravado === "string" ? ex.depoimentoTravado : undefined,
+      autor: typeof ex.autorTravado === "string" ? ex.autorTravado : undefined,
+      estrelas: typeof ex.estrelasTravada === "number" ? ex.estrelasTravada : undefined,
+      destaque: typeof ex.destaqueTravado === "string" ? ex.destaqueTravado : undefined,
+      corCard: typeof ex.corCardTravada === "string" ? ex.corCardTravada : undefined,
     };
     categoria = typeof ex.categoria === "string" ? ex.categoria : undefined;
   } catch {}
@@ -411,6 +462,7 @@ export async function regerarComoNova(id: string) {
   } catch {}
   const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]) : undefined);
   const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+  const num = (v: unknown) => (typeof v === "number" ? v : undefined);
   // A nova versão cai em HOJE (data BRT), do lado do original — mesmo que o dia já
   // tenha outro post (decisão do dono: ver a nova na hora, sem ir pra data distante).
   const hojeBRT = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -426,6 +478,11 @@ export async function regerarComoNova(id: string) {
     diferenciais: arr(ex.diferenciaisTravados),
     categoria: str(ex.categoria),
     corFundo: str(ex.corFundoTravada),
+    depoimento: str(ex.depoimentoTravado),
+    autor: str(ex.autorTravado),
+    estrelas: num(ex.estrelasTravada),
+    destaque: str(ex.destaqueTravado),
+    corCard: str(ex.corCardTravada),
   });
 }
 

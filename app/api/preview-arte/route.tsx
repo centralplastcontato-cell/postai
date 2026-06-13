@@ -106,7 +106,7 @@ export async function GET(req: Request) {
       depoimento:
         "Só tenho a agradecer! Gostei do desempenho de todos, muito atenciosos e educados. Atendimento de primeira qualidade, a festa do meu filho foi perfeita. Recomendo de olhos fechados!",
       autor: "Mariana S.",
-      corFundo: url.searchParams.get("cor") || undefined,
+      corCard: url.searchParams.get("card") || undefined,
     });
   } else if (template === "capa-moldura") {
     elemento = LayoutCapaMoldura({

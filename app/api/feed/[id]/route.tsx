@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, LayoutCapaMoldura, LayoutCapaFaixa, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, LayoutCapaMoldura, LayoutCapaFaixa, LayoutFeedback, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[] } = {};
+  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -81,6 +81,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (p.template === "faixa") {
     return new ImageResponse(
       LayoutCapaFaixa({ ...base, corFundo: extra.corFundo, imagemUrl: p.imagemUrl || undefined }),
+      { width: 1080, height: 1350, fonts, headers: CACHE }
+    );
+  }
+
+  if (p.template === "feedback") {
+    return new ImageResponse(
+      LayoutFeedback({ ...base, titulo: [], imagemUrl: p.imagemUrl || undefined, depoimento: extra.depoimento, autor: extra.autor, estrelas: extra.estrelas, destaque: extra.destaque, corCard: extra.corCard }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }

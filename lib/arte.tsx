@@ -64,7 +64,7 @@ export function escolherFundoFesta(paleta: string[], seed = 0): string {
   return lista[Math.abs(seed) % lista.length] || "#2196F3";
 }
 
-function luminancia(hex: string): number {
+export function luminancia(hex: string): number {
   const h = hex.replace("#", "");
   if (h.length < 6) return 0.5;
   const r = parseInt(h.slice(0, 2), 16) / 255;
