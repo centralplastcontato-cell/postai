@@ -14,6 +14,7 @@ import {
   removerImagemPublicacao,
   sugerirDiferenciais,
   sugerirPromocao,
+  sugerirDepoimento,
 } from "@/app/actions/feed";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
@@ -157,6 +158,7 @@ export function PublicacoesAba({
   const [estrelasFb, setEstrelasFb] = useState(5);
   const [destaqueFb, setDestaqueFb] = useState(""); // vazio = IA extrai do depoimento
   const [corCard, setCorCard] = useState(""); // "" = card branco
+  const [gerandoExemplo, setGerandoExemplo] = useState(false);
   // Cores da marca que servem de fundo (escuras). Vazio se a marca não tem paleta.
   const coresFundo = coresDeFundo(parsePaleta(paleta));
   // Templates de fundo COLORIDO (onde escolher a cor faz sentido — os com foto não).
@@ -184,6 +186,22 @@ export function PublicacoesAba({
     if (!comemorativa) return;
     setTemplate("data-comemorativa");
     if (comemorativa.sugestao) setTema(comemorativa.sugestao);
+  }
+
+  // Preenche os campos com um EXEMPLO de depoimento (rascunho pra testar/adaptar).
+  function handleExemplo() {
+    setErro(null);
+    setGerandoExemplo(true);
+    startTransition(async () => {
+      const r = await sugerirDepoimento(marcaId);
+      if (r.ok) {
+        setDepoimento(r.depoimento);
+        if (r.autor) setAutorFb(r.autor);
+        if (r.destaque) setDestaqueFb(r.destaque);
+        setEstrelasFb(5);
+      } else setErro(r.erro);
+      setGerandoExemplo(false);
+    });
   }
 
   function handleGerar() {
@@ -573,10 +591,16 @@ export function PublicacoesAba({
             <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2.5">
               <p className="text-[11px] text-amber-300/90">⭐ Cole um depoimento <strong>REAL</strong> de cliente. A IA <strong>não inventa</strong> nada — ela só escreve o agradecimento e destaca a frase principal.</p>
             </div>
-            <label className="block text-xs text-muted">
-              Depoimento do cliente <span className="text-red-400">*</span>
-              <textarea value={depoimento} onChange={(e) => setDepoimento(e.target.value)} rows={4} placeholder="Cole aqui exatamente o que o cliente escreveu…" className="input-base resize-none" />
-            </label>
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-muted">Depoimento do cliente <span className="text-red-400">*</span></span>
+                <button type="button" onClick={handleExemplo} disabled={gerandoExemplo} className="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/5 px-2.5 py-1 text-[11px] font-semibold text-amber-200 transition hover:border-amber-400 hover:text-white disabled:opacity-50">
+                  {gerandoExemplo ? "💡 Criando…" : "💡 Gerar exemplo"}
+                </button>
+              </div>
+              <textarea value={depoimento} onChange={(e) => setDepoimento(e.target.value)} rows={4} placeholder="Cole aqui exatamente o que o cliente escreveu…" className="input-base mt-1 resize-none" />
+              <p className="mt-1 text-[11px] text-muted/80">💡 O "Gerar exemplo" é um <strong>rascunho</strong> pra testar/adaptar. Pra postar de verdade, use o depoimento <strong>real</strong> do cliente.</p>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="text-xs text-muted">
                 Nome do cliente <span className="text-muted/70">(opcional)</span>
