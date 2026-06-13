@@ -345,6 +345,32 @@ async function gerarTexto(marca: Marca, template: Template, tema?: string, trava
   return JSON.parse(content) as Gerado;
 }
 
+// Campos manuais que o usuário fornece por template (mesmos no gerar e no editar).
+type CamposTemplate = {
+  oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string;
+  depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string;
+  precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string;
+};
+
+// Monta as "travas" (valores fixos do dono) conforme o template. Cada template usa só
+// os campos que fazem sentido pra ele. Reaproveitado por gerarPublicacao e editarPublicacao.
+function montarTravas(template: Template, c: CamposTemplate): Travas {
+  let travas: Travas = {};
+  if (template === "promocao") {
+    travas = { oferta: c.oferta?.trim() || undefined, validade: c.validade?.trim() || undefined, inclui: (c.inclui || []).map((s) => s.trim()).filter(Boolean), regras: c.regras?.trim() || undefined };
+  } else if (template === "divulgacao") {
+    travas = { diferenciais: (c.diferenciais || []).map((s) => s.trim()).filter(Boolean) };
+  } else if (template === "mosaico") {
+    travas = { oferta: c.oferta?.trim() || undefined, validade: c.validade?.trim() || undefined };
+  } else if (template === "feedback") {
+    travas = { depoimento: c.depoimento?.trim() || undefined, autor: c.autor?.trim() || undefined, estrelas: typeof c.estrelas === "number" ? Math.max(1, Math.min(5, c.estrelas)) : 5, destaque: c.destaque?.trim() || undefined, corCard: c.corCard?.trim() || undefined };
+  } else if (template === "preco") {
+    travas = { modoPreco: c.modoPreco || "promo", precoDe: c.precoDe?.trim() || undefined, precoPor: c.precoPor?.trim() || undefined, labelPor: c.labelPor?.trim() || undefined, parcelas: c.parcelas?.trim() || undefined, economia: c.economia?.trim() || undefined, condicoes: (c.condicoes || []).map((s) => s.trim()).filter(Boolean), validade: c.validade?.trim() || undefined };
+  }
+  travas.corFundo = c.corFundo?.trim() || undefined;
+  return travas;
+}
+
 export async function gerarPublicacao(input: {
   marcaId: string;
   template: Template;
@@ -376,43 +402,10 @@ export async function gerarPublicacao(input: {
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const template = (TEMPLATES as readonly string[]).includes(input.template) ? input.template : "dica";
 
-  // Cada template fixa só os campos que fazem sentido pra ele (ignorados nos demais).
-  let travas: Travas = {};
-  if (template === "promocao") {
-    travas = {
-      oferta: input.oferta?.trim() || undefined,
-      validade: input.validade?.trim() || undefined,
-      inclui: (input.inclui || []).map((s) => s.trim()).filter(Boolean),
-      regras: input.regras?.trim() || undefined,
-    };
-  } else if (template === "divulgacao") {
-    travas = { diferenciais: (input.diferenciais || []).map((s) => s.trim()).filter(Boolean) };
-  } else if (template === "mosaico") {
-    travas = { oferta: input.oferta?.trim() || undefined, validade: input.validade?.trim() || undefined };
-  } else if (template === "feedback") {
-    if (!input.depoimento?.trim()) return { ok: false as const, erro: "Cole o depoimento do cliente pra gerar o feedback." };
-    travas = {
-      depoimento: input.depoimento.trim(),
-      autor: input.autor?.trim() || undefined,
-      estrelas: typeof input.estrelas === "number" ? Math.max(1, Math.min(5, input.estrelas)) : 5,
-      destaque: input.destaque?.trim() || undefined,
-      corCard: input.corCard?.trim() || undefined,
-    };
-  } else if (template === "preco") {
-    if (!input.precoPor?.trim()) return { ok: false as const, erro: "Informe ao menos o preço da oferta (Por R$)." };
-    travas = {
-      modoPreco: input.modoPreco || "promo",
-      precoDe: input.precoDe?.trim() || undefined,
-      precoPor: input.precoPor.trim(),
-      labelPor: input.labelPor?.trim() || undefined,
-      parcelas: input.parcelas?.trim() || undefined,
-      economia: input.economia?.trim() || undefined,
-      condicoes: (input.condicoes || []).map((s) => s.trim()).filter(Boolean),
-      validade: input.validade?.trim() || undefined,
-    };
-  }
-  // Cor de fundo escolhida pelo usuário (vale pra todos os templates de fundo colorido).
-  travas.corFundo = input.corFundo?.trim() || undefined;
+  // Validações de campos obrigatórios por template.
+  if (template === "feedback" && !input.depoimento?.trim()) return { ok: false as const, erro: "Cole o depoimento do cliente pra gerar o feedback." };
+  if (template === "preco" && !input.precoPor?.trim()) return { ok: false as const, erro: "Informe ao menos o preço da oferta (Por R$)." };
+  const travas = montarTravas(template, input);
 
   let gerado: Gerado;
   try {
@@ -457,6 +450,55 @@ export async function gerarPublicacao(input: {
   // nesse dia (em vez de abrir tudo). Ver mais é só clicar em "Ver todas".
   const dia = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(data);
   return { ok: true as const, id: criado.id, dia };
+}
+
+// Edição PONTUAL: muda só os campos informados (título, textos, valores…) SEM chamar a
+// IA e SEM trocar a foto. Reaproveita montarTravas/montarExtra; preserva o que não é
+// editável (fotos do mosaico, categoria, selo). É o "ajuste fino" da arte.
+export async function editarPublicacao(input: {
+  id: string;
+  titulo?: string;
+  texto?: string;
+  legenda?: string;
+  hashtags?: string;
+} & CamposTemplate) {
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const p = await prisma.publicacao.findUnique({ where: { id: input.id }, include: { marca: true } });
+  if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  const template: Template = (TEMPLATES as readonly string[]).includes(p.template) ? (p.template as Template) : "dica";
+  if (template === "feedback" && !input.depoimento?.trim()) return { ok: false as const, erro: "O depoimento não pode ficar vazio." };
+  if (template === "preco" && !input.precoPor?.trim()) return { ok: false as const, erro: "Informe o preço da oferta (Por R$)." };
+
+  let exAntigo: Record<string, unknown> = {};
+  try { exAntigo = JSON.parse(p.extra || "{}"); } catch {}
+  const categoria = typeof exAntigo.categoria === "string" ? exAntigo.categoria : undefined;
+
+  const travas = montarTravas(template, input);
+  const seed = p.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const geradoFake: Gerado = {
+    titulo: input.titulo ?? p.titulo,
+    texto: input.texto ?? p.texto,
+    legenda: input.legenda ?? p.legenda,
+    hashtags: input.hashtags ?? p.hashtags,
+    selo: typeof exAntigo.selo === "string" ? exAntigo.selo : undefined,
+  };
+  // Monta o novo extra com os valores editados; preserva o que não é editável (fotos do mosaico).
+  let exNovo: Record<string, unknown> = {};
+  try { exNovo = JSON.parse(montarExtra(p.marca, template, geradoFake, seed, travas, categoria) || "{}"); } catch {}
+  if (Array.isArray(exAntigo.fotos)) exNovo.fotos = exAntigo.fotos;
+
+  await prisma.publicacao.update({
+    where: { id: input.id },
+    data: {
+      titulo: input.titulo?.trim() || p.titulo,
+      texto: input.texto ?? p.texto,
+      legenda: input.legenda ?? p.legenda,
+      hashtags: input.hashtags ?? p.hashtags,
+      extra: JSON.stringify(exNovo),
+    },
+  });
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const };
 }
 
 export async function regerarPublicacao(id: string) {

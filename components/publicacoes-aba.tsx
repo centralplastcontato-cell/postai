@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   gerarPublicacao,
@@ -15,6 +15,7 @@ import {
   sugerirDiferenciais,
   sugerirPromocao,
   sugerirDepoimento,
+  editarPublicacao,
 } from "@/app/actions/feed";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
@@ -96,6 +97,7 @@ export type PublicacaoView = {
   tema: string | null;
   aprovado: boolean; // revisão interna do dono (não vai pra rede)
   postadoEm?: string | null; // ISO do momento real da publicação (null = não postado)
+  extra?: string | null; // JSON dos campos do template (pra pré-preencher a edição)
   categoria?: string | null; // categoria do banco pra foto (template dica)
 };
 
@@ -179,6 +181,13 @@ export function PublicacoesAba({
   const [economiaInput, setEconomiaInput] = useState(""); // vazio = calcula De − Por
   const [condicoesTxt, setCondicoesTxt] = useState(""); // uma condição por linha
   const [modoPreco, setModoPreco] = useState("promo"); // promo (De→Por) | unico | apartir
+  // Edição PONTUAL de um post já criado (sem IA). Quando editandoId != null, o formulário
+  // entra em modo edição: campos pré-preenchidos + título/texto/legenda editáveis.
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [tituloEdit, setTituloEdit] = useState("");
+  const [textoEdit, setTextoEdit] = useState("");
+  const [legendaEdit, setLegendaEdit] = useState("");
+  const [hashtagsEdit, setHashtagsEdit] = useState("");
   // Cores da marca que servem de fundo (escuras). Vazio se a marca não tem paleta.
   const coresFundo = coresDeFundo(parsePaleta(paleta));
   // Templates de fundo COLORIDO (onde escolher a cor faz sentido — os com foto não).
@@ -221,6 +230,73 @@ export function PublicacoesAba({
         setEstrelasFb(5);
       } else setErro(r.erro);
       setGerandoExemplo(false);
+    });
+  }
+
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // Carrega os valores de um post nos campos do formulário e entra em MODO EDIÇÃO.
+  function handleEditar(p: PublicacaoView) {
+    setErro(null);
+    let ex: Record<string, unknown> = {};
+    try { ex = JSON.parse(p.extra || "{}"); } catch {}
+    const s = (v: unknown) => (typeof v === "string" ? v : "");
+    const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]).join("\n") : "");
+    setTemplate(p.template as Template);
+    setTituloEdit(p.titulo);
+    setTextoEdit(p.texto);
+    setLegendaEdit(p.legenda);
+    setHashtagsEdit(p.hashtags);
+    setOferta(s(ex.oferta));
+    setValidade(s(ex.validade));
+    setInclui(arr(ex.inclui));
+    setRegras(s(ex.regras));
+    setDiferenciais(arr(ex.diferenciais));
+    setCorFundo(s(ex.corFundoTravada));
+    setCategoriaFoto(s(ex.categoria) || "geral");
+    setDepoimento(s(ex.depoimento));
+    setAutorFb(s(ex.autor));
+    setEstrelasFb(typeof ex.estrelas === "number" ? ex.estrelas : 5);
+    setDestaqueFb(s(ex.destaque));
+    setCorCard(s(ex.corCard));
+    setModoPreco(s(ex.modoPreco) || "promo");
+    setPrecoDe(s(ex.precoDe));
+    setPrecoPor(s(ex.precoPor));
+    setLabelPor(s(ex.labelPor) || "À vista");
+    setParcelas(s(ex.parcelas));
+    setEconomiaInput(s(ex.economiaTravada));
+    setCondicoesTxt(arr(ex.condicoes));
+    setEditandoId(p.id);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function cancelarEdicao() {
+    setEditandoId(null);
+    setTituloEdit(""); setTextoEdit(""); setLegendaEdit(""); setHashtagsEdit("");
+    setOferta(""); setValidade(""); setInclui(""); setRegras(""); setDiferenciais("");
+    setCorFundo(""); setCategoriaFoto("geral");
+    setDepoimento(""); setAutorFb(""); setEstrelasFb(5); setDestaqueFb(""); setCorCard("");
+    setPrecoDe(""); setPrecoPor(""); setLabelPor("À vista"); setParcelas(""); setEconomiaInput(""); setCondicoesTxt(""); setModoPreco("promo");
+  }
+
+  function handleSalvarEdicao() {
+    if (!editandoId) return;
+    setErro(null);
+    startTransition(async () => {
+      const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
+      const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
+      const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
+      const r = await editarPublicacao({
+        id: editandoId,
+        titulo: tituloEdit, texto: textoEdit, legenda: legendaEdit, hashtags: hashtagsEdit,
+        oferta, validade, inclui: itens, regras, diferenciais: difs, corFundo,
+        depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard,
+        precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco,
+      });
+      if (r.ok) {
+        cancelarEdicao();
+        router.refresh();
+      } else setErro(r.erro);
     });
   }
 
@@ -420,17 +496,39 @@ export function PublicacoesAba({
         </div>
       )}
 
-      <div className="mb-8 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <p className="mb-1 text-sm font-semibold text-white">Gerar publicação (feed) com IA</p>
-        <p className="mb-3 text-xs text-muted">Post de imagem única, no tom da marca. Sem escolher dia, cai na próxima data livre da agenda.</p>
+      <div ref={formRef} className={`mb-8 scroll-mt-4 rounded-xl border bg-preto-card p-4 sm:p-5 ${editandoId ? "border-sky-500/60 ring-2 ring-sky-500/30" : "border-linha"}`}>
+        {editandoId ? (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-sky-500/40 bg-sky-500/10 px-3 py-2">
+            <span className="text-xs font-semibold text-sky-200">✏️ Editando esta arte — muda só o que você alterar, sem IA e sem trocar a foto.</span>
+            <button type="button" onClick={cancelarEdicao} className="rounded-md border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">✕ Cancelar</button>
+          </div>
+        ) : (
+          <>
+            <p className="mb-1 text-sm font-semibold text-white">Gerar publicação (feed) com IA</p>
+            <p className="mb-3 text-xs text-muted">Post de imagem única, no tom da marca. Sem escolher dia, cai na próxima data livre da agenda.</p>
+          </>
+        )}
 
         <div className="mb-3 flex flex-wrap gap-2">
           {TEMPLATES.map((t) => (
-            <button key={t} type="button" onClick={() => setTemplate(t)} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${template === t ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"}`}>
+            <button key={t} type="button" onClick={() => { if (!editandoId) setTemplate(t); }} disabled={!!editandoId && template !== t} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${template === t ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"} ${editandoId && template !== t ? "cursor-not-allowed opacity-30" : ""}`}>
               {TEMPLATE_LABEL[t]}
             </button>
           ))}
         </div>
+
+        {editandoId && (
+          <div className="mb-3 flex flex-col gap-3 rounded-md border border-sky-500/20 bg-sky-500/5 p-3">
+            <label className="text-xs text-muted">
+              Título da arte
+              <input value={tituloEdit} onChange={(e) => setTituloEdit(e.target.value)} placeholder="Texto principal da arte" className="input-base" />
+            </label>
+            <label className="text-xs text-muted">
+              Texto de apoio <span className="text-muted/70">(se o template usa — ex: subtítulo)</span>
+              <input value={textoEdit} onChange={(e) => setTextoEdit(e.target.value)} placeholder="Frase de apoio" className="input-base" />
+            </label>
+          </div>
+        )}
 
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1 text-xs text-muted">
@@ -764,15 +862,36 @@ export function PublicacoesAba({
           </div>
         )}
 
-        <div className="flex flex-col gap-3 md:flex-row md:items-end">
-          <label className="flex-1 text-xs text-muted">
-            Assunto (opcional — se vazio, a IA escolhe)
-            <input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: novidade da semana" className="input-base" />
-          </label>
-          <button onClick={handleGerar} disabled={isPending || (template === "feedback" && !depoimento.trim()) || (template === "preco" && !precoPor.trim())} title={template === "feedback" && !depoimento.trim() ? "Cole o depoimento do cliente primeiro" : template === "preco" && !precoPor.trim() ? "Informe o preço da oferta (Por R$)" : undefined} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
-            {isPending ? "Gerando…" : "Gerar"}
-          </button>
-        </div>
+        {editandoId ? (
+          <div className="flex flex-col gap-3">
+            <label className="text-xs text-muted">
+              Legenda do post <span className="text-muted/70">(o que vai escrito embaixo no Instagram)</span>
+              <textarea value={legendaEdit} onChange={(e) => setLegendaEdit(e.target.value)} rows={4} className="input-base resize-none" />
+            </label>
+            <label className="text-xs text-muted">
+              Hashtags
+              <input value={hashtagsEdit} onChange={(e) => setHashtagsEdit(e.target.value)} placeholder="#festa #buffet …" className="input-base" />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={handleSalvarEdicao} disabled={isPending} className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:opacity-50">
+                {isPending ? "Salvando…" : "💾 Salvar alterações"}
+              </button>
+              <button onClick={cancelarEdicao} disabled={isPending} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-50">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 md:flex-row md:items-end">
+            <label className="flex-1 text-xs text-muted">
+              Assunto (opcional — se vazio, a IA escolhe)
+              <input value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: novidade da semana" className="input-base" />
+            </label>
+            <button onClick={handleGerar} disabled={isPending || (template === "feedback" && !depoimento.trim()) || (template === "preco" && !precoPor.trim())} title={template === "feedback" && !depoimento.trim() ? "Cole o depoimento do cliente primeiro" : template === "preco" && !precoPor.trim() ? "Informe o preço da oferta (Por R$)" : undefined} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
+              {isPending ? "Gerando…" : "Gerar"}
+            </button>
+          </div>
+        )}
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
       </div>
 
@@ -798,7 +917,7 @@ export function PublicacoesAba({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visiveis.map((p) => {
-            const v = hashCurto(`${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}`);
+            const v = hashCurto(`${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`);
             const arte = `/api/feed/${p.id}?v=${v}`;
             const postado = p.status === "postado";
             const ocupado = proc === p.id;
@@ -834,7 +953,8 @@ export function PublicacoesAba({
                 {ocupado && <p className="mt-1 text-[11px] text-muted">Processando…</p>}
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <button onClick={() => handleRegerar(p)} disabled={ocupado} title={postado ? "Já postado — cria uma nova versão ao lado" : "Regerar texto"} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻ Regerar</button>
+                  {!postado && <button onClick={() => handleEditar(p)} disabled={ocupado} title="Editar os textos e valores desta arte (sem IA, mantém a foto)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-sky-500 hover:text-white disabled:opacity-40">✏️ Editar</button>}
+                  <button onClick={() => handleRegerar(p)} disabled={ocupado} title={postado ? "Já postado — cria uma nova versão ao lado" : "Regerar texto (com IA)"} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻ Regerar</button>
                   <a href={arte} download={`feed-${p.slug}.png`} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">⬇ Baixar</a>
                   <button onClick={() => copiar(p)} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">{copiadoId === p.id ? "✓ Copiado" : "Copiar texto"}</button>
                   {/* Edição de imagem some em posts já postados (não muda o que está no

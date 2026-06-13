@@ -73,6 +73,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     tema: p.tema,
     aprovado: p.aprovado,
     postadoEm: p.postadoEm?.toISOString() ?? null,
+    extra: p.extra ?? null, // JSON dos campos do template — pra pré-preencher a edição
     categoria: (() => { try { return JSON.parse(p.extra || "{}").categoria ?? null; } catch { return null; } })(),
   }));
 
