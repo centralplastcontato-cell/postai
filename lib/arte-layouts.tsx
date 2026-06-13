@@ -744,7 +744,12 @@ export function LayoutPreco(
   const fundo = d.corFundo || escolherFundoFesta(d.paleta);
   const conds = (d.condicoes || []).map((s) => s.trim()).filter(Boolean).slice(0, 3);
   const por = (d.precoPor || "").trim();
-  const porFont = por.length > 9 ? 118 : por.length > 6 ? 138 : 158;
+  const porFont = por.length > 9 ? 104 : por.length > 6 ? 124 : 142;
+  // Margem do topo e fonte do título adaptam ao nº de linhas pra TUDO (card + economia
+  // + CTA) caber ACIMA da onda (top 1110) — senão o selo de economia/CTA é cortado.
+  const nLinhas = d.titulo.length;
+  const margemTopo = nLinhas >= 3 ? 130 : nLinhas === 2 ? 185 : 235;
+  const tFont = nLinhas >= 3 ? 74 : nLinhas === 2 ? 88 : 102;
   return (
     <div
       style={{
@@ -769,46 +774,46 @@ export function LayoutPreco(
         </div>
       ) : null}
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 70px", marginTop: 250, flexGrow: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 70px", marginTop: margemTopo, flexGrow: 1 }}>
         {/* Título (chamada da promoção) */}
-        <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 84 : 100} fundo={fundo} />
+        <TituloMulticolor linhas={d.titulo} fontSize={tFont} fundo={fundo} />
 
         {/* Condições (pílulas) */}
         {conds.length ? (
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: 22 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: 18 }}>
             {conds.map((cnd, i) => (
-              <div key={i} style={{ display: "flex", marginLeft: i === 0 ? 0 : 12, marginTop: 8, fontFamily: "Fredoka", fontSize: 28, color: PRETO, backgroundColor: "rgba(255,255,255,0.92)", padding: "8px 22px", borderRadius: 999 }}>{cnd}</div>
+              <div key={i} style={{ display: "flex", marginLeft: i === 0 ? 0 : 12, marginTop: 8, fontFamily: "Fredoka", fontSize: 26, color: PRETO, backgroundColor: "rgba(255,255,255,0.92)", padding: "7px 20px", borderRadius: 999 }}>{cnd}</div>
             ))}
           </div>
         ) : null}
 
         {/* Card de PREÇO */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 30, backgroundColor: "#fff", borderRadius: 40, padding: "34px 60px 40px", boxShadow: "0 22px 60px rgba(0,0,0,0.4)", minWidth: 720 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: 24, backgroundColor: "#fff", borderRadius: 38, padding: "26px 56px 30px", boxShadow: "0 22px 60px rgba(0,0,0,0.4)", minWidth: 700 }}>
           {d.precoDe ? (
-            <div style={{ display: "flex", alignItems: "center", fontFamily: "Fredoka", fontSize: 40, color: "#9a9a9a", textDecoration: "line-through" }}>De R$ {d.precoDe}</div>
+            <div style={{ display: "flex", alignItems: "center", fontFamily: "Fredoka", fontSize: 36, color: "#9a9a9a", textDecoration: "line-through" }}>De R$ {d.precoDe}</div>
           ) : null}
-          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 34, color: PRETO, marginTop: d.precoDe ? 4 : 0 }}>POR APENAS</div>
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 30, color: PRETO, marginTop: d.precoDe ? 2 : 0 }}>POR APENAS</div>
           <div style={{ display: "flex", alignItems: "flex-start", marginTop: 2 }}>
-            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 52, color: c1, marginTop: 18, marginRight: 6 }}>R$</div>
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 46, color: c1, marginTop: 16, marginRight: 6 }}>R$</div>
             <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: porFont, color: c1, lineHeight: 1.0 }}>{por}</div>
           </div>
           {d.labelPor ? (
-            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 36, color: "#fff", backgroundColor: c1, padding: "6px 30px", borderRadius: 999, marginTop: 6, letterSpacing: 2 }}>{d.labelPor}</div>
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 32, color: "#fff", backgroundColor: c1, padding: "5px 26px", borderRadius: 999, marginTop: 6, letterSpacing: 2 }}>{d.labelPor}</div>
           ) : null}
           {d.parcelas ? (
-            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 34, color: PRETO, marginTop: 16 }}>ou {d.parcelas}</div>
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 30, color: PRETO, marginTop: 12 }}>ou {d.parcelas}</div>
           ) : null}
         </div>
 
         {/* Economia */}
         {d.economia ? (
-          <div style={{ display: "flex", alignItems: "center", marginTop: 22, fontFamily: "Fredoka", fontSize: 36, color: PRETO, backgroundColor: c3, padding: "12px 36px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.2)" }}>
+          <div style={{ display: "flex", alignItems: "center", marginTop: 18, fontFamily: "Fredoka", fontSize: 32, color: PRETO, backgroundColor: c3, padding: "10px 32px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.2)" }}>
             ⭐ ECONOMIA DE R$ {d.economia}
           </div>
         ) : null}
 
         {/* CTA WhatsApp */}
-        {d.telefone ? <div style={{ display: "flex", marginTop: 26 }}><CtaWhatsApp telefone={d.telefone} /></div> : null}
+        {d.telefone ? <div style={{ display: "flex", marginTop: 18 }}><CtaWhatsApp telefone={d.telefone} /></div> : null}
       </div>
 
       <OndaBase cor={c1} />
