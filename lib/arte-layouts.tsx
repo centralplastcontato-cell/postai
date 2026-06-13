@@ -1,7 +1,7 @@
 // Layouts completos (canvas 1080x1350) por template, reaproveitados pelo route de
 // produção e pela rota de preview. Cada função recebe os dados já prontos e
 // devolve o JSX para o ImageResponse.
-import { Confete, OndaBase, TituloMulticolor, CtaWhatsApp, LogoSolto, escolherFundoFesta, contorno, corContraste, BRANCO, PRETO } from "@/lib/arte";
+import { Confete, OndaBase, TituloMulticolor, CtaWhatsApp, LogoSolto, escolherFundoFesta, contorno, corContraste, svgDataUri, BRANCO, PRETO } from "@/lib/arte";
 
 export type DadosArte = {
   paleta: string[];
@@ -647,6 +647,83 @@ export function LayoutCapaFaixa(d: DadosArte & { imagemUrl?: string; arraste?: b
       <div style={{ position: "absolute", bottom: 56, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.75)" }}>
         {d.site}{d.site && d.arraste ? "   ·   " : ""}{d.arraste ? "arraste →" : ""}
       </div>
+    </div>
+  );
+}
+
+// ⭐ Feedback / Depoimento — prova social: card branco elegante sobre foto do espaço,
+// 5 estrelas, "FEEDBACK" colorido, frase de destaque + depoimento REAL do cliente +
+// autor + logo. O texto do depoimento NUNCA é inventado pela IA — vem do cliente.
+export function LayoutFeedback(
+  d: DadosArte & { imagemUrl?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string }
+) {
+  const paleta = d.paleta;
+  const fundo = d.corFundo || escolherFundoFesta(paleta);
+  const n = Math.max(1, Math.min(5, d.estrelas ?? 5));
+  const dep = (d.depoimento || "").trim();
+  // A fonte do depoimento encolhe conforme o texto cresce, pra caber depoimento longo.
+  const depFont = dep.length > 380 ? 29 : dep.length > 260 ? 33 : dep.length > 150 ? 37 : 41;
+  const logoW = Math.round(64 * 1.76);
+  const estrelaSVG = (cor: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" width="58" height="58" viewBox="0 0 24 24"><path d="M12 2l2.9 6.26 6.86.55-5.2 4.5 1.6 6.7L12 16.9 5.84 20.5l1.6-6.7-5.2-4.5 6.86-.55z" fill="${cor}"/></svg>`;
+  const letras = "FEEDBACK".split("");
+  return (
+    <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative", backgroundColor: fundo, fontFamily: "Baloo" }}>
+      {/* Foto do espaço de fundo (opcional) + overlay escuro pra dar contraste ao card */}
+      {d.imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={d.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
+      ) : null}
+      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", backgroundColor: "rgba(0,0,0,0.5)" }} />
+
+      {/* Área central que centraliza o card (deixa espaço pro logo no rodapé) */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", alignItems: "center", justifyContent: "center", padding: "70px 64px 180px" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 936, backgroundColor: "#ffffff", borderRadius: 46, padding: "64px 64px 58px", boxShadow: "0 30px 80px rgba(0,0,0,0.45)" }}>
+          {/* Estrelas */}
+          <div style={{ display: "flex", alignItems: "center" }}>
+            {Array.from({ length: n }).map((_, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={i} src={svgDataUri(estrelaSVG("#E6B33E"))} width={58} height={58} style={{ marginLeft: i === 0 ? 0 : 6 }} />
+            ))}
+          </div>
+
+          {/* FEEDBACK — cada letra numa cor da paleta (a vibe colorida das referências) */}
+          <div style={{ display: "flex", marginTop: 20, fontFamily: "Fredoka" }}>
+            {letras.map((L, i) => (
+              <span key={i} style={{ display: "flex", fontSize: 90, color: corContraste(paleta[i % paleta.length], "#ffffff"), letterSpacing: 2 }}>{L}</span>
+            ))}
+          </div>
+
+          {/* Divisor fino */}
+          <div style={{ display: "flex", width: 320, height: 3, backgroundColor: "#E8E3DA", marginTop: 12 }} />
+
+          {/* Aspas decorativa */}
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 130, color: "#ECE7DD", height: 78, lineHeight: 1 }}>&#8220;</div>
+
+          {/* Frase de destaque (curta) na cor da marca */}
+          {d.destaque ? (
+            <div style={{ display: "flex", textAlign: "center", fontFamily: "Fredoka", fontSize: 54, color: corContraste(paleta[0], "#ffffff"), lineHeight: 1.06, marginTop: 2, maxWidth: 740 }}>{d.destaque}</div>
+          ) : null}
+
+          {/* Depoimento REAL do cliente */}
+          {dep ? (
+            <div style={{ display: "flex", textAlign: "center", marginTop: 24, fontSize: depFont, color: "#3a3a3a", lineHeight: 1.36, maxWidth: 760 }}>{dep}</div>
+          ) : null}
+
+          {/* Autor */}
+          {d.autor ? (
+            <div style={{ display: "flex", marginTop: 26, fontFamily: "Fredoka", fontSize: 36, color: corContraste(paleta[0], "#ffffff") }}>— {d.autor}</div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Logo da marca no rodapé (sobre a foto) */}
+      {d.logoSrc ? (
+        <div style={{ position: "absolute", bottom: 54, left: 0, width: "1080px", display: "flex", justifyContent: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={d.logoSrc} width={logoW} height={64} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.7))" }} />
+        </div>
+      ) : null}
     </div>
   );
 }

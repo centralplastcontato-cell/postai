@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
-import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, LayoutAnivCapa, LayoutAnivCard, LayoutMosaico, LayoutCapaFestiva, LayoutCapaFoto, LayoutCapaMoldura, LayoutCapaFaixa, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutDataComemorativa, LayoutDivulgacao, LayoutAnivCapa, LayoutAnivCard, LayoutMosaico, LayoutCapaFestiva, LayoutCapaFoto, LayoutCapaMoldura, LayoutCapaFaixa, LayoutFeedback, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,6 +94,20 @@ export async function GET(req: Request) {
       corFundo: url.searchParams.get("cor") || undefined,
     };
     elemento = template === "capa-foto" ? LayoutCapaFoto(dados) : LayoutCapaFaixa(dados);
+  } else if (template === "feedback") {
+    const banco = marca ? await prisma.imagemMarca.findFirst({ where: { marcaId: marca.id }, orderBy: { criadoEm: "asc" }, select: { url: true } }) : null;
+    const foto = banco?.url || "https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=1000&q=80";
+    elemento = LayoutFeedback({
+      ...base,
+      titulo: [],
+      imagemUrl: foto,
+      estrelas: 5,
+      destaque: "Excelente atendimento!",
+      depoimento:
+        "Só tenho a agradecer! Gostei do desempenho de todos, muito atenciosos e educados. Atendimento de primeira qualidade, a festa do meu filho foi perfeita. Recomendo de olhos fechados!",
+      autor: "Mariana S.",
+      corFundo: url.searchParams.get("cor") || undefined,
+    });
   } else if (template === "capa-moldura") {
     elemento = LayoutCapaMoldura({
       ...base,
