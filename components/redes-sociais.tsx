@@ -93,20 +93,18 @@ export function RedesSociais({
       </div>
 
       {subaba === "carrosseis" && (
-        <>
-          <MarketingCalendario
-            marcaId={marcaId}
-            posts={posts}
-            selId={selecao?.tipo === "carrossel" ? selecao.id : null}
-            onSelId={(id) => setSelecao(id ? { tipo: "carrossel", id } : null)}
-            dataAlvo={dataAlvo}
-            horaPadrao={horaCarrossel}
-            onGerado={(dia) => setDataAlvo(dia ?? null)}
-            onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
-            temFacebook={temFacebook}
-          />
-          <AniversariantesForm marcaId={marcaId} dataAlvo={dataAlvo} onGerado={(dia) => setDataAlvo(dia ?? null)} />
-        </>
+        <MarketingCalendario
+          marcaId={marcaId}
+          posts={posts}
+          selId={selecao?.tipo === "carrossel" ? selecao.id : null}
+          onSelId={(id) => setSelecao(id ? { tipo: "carrossel", id } : null)}
+          dataAlvo={dataAlvo}
+          horaPadrao={horaCarrossel}
+          onGerado={(dia) => setDataAlvo(dia ?? null)}
+          onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
+          temFacebook={temFacebook}
+          slotGerador={<AniversariantesForm marcaId={marcaId} dataAlvo={dataAlvo} onGerado={(dia) => setDataAlvo(dia ?? null)} />}
+        />
       )}
 
       {subaba === "publicacoes" && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useTransition } from "react";
+import { useState, useEffect, useRef, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
@@ -121,6 +121,7 @@ export function MarketingCalendario({
   onGerado,
   onLimparDia,
   temFacebook,
+  slotGerador,
 }: {
   marcaId: string;
   posts: Post[];
@@ -131,6 +132,7 @@ export function MarketingCalendario({
   onGerado: (dia?: string) => void;
   onLimparDia?: () => void;
   temFacebook?: boolean; // posta também no Facebook → reflete na caixinha "Estamos postando"
+  slotGerador?: ReactNode; // outro gerador (Aniversariantes) renderizado logo abaixo do principal
 }) {
   const router = useRouter();
   const redesTexto = temFacebook ? "no Instagram e Facebook" : "no Instagram";
@@ -504,6 +506,10 @@ export function MarketingCalendario({
         </div>
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
       </div>
+
+      {/* Aniversariantes da Semana entra AQUI, logo abaixo do gerador principal — é
+          outro jeito de gerar carrossel, então fica na mesma área (não solto no fim). */}
+      {slotGerador}
 
       {/* Contagem + paginação (o filtro por dia + "Ver todos" agora ficam no topo,
           acima das abas, pois são globais — ver redes-sociais.tsx). */}
