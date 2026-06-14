@@ -16,7 +16,10 @@ export default async function PainelHome() {
   const marcas = await prisma.marca.findMany({
     where: filtroMarcaVisivel(s),
     orderBy: { criadoEm: "asc" },
-    include: { _count: { select: { conteudos: true, publicacoes: true } } },
+    include: {
+      _count: { select: { conteudos: true, publicacoes: true } },
+      usuario: { select: { nome: true } }, // dono (cliente) — mostrado no card pro admin
+    },
   });
 
   return (
@@ -105,15 +108,27 @@ export default async function PainelHome() {
                     </p>
                   </div>
                 </div>
-                <span
-                  className={`mt-3 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-                    conectada
-                      ? "border-green-500/30 bg-green-500/15 text-green-400"
-                      : "border-amber-500/30 bg-amber-500/15 text-amber-400"
-                  }`}
-                >
-                  {conectada ? "✓ Instagram conectado" : "⚠ Falta conectar"}
-                </span>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <span
+                    className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                      conectada
+                        ? "border-green-500/30 bg-green-500/15 text-green-400"
+                        : "border-amber-500/30 bg-amber-500/15 text-amber-400"
+                    }`}
+                  >
+                    {conectada ? "✓ Instagram conectado" : "⚠ Falta conectar"}
+                  </span>
+                  {/* Dono da marca (só o admin vê) — pra saber de quem é cada uma de relance */}
+                  {s.admin && (
+                    <span
+                      className={`inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                        m.usuario ? "border-[#7c3aed]/40 bg-[#7c3aed]/15 text-[#c7b2ff]" : "border-linha bg-preto text-muted"
+                      }`}
+                    >
+                      👤 {m.usuario ? m.usuario.nome : "sem dono"}
+                    </span>
+                  )}
+                </div>
               </Link>
             );
           })}
