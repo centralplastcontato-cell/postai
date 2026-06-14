@@ -16,6 +16,8 @@ export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marca
   const [erro, setErro] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [excluirAlvo, setExcluirAlvo] = useState<Cliente | null>(null);
+  const [redefinindoId, setRedefinindoId] = useState<string | null>(null);
+  const [novaSenha, setNovaSenha] = useState("");
 
   function aviso(texto: string) {
     setMsg(texto);
@@ -48,14 +50,27 @@ export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marca
     });
   }
 
-  function handleSenha(id: string) {
-    const nova = prompt("Nova senha do cliente (mínimo 4 caracteres):");
-    if (nova === null) return;
+  // Abre/fecha o campo inline de nova senha pra um cliente (sem prompt() do navegador,
+  // que muitos bloqueiam — por isso o botão "não fazia nada").
+  function abrirRedefinir(id: string) {
+    setErro(null);
+    setNovaSenha("");
+    setRedefinindoId((cur) => (cur === id ? null : id));
+  }
+  function handleSalvarSenha(id: string) {
+    if (novaSenha.length < 4) {
+      setErro("A nova senha precisa ter no mínimo 4 caracteres.");
+      return;
+    }
     setErro(null);
     startTransition(async () => {
-      const r = await redefinirSenhaCliente(id, nova);
+      const r = await redefinirSenhaCliente(id, novaSenha);
       if (!r.ok) setErro(r.erro);
-      else aviso("Senha redefinida!");
+      else {
+        aviso("Senha redefinida!");
+        setRedefinindoId(null);
+        setNovaSenha("");
+      }
     });
   }
 
@@ -137,17 +152,29 @@ export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marca
             <p className="rounded-lg border border-dashed border-linha bg-preto-card p-4 text-sm text-muted">Nenhum cliente ainda. Crie o primeiro acima.</p>
           ) : (
             usuarios.map((u) => (
-              <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-linha bg-preto-card px-4 py-3">
-                <div>
-                  <p className="text-sm font-semibold text-white">{u.nome}</p>
-                  <p className="text-xs text-muted">
-                    {u.marcas.length ? u.marcas.map((m) => m.nome).join(", ") : "sem marca atribuída"}
-                  </p>
+              <div key={u.id} className="rounded-lg border border-linha bg-preto-card px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{u.nome}</p>
+                    <p className="text-xs text-muted">
+                      {u.marcas.length ? u.marcas.map((m) => m.nome).join(", ") : "sem marca atribuída"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => abrirRedefinir(u.id)} disabled={pending} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-50">🔑 {redefinindoId === u.id ? "Fechar" : "Redefinir senha"}</button>
+                    <button onClick={() => setExcluirAlvo(u)} disabled={pending} className="rounded-md border border-red-900 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-950/40 disabled:opacity-50">🗑 Excluir</button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => handleSenha(u.id)} disabled={pending} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-50">🔑 Redefinir senha</button>
-                  <button onClick={() => setExcluirAlvo(u)} disabled={pending} className="rounded-md border border-red-900 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-950/40 disabled:opacity-50">🗑 Excluir</button>
-                </div>
+                {redefinindoId === u.id && (
+                  <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-linha pt-3">
+                    <label className="flex-1 text-xs text-muted">
+                      Nova senha para <span className="font-semibold text-white">{u.nome}</span>
+                      <input value={novaSenha} onChange={(e) => setNovaSenha(e.target.value)} type="text" placeholder="mínimo 4 caracteres" autoFocus className="input-base" />
+                    </label>
+                    <button onClick={() => handleSalvarSenha(u.id)} disabled={pending || novaSenha.length < 4} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">Salvar senha</button>
+                    <button onClick={() => { setRedefinindoId(null); setNovaSenha(""); }} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho">Cancelar</button>
+                  </div>
+                )}
               </div>
             ))
           )}
