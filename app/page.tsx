@@ -3,50 +3,50 @@ import type { Metadata } from "next";
 import { APP_NAME } from "@/lib/config";
 
 export const metadata: Metadata = {
-  title: `${APP_NAME} — sua marca postando sozinha no Instagram e Facebook`,
+  title: `${APP_NAME} — o Instagram do seu buffet infantil postando sozinho`,
   description:
-    "O Postaí cria carrosséis e posts com inteligência artificial no tom da sua marca e publica sozinho no Instagram e no Facebook, nos dias e horários que você escolher.",
+    "O Postaí cria e publica sozinho os posts do seu buffet infantil no Instagram e no Facebook: pacotes, promoções, depoimentos de famílias e datas comemorativas — no tom da sua festa, todos os dias.",
 };
 
 // Contato de vendas (modo concierge). Troque por um link de WhatsApp quando quiser:
 // const CONTATO = "https://wa.me/55SEUNUMERO";
-const CONTATO = "mailto:centralplast.contato@gmail.com?subject=Quero%20o%20Postai%20na%20minha%20empresa";
+const CONTATO = "mailto:centralplast.contato@gmail.com?subject=Quero%20o%20Postai%20no%20meu%20buffet%20infantil";
 
 const PASSOS: { n: string; titulo: string; texto: string }[] = [
   {
     n: "1",
-    titulo: "Conecte sua marca",
-    texto: "Cores, logo, jeito de falar e as contas do Instagram e Facebook. Você faz isso uma vez só.",
+    titulo: "Conecte seu buffet",
+    texto: "Cores, logo, jeito de falar e as contas do Instagram e Facebook do buffet. Você faz isso uma vez só.",
   },
   {
     n: "2",
-    titulo: "A IA cria as artes",
-    texto: "Carrosséis e posts prontos no seu estilo: promoções, preços, depoimentos, datas comemorativas e muito mais.",
+    titulo: "A IA cria as artes da festa",
+    texto: "Carrosséis e posts prontos no estilo do seu buffet: pacotes, promoções, depoimentos de famílias, datas comemorativas e muito mais.",
   },
   {
     n: "3",
     titulo: "Posta sozinho",
-    texto: "Você aprova ou deixa no automático. O Postaí publica nos dias e horas certos. Todo dia no ar.",
+    texto: "Você aprova ou deixa no automático. O Postaí publica nos dias e horas certos. Seu buffet todo dia no feed.",
   },
 ];
 
 const RECURSOS: { emoji: string; titulo: string; texto: string }[] = [
-  { emoji: "🤖", titulo: "Arte com IA no seu tom", texto: "Títulos, legendas e imagens gerados no estilo da sua marca — não fica com cara de robô." },
-  { emoji: "🗓️", titulo: "Piloto automático", texto: "Escolha os dias e horários. O Postaí posta sozinho, mesmo enquanto você dorme." },
-  { emoji: "📱", titulo: "Instagram + Facebook", texto: "Um post só, publicado nas duas redes ao mesmo tempo, sem retrabalho." },
-  { emoji: "🎨", titulo: "Vários modelos de arte", texto: "Promoção, preço, depoimento, data comemorativa, divulgação, dica, mosaico e capas especiais." },
-  { emoji: "🏢", titulo: "Várias marcas num lugar", texto: "Gerencie quantos negócios quiser no mesmo painel — ideal para quem cuida de clientes." },
-  { emoji: "✅", titulo: "Você no controle", texto: "Aprove, edite o texto, troque a foto ou a capa antes de publicar. Sem surpresa." },
+  { emoji: "🤖", titulo: "Arte com IA no tom do buffet", texto: "Títulos, legendas e imagens no clima de festa infantil — alegre, caloroso e com a cara do seu espaço." },
+  { emoji: "🗓️", titulo: "Piloto automático", texto: "Escolha os dias e horários. O Postaí posta sozinho, até quando você está no meio de uma festa." },
+  { emoji: "📱", titulo: "Instagram + Facebook", texto: "Um post só, publicado no Instagram e no Facebook do buffet ao mesmo tempo." },
+  { emoji: "🎨", titulo: "Modelos pensados pra festa", texto: "Pacote de festa, promoção, depoimento de família, data comemorativa, tour pelo espaço e capas especiais." },
+  { emoji: "🎂", titulo: "Seu espaço sempre em evidência", texto: "Mostre o salão, os brinquedos e o que está incluso no pacote — o que faz a família escolher você." },
+  { emoji: "✅", titulo: "Você no controle", texto: "Aprove, edite o texto, troque a foto do salão ou a capa antes de publicar. Sem surpresa." },
 ];
 
 const TEMPLATES: { emoji: string; nome: string }[] = [
+  { emoji: "💰", nome: "Pacote de festa" },
   { emoji: "🎉", nome: "Promoção" },
-  { emoji: "💰", nome: "Preço e Pacote" },
-  { emoji: "⭐", nome: "Depoimento" },
-  { emoji: "🎄", nome: "Data comemorativa" },
-  { emoji: "🏆", nome: "Divulgação" },
-  { emoji: "💡", nome: "Dica" },
-  { emoji: "🖼️", nome: "Mosaico de fotos" },
+  { emoji: "⭐", nome: "Depoimento de família" },
+  { emoji: "🎈", nome: "Data comemorativa" },
+  { emoji: "🏆", nome: "Por que nos escolher" },
+  { emoji: "💡", nome: "Dica pros pais" },
+  { emoji: "🖼️", nome: "Tour pelo espaço" },
   { emoji: "🪟", nome: "Capas especiais" },
 ];
 
@@ -54,27 +54,27 @@ const PLANOS: { nome: string; posts: string; destaque?: boolean; itens: string[]
   {
     nome: "Essencial",
     posts: "1 post por dia",
-    itens: ["Sua página sempre ativa", "Carrosséis e posts com IA", "Instagram + Facebook", "Piloto automático"],
+    itens: ["Seu buffet sempre ativo no feed", "Carrosséis e posts com IA", "Instagram + Facebook", "Piloto automático"],
   },
   {
     nome: "Profissional",
     posts: "2 posts por dia",
     destaque: true,
-    itens: ["Presença forte e constante", "Todos os modelos de arte", "Horários diferentes no mesmo dia", "Aprovação e edição fácil"],
+    itens: ["Presença forte na temporada de festas", "Todos os modelos de arte", "Horários diferentes no mesmo dia", "Aprovação e edição fácil"],
   },
   {
     nome: "Turbo",
     posts: "3 posts por dia",
-    itens: ["Máximo de alcance e ofertas", "Mais conteúdo, mais venda", "Várias marcas no painel", "Suporte prioritário"],
+    itens: ["Máximo de alcance e reservas", "Mais conteúdo, mais festas fechadas", "Prioridade nas datas quentes", "Suporte prioritário"],
   },
 ];
 
 const FAQ: { p: string; r: string }[] = [
-  { p: "Preciso saber design ou postar na mão?", r: "Não. O Postaí cria as artes e posta por você. Você só acompanha." },
-  { p: "Funciona no Instagram e no Facebook?", r: "Sim, nas duas redes ao mesmo tempo — um post vira presença nos dois lugares." },
-  { p: "Posso revisar antes de publicar?", r: "Pode. Aprove, edite o texto, troque a foto, ou deixe tudo no automático." },
-  { p: "Atende mais de uma empresa?", r: "Sim. Você gerencia várias marcas no mesmo painel, cada uma no seu tom." },
-  { p: "Como eu começo?", r: "Clique em Acessar o painel para entrar, ou fale com a gente que te colocamos no ar." },
+  { p: "Preciso saber design ou postar na mão?", r: "Não. O Postaí cria as artes e posta pelo seu buffet. Você só acompanha." },
+  { p: "Funciona no Instagram e no Facebook?", r: "Sim, nas duas redes ao mesmo tempo — um post vira presença do buffet nos dois lugares." },
+  { p: "Posso revisar antes de publicar?", r: "Pode. Aprove, edite o texto, troque a foto do salão, ou deixe tudo no automático." },
+  { p: "Tenho mais de uma unidade de buffet. Dá pra usar?", r: "Sim. Você gerencia mais de um buffet no mesmo painel, cada um no seu tom." },
+  { p: "Como eu começo?", r: "Clique em Acessar o painel para entrar, ou fale com a gente que colocamos o seu buffet no ar." },
 ];
 
 export default function Home() {
@@ -107,16 +107,16 @@ export default function Home() {
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:grid-cols-2 md:py-24">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/10 px-3 py-1 text-xs font-semibold text-[#c7b2ff]">
-              ✨ Piloto automático de Instagram + Facebook
+              🎈 Marketing automático para buffet infantil
             </span>
             <h1 className="display mt-5 text-4xl leading-[1.04] sm:text-5xl md:text-6xl">
-              Sua marca postando<br />
-              <span className="bg-gradient-to-r from-[#a78bfa] via-[#c084fc] to-[#ec4899] bg-clip-text text-transparent">todo dia</span>. Sem você<br />
-              levantar um dedo.
+              Seu buffet infantil<br />
+              postando <span className="bg-gradient-to-r from-[#a78bfa] via-[#c084fc] to-[#ec4899] bg-clip-text text-transparent">todo dia</span>.<br />
+              Sem você levantar um dedo.
             </h1>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-muted sm:text-lg">
-              O {APP_NAME} cria os carrosséis e posts com inteligência artificial no tom da sua marca
-              e publica sozinho no Instagram e no Facebook — nos dias e horários que você escolher.
+              O {APP_NAME} cria os carrosséis e posts do seu buffet com inteligência artificial — pacotes,
+              promoções e depoimentos — e publica sozinho no Instagram e no Facebook, nos dias e horários que você escolher.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <Link href="/login" className="rounded-xl bg-vermelho px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
@@ -127,7 +127,7 @@ export default function Home() {
               </a>
             </div>
             <p className="mt-5 text-sm text-muted">
-              Feito para buffets, lojas e negócios locais que querem aparecer todos os dias.
+              Feito para donos de buffet infantil que querem encher a agenda de festas — sem perder tempo postando.
             </p>
           </div>
 
@@ -137,9 +137,9 @@ export default function Home() {
             <div className="relative rounded-[1.6rem] border border-linha bg-preto-card p-3 shadow-2xl">
               {/* cabeçalho do post */}
               <div className="flex items-center gap-2.5 px-1 pb-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#a78bfa] to-[#ec4899] text-sm font-bold text-white">S</div>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#a78bfa] to-[#ec4899] text-sm font-bold text-white">B</div>
                 <div className="leading-tight">
-                  <p className="text-sm font-semibold text-white">sua_marca</p>
+                  <p className="text-sm font-semibold text-white">seu.buffet</p>
                   <p className="text-[11px] text-muted">Patrocinado</p>
                 </div>
                 <svg viewBox="0 0 24 24" fill="currentColor" className="ml-auto h-5 w-5 text-muted"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
@@ -168,7 +168,7 @@ export default function Home() {
               </div>
               {/* legenda + assinatura do Postaí */}
               <div className="px-2 pb-1 pt-2">
-                <p className="text-xs leading-relaxed text-muted"><span className="font-semibold text-white">sua_marca</span> Garanta sua data especial com o nosso pacote completo. Vagas limitadas!</p>
+                <p className="text-xs leading-relaxed text-muted"><span className="font-semibold text-white">seu.buffet</span> Garanta a festa do seu pequeno com o nosso pacote completo. Datas voando!</p>
                 <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-vermelho/15 px-2 py-0.5 text-[11px] font-semibold text-[#c7b2ff]">
                   <span className="text-green-400">✓</span> publicado no automático pelo {APP_NAME}
                 </p>
@@ -182,9 +182,9 @@ export default function Home() {
       <section className="border-y border-linha bg-preto-card/40">
         <div className="mx-auto max-w-4xl px-5 py-14 text-center">
           <p className="text-lg leading-relaxed text-muted sm:text-xl">
-            Postar todo dia cansa. Falta tempo, falta ideia, falta arte. Aí a página fica parada
-            e o cliente esquece de você.{" "}
-            <span className="font-semibold text-white">O {APP_NAME} cuida disso no automático</span> — para sua marca nunca mais sumir do feed.
+            Entre uma festa e outra, ninguém tem tempo de postar. Aí o Instagram do buffet fica parado
+            e a família que ia fechar acaba escolhendo quem aparece.{" "}
+            <span className="font-semibold text-white">O {APP_NAME} cuida disso no automático</span> — pro seu buffet nunca mais sumir do feed.
           </p>
         </div>
       </section>
@@ -194,7 +194,7 @@ export default function Home() {
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-widest text-vermelho">Como funciona</p>
           <h2 className="display mt-2 text-3xl sm:text-4xl">Três passos e pronto</h2>
-          <p className="mx-auto mt-3 max-w-xl text-muted">Configura uma vez e a sua marca passa a aparecer todos os dias, sozinha.</p>
+          <p className="mx-auto mt-3 max-w-xl text-muted">Configura uma vez e o seu buffet passa a aparecer todos os dias, sozinho.</p>
         </div>
         <div className="mt-12 grid gap-5 md:grid-cols-3">
           {PASSOS.map((p) => (
@@ -212,7 +212,7 @@ export default function Home() {
         <div className="mx-auto max-w-6xl px-5 py-20">
           <div className="text-center">
             <p className="text-sm font-semibold uppercase tracking-widest text-vermelho">Recursos</p>
-            <h2 className="display mt-2 text-3xl sm:text-4xl">Tudo para postar sem esforço</h2>
+            <h2 className="display mt-2 text-3xl sm:text-4xl">Tudo para o buffet postar sem esforço</h2>
           </div>
           <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {RECURSOS.map((r) => (
@@ -230,8 +230,8 @@ export default function Home() {
       <section className="mx-auto max-w-6xl px-5 py-20">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-widest text-vermelho">Modelos de arte</p>
-          <h2 className="display mt-2 text-3xl sm:text-4xl">Um modelo para cada momento</h2>
-          <p className="mx-auto mt-3 max-w-xl text-muted">A IA monta a arte certa para promoção, preço, depoimento, data comemorativa e muito mais.</p>
+          <h2 className="display mt-2 text-3xl sm:text-4xl">Um modelo para cada momento da festa</h2>
+          <p className="mx-auto mt-3 max-w-xl text-muted">A IA monta a arte certa: pacote de festa, promoção, depoimento de família, data comemorativa e muito mais.</p>
         </div>
         <div className="mt-10 flex flex-wrap justify-center gap-3">
           {TEMPLATES.map((t) => (
@@ -253,7 +253,7 @@ export default function Home() {
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-lg text-muted">
             Escolha os dias e horários — até vários posts no mesmo dia. O {APP_NAME} publica sozinho na hora certa,
-            no Instagram e no Facebook. Você cuida do seu negócio; a sua presença online roda no automático.
+            no Instagram e no Facebook. Você cuida das festas; a divulgação do buffet roda no automático.
           </p>
           <Link href="/login" className="mt-8 inline-block rounded-xl bg-vermelho px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
             Quero no automático →
@@ -265,8 +265,8 @@ export default function Home() {
       <section id="planos" className="mx-auto max-w-6xl px-5 py-20">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-widest text-vermelho">Planos</p>
-          <h2 className="display mt-2 text-3xl sm:text-4xl">Escolha o ritmo da sua marca</h2>
-          <p className="mx-auto mt-3 max-w-xl text-muted">Quanto mais posts por dia, mais a sua marca aparece e vende. Valor mensal por marca.</p>
+          <h2 className="display mt-2 text-3xl sm:text-4xl">Escolha o ritmo do seu buffet</h2>
+          <p className="mx-auto mt-3 max-w-xl text-muted">Quanto mais posts por dia, mais famílias veem o seu buffet. Valor mensal por buffet.</p>
         </div>
         <div className="mt-12 grid gap-5 md:grid-cols-3">
           {PLANOS.map((pl) => (
@@ -323,9 +323,9 @@ export default function Home() {
       <section className="relative overflow-hidden">
         <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 h-[400px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#7c3aed]/20 blur-[120px]" />
         <div className="relative mx-auto max-w-3xl px-5 py-24 text-center">
-          <h2 className="display text-4xl sm:text-5xl">Pronto para sua marca postar sozinha?</h2>
+          <h2 className="display text-4xl sm:text-5xl">Pronto para o seu buffet postar sozinho?</h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-muted">
-            Deixe o {APP_NAME} cuidar das postagens enquanto você cuida do que importa: o seu negócio.
+            Deixe o {APP_NAME} cuidar da divulgação enquanto você cuida do que importa: as festas e as famílias.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link href="/login" className="rounded-xl bg-vermelho px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
@@ -344,7 +344,7 @@ export default function Home() {
           <span className="display text-lg text-white">
             {APP_NAME}<span className="text-vermelho">.</span>
           </span>
-          <span>Feito para negócios locais que querem aparecer todo dia.</span>
+          <span>Feito para buffets infantis que querem encher a agenda de festas.</span>
           <Link href="/login" className="transition hover:text-white">Entrar →</Link>
         </div>
       </footer>
