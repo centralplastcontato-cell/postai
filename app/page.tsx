@@ -131,18 +131,20 @@ export default function Home() {
             </p>
           </div>
 
-          {/* MOCK de post (puro CSS, sem imagem) */}
+          {/* MOCK de post (exemplo de arte gerada — puro CSS, ícones em SVG) */}
           <div className="relative mx-auto w-full max-w-sm">
             <div className="absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-[#7c3aed]/30 to-[#ec4899]/30 blur-2xl" />
             <div className="relative rounded-[1.6rem] border border-linha bg-preto-card p-3 shadow-2xl">
-              <div className="flex items-center gap-2 px-1 pb-3">
-                <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#a78bfa] to-[#ec4899]" />
-                <div>
-                  <div className="h-2.5 w-24 rounded-full bg-white/80" />
-                  <div className="mt-1 h-2 w-16 rounded-full bg-white/25" />
+              {/* cabeçalho do post */}
+              <div className="flex items-center gap-2.5 px-1 pb-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#a78bfa] to-[#ec4899] text-sm font-bold text-white">S</div>
+                <div className="leading-tight">
+                  <p className="text-sm font-semibold text-white">sua_marca</p>
+                  <p className="text-[11px] text-muted">Patrocinado</p>
                 </div>
-                <span className="ml-auto text-lg">⋯</span>
+                <svg viewBox="0 0 24 24" fill="currentColor" className="ml-auto h-5 w-5 text-muted"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
               </div>
+              {/* arte */}
               <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-gradient-to-br from-[#7c3aed] via-[#9333ea] to-[#ec4899]">
                 <div className="absolute right-3 top-3 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[#7c3aed]">ATÉ 30/6</div>
                 <div className="flex h-full flex-col items-center justify-center px-6 text-center">
@@ -151,12 +153,25 @@ export default function Home() {
                     <p className="text-[10px] font-bold tracking-wide text-[#7c3aed]">A PARTIR DE</p>
                     <p className="display text-4xl text-[#111827]">R$ 5.990</p>
                   </div>
-                  <div className="mt-3 rounded-full bg-[#22c55e] px-4 py-1.5 text-xs font-bold text-white">📲 chamar no WhatsApp</div>
+                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-4 py-1.5 text-xs font-bold text-white shadow">
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm5.8 14.16c-.24.68-1.42 1.31-1.95 1.35-.5.04-.97.23-3.27-.68-2.77-1.09-4.5-3.93-4.64-4.11-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.94-2.25.24-.27.53-.34.71-.34.18 0 .36 0 .51.01.16.01.39-.06.6.46.24.59.81 2.04.88 2.19.07.15.12.32.02.5-.09.18-.14.29-.27.45-.14.15-.29.35-.41.47-.14.13-.28.28-.12.55.16.27.71 1.17 1.53 1.9 1.05.93 1.94 1.22 2.21 1.36.27.13.43.11.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.22.6-.13.24.09 1.55.73 1.81.86.27.13.45.2.51.31.07.11.07.63-.17 1.31z" /></svg>
+                    Chamar no WhatsApp
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3 px-1 pt-3 text-lg">
-                <span>❤️</span><span>💬</span><span>📤</span>
-                <span className="ml-auto rounded-full bg-vermelho px-2.5 py-1 text-[10px] font-bold text-white">postado pelo {APP_NAME}</span>
+              {/* ações */}
+              <div className="flex items-center gap-4 px-2 pt-3 text-white">
+                <svg viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" strokeWidth="1.5" className="h-6 w-6"><path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M7.5 8.25h9m-9 3H12m8.25.75c0 4.556-3.694 8.25-8.25 8.25a8.2 8.2 0 0 1-3.59-.82L3 21l1.32-3.96A8.21 8.21 0 0 1 3.75 12c0-4.556 3.694-8.25 8.25-8.25s8.25 3.694 8.25 8.25z" /></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M6 12 3.27 3.13A59.77 59.77 0 0 1 21.49 12 59.77 59.77 0 0 1 3.27 20.88L6 12zm0 0h7.5" /></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="ml-auto h-6 w-6"><path d="M17.59 3.32c1.1.13 1.91 1.08 1.91 2.19V21L12 17.25 4.5 21V5.51c0-1.11.81-2.06 1.91-2.19a48.5 48.5 0 0 1 11.18 0z" /></svg>
+              </div>
+              {/* legenda + assinatura do Postaí */}
+              <div className="px-2 pb-1 pt-2">
+                <p className="text-xs leading-relaxed text-muted"><span className="font-semibold text-white">sua_marca</span> Garanta sua data especial com o nosso pacote completo. Vagas limitadas!</p>
+                <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-vermelho/15 px-2 py-0.5 text-[11px] font-semibold text-[#c7b2ff]">
+                  <span className="text-green-400">✓</span> publicado no automático pelo {APP_NAME}
+                </p>
               </div>
             </div>
           </div>
