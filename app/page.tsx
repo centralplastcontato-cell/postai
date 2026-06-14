@@ -78,7 +78,49 @@ const FAQ: { p: string; r: string }[] = [
 ];
 
 // Exemplos de publicações que rolam no feed do hero (um por template).
-const ARTES = ["preco", "depo", "promo", "data", "tour"] as const;
+// "foto" e "espaco" simulam FOTO de um buffet fictício (cena de festa em SVG).
+const ARTES = ["foto", "preco", "depo", "espaco", "promo", "data"] as const;
+
+// Cena ilustrada de um buffet infantil fictício (bandeirolas, balões, mesa com bolo)
+// — serve de "foto" de fundo nas artes que usam imagem real. Tudo em SVG: sempre
+// renderiza, sem depender de imagem externa. Sem <defs>/id pra não duplicar ids.
+function CenaBuffet() {
+  return (
+    <div className="absolute inset-0 bg-gradient-to-b from-[#fde68a] via-[#fbcfe8] to-[#c4b5fd]">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 h-full w-full">
+        {/* chão / tapete */}
+        <rect x="0" y="80" width="100" height="20" fill="#7c3aed" opacity="0.2" />
+        {/* bandeirolas */}
+        <path d="M0 12 Q50 22 100 12" stroke="#ffffff" strokeWidth="0.5" fill="none" opacity="0.7" />
+        <path d="M6 13 l5 0 l-2.5 5 z" fill="#ef4444" />
+        <path d="M17 14 l5 0 l-2.5 5 z" fill="#f59e0b" />
+        <path d="M28 15 l5 0 l-2.5 5 z" fill="#22c55e" />
+        <path d="M40 16 l5 0 l-2.5 5 z" fill="#3b82f6" />
+        <path d="M52 16 l5 0 l-2.5 5 z" fill="#a855f7" />
+        <path d="M64 15 l5 0 l-2.5 5 z" fill="#ef4444" />
+        <path d="M75 14 l5 0 l-2.5 5 z" fill="#f59e0b" />
+        <path d="M86 13 l5 0 l-2.5 5 z" fill="#22c55e" />
+        {/* cordões dos balões */}
+        <g stroke="#ffffff" strokeWidth="0.3" opacity="0.9">
+          <line x1="16" y1="30" x2="16" y2="44" />
+          <line x1="26" y1="30" x2="26" y2="44" />
+          <line x1="84" y1="32" x2="84" y2="46" />
+        </g>
+        {/* balões */}
+        <ellipse cx="16" cy="24" rx="6" ry="7.5" fill="#ef4444" />
+        <ellipse cx="26" cy="24" rx="5.5" ry="7" fill="#22c55e" />
+        <ellipse cx="84" cy="26" rx="6" ry="7.5" fill="#f59e0b" />
+        <ellipse cx="90" cy="20" rx="5" ry="6.5" fill="#ec4899" />
+        {/* mesa + bolo + velinha */}
+        <rect x="33" y="70" width="34" height="3.5" rx="1.5" fill="#ffffff" opacity="0.9" />
+        <rect x="44" y="58" width="12" height="12" rx="1.5" fill="#ec4899" />
+        <rect x="46" y="52" width="8" height="6" rx="1" fill="#f9a8d4" />
+        <rect x="49.3" y="47" width="1.4" height="5" fill="#fbbf24" />
+        <circle cx="50" cy="46" r="1.2" fill="#fde047" />
+      </svg>
+    </div>
+  );
+}
 
 // Mini publicação (cabeçalho + arte + ações) — exemplo de arte gerada pelo Postaí.
 function MiniPost({ v }: { v: string }) {
@@ -127,15 +169,28 @@ function MiniPost({ v }: { v: string }) {
             <p className="display text-2xl leading-tight text-white drop-shadow">FELIZ DIA<br />DAS CRIANÇAS!</p>
           </div>
         )}
-        {v === "tour" && (
-          <div className="flex h-full flex-col items-center justify-center bg-[#101010] px-4 text-center">
-            <div className="flex gap-1.5">
-              <span className="h-11 w-11 rounded-full border-2 border-white/80 bg-gradient-to-br from-[#7c3aed] to-[#ec4899]" />
-              <span className="h-11 w-11 rounded-full border-2 border-white/80 bg-gradient-to-br from-[#0ea5e9] to-[#22c55e]" />
-              <span className="h-11 w-11 rounded-full border-2 border-white/80 bg-gradient-to-br from-[#f97316] to-[#ef4444]" />
-              <span className="h-11 w-11 rounded-full border-2 border-white/80 bg-gradient-to-br from-[#a855f7] to-[#ec4899]" />
+        {v === "foto" && (
+          <div className="relative h-full">
+            <CenaBuffet />
+            {/* degradê embaixo pra leitura do título (igual ao template Foto) */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/15 to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 p-4 text-center">
+              <p className="display text-xl leading-tight text-white drop-shadow-lg">A FESTA DOS SONHOS COMEÇA AQUI</p>
+              <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-white/90">
+                <svg viewBox="0 0 24 24" fill="currentColor" className="h-3 w-3"><path d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" /></svg>
+                seu buffet infantil
+              </p>
             </div>
-            <p className="display mt-3 text-lg text-white">CONHEÇA NOSSO ESPAÇO</p>
+          </div>
+        )}
+        {v === "espaco" && (
+          <div className="relative h-full">
+            <CenaBuffet />
+            <div className="absolute inset-0 bg-black/15" />
+            {/* faixa diagonal com o título (igual ao template Faixa) */}
+            <div className="absolute left-1/2 top-1/2 w-[170%] -translate-x-1/2 -translate-y-1/2 -rotate-6 bg-vermelho py-2 text-center shadow-lg">
+              <p className="display text-lg text-white">CONHEÇA NOSSO ESPAÇO</p>
+            </div>
           </div>
         )}
       </div>

@@ -36,7 +36,7 @@ body {
   to { transform: translateY(-50%); }
 }
 .animate-postai-feed {
-  animation: postai-feed 26s linear infinite;
+  animation: postai-feed 34s linear infinite;
   will-change: transform;
 }
 @media (prefers-reduced-motion: reduce) {
