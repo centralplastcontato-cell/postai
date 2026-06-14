@@ -29,6 +29,20 @@ body {
   overflow-x: clip;
 }
 
+/* Feed que rola sozinho no hero da landing (carrossel vertical de publicações).
+   Duplicamos a lista e deslizamos -50% → loop perfeito. mb uniforme em cada card. */
+@keyframes postai-feed {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+.animate-postai-feed {
+  animation: postai-feed 26s linear infinite;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-postai-feed { animation: none; }
+}
+
 /* Títulos: Oswald, caixa alta, condensado */
 .display {
   font-family: var(--font-display);

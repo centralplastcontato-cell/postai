@@ -77,6 +77,78 @@ const FAQ: { p: string; r: string }[] = [
   { p: "Como eu começo?", r: "Clique em Acessar o painel para entrar, ou fale com a gente que colocamos o seu buffet no ar." },
 ];
 
+// Exemplos de publicações que rolam no feed do hero (um por template).
+const ARTES = ["preco", "depo", "promo", "data", "tour"] as const;
+
+// Mini publicação (cabeçalho + arte + ações) — exemplo de arte gerada pelo Postaí.
+function MiniPost({ v }: { v: string }) {
+  return (
+    <div className="mb-4 overflow-hidden rounded-2xl border border-linha bg-preto shadow-lg">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#a78bfa] to-[#ec4899]" />
+        <span className="text-[11px] font-semibold text-white">seu.buffet</span>
+        <span className="ml-auto text-sm leading-none text-muted">•••</span>
+      </div>
+      <div className="relative aspect-square overflow-hidden">
+        {v === "preco" && (
+          <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-[#7c3aed] via-[#9333ea] to-[#ec4899] px-4 text-center">
+            <span className="absolute right-2.5 top-2.5 rounded-full bg-white px-2 py-0.5 text-[9px] font-bold text-[#7c3aed]">ATÉ 30/6</span>
+            <p className="display text-2xl text-white drop-shadow">PACOTE IMPERDÍVEL</p>
+            <div className="mt-2 rounded-xl bg-white/95 px-5 py-2 shadow">
+              <p className="text-[8px] font-bold tracking-wide text-[#7c3aed]">A PARTIR DE</p>
+              <p className="display text-3xl text-[#111827]">R$ 5.990</p>
+            </div>
+            <span className="mt-2.5 rounded-full bg-[#25D366] px-3 py-1 text-[10px] font-bold text-white">CHAMAR NO WHATSAPP</span>
+          </div>
+        )}
+        {v === "depo" && (
+          <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-[#0ea5e9] to-[#6366f1] px-4 text-center">
+            <div className="rounded-2xl bg-white px-4 py-3 shadow-lg">
+              <div className="text-sm tracking-widest text-amber-400">★★★★★</div>
+              <p className="display mt-1 text-lg text-[#111827]">FESTA INESQUECÍVEL!</p>
+              <p className="mt-1 text-[9px] leading-snug text-gray-500">Atendimento nota 10, a criançada amou. Super recomendo!</p>
+              <p className="mt-1.5 text-[10px] font-bold text-[#6366f1]">— Família Souza</p>
+            </div>
+          </div>
+        )}
+        {v === "promo" && (
+          <div className="flex h-full flex-col items-center justify-center bg-gradient-to-br from-[#f97316] to-[#ef4444] px-4 text-center">
+            <p className="display text-5xl leading-none text-white drop-shadow">10</p>
+            <p className="display text-2xl text-white">CRIANÇAS GRÁTIS</p>
+            <p className="mt-1.5 text-[10px] font-semibold text-white/90">Nos pacotes de aniversário</p>
+          </div>
+        )}
+        {v === "data" && (
+          <div className="relative flex h-full flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-[#ec4899] via-[#a855f7] to-[#6366f1] px-4 text-center">
+            <span className="absolute left-4 top-5 h-2 w-2 rounded-full bg-amber-300" />
+            <span className="absolute right-6 top-8 h-1.5 w-1.5 rounded-full bg-white" />
+            <span className="absolute bottom-8 left-8 h-1.5 w-1.5 rounded-full bg-emerald-300" />
+            <span className="absolute bottom-6 right-5 h-2 w-2 rounded-full bg-amber-200" />
+            <p className="display text-2xl leading-tight text-white drop-shadow">FELIZ DIA<br />DAS CRIANÇAS!</p>
+          </div>
+        )}
+        {v === "tour" && (
+          <div className="flex h-full flex-col items-center justify-center bg-[#101010] px-4 text-center">
+            <div className="flex gap-1.5">
+              <span className="h-11 w-11 rounded-full border-2 border-white/80 bg-gradient-to-br from-[#7c3aed] to-[#ec4899]" />
+              <span className="h-11 w-11 rounded-full border-2 border-white/80 bg-gradient-to-br from-[#0ea5e9] to-[#22c55e]" />
+              <span className="h-11 w-11 rounded-full border-2 border-white/80 bg-gradient-to-br from-[#f97316] to-[#ef4444]" />
+              <span className="h-11 w-11 rounded-full border-2 border-white/80 bg-gradient-to-br from-[#a855f7] to-[#ec4899]" />
+            </div>
+            <p className="display mt-3 text-lg text-white">CONHEÇA NOSSO ESPAÇO</p>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-3 px-3 py-2 text-white/85">
+        <svg viewBox="0 0 24 24" fill="#ef4444" className="h-4 w-4"><path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M7.5 8.25h9m-9 3H12m8.25.75c0 4.556-3.694 8.25-8.25 8.25a8.2 8.2 0 0 1-3.59-.82L3 21l1.32-3.96A8.21 8.21 0 0 1 3.75 12c0-4.556 3.694-8.25 8.25-8.25s8.25 3.694 8.25 8.25z" /></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 12 3.27 3.13A59.77 59.77 0 0 1 21.49 12 59.77 59.77 0 0 1 3.27 20.88L6 12zm0 0h7.5" /></svg>
+        <span className="ml-auto text-[9px] font-bold text-[#c7b2ff]">✓ pelo {APP_NAME}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-preto text-white">
@@ -131,49 +203,22 @@ export default function Home() {
             </p>
           </div>
 
-          {/* MOCK de post (exemplo de arte gerada — puro CSS, ícones em SVG) */}
-          <div className="relative mx-auto w-full max-w-sm">
-            <div className="absolute -inset-3 rounded-[2rem] bg-gradient-to-br from-[#7c3aed]/30 to-[#ec4899]/30 blur-2xl" />
-            <div className="relative rounded-[1.6rem] border border-linha bg-preto-card p-3 shadow-2xl">
-              {/* cabeçalho do post */}
-              <div className="flex items-center gap-2.5 px-1 pb-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#a78bfa] to-[#ec4899] text-sm font-bold text-white">B</div>
-                <div className="leading-tight">
-                  <p className="text-sm font-semibold text-white">seu.buffet</p>
-                  <p className="text-[11px] text-muted">Patrocinado</p>
-                </div>
-                <svg viewBox="0 0 24 24" fill="currentColor" className="ml-auto h-5 w-5 text-muted"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
-              </div>
-              {/* arte */}
-              <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-gradient-to-br from-[#7c3aed] via-[#9333ea] to-[#ec4899]">
-                <div className="absolute right-3 top-3 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-[#7c3aed]">ATÉ 30/6</div>
-                <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-                  <p className="display text-3xl text-white drop-shadow">PACOTE IMPERDÍVEL</p>
-                  <div className="mt-3 rounded-2xl bg-white/95 px-6 py-3 shadow-lg">
-                    <p className="text-[10px] font-bold tracking-wide text-[#7c3aed]">A PARTIR DE</p>
-                    <p className="display text-4xl text-[#111827]">R$ 5.990</p>
-                  </div>
-                  <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-4 py-1.5 text-xs font-bold text-white shadow">
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm5.8 14.16c-.24.68-1.42 1.31-1.95 1.35-.5.04-.97.23-3.27-.68-2.77-1.09-4.5-3.93-4.64-4.11-.13-.18-1.1-1.46-1.1-2.79 0-1.33.7-1.98.94-2.25.24-.27.53-.34.71-.34.18 0 .36 0 .51.01.16.01.39-.06.6.46.24.59.81 2.04.88 2.19.07.15.12.32.02.5-.09.18-.14.29-.27.45-.14.15-.29.35-.41.47-.14.13-.28.28-.12.55.16.27.71 1.17 1.53 1.9 1.05.93 1.94 1.22 2.21 1.36.27.13.43.11.59-.07.16-.18.68-.79.86-1.06.18-.27.36-.22.6-.13.24.09 1.55.73 1.81.86.27.13.45.2.51.31.07.11.07.63-.17 1.31z" /></svg>
-                    Chamar no WhatsApp
-                  </div>
-                </div>
-              </div>
-              {/* ações */}
-              <div className="flex items-center gap-4 px-2 pt-3 text-white">
-                <svg viewBox="0 0 24 24" fill="#ef4444" stroke="#ef4444" strokeWidth="1.5" className="h-6 w-6"><path d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M7.5 8.25h9m-9 3H12m8.25.75c0 4.556-3.694 8.25-8.25 8.25a8.2 8.2 0 0 1-3.59-.82L3 21l1.32-3.96A8.21 8.21 0 0 1 3.75 12c0-4.556 3.694-8.25 8.25-8.25s8.25 3.694 8.25 8.25z" /></svg>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M6 12 3.27 3.13A59.77 59.77 0 0 1 21.49 12 59.77 59.77 0 0 1 3.27 20.88L6 12zm0 0h7.5" /></svg>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="ml-auto h-6 w-6"><path d="M17.59 3.32c1.1.13 1.91 1.08 1.91 2.19V21L12 17.25 4.5 21V5.51c0-1.11.81-2.06 1.91-2.19a48.5 48.5 0 0 1 11.18 0z" /></svg>
-              </div>
-              {/* legenda + assinatura do Postaí */}
-              <div className="px-2 pb-1 pt-2">
-                <p className="text-xs leading-relaxed text-muted"><span className="font-semibold text-white">seu.buffet</span> Garanta a festa do seu pequeno com o nosso pacote completo. Datas voando!</p>
-                <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-vermelho/15 px-2 py-0.5 text-[11px] font-semibold text-[#c7b2ff]">
-                  <span className="text-green-400">✓</span> publicado no automático pelo {APP_NAME}
-                </p>
+          {/* MOCK: feed do buffet rolando sozinho (carrossel vertical de publicações) */}
+          <div className="relative mx-auto w-full max-w-[300px]">
+            <div aria-hidden className="pointer-events-none absolute -inset-4 rounded-[2.5rem] bg-gradient-to-br from-[#7c3aed]/25 to-[#ec4899]/25 blur-3xl" />
+            <div className="relative h-[500px] overflow-hidden rounded-[1.8rem] border border-linha bg-preto-card p-3 shadow-2xl">
+              {/* fade no topo e na base, pra dar sensação de feed contínuo */}
+              <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-preto-card to-transparent" />
+              <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-preto-card to-transparent" />
+              <div className="flex flex-col animate-postai-feed hover:[animation-play-state:paused]">
+                {[...ARTES, ...ARTES].map((v, i) => (
+                  <MiniPost key={i} v={v} />
+                ))}
               </div>
             </div>
+            <span className="absolute -bottom-3.5 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-vermelho px-3.5 py-1.5 text-[11px] font-bold text-white shadow-lg shadow-[#7c3aed]/40">
+              ✨ postando no automático
+            </span>
           </div>
         </div>
       </section>
