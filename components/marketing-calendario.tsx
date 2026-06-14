@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useTransition, type ReactNode } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
@@ -164,13 +164,6 @@ export function MarketingCalendario({
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
 
   const selecionado = posts.find((p) => p.id === selId) ?? null;
-
-  // Ao abrir um card (selId muda), rola suave até a tela de edição de slides — assim
-  // clicar no card leva direto pra "tela de edição", igual a entrar pela agenda.
-  const detalheRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (selId) detalheRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [selId]);
 
   // Grade de cards: filtra por dia clicado (se houver) e pagina o resto — mesma cara
   // das Publicações, pra ambas as abas serem iguais.
@@ -384,7 +377,7 @@ export function MarketingCalendario({
   return (
     <div>
       {imgExpandida && (
-        <div onClick={() => setImgExpandida(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+        <div onClick={() => setImgExpandida(null)} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imgExpandida} alt="Slide" className="h-auto max-h-[90vh] w-auto max-w-[90vw] rounded-lg border border-linha" />
           <button onClick={() => setImgExpandida(null)} aria-label="Fechar" className="absolute right-4 top-4 rounded-full bg-preto-card px-3 py-1 text-lg text-white transition hover:bg-vermelho">✕</button>
@@ -589,10 +582,13 @@ export function MarketingCalendario({
         </div>
       )}
 
-      {/* Detalhe do post selecionado (abre ao clicar num card) */}
+      {/* Detalhe do post selecionado — abre num MODAL central (foco na edição). Antes
+          renderizava no fim da página e "descia" lá embaixo no Ver todos os dias. */}
       {selecionado && (
-        <div ref={detalheRef} className="mb-8 scroll-mt-4 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <div onClick={() => onSelId(null)} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/75 p-3 backdrop-blur-sm sm:p-6">
+          <div onClick={(e) => e.stopPropagation()} className="relative my-auto w-full max-w-2xl rounded-xl border border-linha bg-preto-card p-4 shadow-2xl sm:p-5">
+            <button type="button" onClick={() => onSelId(null)} aria-label="Fechar detalhe" className="absolute right-3 top-3 z-10 rounded-full bg-preto px-2.5 py-1 text-lg text-muted transition hover:text-white">✕</button>
+            <div className="flex flex-wrap items-center justify-between gap-3 pr-10">
             <div>
               <p className="text-xs uppercase tracking-wider text-muted">{dataBR(selecionado.data)}</p>
               <h3 className="display text-lg text-white sm:text-xl">{selecionado.titulo}</h3>
@@ -695,6 +691,7 @@ export function MarketingCalendario({
             </form>
           </div>
           {erroPost && <p className="mt-3 rounded-md border border-red-800 bg-red-950/40 p-3 text-sm text-red-300">{erroPost}</p>}
+          </div>
         </div>
       )}
 
