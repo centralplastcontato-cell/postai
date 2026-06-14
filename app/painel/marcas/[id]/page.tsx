@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { sessaoAtual } from "@/lib/auth";
 import { marcaConectada } from "@/lib/instagram";
 import { MarcaHub } from "@/components/marca-hub";
 import { type Post } from "@/components/marketing-calendario";
@@ -20,6 +21,12 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const marca = await prisma.marca.findUnique({ where: { id } });
   if (!marca) notFound();
+
+  // Autorização multi-tenant: o cliente só abre a própria marca; o admin abre qualquer
+  // uma. notFound() (em vez de erro) pra nem revelar que a marca de outro existe.
+  const sessao = await sessaoAtual();
+  if (!sessao) notFound();
+  if (!sessao.admin && marca.usuarioId !== sessao.id) notFound();
 
   const conteudos = await prisma.conteudo.findMany({
     where: { marcaId: id },

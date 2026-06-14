@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
-import { estaLogado } from "@/lib/auth";
+import { guardaMarca, guardaPublicacao } from "@/lib/acesso";
 import { publicarNasRedes, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
@@ -440,7 +440,8 @@ export async function gerarPublicacao(input: {
   modoPreco?: string; // preco: "promo" (De→Por) | "unico" | "apartir"
   hora?: number; // hora do post (BRT) — permite vários posts no mesmo dia em horas diferentes
 }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaMarca(input.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const template = (TEMPLATES as readonly string[]).includes(input.template) ? input.template : "dica";
@@ -505,7 +506,8 @@ export async function editarPublicacao(input: {
   legenda?: string;
   hashtags?: string;
 } & CamposTemplate) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id: input.id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   const template: Template = (TEMPLATES as readonly string[]).includes(p.template) ? (p.template as Template) : "dica";
@@ -547,7 +549,8 @@ export async function editarPublicacao(input: {
 // Reagenda a HORA de um post já criado (mantém o dia, troca só a hora). Permite
 // ajustar o horário de postagens já programadas sem refazer nada.
 export async function reagendarPublicacao(id: string, hora: number) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id }, select: { data: true, marcaId: true, status: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   if (p.status === "postado") return { ok: false as const, erro: "Esse post já foi publicado." };
@@ -560,7 +563,8 @@ export async function reagendarPublicacao(id: string, hora: number) {
 }
 
 export async function regerarPublicacao(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   const template: Template = (TEMPLATES as readonly string[]).includes(p.template) ? (p.template as Template) : "dica";
@@ -628,7 +632,8 @@ export async function regerarPublicacao(id: string) {
 // que o usuário havia fixado — preservando a postada intacta. Vai pra próxima data
 // livre da agenda (reusa gerarPublicacao, que cuida de texto + foto).
 export async function regerarComoNova(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   const template: Template = (TEMPLATES as readonly string[]).includes(p.template) ? (p.template as Template) : "dica";
@@ -673,7 +678,8 @@ export async function regerarComoNova(id: string) {
 // escolhido — pra preencher/variar o campo ANTES de gerar a publicação (template
 // Divulgação). Cada clique traz uma versão nova (temperatura alta).
 export async function sugerirDiferenciais(marcaId: string, tema?: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const key = process.env.OPENAI_API_KEY;
@@ -709,7 +715,8 @@ export async function sugerirDiferenciais(marcaId: string, tema?: string) {
 // regras), a partir da ocasião/assunto — pra servir de INSPIRAÇÃO ao criar promoções.
 // O dono revisa tudo antes de postar (são só ideias, ele ajusta os números/condições).
 export async function sugerirPromocao(marcaId: string, tema?: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const key = process.env.OPENAI_API_KEY;
@@ -750,7 +757,8 @@ export async function sugerirPromocao(marcaId: string, tema?: string) {
 // de partida. NÃO substitui um depoimento real — a ideia é o dono colar o feedback
 // verdadeiro do cliente na hora de postar. Cada clique traz uma variação (temp alta).
 export async function sugerirDepoimento(marcaId: string, destaque?: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const key = process.env.OPENAI_API_KEY;
@@ -788,7 +796,8 @@ export async function sugerirDepoimento(marcaId: string, destaque?: string) {
 }
 
 export async function excluirPublicacao(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id } });
   if (!p) return { ok: false as const, erro: "Não encontrada." };
   await prisma.publicacao.delete({ where: { id } });
@@ -797,7 +806,8 @@ export async function excluirPublicacao(id: string) {
 }
 
 export async function gerarImagemPublicacao(input: { id: string; descricao?: string }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id: input.id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   const key = process.env.OPENAI_API_KEY;
@@ -837,7 +847,8 @@ export async function gerarImagemPublicacao(input: { id: string; descricao?: str
 }
 
 export async function definirImagemPublicacao(input: { id: string; url: string }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id: input.id } });
   if (!p) return { ok: false as const, erro: "Não encontrada." };
   await prisma.publicacao.update({ where: { id: input.id }, data: { imagemUrl: input.url } });
@@ -846,7 +857,8 @@ export async function definirImagemPublicacao(input: { id: string; url: string }
 }
 
 export async function removerImagemPublicacao(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id } });
   if (!p) return { ok: false as const, erro: "Não encontrada." };
   await prisma.publicacao.update({ where: { id }, data: { imagemUrl: null } });
@@ -856,7 +868,8 @@ export async function removerImagemPublicacao(id: string) {
 
 // Marca/desmarca "✓ Aprovado" — revisão INTERNA do dono (não vai pra rede social).
 export async function alternarAprovacao(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id }, select: { aprovado: true, marcaId: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   await prisma.publicacao.update({ where: { id }, data: { aprovado: !p.aprovado } });
@@ -865,7 +878,8 @@ export async function alternarAprovacao(id: string) {
 }
 
 export async function postarPublicacao(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   if (p.status === "postado") return { ok: false as const, erro: "Essa publicação já foi postada." };

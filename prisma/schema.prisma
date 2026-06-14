@@ -38,9 +38,16 @@ model Marca {
   ativa       Boolean  @default(true)
   criadoEm    DateTime @default(now())
 
+  // Dono (cliente) da marca — null = sem dono, só o admin vê. Multi-tenant: cada
+  // cliente entra e vê SÓ as marcas dele; o admin (você) vê todas.
+  usuarioId   String?
+  usuario     Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
   conteudos   Conteudo[]
   publicacoes Publicacao[]
   imagens     ImagemMarca[]
+
+  @@index([usuarioId])
 }
 
 // Banco de fotos REAIS do negócio (ex: espaço, brinquedos, festas do buffet).
@@ -108,6 +115,8 @@ model Usuario {
   senhaHash String
   admin     Boolean  @default(false)
   criadoEm  DateTime @default(now())
+
+  marcas    Marca[] // marcas que este usuário (cliente) administra
 }
 
 // Log de ações ("Postaí postou X pra marca Y") — feed de atividade do painel.

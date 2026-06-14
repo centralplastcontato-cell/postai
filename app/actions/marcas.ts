@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { estaLogado } from "@/lib/auth";
+import { guardaMarca, exigirAdmin } from "@/lib/acesso";
 import { listarPaginas } from "@/lib/facebook";
 
 function slugify(s: string): string {
@@ -28,7 +29,8 @@ async function slugUnico(base: string): Promise<string> {
 
 // Cria uma marca nova (mínimo: nome). Redireciona pra tela dela.
 export async function criarMarca(formData: FormData) {
-  if (!(await estaLogado())) return;
+  const g = await exigirAdmin(); // só o admin cria marcas (e depois atribui ao cliente)
+  if (!g.ok) return;
   const nome = String(formData.get("nome") || "").trim();
   if (!nome) return;
   const slug = await slugUnico(nome);
@@ -61,7 +63,8 @@ type DadosMarca = {
 };
 
 export async function salvarMarca(input: DadosMarca) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaMarca(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const { id, ...resto } = input;
   const data: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(resto)) {
@@ -74,7 +77,8 @@ export async function salvarMarca(input: DadosMarca) {
 }
 
 export async function excluirMarca(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await exigirAdmin(); // excluir marca é ação destrutiva — só admin
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   await prisma.marca.delete({ where: { id } });
   revalidatePath("/painel");
   return { ok: true as const };

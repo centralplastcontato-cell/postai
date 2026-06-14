@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
-import { estaLogado } from "@/lib/auth";
+import { guardaMarca, guardaConteudo } from "@/lib/acesso";
 import { publicarNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
@@ -167,7 +167,8 @@ export async function gerarCarrossel(input: {
   corFundo?: string; // cor de fundo da capa (ou vazio = automático)
   hora?: number; // hora do post (BRT) — permite vários posts no mesmo dia em horas diferentes
 }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaMarca(input.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const tema = input.tema?.trim();
@@ -222,7 +223,8 @@ export async function criarAniversariantes(input: {
   semana?: string;
   aniversariantes: { nome: string; idade?: string; fotoUrl: string }[];
 }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaMarca(input.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
 
@@ -267,7 +269,8 @@ export async function criarAniversariantes(input: {
 // outros slides nem no texto. Reaproveita aplicarEstiloCapa, que só altera o slide 0
 // (mantém título/texto da capa; re-sorteia fotos no mosaico/foto/faixa).
 export async function trocarCapaCarrossel(input: { id: string; estiloCapa: string; corFundo?: string }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await prisma.conteudo.findUnique({ where: { id: input.id }, include: { marca: true } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   const slides = lerSlides(c.slidesTexto);
@@ -281,7 +284,8 @@ export async function trocarCapaCarrossel(input: { id: string; estiloCapa: strin
 // Muda só a HORA de um carrossel já programado (mantém o dia). Bloqueia se já postado.
 // Permite o dono espalhar vários posts do mesmo dia em horários diferentes pelo card.
 export async function reagendarCarrossel(id: string, hora: number) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await prisma.conteudo.findUnique({ where: { id }, select: { data: true, marcaId: true, status: true } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   if (c.status === "postado") return { ok: false as const, erro: "Esse carrossel já foi publicado." };
@@ -294,7 +298,8 @@ export async function reagendarCarrossel(id: string, hora: number) {
 }
 
 export async function regerarCarrossel(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const atual = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
   if (!atual?.tema) return { ok: false as const, erro: "Esse carrossel não foi gerado por IA." };
   const nSlides = (() => {
@@ -337,7 +342,8 @@ export async function regerarCarrossel(id: string) {
 // NOVO carrossel ao lado — mesmo tema, nº de slides e capa-mosaico — em HOJE (data
 // BRT), preservando o postado. Reusa gerarCarrossel (texto + fotos).
 export async function regerarCarrosselComoNova(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const atual = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
   if (!atual?.tema) return { ok: false as const, erro: "Esse carrossel não foi gerado por IA." };
   let nSlides = 7;
@@ -351,7 +357,8 @@ export async function regerarCarrosselComoNova(id: string) {
 
 // Marca/desmarca "✓ Aprovado" do carrossel — revisão INTERNA (não vai pra rede).
 export async function alternarAprovacaoCarrossel(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await prisma.conteudo.findUnique({ where: { id }, select: { aprovado: true, marcaId: true } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   await prisma.conteudo.update({ where: { id }, data: { aprovado: !c.aprovado } });
@@ -360,7 +367,8 @@ export async function alternarAprovacaoCarrossel(id: string) {
 }
 
 export async function sugerirTemas(marcaId: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const key = process.env.OPENAI_API_KEY;
@@ -405,7 +413,8 @@ export async function sugerirTemas(marcaId: string) {
 }
 
 export async function postarInstagram(id: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   if (c.status === "postado") return { ok: false as const, erro: "Esse carrossel já foi postado." };
@@ -441,7 +450,8 @@ function lerSlides(slidesTexto: string | null): SlideTexto[] | null {
 }
 
 export async function gerarImagemSlide(input: { id: string; indice: number; descricao?: string }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await prisma.conteudo.findUnique({ where: { id: input.id }, include: { marca: true } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   const slides = lerSlides(c.slidesTexto);
@@ -459,7 +469,8 @@ export async function gerarImagemSlide(input: { id: string; indice: number; desc
 }
 
 export async function definirImagemSlide(input: { id: string; indice: number; url: string }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await prisma.conteudo.findUnique({ where: { id: input.id } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   const slides = lerSlides(c.slidesTexto);
@@ -471,7 +482,8 @@ export async function definirImagemSlide(input: { id: string; indice: number; ur
 }
 
 export async function removerImagemSlide(input: { id: string; indice: number }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await prisma.conteudo.findUnique({ where: { id: input.id } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   const slides = lerSlides(c.slidesTexto);
@@ -485,7 +497,8 @@ export async function removerImagemSlide(input: { id: string; indice: number }) 
 }
 
 export async function regerarSlide(input: { id: string; indice: number }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await guardaConteudo(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await prisma.conteudo.findUnique({ where: { id: input.id }, include: { marca: true } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   const slides = lerSlides(c.slidesTexto);
@@ -527,8 +540,9 @@ export async function regerarSlide(input: { id: string; indice: number }) {
 }
 
 export async function marcarConteudo(formData: FormData) {
-  if (!(await estaLogado())) return;
   const id = String(formData.get("id") || "");
+  const g = await guardaConteudo(id);
+  if (!g.ok) return;
   const status = String(formData.get("status") || "");
   const c = await prisma.conteudo.findUnique({ where: { id } });
   if (!c) return;

@@ -1,46 +1,72 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { criarMarca } from "@/app/actions/marcas";
 import { marcaConectada } from "@/lib/instagram";
+import { sessaoAtual } from "@/lib/auth";
+import { filtroMarcaVisivel } from "@/lib/acesso";
 
 export const dynamic = "force-dynamic";
 
 export default async function PainelHome() {
+  const s = await sessaoAtual();
+  if (!s) redirect("/login");
+
+  // Admin vê todas as marcas; cliente vê só as dele (filtroMarcaVisivel).
   const marcas = await prisma.marca.findMany({
+    where: filtroMarcaVisivel(s),
     orderBy: { criadoEm: "asc" },
     include: { _count: { select: { conteudos: true, publicacoes: true } } },
   });
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
-      <h1 className="display text-3xl text-white">Marcas</h1>
-      <p className="mt-1 text-sm text-muted">
-        Cada marca posta no seu próprio Instagram. Crie uma e conecte a conta.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="display text-3xl text-white">{s.admin ? "Marcas" : "Suas marcas"}</h1>
+          <p className="mt-1 text-sm text-muted">
+            {s.admin
+              ? "Cada marca posta no seu próprio Instagram. Crie uma e conecte a conta."
+              : "A sua marca posta sozinha no Instagram e Facebook. Abra pra ver e aprovar os posts."}
+          </p>
+        </div>
+        {s.admin && (
+          <Link
+            href="/painel/usuarios"
+            className="flex items-center gap-1.5 rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho"
+          >
+            👥 Clientes
+          </Link>
+        )}
+      </div>
 
-      {/* Nova marca */}
-      <form
-        action={criarMarca}
-        className="mt-6 flex flex-col gap-3 rounded-xl border border-linha bg-preto-card p-4 sm:flex-row sm:items-end"
-      >
-        <label className="flex-1 text-xs text-muted">
-          Nome da marca
-          <input
-            name="nome"
-            required
-            placeholder="Ex: Castelo da Diversão"
-            className="input-base"
-          />
-        </label>
-        <button className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover">
-          + Criar marca
-        </button>
-      </form>
+      {/* Nova marca — só admin cria (e depois atribui ao cliente) */}
+      {s.admin && (
+        <form
+          action={criarMarca}
+          className="mt-6 flex flex-col gap-3 rounded-xl border border-linha bg-preto-card p-4 sm:flex-row sm:items-end"
+        >
+          <label className="flex-1 text-xs text-muted">
+            Nome da marca
+            <input
+              name="nome"
+              required
+              placeholder="Ex: Castelo da Diversão"
+              className="input-base"
+            />
+          </label>
+          <button className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover">
+            + Criar marca
+          </button>
+        </form>
+      )}
 
       {/* Lista */}
       {marcas.length === 0 ? (
         <p className="mt-8 rounded-xl border border-dashed border-linha bg-preto-card p-8 text-center text-sm text-muted">
-          Nenhuma marca ainda. Crie a primeira acima (ex: Castelo da Diversão).
+          {s.admin
+            ? "Nenhuma marca ainda. Crie a primeira acima (ex: Castelo da Diversão)."
+            : "Nenhuma marca atribuída a você ainda. Fale com o suporte."}
         </p>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

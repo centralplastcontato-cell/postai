@@ -14,7 +14,7 @@ export default async function PainelLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <PainelHeader nome={s.nome} />
+      <PainelHeader nome={s.nome} admin={s.admin} />
       <main className="flex-1">{children}</main>
     </div>
   );

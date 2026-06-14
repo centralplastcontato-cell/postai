@@ -6,7 +6,7 @@ import { APP_NAME } from "@/lib/config";
 
 // Cabeçalho horizontal fino do painel (substituiu a sidebar lateral, que gastava
 // largura à toa com um único item). Libera a área útil inteira pro conteúdo.
-export function PainelHeader({ nome }: { nome: string }) {
+export function PainelHeader({ nome, admin }: { nome: string; admin?: boolean }) {
   return (
     <header className="flex items-center justify-between gap-3 border-b border-linha bg-preto-card px-4 py-2.5">
       <div className="flex items-center gap-2 sm:gap-4">
@@ -22,6 +22,16 @@ export function PainelHeader({ nome }: { nome: string }) {
           <span>🏷️</span>
           <span>Marcas</span>
         </Link>
+        {admin && (
+          <Link
+            href="/painel/usuarios"
+            title="Clientes"
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
+          >
+            <span>👥</span>
+            <span>Clientes</span>
+          </Link>
+        )}
       </div>
 
       <div className="flex items-center gap-3">
