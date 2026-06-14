@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { entrar } from "@/app/actions/admin";
 import { APP_NAME } from "@/lib/config";
@@ -14,6 +15,12 @@ export default function LoginPage() {
         action={action}
         className="w-full max-w-sm rounded-2xl border border-linha bg-preto-card p-8"
       >
+        <Link
+          href="/"
+          className="mb-5 inline-flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-white"
+        >
+          ← Voltar ao site
+        </Link>
         <h1 className="display text-3xl text-white">
           {APP_NAME}
           <span className="text-vermelho">.</span>
