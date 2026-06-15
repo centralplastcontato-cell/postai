@@ -38,6 +38,8 @@ export type Sessao = {
   id: string;
   nome: string;
   admin: boolean;
+  plano?: string | null; // pacote do cliente (admin não usa)
+  acessoAte?: Date | null; // validade do acesso do cliente
 };
 
 const SESSAO_MASTER: Sessao = { id: MASTER, nome: "Admin", admin: true };
@@ -82,7 +84,7 @@ export async function sessaoAtual(): Promise<Sessao | null> {
   try {
     const u = await prisma.usuario.findUnique({ where: { id: val } });
     if (!u) return null;
-    return { id: u.id, nome: u.nome, admin: u.admin };
+    return { id: u.id, nome: u.nome, admin: u.admin, plano: u.plano, acessoAte: u.acessoAte };
   } catch {
     return null;
   }

@@ -120,11 +120,13 @@ model Publicacao {
 
 // Operadores do painel (admin mestre via ADMIN_SENHA; usuários extras opcionais).
 model Usuario {
-  id        String   @id @default(cuid())
-  nome      String   @unique
+  id        String    @id @default(cuid())
+  nome      String    @unique
   senhaHash String
-  admin     Boolean  @default(false)
-  criadoEm  DateTime @default(now())
+  admin     Boolean   @default(false)
+  plano     String? // pacote do cliente: essencial | profissional | turbo (null = não definido)
+  acessoAte DateTime? // validade do acesso do cliente (null = sem restrição; admin ignora)
+  criadoEm  DateTime  @default(now())
 
   marcas    Marca[] // marcas que este usuário (cliente) administra
 }
