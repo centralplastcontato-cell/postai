@@ -9,7 +9,9 @@ import {
   reagendarPublicacao,
   alternarAprovacao,
   excluirPublicacao,
+  sugerirPromocao,
 } from "@/app/actions/feed";
+import { sugerirTemas } from "@/app/actions/marketing";
 import { type Template } from "@/lib/feed-templates";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { ConfirmDialog } from "./confirm-dialog";
@@ -22,6 +24,18 @@ const TEMPLATES_STORY: { v: string; nome: string; oferta?: boolean }[] = [
   { v: "divulgacao", nome: "🏆 Divulgação" },
   { v: "data-comemorativa", nome: "🎈 Data comemorativa" },
   { v: "dica", nome: "💡 Dica" },
+];
+
+// Temas prontos pra Story (clique preenche o campo Tema). Curtos, com urgência/novidade
+// — o que funciona bem no Story de um buffet infantil.
+const MODELOS_STORY: { rotulo: string; tema: string }[] = [
+  { rotulo: "🔥 Última vaga", tema: "a última data disponível do mês pra fechar a festa agora" },
+  { rotulo: "⚡ Promo relâmpago", tema: "uma promoção relâmpago válida só hoje pra fechar a festa" },
+  { rotulo: "📸 Bastidor da festa", tema: "o clima/bastidor de uma festa acontecendo no nosso espaço" },
+  { rotulo: "⏰ Agenda enchendo", tema: "aviso de que as datas estão acabando, corra pra garantir a sua" },
+  { rotulo: "🎈 Novidade do espaço", tema: "uma novidade ou atração nova do nosso buffet" },
+  { rotulo: "💬 Chama no WhatsApp", tema: "convite direto pra chamar no WhatsApp e tirar dúvidas da festa" },
+  { rotulo: "📋 Dica rápida", tema: "uma dica rápida e útil pra quem vai organizar uma festa infantil" },
 ];
 
 function dataBR(iso: string): string {
@@ -76,6 +90,9 @@ export function StoriesAba({
   const [excluirAlvo, setExcluirAlvo] = useState<PublicacaoView | null>(null);
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
+  const [temasIA, setTemasIA] = useState<string[]>([]);
+  const [sugerindo, setSugerindo] = useState(false);
+  const [sugerindoOferta, setSugerindoOferta] = useState(false);
 
   const ehPromo = TEMPLATES_STORY.find((t) => t.v === template)?.oferta;
   const filtrados = dataAlvo ? stories.filter((s) => chaveDiaSP(s.data) === dataAlvo) : stories;
@@ -110,6 +127,28 @@ export function StoriesAba({
     });
   }
 
+  function handleSugerirTemas() {
+    setErro(null);
+    setSugerindo(true);
+    startTransition(async () => {
+      const r = await sugerirTemas(marcaId);
+      if (r.ok) setTemasIA(r.temas);
+      else setErro(r.erro);
+      setSugerindo(false);
+    });
+  }
+  function handleSugerirOferta() {
+    setErro(null);
+    setSugerindoOferta(true);
+    startTransition(async () => {
+      const r = await sugerirPromocao(marcaId, tema);
+      if (r.ok) {
+        setOferta(r.oferta);
+        setValidade(r.validade);
+      } else setErro(r.erro);
+      setSugerindoOferta(false);
+    });
+  }
   function handleReagendar(id: string, h: number) {
     setErro(null);
     setProc(id);
@@ -186,6 +225,14 @@ export function StoriesAba({
             </button>
           ))}
         </div>
+        <div className="mt-3">
+          <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Temas prontos (clique pra preencher)</p>
+          <div className="flex flex-wrap gap-2">
+            {MODELOS_STORY.map((m) => (
+              <button key={m.rotulo} type="button" onClick={() => setTema(m.tema)} className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">{m.rotulo}</button>
+            ))}
+          </div>
+        </div>
         <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-end">
           <label className="flex-1 text-xs text-muted">
             Tema
@@ -208,17 +255,34 @@ export function StoriesAba({
           </button>
         </div>
         {ehPromo && (
-          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-            <label className="flex-1 text-xs text-muted">
-              Oferta em destaque <span className="text-muted/70">(opcional)</span>
-              <input value={oferta} onChange={(e) => setOferta(e.target.value)} placeholder="Ex: 10 CRIANÇAS GRÁTIS" className="input-base" />
-            </label>
-            <label className="flex-1 text-xs text-muted">
-              Validade <span className="text-muted/70">(opcional)</span>
-              <input value={validade} onChange={(e) => setValidade(e.target.value)} placeholder="Ex: 30/06" className="input-base" />
-            </label>
+          <div className="mt-3">
+            <button type="button" onClick={handleSugerirOferta} disabled={sugerindoOferta} className="mb-2 flex items-center gap-1 text-xs uppercase tracking-wider text-amber-300 transition hover:text-amber-200 disabled:opacity-50">
+              {sugerindoOferta ? "✨ Pensando…" : "✨ Sugerir oferta com IA"}
+            </button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <label className="flex-1 text-xs text-muted">
+                Oferta em destaque <span className="text-muted/70">(opcional)</span>
+                <input value={oferta} onChange={(e) => setOferta(e.target.value)} placeholder="Ex: 10 CRIANÇAS GRÁTIS" className="input-base" />
+              </label>
+              <label className="flex-1 text-xs text-muted">
+                Validade <span className="text-muted/70">(opcional)</span>
+                <input value={validade} onChange={(e) => setValidade(e.target.value)} placeholder="Ex: 30/06" className="input-base" />
+              </label>
+            </div>
           </div>
         )}
+        <div className="mt-3">
+          <button type="button" onClick={handleSugerirTemas} disabled={sugerindo} className="flex items-center gap-1 text-xs uppercase tracking-wider text-amber-300 transition hover:text-amber-200 disabled:opacity-50">
+            {sugerindo ? "💡 Pensando…" : "💡 Sugerir temas com IA"}
+          </button>
+          {temasIA.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {temasIA.map((t) => (
+                <button key={t} type="button" onClick={() => setTema(t)} className="rounded-full border border-amber-500/40 bg-amber-500/5 px-3 py-1 text-xs text-amber-200 transition hover:border-amber-400 hover:text-white">{t}</button>
+              ))}
+            </div>
+          )}
+        </div>
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
         <p className="mt-2 text-[11px] text-muted">O Story some sozinho em 24h no Instagram — perfeito pra novidades e urgência.</p>
       </div>
