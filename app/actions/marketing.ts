@@ -7,6 +7,8 @@ import { guardaMarca, guardaConteudo } from "@/lib/acesso";
 import { publicarNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
+import { rotuloPlano } from "@/lib/plano";
+import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
 import type { Marca } from "@prisma/client";
 
@@ -175,6 +177,16 @@ export async function gerarCarrossel(input: {
   if (!tema) return { ok: false as const, erro: "Informe um tema." };
   const nSlides = Math.min(10, Math.max(4, input.nSlides ?? 7));
 
+  // Dia/hora + limite de feed/dia do pacote do dono (carrossel conta junto com o feed).
+  // Validado ANTES da IA pra não gastar geração. Marca sem dono/plano (admin) = sem limite.
+  const horaC = String(typeof input.hora === "number" ? input.hora : (marca.horaCarrossel ?? 10)).padStart(2, "0");
+  const data = new Date(`${input.data}T${horaC}:00:00-03:00`);
+  const plano = await planoDaMarca(marca.id);
+  if (plano) {
+    const lim = await checarLimiteFeed(marca.id, data, plano);
+    if (lim.bloqueia) return { ok: false as const, erro: `O pacote ${rotuloPlano(plano)} permite ${lim.limite} post${lim.limite > 1 ? "s" : ""} de feed por dia — esse dia já tem ${lim.jaTem}. Escolha outro dia.` };
+  }
+
   let gerado: Gerado;
   try {
     gerado = await gerarConteudo(marca, tema, nSlides);
@@ -183,8 +195,6 @@ export async function gerarCarrossel(input: {
     return { ok: false as const, erro: "Não consegui gerar agora. Confira a chave da OpenAI." };
   }
 
-  const horaC = String(typeof input.hora === "number" ? input.hora : (marca.horaCarrossel ?? 10)).padStart(2, "0");
-  const data = new Date(`${input.data}T${horaC}:00:00-03:00`);
   const slug = `${marca.slug}-${slugify(tema)}-${Date.now().toString(36).slice(-4)}`;
   const criado = await prisma.conteudo.create({
     data: {

@@ -8,6 +8,8 @@ import { publicarNasRedes, publicarStoryNasRedes, marcaConectada } from "@/lib/i
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
+import { planoTemStory, rotuloPlano } from "@/lib/plano";
+import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import type { Marca } from "@prisma/client";
@@ -505,6 +507,25 @@ export async function gerarPublicacao(input: {
   if (template === "preco" && !input.precoPor?.trim()) return { ok: false as const, erro: "Informe ao menos o preço da oferta (Por R$)." };
   const travas = montarTravas(template, input);
 
+  // Dia/hora do post (computado ANTES da IA pra já validar os limites do pacote sem gastar
+  // geração à toa).
+  const horaFeed = typeof input.hora === "number" ? input.hora : marca.horaPost;
+  const data = input.data
+    ? new Date(`${input.data}T${String(horaFeed).padStart(2, "0")}:00:00-03:00`)
+    : await proximaDataFeed(marca);
+
+  // Limites do PACOTE do dono (só marca de cliente com plano; admin não tem limite):
+  // Story a partir do Profissional; feed limitado por dia.
+  const ehStory = input.formato === "story";
+  const plano = await planoDaMarca(marca.id);
+  if (plano && ehStory && !planoTemStory(plano)) {
+    return { ok: false as const, erro: "O Story está disponível a partir do pacote Profissional. Faça upgrade pra liberar." };
+  }
+  if (plano && !ehStory) {
+    const lim = await checarLimiteFeed(marca.id, data, plano);
+    if (lim.bloqueia) return { ok: false as const, erro: `O pacote ${rotuloPlano(plano)} permite ${lim.limite} post${lim.limite > 1 ? "s" : ""} de feed por dia — esse dia já tem ${lim.jaTem}. Escolha outro dia.` };
+  }
+
   let gerado: Gerado;
   try {
     gerado = await gerarTexto(marca, template, input.tema, travas);
@@ -513,10 +534,6 @@ export async function gerarPublicacao(input: {
     const msg = e instanceof ErroOpenAI ? e.message : "Não consegui gerar agora. Tente de novo em instantes.";
     return { ok: false as const, erro: msg };
   }
-  const horaFeed = typeof input.hora === "number" ? input.hora : marca.horaPost;
-  const data = input.data
-    ? new Date(`${input.data}T${String(horaFeed).padStart(2, "0")}:00:00-03:00`)
-    : await proximaDataFeed(marca);
   const slug = `${marca.slug}-${template}-${slugify(gerado.titulo || template)}-${Date.now().toString(36).slice(-4)}`;
   const criado = await prisma.publicacao.create({
     data: {
