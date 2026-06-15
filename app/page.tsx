@@ -8,9 +8,8 @@ export const metadata: Metadata = {
     "O Postaí cria e publica sozinho os posts do seu buffet infantil no Instagram e no Facebook: pacotes, promoções, depoimentos de famílias e datas comemorativas — no tom da sua festa, todos os dias.",
 };
 
-// Contato de vendas (modo concierge). Troque por um link de WhatsApp quando quiser:
-// const CONTATO = "https://wa.me/55SEUNUMERO";
-const CONTATO = "mailto:centralplast.contato@gmail.com?subject=Quero%20o%20Postai%20no%20meu%20buffet%20infantil";
+// Contato de vendas (modo concierge) — WhatsApp do Postaí (15 98112-1710).
+const CONTATO = "https://wa.me/5515981121710?text=Oi!%20Quero%20o%20Postai%20no%20meu%20buffet%20infantil";
 
 const PASSOS: { n: string; titulo: string; texto: string }[] = [
   {
@@ -50,21 +49,24 @@ const TEMPLATES: { emoji: string; nome: string }[] = [
   { emoji: "🪟", nome: "Capas especiais" },
 ];
 
-const PLANOS: { nome: string; posts: string; destaque?: boolean; itens: string[] }[] = [
+const PLANOS: { nome: string; posts: string; preco: string; destaque?: boolean; itens: string[] }[] = [
   {
     nome: "Essencial",
     posts: "1 post por dia",
+    preco: "97",
     itens: ["Seu buffet sempre ativo no feed", "Carrosséis e posts com IA", "Instagram + Facebook", "Piloto automático"],
   },
   {
     nome: "Profissional",
     posts: "2 posts por dia",
+    preco: "197",
     destaque: true,
     itens: ["Presença forte na temporada de festas", "Todos os modelos de arte", "Horários diferentes no mesmo dia", "Aprovação e edição fácil"],
   },
   {
     nome: "Turbo",
     posts: "3 posts por dia",
+    preco: "347",
     itens: ["Máximo de alcance e reservas", "Mais conteúdo, mais festas fechadas", "Prioridade nas datas quentes", "Suporte prioritário"],
   },
 ];
@@ -347,7 +349,7 @@ export default function Home() {
               )}
               <h3 className="display text-2xl text-white">{pl.nome}</h3>
               <p className="mt-1 text-sm font-semibold text-vermelho">{pl.posts}</p>
-              <p className="mt-4 text-3xl font-bold text-white">Sob consulta</p>
+              <p className="mt-4 text-3xl font-bold text-white">R$ {pl.preco}<span className="ml-1 text-base font-medium text-muted">/mês</span></p>
               <ul className="mt-5 flex-1 space-y-2.5 text-sm text-muted">
                 {pl.itens.map((i) => (
                   <li key={i} className="flex items-start gap-2">
