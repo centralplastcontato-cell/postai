@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
+import { fotoSegura, fotosSeguras } from "@/lib/foto-arte";
 import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, LayoutCapaMoldura, LayoutCapaFaixa, LayoutFeedback, LayoutPreco, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
@@ -43,6 +44,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     textoApoio: p.texto || "",
   };
 
+  // Normaliza a foto pra um formato que o next/og aceita (PNG/JPEG) — senão webp/avif
+  // do banco quebram o render. Feito uma vez e reusado pelos templates com foto.
+  const fotoUrl = await fotoSegura(p.imagemUrl);
+
   if (p.template === "promocao") {
     return new ImageResponse(
       LayoutPromocao({ ...base, oferta: extra.oferta, validade: extra.validade, inclui: extra.inclui, regras: extra.regras, corFundo: extra.corFundo }),
@@ -52,7 +57,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   if (p.template === "data-comemorativa") {
     return new ImageResponse(
-      LayoutDataComemorativa({ ...base, selo: extra.selo, corFundo: extra.corFundo, imagemUrl: p.imagemUrl || undefined }),
+      LayoutDataComemorativa({ ...base, selo: extra.selo, corFundo: extra.corFundo, imagemUrl: fotoUrl }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
@@ -66,7 +71,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   if (p.template === "mosaico") {
     return new ImageResponse(
-      LayoutMosaico({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, fotos: extra.fotos }),
+      LayoutMosaico({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, fotos: await fotosSeguras(extra.fotos) }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
@@ -80,14 +85,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   if (p.template === "faixa") {
     return new ImageResponse(
-      LayoutCapaFaixa({ ...base, corFundo: extra.corFundo, imagemUrl: p.imagemUrl || undefined }),
+      LayoutCapaFaixa({ ...base, corFundo: extra.corFundo, imagemUrl: fotoUrl }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
 
   if (p.template === "feedback") {
     return new ImageResponse(
-      LayoutFeedback({ ...base, titulo: [], imagemUrl: p.imagemUrl || undefined, depoimento: extra.depoimento, autor: extra.autor, estrelas: extra.estrelas, destaque: extra.destaque, corCard: extra.corCard }),
+      LayoutFeedback({ ...base, titulo: [], imagemUrl: fotoUrl, depoimento: extra.depoimento, autor: extra.autor, estrelas: extra.estrelas, destaque: extra.destaque, corCard: extra.corCard }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
@@ -101,7 +106,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   // dica e templates legados: foto de IA (ou cor sólida se ainda não tem foto)
   return new ImageResponse(
-    LayoutFoto({ ...base, imagemUrl: p.imagemUrl || undefined }),
+    LayoutFoto({ ...base, imagemUrl: fotoUrl }),
     { width: 1080, height: 1350, fonts, headers: CACHE }
   );
 }

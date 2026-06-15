@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
+import { fotoSegura, fotosSeguras } from "@/lib/foto-arte";
 import { LayoutAnivCapa, LayoutAnivCard, LayoutMosaico, LayoutCapaFestiva, LayoutCapaFoto, LayoutCapaMoldura, LayoutCapaFaixa } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
@@ -42,6 +43,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     }
   } catch {}
 
+  // Normaliza a foto do slide pra PNG/JPEG (o next/og não aceita webp/avif do banco).
+  const fotoSlide = await fotoSegura(slide.imagemUrl);
+
   // Capa em Mosaico: 4 fotos reais do banco em círculos, com a cara da marca.
   if (slide.tipo === "mosaico") {
     const fonts = carregarFontes();
@@ -52,7 +56,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       telefone,
       titulo: montarTituloColorido(slide.titulo || "Conheça nosso espaço", paleta),
       oferta: slide.texto || undefined,
-      fotos: slide.fotos,
+      fotos: await fotosSeguras(slide.fotos),
       corFundo: slide.corFundo,
       arraste: true,
     });
@@ -70,7 +74,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       telefone,
       titulo: montarTituloColorido(slide.titulo || "Conheça nosso espaço", paleta),
       textoApoio: slide.texto || undefined,
-      imagemUrl: slide.imagemUrl,
+      imagemUrl: fotoSlide,
       corFundo: slide.corFundo,
       arraste: true,
     };
@@ -92,7 +96,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     const el =
       slide.tipo === "aniv-capa"
         ? LayoutAnivCapa({ ...dados, textoApoio: slide.texto })
-        : LayoutAnivCard({ ...dados, nome: slide.titulo, idade: slide.texto, fotoUrl: slide.imagemUrl });
+        : LayoutAnivCard({ ...dados, nome: slide.titulo, idade: slide.texto, fotoUrl: fotoSlide });
     return new ImageResponse(el, { width: 1080, height: 1350, fonts, headers: CACHE });
   }
 
@@ -114,13 +118,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     );
 
   // Slide com foto de fundo: texto ancorado embaixo, gradiente forte só na base.
-  if (slide.imagemUrl) {
+  if (fotoSlide) {
     const sombra = "0 2px 12px rgba(0,0,0,0.6)";
     return new ImageResponse(
       (
         <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={slide.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
+          <img src={fotoSlide} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
           <div
             style={{
               position: "absolute",

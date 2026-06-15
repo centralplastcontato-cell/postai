@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
+import { fotoSegura } from "@/lib/foto-arte";
 import { LayoutStory, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
@@ -44,8 +45,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     textoApoio: p.texto || "",
   };
 
+  const imagemUrl = await fotoSegura(p.imagemUrl);
   return new ImageResponse(
-    LayoutStory({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, imagemUrl: p.imagemUrl || undefined, variante: extra.estiloStory }),
+    LayoutStory({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, imagemUrl, variante: extra.estiloStory }),
     { width: 1080, height: 1920, fonts, headers: CACHE }
   );
 }

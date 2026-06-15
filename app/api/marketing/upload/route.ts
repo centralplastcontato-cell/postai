@@ -70,11 +70,28 @@ export async function POST(req: Request) {
       }
     }
 
-    // Demais imagens: vão pro Vercel Blob normalmente.
-    const nome = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const blob = await put(`upload/${Date.now()}-${nome}`, file, {
+    // Demais imagens (fotos do banco/posts): NORMALIZA pra JPEG. O renderizador das
+    // artes (next/og) só aceita PNG/JPEG — webp/avif/heic quebrariam o render. Também
+    // redimensiona pra não guardar arquivos gigantes (e fica leve pra postar na Meta).
+    const bruto = Buffer.from(await file.arrayBuffer());
+    let saida: Buffer = bruto;
+    let contentType = file.type || "image/png";
+    let ext = (file.name.split(".").pop() || "png").toLowerCase();
+    try {
+      saida = await sharp(bruto)
+        .rotate() // respeita a orientação EXIF
+        .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+      contentType = "image/jpeg";
+      ext = "jpg";
+    } catch (e) {
+      console.error("Não consegui normalizar a imagem (subindo original):", e);
+    }
+    const nomeBase = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "_") || "foto";
+    const blob = await put(`upload/${Date.now()}-${nomeBase}.${ext}`, saida, {
       access: "public",
-      contentType: file.type || "image/png",
+      contentType,
     });
     return Response.json({ ok: true, url: blob.url });
   } catch (e) {
