@@ -32,7 +32,7 @@ const PASSOS: { n: string; titulo: string; texto: string }[] = [
 const RECURSOS: { emoji: string; titulo: string; texto: string }[] = [
   { emoji: "🤖", titulo: "Arte com IA no tom do buffet", texto: "Títulos, legendas e imagens no clima de festa infantil — alegre, caloroso e com a cara do seu espaço." },
   { emoji: "🗓️", titulo: "Piloto automático", texto: "Escolha os dias e horários. O Postaí posta sozinho, até quando você está no meio de uma festa." },
-  { emoji: "📱", titulo: "Instagram + Facebook", texto: "Um post só, publicado no Instagram e no Facebook do buffet ao mesmo tempo." },
+  { emoji: "📱", titulo: "Carrosséis, Feed e Stories", texto: "Os 3 formatos que mais aparecem — publicados no Instagram e no Facebook do buffet, no automático." },
   { emoji: "🎨", titulo: "Modelos pensados pra festa", texto: "Pacote de festa, promoção, depoimento de família, data comemorativa, tour pelo espaço e capas especiais." },
   { emoji: "🎂", titulo: "Seu espaço sempre em evidência", texto: "Mostre o salão, os brinquedos e o que está incluso no pacote — o que faz a família escolher você." },
   { emoji: "✅", titulo: "Você no controle", texto: "Aprove, edite o texto, troque a foto do salão ou a capa antes de publicar. Sem surpresa." },
@@ -49,25 +49,43 @@ const TEMPLATES: { emoji: string; nome: string }[] = [
   { emoji: "🪟", nome: "Capas especiais" },
 ];
 
-const PLANOS: { nome: string; posts: string; preco: string; destaque?: boolean; itens: string[] }[] = [
+const PLANOS: { nome: string; posts: string; preco: string; resumo: string; destaque?: boolean; itens: string[] }[] = [
   {
     nome: "Essencial",
     posts: "1 post por dia",
     preco: "97",
-    itens: ["Seu buffet sempre ativo no feed", "Carrosséis e posts com IA", "Instagram + Facebook", "Piloto automático"],
+    resumo: "Pra estar presente todo dia, sem esforço.",
+    itens: [
+      "Carrosséis e Feed gerados por IA",
+      "Postagem no Instagram + Facebook",
+      "Piloto automático (posta sozinho)",
+      "Legendas e hashtags prontas",
+    ],
   },
   {
     nome: "Profissional",
     posts: "2 posts por dia",
     preco: "197",
     destaque: true,
-    itens: ["Presença forte na temporada de festas", "Todos os modelos de arte", "Horários diferentes no mesmo dia", "Aprovação e edição fácil"],
+    resumo: "O mais escolhido — presença forte na temporada de festas.",
+    itens: [
+      "Tudo do Essencial, e mais:",
+      "Carrosséis · Feed · Stories no automático",
+      "Todos os modelos (promoção, depoimento, datas comemorativas…)",
+      "Vários horários no mesmo dia",
+    ],
   },
   {
     nome: "Turbo",
     posts: "3 posts por dia",
     preco: "347",
-    itens: ["Máximo de alcance e reservas", "Mais conteúdo, mais festas fechadas", "Prioridade nas datas quentes", "Suporte prioritário"],
+    resumo: "Máximo de alcance pra encher a agenda de festas.",
+    itens: [
+      "Tudo do Profissional, e mais:",
+      "Story todo dia (espelha o feed)",
+      "Prioridade nas datas quentes",
+      "Suporte e relatório de crescimento",
+    ],
   },
 ];
 
@@ -336,7 +354,13 @@ export default function Home() {
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-widest text-vermelho">Planos</p>
           <h2 className="display mt-2 text-3xl sm:text-4xl">Escolha o ritmo do seu buffet</h2>
-          <p className="mx-auto mt-3 max-w-xl text-muted">Quanto mais posts por dia, mais famílias veem o seu buffet. Valor mensal por buffet.</p>
+          <p className="mx-auto mt-3 max-w-xl text-muted">Tudo no piloto automático, publicado no Instagram e no Facebook. Valor mensal por buffet.</p>
+          <div className="mx-auto mt-5 flex max-w-2xl flex-wrap items-center justify-center gap-2 text-xs font-semibold">
+            <span className="rounded-full border border-linha bg-preto-card px-3 py-1.5 text-white">📷 Instagram + 📘 Facebook</span>
+            <span className="rounded-full border border-linha bg-preto-card px-3 py-1.5 text-white">🖼️ Carrosséis</span>
+            <span className="rounded-full border border-linha bg-preto-card px-3 py-1.5 text-white">📱 Feed</span>
+            <span className="rounded-full border border-linha bg-preto-card px-3 py-1.5 text-white">🟣 Stories</span>
+          </div>
         </div>
         <div className="mt-12 grid gap-5 md:grid-cols-3">
           {PLANOS.map((pl) => (
@@ -350,6 +374,7 @@ export default function Home() {
               <h3 className="display text-2xl text-white">{pl.nome}</h3>
               <p className="mt-1 text-sm font-semibold text-vermelho">{pl.posts}</p>
               <p className="mt-4 text-3xl font-bold text-white">R$ {pl.preco}<span className="ml-1 text-base font-medium text-muted">/mês</span></p>
+              <p className="mt-2 text-sm text-muted">{pl.resumo}</p>
               <ul className="mt-5 flex-1 space-y-2.5 text-sm text-muted">
                 {pl.itens.map((i) => (
                   <li key={i} className="flex items-start gap-2">
