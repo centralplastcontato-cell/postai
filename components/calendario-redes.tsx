@@ -21,17 +21,52 @@ function chaveData(iso: string): string {
   }).format(new Date(iso));
 }
 
+// Mantido (redes-sociais usa pra destacar/abrir o item nas abas de edição).
 export type SelecaoRede = { tipo: "carrossel" | "feed"; id: string };
+
+type Tipo = "carrossel" | "feed" | "story";
+type ResTipo = { total: number; postados: number; aprovados: number };
+type ResumoDia = Record<Tipo, ResTipo>;
+const zero = (): ResumoDia => ({
+  carrossel: { total: 0, postados: 0, aprovados: 0 },
+  feed: { total: 0, postados: 0, aprovados: 0 },
+  story: { total: 0, postados: 0, aprovados: 0 },
+});
+
+const CHIP: Record<Tipo, { icone: string; cor: string; nome: string }> = {
+  carrossel: { icone: "🖼️", cor: "bg-orange-500", nome: "Carrossel" },
+  feed: { icone: "📱", cor: "bg-sky-600", nome: "Feed" },
+  story: { icone: "🟣", cor: "bg-[#7c3aed]", nome: "Story" },
+};
 
 function parseDias(s: string): number[] {
   return s.split(",").map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
 }
 
+// Chip de um tipo num dia: ícone + (nº se houver mais de um). Verde = todos postados;
+// cor do tipo = nada postado ainda; anel verde = parte postada (parcial).
+function Chip({ tipo, res }: { tipo: Tipo; res: ResTipo }) {
+  const c = CHIP[tipo];
+  const todos = res.postados === res.total;
+  const parcial = res.postados > 0 && !todos;
+  const bg = todos ? "bg-green-600" : c.cor;
+  const titulo = `${c.icone} ${res.total} ${c.nome}${res.total > 1 ? "s" : ""} · ${res.postados} postado${res.postados === 1 ? "" : "s"}`;
+  return (
+    <span
+      title={titulo}
+      className={`flex h-[18px] items-center justify-center gap-0.5 rounded px-1 text-[10px] font-bold leading-none text-white ${bg} ${parcial ? "ring-1 ring-green-400" : ""}`}
+    >
+      <span style={{ fontSize: 9 }}>{c.icone}</span>
+      {res.total > 1 && <span>{res.total}</span>}
+      {todos && <span className="text-[8px]">✓</span>}
+    </span>
+  );
+}
+
 export function CalendarioRedes({
   posts,
   publicacoes,
-  selecao,
-  onSelecionar,
+  stories,
   dataAlvo,
   onSelecionarDia,
   diasCarrossel,
@@ -39,8 +74,7 @@ export function CalendarioRedes({
 }: {
   posts: Post[];
   publicacoes: PublicacaoView[];
-  selecao: SelecaoRede | null;
-  onSelecionar: (s: SelecaoRede, iso: string) => void;
+  stories: PublicacaoView[];
   dataAlvo: string | null;
   onSelecionarDia: (iso: string) => void;
   diasCarrossel: string;
@@ -51,21 +85,22 @@ export function CalendarioRedes({
   const planoCar = parseDias(diasCarrossel);
   const planoFeed = parseDias(diasFeed);
 
-  // Um dia pode ter mais de um item (ex: regerar um postado cria uma nova versão no
-  // mesmo dia). O calendário mostra 1 cor por dia, então PRIORIZA o "postado" — se há
-  // qualquer publicação já postada no dia, ele aparece verde (não some no "a postar").
-  const carrosselPorDia = new Map<string, Post>();
-  for (const p of posts) {
-    const k = chaveData(p.data);
-    const a = carrosselPorDia.get(k);
-    if (!a || (a.status !== "postado" && p.status === "postado")) carrosselPorDia.set(k, p);
+  // Agrega TODAS as publicações por dia e por tipo (carrossel/feed/story), contando
+  // quantas e quantas já foram postadas — o calendário mostra um chip por tipo, então
+  // dá pra ver o que tem no dia E o status de cada (não some o feed atrás do carrossel,
+  // e o verde não vira "uma cor pro dia inteiro").
+  const porDia = new Map<string, ResumoDia>();
+  function add(iso: string, tipo: Tipo, postado: boolean, aprovado: boolean) {
+    const k = chaveData(iso);
+    const r = porDia.get(k) ?? zero();
+    r[tipo].total++;
+    if (postado) r[tipo].postados++;
+    if (aprovado) r[tipo].aprovados++;
+    porDia.set(k, r);
   }
-  const feedPorDia = new Map<string, PublicacaoView>();
-  for (const p of publicacoes) {
-    const k = chaveData(p.data);
-    const a = feedPorDia.get(k);
-    if (!a || (a.status !== "postado" && p.status === "postado")) feedPorDia.set(k, p);
-  }
+  for (const p of posts) add(p.data, "carrossel", p.status === "postado", p.aprovado);
+  for (const p of publicacoes) add(p.data, "feed", p.status === "postado", p.aprovado);
+  for (const p of stories) add(p.data, "story", p.status === "postado", p.aprovado);
 
   function mudarMes(delta: number) {
     setView((v) => {
@@ -89,15 +124,14 @@ export function CalendarioRedes({
         <button onClick={() => mudarMes(1)} aria-label="Próximo mês" className="rounded-md border border-linha px-3 py-2 text-sm text-muted transition hover:border-vermelho hover:text-white">▶</button>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-center text-xs text-muted">
+      <div className="mb-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-[11px] text-muted">
         <span>🖼️ <span className="text-orange-400">Carrossel</span></span>
         <span>📱 <span className="text-sky-400">Feed</span></span>
-        <span><span className="text-green-400">Verde</span> = postado</span>
+        <span>🟣 <span className="text-purple-300">Story</span></span>
+        <span><span className="rounded bg-green-600 px-1 text-white">✓</span> = já postado</span>
         <span><span className="text-amber-300">Amarelo</span> = hoje</span>
         <span>🎉 <span className="text-yellow-300">data comemorativa</span></span>
-        <span><span className="text-muted/70">tracejado</span> = agenda (criar aqui)</span>
-        <span><span className="text-green-300">✓</span> = aprovado</span>
-        <span>dia cheio = ver · dia vazio = gerar nele</span>
+        <span><span className="text-muted/70">tracejado</span> = agenda</span>
       </div>
 
       <div className="grid grid-cols-7 gap-1 text-center sm:gap-2">
@@ -107,22 +141,19 @@ export function CalendarioRedes({
         {celulas.map((diaCel, i) => {
           if (diaCel === null) return <span key={`v${i}`} />;
           const chave = `${view.ano}-${pad(view.mes + 1)}-${pad(diaCel)}`;
-          const carrossel = carrosselPorDia.get(chave);
-          const feed = feedPorDia.get(chave);
+          const res = porDia.get(chave);
           const ehHoje = chave === hojeChave;
+          const escolhido = dataAlvo === chave;
           const comemorativa = dataComemorativaDe(chave);
 
-          if (!carrossel && !feed) {
-            const escolhido = dataAlvo === chave;
-            // Lembrete da agenda: dia futuro (>= hoje) que cai no plano da marca e
-            // ainda não tem conteúdo criado. Indica o que era pra criar ali.
+          // Dia VAZIO: mantém o lembrete da agenda (tracejado) pra indicar o que criar ali.
+          if (!res) {
             const futuro = chave >= hojeChave;
             const diaSemana = new Date(view.ano, view.mes, diaCel).getDay();
             const planCar = futuro && planoCar.includes(diaSemana);
             const planFeed = futuro && planoFeed.includes(diaSemana);
             const temPlano = planCar || planFeed;
             const planoTxt = [planCar ? "🖼️ carrossel" : "", planFeed ? "📱 feed" : ""].filter(Boolean).join(" · ");
-            // Borda: hoje/escolhido/comemorativa têm prioridade; senão, tracejada do plano.
             const borda = escolhido
               ? "border-2 border-white font-bold text-white"
               : ehHoje
@@ -139,14 +170,10 @@ export function CalendarioRedes({
                 key={i}
                 onClick={() => onSelecionarDia(chave)}
                 title={comemorativa || temPlano ? undefined : "Gerar conteúdo neste dia"}
-                className={`group relative flex h-11 items-center justify-center rounded-md text-sm transition sm:h-12 sm:text-base ${borda}`}
+                className={`group relative flex min-h-14 items-center justify-center rounded-md text-sm transition sm:min-h-16 sm:text-base ${borda}`}
               >
                 {comemorativa && <span className="absolute left-0.5 top-0.5 text-[10px] leading-none">🎉</span>}
-                {temPlano && (
-                  <span className="absolute bottom-0.5 right-0.5 text-[9px] leading-none opacity-60">
-                    {planCar && "🖼️"}{planFeed && "📱"}
-                  </span>
-                )}
+                {temPlano && <span className="absolute bottom-0.5 right-0.5 text-[9px] leading-none opacity-60">{planCar && "🖼️"}{planFeed && "📱"}</span>}
                 {diaCel}
                 {(comemorativa || temPlano) && (
                   <TooltipData
@@ -159,35 +186,30 @@ export function CalendarioRedes({
             );
           }
 
-          const tipo: "carrossel" | "feed" = carrossel ? "carrossel" : "feed";
-          const item = carrossel ?? feed!;
-          const postado = item.status === "postado";
-          const selecionado = selecao?.tipo === tipo && selecao?.id === item.id;
-          const icone = tipo === "carrossel" ? "🖼️" : "📱";
-          const cor = postado
-            ? "bg-green-600 hover:bg-green-500"
-            : tipo === "carrossel"
-              ? "bg-orange-500 hover:bg-orange-400"
-              : "bg-sky-600 hover:bg-sky-500";
-
+          // Dia COM conteúdo: número + um chip por tipo presente (com status).
+          const borda = escolhido
+            ? "border-2 border-white"
+            : ehHoje
+              ? "border-2 border-amber-400"
+              : comemorativa
+                ? "border border-yellow-400/60"
+                : "border border-linha";
           return (
-            <div
+            <button
               key={i}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelecionar({ tipo, id: item.id }, chave)}
-              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelecionar({ tipo, id: item.id }, chave); }}
-              title={comemorativa ? undefined : `${icone} ${item.titulo}`}
-              className={`group relative flex h-11 cursor-pointer items-center justify-center rounded-md text-sm font-bold text-white transition sm:h-12 sm:text-base ${cor} ${
-                selecionado ? "ring-2 ring-white" : ehHoje ? "ring-2 ring-amber-400" : comemorativa ? "ring-2 ring-yellow-400/70" : ""
-              }`}
+              onClick={() => onSelecionarDia(chave)}
+              title={comemorativa ? undefined : "Ver tudo desse dia"}
+              className={`group relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-md bg-preto px-0.5 py-1 text-sm font-semibold text-white transition hover:bg-preto-card sm:min-h-16 sm:text-base ${borda}`}
             >
-              <span className="absolute left-0.5 top-0.5 text-[10px] leading-none">{icone}</span>
-              {comemorativa && <span className="absolute bottom-0.5 left-0.5 text-[10px] leading-none">🎉</span>}
-              {item.aprovado && <span title="Você já aprovou este dia" className="absolute bottom-0.5 right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-white text-[9px] font-bold leading-none text-green-600">✓</span>}
-              {diaCel}
-              {comemorativa && <TooltipData emoji={comemorativa.emoji} nome={comemorativa.nome} rodape={item.titulo} />}
-            </div>
+              {comemorativa && <span className="absolute left-0.5 top-0.5 text-[10px] leading-none">🎉</span>}
+              <span className={ehHoje ? "text-amber-300" : ""}>{diaCel}</span>
+              <span className="flex flex-wrap items-center justify-center gap-0.5">
+                {res.carrossel.total > 0 && <Chip tipo="carrossel" res={res.carrossel} />}
+                {res.feed.total > 0 && <Chip tipo="feed" res={res.feed} />}
+                {res.story.total > 0 && <Chip tipo="story" res={res.story} />}
+              </span>
+              {comemorativa && <TooltipData emoji={comemorativa.emoji} nome={comemorativa.nome} rodape="clique pra ver o dia" />}
+            </button>
           );
         })}
       </div>
@@ -208,4 +230,3 @@ function TooltipData({ emoji, nome, rodape }: { emoji: string; nome: string; rod
     </span>
   );
 }
-

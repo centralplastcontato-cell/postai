@@ -5,6 +5,7 @@ import { MarketingCalendario, type Post } from "./marketing-calendario";
 import { PublicacoesAba, type PublicacaoView } from "./publicacoes-aba";
 import { StoriesAba } from "./stories-aba";
 import { CalendarioRedes, type SelecaoRede } from "./calendario-redes";
+import { ResumoDoDia } from "./resumo-dia";
 import { AniversariantesForm } from "./aniversariantes-form";
 
 function parseDias(s: string): number[] {
@@ -43,10 +44,12 @@ export function RedesSociais({
   const planoCar = parseDias(diasCarrossel);
   const planoFeed = parseDias(diasFeed);
 
-  function aoSelecionar(s: SelecaoRede, iso: string) {
-    setSelecao(s);
-    setSubaba(s.tipo === "carrossel" ? "carrosseis" : "publicacoes");
-    setDataAlvo(iso); // o dia clicado também filtra a lista da aba
+  // Abre um item da VISÃO DO DIA: leva pra aba do tipo certo pra editar/postar
+  // (o item já aparece filtrado lá, porque o dia segue selecionado).
+  function abrirDoResumo(tipo: "carrossel" | "feed" | "story", id: string) {
+    if (tipo === "carrossel") { setSelecao({ tipo: "carrossel", id }); setSubaba("carrosseis"); }
+    else if (tipo === "feed") { setSelecao({ tipo: "feed", id }); setSubaba("publicacoes"); }
+    else { setSelecao(null); setSubaba("story"); }
   }
 
   // Empurrão pela PROGRAMAÇÃO da agenda (Configurações): ao escolher um dia, leva
@@ -69,8 +72,7 @@ export function RedesSociais({
         <CalendarioRedes
           posts={posts}
           publicacoes={publicacoes}
-          selecao={selecao}
-          onSelecionar={aoSelecionar}
+          stories={stories}
           dataAlvo={dataAlvo}
           onSelecionarDia={aoSelecionarDia}
           diasCarrossel={diasCarrossel}
@@ -84,12 +86,23 @@ export function RedesSociais({
       {dataAlvo && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-orange-500/40 bg-orange-500/10 px-3 py-2">
           <span className="text-xs font-semibold text-orange-200">
-            📅 Mostrando só {new Date(`${dataAlvo}T12:00:00-03:00`).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "short" })} · vale pras duas abas
+            📅 Mostrando só {new Date(`${dataAlvo}T12:00:00-03:00`).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "short" })} · vale pras 3 abas
           </span>
           <button onClick={() => { setDataAlvo(null); setSelecao(null); }} className="rounded-md border border-linha bg-preto px-3 py-1 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">
             📋 Ver todos os dias
           </button>
         </div>
+      )}
+
+      {/* Visão UNIFICADA do dia: Carrossel + Feed + Story juntos (não obriga trocar de aba). */}
+      {dataAlvo && (
+        <ResumoDoDia
+          dia={dataAlvo}
+          posts={posts}
+          publicacoes={publicacoes}
+          stories={stories}
+          onAbrir={abrirDoResumo}
+        />
       )}
 
       <div className="mb-5 flex flex-wrap gap-2">
