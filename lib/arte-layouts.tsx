@@ -107,12 +107,37 @@ export function LayoutPromocao(d: DadosArte) {
 // 🟣 STORY (1080x1920, 9:16) — vertical tela cheia pro Story do Instagram. Fundo:
 // foto real (com degradê pra leitura) OU cor festiva + confete. Título grande,
 // oferta opcional, validade, CTA WhatsApp e site no rodapé. Mesmos helpers do feed.
-export function LayoutStory(d: DadosArte & { imagemUrl?: string }) {
+export function LayoutStory(d: DadosArte & { imagemUrl?: string; variante?: string }) {
   const [c1, c2, c3, , c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[3] || d.paleta[0], d.paleta[4] || d.paleta[0]];
   const fundo = d.corFundo || d.paleta[3] || d.paleta[0];
   const temFoto = Boolean(d.imagemUrl);
   const nLinhas = d.titulo.length;
   const fonteTitulo = nLinhas >= 4 ? 100 : nLinhas === 3 ? 116 : 132;
+
+  // Variante FAIXA: foto de fundo + faixa diagonal com o título (estilo do feed Faixa).
+  if (temFoto && d.variante === "faixa") {
+    const fFaixa = nLinhas >= 3 ? 78 : nLinhas === 2 ? 98 : 120;
+    return (
+      <div style={{ width: "1080px", height: "1920px", display: "flex", position: "relative", backgroundColor: fundo, fontFamily: "Baloo" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={d.imagemUrl} width={1080} height={1920} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1920px", objectFit: "cover" }} />
+        <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1920px", display: "flex", backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.30), rgba(0,0,0,0.05) 38%, rgba(0,0,0,0.6))" }} />
+        {d.logoSrc ? <LogoSolto src={d.logoSrc} top={150} right={80} h={130} /> : null}
+        {/* faixa diagonal com o título */}
+        <div style={{ position: "absolute", top: 760, left: -90, width: 1260, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "56px 40px", backgroundColor: c1, transform: "rotate(-8deg)", boxShadow: "0 14px 0 rgba(0,0,0,0.22)" }}>
+          {d.titulo.map((l, i) => (
+            <div key={i} style={{ display: "flex", fontSize: fFaixa, color: corContraste(BRANCO, c1), fontFamily: "Fredoka", textShadow: contorno(), lineHeight: 1.02, letterSpacing: 1 }}>{l.t}</div>
+          ))}
+        </div>
+        {/* CTA + site embaixo */}
+        <div style={{ position: "absolute", bottom: 130, left: 0, width: "1080px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
+          <div style={{ display: "flex", marginTop: 22, fontFamily: "Fredoka", fontSize: 34, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{d.site}</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ width: "1080px", height: "1920px", display: "flex", flexDirection: "column", position: "relative", backgroundColor: fundo, backgroundImage: temFoto ? undefined : "radial-gradient(circle at 50% 28%, rgba(255,255,255,0.22), rgba(0,0,0,0.18) 72%)", fontFamily: "Baloo" }}>
       {temFoto ? (

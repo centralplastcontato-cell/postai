@@ -30,7 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; corFundo?: string } = {};
+  let extra: { oferta?: string; validade?: string; corFundo?: string; estiloStory?: string } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -45,7 +45,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   };
 
   return new ImageResponse(
-    LayoutStory({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, imagemUrl: p.imagemUrl || undefined }),
+    LayoutStory({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, imagemUrl: p.imagemUrl || undefined, variante: extra.estiloStory }),
     { width: 1080, height: 1920, fonts, headers: CACHE }
   );
 }

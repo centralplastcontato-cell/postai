@@ -97,7 +97,7 @@ export function StoriesAba({
   const [temasIA, setTemasIA] = useState<string[]>([]);
   const [sugerindo, setSugerindo] = useState(false);
   const [sugerindoOferta, setSugerindoOferta] = useState(false);
-  const [estilo, setEstilo] = useState<"colorida" | "foto">("colorida");
+  const [estilo, setEstilo] = useState<"colorida" | "foto" | "faixa">("colorida");
   const [cor, setCor] = useState("");
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [edTitulo, setEdTitulo] = useState("");
@@ -128,7 +128,8 @@ export function StoriesAba({
         oferta: ehPromo ? oferta : undefined,
         validade: ehPromo ? validade : undefined,
         corFundo: estilo === "colorida" ? (cor || undefined) : undefined,
-        comFoto: estilo === "foto",
+        comFoto: estilo === "foto" || estilo === "faixa",
+        estiloStory: estilo,
       });
       if (r.ok) {
         setTema("");
@@ -302,6 +303,7 @@ export function StoriesAba({
             <span className="mr-1 text-xs text-muted">Estilo:</span>
             <button type="button" onClick={() => setEstilo("colorida")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${estilo === "colorida" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>🎨 Colorida</button>
             <button type="button" onClick={() => setEstilo("foto")} title="Usa uma foto real do seu banco como fundo (tela cheia)" className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${estilo === "foto" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>📷 Foto real</button>
+            <button type="button" onClick={() => setEstilo("faixa")} title="Foto real com uma faixa diagonal trazendo o título" className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${estilo === "faixa" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>📐 Faixa</button>
           </div>
           {estilo === "colorida" && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -312,7 +314,7 @@ export function StoriesAba({
               ))}
             </div>
           )}
-          {estilo === "foto" && <p className="mt-2 text-[11px] text-muted">📷 Usa uma foto real do seu <strong className="text-white/80">banco de imagens</strong> como fundo. Se o banco estiver vazio, cai na cor.</p>}
+          {(estilo === "foto" || estilo === "faixa") && <p className="mt-2 text-[11px] text-muted">📷 Usa uma foto real do seu <strong className="text-white/80">banco de imagens</strong> como fundo. Se o banco estiver vazio, cai na cor.</p>}
         </div>
         {ehPromo && (
           <div className="mt-3">

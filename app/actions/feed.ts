@@ -444,6 +444,7 @@ export async function gerarPublicacao(input: {
   hora?: number; // hora do post (BRT) — permite vários posts no mesmo dia em horas diferentes
   formato?: string; // "feed" (padrão, 4:5) | "story" (9:16, vai pro Story)
   comFoto?: boolean; // força (true) ou impede (false) foto de fundo; undefined = padrão do template
+  estiloStory?: string; // colorida | foto | faixa — guardado no extra pro render do Story
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -497,6 +498,13 @@ export async function gerarPublicacao(input: {
     // Só cai pro fundo de IA nos templates que normalmente usam foto (não quando o
     // Story força "Foto" e o banco está vazio — aí fica na cor mesmo).
     else if (input.comFoto === undefined && USA_FOTO[template]) await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
+  }
+  // Guarda o estilo do Story no extra (o render usa pra escolher a variante, ex: faixa).
+  if (input.formato === "story" && input.estiloStory) {
+    const cur = await prisma.publicacao.findUnique({ where: { id: criado.id }, select: { extra: true } });
+    let ex: Record<string, unknown> = {};
+    try { ex = JSON.parse(cur?.extra || "{}"); } catch {}
+    await prisma.publicacao.update({ where: { id: criado.id }, data: { extra: JSON.stringify({ ...ex, estiloStory: input.estiloStory }) } });
   }
   revalidatePath(`/painel/marcas/${marca.id}`);
   // Devolve o DIA (chave SP) da publicação criada — a UI usa pra filtrar a lista só
