@@ -49,11 +49,12 @@ const TEMPLATES: { emoji: string; nome: string }[] = [
   { emoji: "🪟", nome: "Capas especiais" },
 ];
 
-const PLANOS: { nome: string; posts: string; preco: string; resumo: string; destaque?: boolean; itens: string[] }[] = [
+const PLANOS: { nome: string; posts: string; preco: string; porPost: string; melhorCusto?: boolean; resumo: string; destaque?: boolean; itens: string[] }[] = [
   {
     nome: "Essencial",
     posts: "1 post por dia",
-    preco: "97",
+    preco: "159",
+    porPost: "5,30",
     resumo: "Pra estar presente todo dia, sem esforço.",
     itens: [
       "Carrosséis e Feed gerados por IA",
@@ -65,7 +66,8 @@ const PLANOS: { nome: string; posts: string; preco: string; resumo: string; dest
   {
     nome: "Profissional",
     posts: "2 posts por dia",
-    preco: "197",
+    preco: "289",
+    porPost: "4,82",
     destaque: true,
     resumo: "O mais escolhido — presença forte na temporada de festas.",
     itens: [
@@ -78,7 +80,9 @@ const PLANOS: { nome: string; posts: string; preco: string; resumo: string; dest
   {
     nome: "Turbo",
     posts: "3 posts por dia",
-    preco: "347",
+    preco: "399",
+    porPost: "4,43",
+    melhorCusto: true,
     resumo: "Máximo de alcance pra encher a agenda de festas.",
     itens: [
       "Tudo do Profissional, e mais:",
@@ -354,7 +358,7 @@ export default function Home() {
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-widest text-vermelho">Planos</p>
           <h2 className="display mt-2 text-3xl sm:text-4xl">Escolha o ritmo do seu buffet</h2>
-          <p className="mx-auto mt-3 max-w-xl text-muted">Tudo no piloto automático, publicado no Instagram e no Facebook. Valor mensal por buffet.</p>
+          <p className="mx-auto mt-3 max-w-xl text-muted">Tudo no piloto automático, publicado no Instagram e no Facebook. <span className="text-white">Quanto mais posts, mais barato sai cada um.</span></p>
           <div className="mx-auto mt-5 flex max-w-2xl flex-wrap items-center justify-center gap-2 text-xs font-semibold">
             <span className="rounded-full border border-linha bg-preto-card px-3 py-1.5 text-white">📷 Instagram + 📘 Facebook</span>
             <span className="rounded-full border border-linha bg-preto-card px-3 py-1.5 text-white">🖼️ Carrosséis</span>
@@ -374,6 +378,7 @@ export default function Home() {
               <h3 className="display text-2xl text-white">{pl.nome}</h3>
               <p className="mt-1 text-sm font-semibold text-vermelho">{pl.posts}</p>
               <p className="mt-4 text-3xl font-bold text-white">R$ {pl.preco}<span className="ml-1 text-base font-medium text-muted">/mês</span></p>
+              <p className={`mt-1 text-xs ${pl.melhorCusto ? "font-semibold text-green-400" : "text-muted"}`}>≈ R$ {pl.porPost} por post{pl.melhorCusto ? " · melhor custo 🏆" : ""}</p>
               <p className="mt-2 text-sm text-muted">{pl.resumo}</p>
               <ul className="mt-5 flex-1 space-y-2.5 text-sm text-muted">
                 {pl.itens.map((i) => (
