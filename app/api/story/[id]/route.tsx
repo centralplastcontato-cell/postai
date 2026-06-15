@@ -62,6 +62,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     const buf = await new ImageResponse(LayoutStory({ ...dados, imagemUrl }), opts).arrayBuffer();
     return new Response(buf, { headers: { ...CACHE, "content-type": "image/png" } });
   } catch (e) {
+    console.error("STORY render COM foto falhou:", e);
     if (imagemUrl) {
       registrarAtividade(APP_NAME, `A arte do Story "${p.titulo}" não renderizou COM a foto (${msg(e)}) — caiu no fundo colorido.`, p.marcaId).catch(() => {});
     }

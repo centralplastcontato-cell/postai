@@ -139,7 +139,7 @@ export function LayoutStory(d: DadosArte & { imagemUrl?: string; variante?: stri
   }
 
   return (
-    <div style={{ width: "1080px", height: "1920px", display: "flex", flexDirection: "column", position: "relative", backgroundColor: fundo, backgroundImage: temFoto ? undefined : "radial-gradient(circle at 50% 28%, rgba(255,255,255,0.22), rgba(0,0,0,0.18) 72%)", fontFamily: "Baloo" }}>
+    <div style={{ width: "1080px", height: "1920px", display: "flex", flexDirection: "column", position: "relative", backgroundColor: fundo, ...(temFoto ? {} : { backgroundImage: "radial-gradient(circle at 50% 28%, rgba(255,255,255,0.22), rgba(0,0,0,0.18) 72%)" }), fontFamily: "Baloo" }}>
       {temFoto ? (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
