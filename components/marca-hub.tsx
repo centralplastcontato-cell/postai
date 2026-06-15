@@ -7,6 +7,7 @@ import { MarcaForm, type MarcaView } from "./marca-form";
 import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
+import { ConexaoCard } from "./conexao-card";
 
 export function MarcaHub({
   marca,
@@ -53,6 +54,10 @@ export function MarcaHub({
           Pra postar de verdade, vá em <strong>Configurações</strong> e conecte o Instagram desta marca (IG User ID + token).
         </p>
       )}
+
+      <div className="mt-5">
+        <ConexaoCard marcaId={marca.id} temConexao={conectada} />
+      </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
