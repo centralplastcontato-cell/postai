@@ -142,6 +142,13 @@ model AtividadeAgente {
   @@index([criadoEm])
 }
 
+// "Batimento" do piloto: o cron grava aqui toda vez que roda (singleton id="cron").
+// O painel admin avisa se o último foi há muito tempo (cron pode ter travado).
+model Heartbeat {
+  id String   @id
+  em DateTime
+}
+
 // Snapshot diário dos números da conta (seguidores/posts) — alimenta o gráfico de
 // evolução "desde que usa o Postaí". 1 linha por marca por dia (upsert).
 model MetricaMarca {

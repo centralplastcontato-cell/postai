@@ -8,6 +8,12 @@ import { filtroMarcaVisivel } from "@/lib/acesso";
 
 export const dynamic = "force-dynamic";
 
+function tempoDesde(min: number): string {
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  return h < 24 ? `${h}h` : `${Math.floor(h / 24)} dia(s)`;
+}
+
 export default async function PainelHome() {
   const s = await sessaoAtual();
   if (!s) redirect("/login");
@@ -21,6 +27,17 @@ export default async function PainelHome() {
       usuario: { select: { nome: true } }, // dono (cliente) — mostrado no card pro admin
     },
   });
+
+  // Batimento do piloto (só admin): se o cron não roda há mais de 90 min, avisa — pode
+  // ter travado e os posts agendados não estarem saindo.
+  let pilotoParadoMin: number | null = null;
+  if (s.admin) {
+    const hb = await prisma.heartbeat.findUnique({ where: { id: "cron" } }).catch(() => null);
+    if (hb) {
+      const min = Math.floor((Date.now() - hb.em.getTime()) / 60000);
+      if (min > 90) pilotoParadoMin = min;
+    }
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
@@ -42,6 +59,12 @@ export default async function PainelHome() {
           </Link>
         )}
       </div>
+
+      {pilotoParadoMin !== null && (
+        <div className="mt-4 rounded-xl border border-red-900/60 bg-red-950/30 p-4 text-sm text-red-200">
+          ⚠️ <strong>O piloto não roda há {tempoDesde(pilotoParadoMin)}.</strong> O despertador (cron) pode ter travado — os posts agendados podem não estar saindo. Confira o job <span className="font-mono text-xs">postai-piloto</span> no Supabase (pg_cron).
+        </div>
+      )}
 
       {/* Nova marca — só admin cria (e depois atribui ao cliente) */}
       {s.admin && (

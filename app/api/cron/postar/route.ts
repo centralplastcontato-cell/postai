@@ -38,6 +38,9 @@ export async function GET(req: Request) {
   const base = baseUrl();
   const resultados: Resultado[] = [];
 
+  // Batimento: registra que o piloto rodou agora — o painel admin avisa se parar de rodar.
+  await prisma.heartbeat.upsert({ where: { id: "cron" }, update: { em: agora }, create: { id: "cron", em: agora } }).catch(() => {});
+
   const marcas = await prisma.marca
     .findMany({ where: { ativa: true }, include: { usuario: { select: { admin: true, acessoAte: true } } } })
     .catch(() => null);
