@@ -26,6 +26,7 @@ import { parsePaleta, coresDeFundo } from "@/lib/cores-fundo";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
+import { usePainelColapsavel } from "./use-painel-colapsavel";
 
 type Confirmacao = { titulo: string; descricao?: string; textoConfirmar: string; acao: () => void };
 
@@ -164,6 +165,7 @@ export function PublicacoesAba({
   espelharStoryPadrao?: boolean; // padrão da marca pra espelhar o feed no Story
 }) {
   const router = useRouter();
+  const gerador = usePainelColapsavel("feed");
   const redesTexto = temFacebook ? "no Instagram e Facebook" : "no Instagram";
   const [isPending, startTransition] = useTransition();
   const [template, setTemplate] = useState<Template>("dica");
@@ -535,13 +537,17 @@ export function PublicacoesAba({
             <button type="button" onClick={cancelarEdicao} className="rounded-md border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">✕ Cancelar</button>
           </div>
         ) : (
-          <>
-            <p className="mb-1 text-sm font-semibold text-white">Gerar publicação (feed) com IA</p>
-            <p className="mb-3 text-xs text-muted">Post de imagem única, no tom da marca. Sem escolher dia, cai na próxima data livre da agenda.</p>
-          </>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="mb-1 text-sm font-semibold text-white">Gerar publicação (feed) com IA</p>
+              <p className="text-xs text-muted">Post de imagem única, no tom da marca. Sem escolher dia, cai na próxima data livre da agenda.</p>
+            </div>
+            <button type="button" onClick={gerador.alternar} className="shrink-0 rounded-md border border-linha px-2 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white">{gerador.aberto ? "▾ recolher" : "▸ expandir"}</button>
+          </div>
         )}
 
-        <div className="mb-3 flex flex-wrap gap-2">
+        {(gerador.aberto || editandoId) && (<>
+        <div className="mb-3 mt-3 flex flex-wrap gap-2">
           {TEMPLATES.map((t) => (
             <button key={t} type="button" onClick={() => { if (!editandoId) setTemplate(t); }} disabled={!!editandoId && template !== t} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${template === t ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"} ${editandoId && template !== t ? "cursor-not-allowed opacity-30" : ""}`}>
               {TEMPLATE_LABEL[t]}
@@ -925,6 +931,7 @@ export function PublicacoesAba({
           </div>
         )}
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
+        </>)}
       </div>
 
       {/* Contagem + paginação (o filtro por dia + "Ver todos" agora ficam no topo,

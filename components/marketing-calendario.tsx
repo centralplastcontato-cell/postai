@@ -22,6 +22,7 @@ import {
 import { excluirConteudo } from "@/app/actions/excluir";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
+import { usePainelColapsavel } from "./use-painel-colapsavel";
 
 // Temas prontos de carrossel (clique preenche o campo Tema). Ângulos que funcionam
 // pro público de um buffet infantil — o dono ajusta ou pede "Sugerir temas com IA".
@@ -135,6 +136,7 @@ export function MarketingCalendario({
   slotGerador?: ReactNode; // outro gerador (Aniversariantes) renderizado logo abaixo do principal
 }) {
   const router = useRouter();
+  const gerador = usePainelColapsavel("carrossel");
   const redesTexto = temFacebook ? "no Instagram e Facebook" : "no Instagram";
   const [isPending, startTransition] = useTransition();
   const [tema, setTema] = useState("");
@@ -386,8 +388,12 @@ export function MarketingCalendario({
 
       {/* Gerar carrossel */}
       <div className="mb-8 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <p className="mb-1 text-sm font-semibold text-white">Gerar carrossel com IA</p>
-        <div className="mb-3">
+        <button type="button" onClick={gerador.alternar} className="flex w-full items-center justify-between gap-3 text-left">
+          <span className="text-sm font-semibold text-white">Gerar carrossel com IA</span>
+          <span className="shrink-0 rounded-md border border-linha px-2 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white">{gerador.aberto ? "▾ recolher" : "▸ expandir"}</span>
+        </button>
+        {gerador.aberto && (<>
+        <div className="mb-3 mt-3">
           <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Temas prontos (clique pra preencher)</p>
           <div className="flex flex-wrap gap-2">
             {MODELOS_CARROSSEL.map((m) => (
@@ -498,6 +504,7 @@ export function MarketingCalendario({
           )}
         </div>
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
+        </>)}
       </div>
 
       {/* Aniversariantes da Semana entra AQUI, logo abaixo do gerador principal — é

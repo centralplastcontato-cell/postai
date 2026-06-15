@@ -17,6 +17,7 @@ import { type Template } from "@/lib/feed-templates";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
+import { usePainelColapsavel } from "./use-painel-colapsavel";
 
 // Templates que fazem sentido pro Story (vertical, chamativo). Promoção mostra o selo
 // de oferta; os demais usam só título + texto. Tudo renderizado em 9:16.
@@ -80,6 +81,7 @@ export function StoriesAba({
   onLimparDia?: () => void;
 }) {
   const router = useRouter();
+  const gerador = usePainelColapsavel("story");
   const [isPending, startTransition] = useTransition();
   const [tema, setTema] = useState("");
   const [template, setTemplate] = useState("promocao");
@@ -268,7 +270,11 @@ export function StoriesAba({
 
       {/* Gerar Story */}
       <div className="mb-8 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <p className="mb-1 text-sm font-semibold text-white">🟣 Gerar Story com IA <span className="font-normal text-muted">— formato vertical (9:16), tela cheia</span></p>
+        <button type="button" onClick={gerador.alternar} className="flex w-full items-center justify-between gap-3 text-left">
+          <span className="text-sm font-semibold text-white">🟣 Gerar Story com IA <span className="font-normal text-muted">— formato vertical (9:16), tela cheia</span></span>
+          <span className="shrink-0 rounded-md border border-linha px-2 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white">{gerador.aberto ? "▾ recolher" : "▸ expandir"}</span>
+        </button>
+        {gerador.aberto && (<>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {TEMPLATES_STORY.map((t) => (
             <button key={t.v} type="button" onClick={() => setTemplate(t.v)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${template === t.v ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>
@@ -355,6 +361,7 @@ export function StoriesAba({
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
         {aviso && <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">💡 {aviso}</p>}
         <p className="mt-2 text-[11px] text-muted">O Story some sozinho em 24h no Instagram — perfeito pra novidades e urgência.</p>
+        </>)}
       </div>
 
       {stories.length > 0 && (
