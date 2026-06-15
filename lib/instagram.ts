@@ -16,13 +16,24 @@ const GRAPH = "https://graph.facebook.com/v21.0";
 
 // Renderiza a arte (rota next/og) e salva como PNG estático no Blob; devolve a URL
 // estática (rápida pra Meta baixar). Joga erro se a arte não puder ser renderizada.
-async function materializar(url: string): Promise<string> {
-  const resp = await fetch(url, { cache: "no-store" });
-  if (!resp.ok) throw new Error(`Arte indisponível (${resp.status})`);
-  const buf = Buffer.from(await resp.arrayBuffer());
-  const nome = `posts/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.png`;
-  const blob = await put(nome, buf, { access: "public", contentType: "image/png" });
-  return blob.url;
+async function materializar(url: string, tentativas = 3): Promise<string> {
+  // A rota da arte (next/og) é PESADA — sobretudo o Story (1080x1920 + confete/gradiente).
+  // Em função "fria" (cold start) ou sob pressão de memória, ela às vezes devolve 500; na
+  // 2ª/3ª tentativa a função já esquentou e renderiza. Por isso tentamos algumas vezes
+  // antes de desistir (era 1 tentativa só → o piloto desistia no primeiro tropeço).
+  let ultimoStatus = 0;
+  for (let i = 0; i < tentativas; i++) {
+    const resp = await fetch(url, { cache: "no-store" });
+    if (resp.ok) {
+      const buf = Buffer.from(await resp.arrayBuffer());
+      const nome = `posts/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.png`;
+      const blob = await put(nome, buf, { access: "public", contentType: "image/png" });
+      return blob.url;
+    }
+    ultimoStatus = resp.status;
+    if (i < tentativas - 1) await espera(1500 * (i + 1)); // 1.5s, 3s — dá tempo de esquentar
+  }
+  throw new Error(`Arte indisponível (${ultimoStatus}) após ${tentativas} tentativas`);
 }
 
 export type ResultadoPostagem =
