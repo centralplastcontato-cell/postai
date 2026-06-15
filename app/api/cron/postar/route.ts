@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { snapshotDeMarca, alertarTokenSeVencendo } from "@/lib/metricas";
+import { acessoExpirado } from "@/lib/plano";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 
@@ -37,13 +38,17 @@ export async function GET(req: Request) {
   const base = baseUrl();
   const resultados: Resultado[] = [];
 
-  const marcas = await prisma.marca.findMany({ where: { ativa: true } }).catch(() => null);
+  const marcas = await prisma.marca
+    .findMany({ where: { ativa: true }, include: { usuario: { select: { admin: true, acessoAte: true } } } })
+    .catch(() => null);
   if (!marcas) {
     return Response.json({ ok: false, erro: "Banco indisponível ao listar marcas." }, { status: 503 });
   }
 
   for (const m of marcas) {
     if (!marcaConectada(m)) continue;
+    // Dono com acesso vencido → piloto PAUSADO pra essa marca. Marca sem dono (admin) nunca pausa.
+    if (m.usuario && acessoExpirado(m.usuario)) continue;
     try {
       await snapshotDeMarca(m).catch(() => {}); // best-effort, nunca derruba o piloto
       await alertarTokenSeVencendo(m).catch(() => {}); // avisa nas Atividades se o token estiver vencendo

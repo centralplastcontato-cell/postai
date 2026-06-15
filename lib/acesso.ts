@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { sessaoAtual, type Sessao } from "@/lib/auth";
+import { acessoExpirado } from "@/lib/plano";
 
 // Camada de AUTORIZAÇÃO multi-tenant. Login (estaLogado) só diz "tem sessão"; aqui
 // dizemos "ESSA sessão pode mexer NESSA marca?". Regra: admin pode tudo; cliente só
@@ -10,6 +11,7 @@ import { sessaoAtual, type Sessao } from "@/lib/auth";
 export type Guarda = { ok: true; sessao: Sessao } | { ok: false; erro: string };
 
 const NEGADO: { ok: false; erro: string } = { ok: false, erro: "Sem permissão." };
+const VENCIDO: { ok: false; erro: string } = { ok: false, erro: "Seu acesso expirou. Fale com o suporte pra reativar." };
 
 // O dono pode? (admin sempre; cliente só se for o dono da marca)
 function pode(s: Sessao, donoId: string | null): boolean {
@@ -33,6 +35,7 @@ export async function exigirAdmin(): Promise<Guarda> {
 export async function guardaMarca(marcaId: string): Promise<Guarda> {
   const s = await sessaoAtual();
   if (!s) return NEGADO;
+  if (acessoExpirado(s)) return VENCIDO;
   if (!marcaId) return { ok: false, erro: "Marca não informada." };
   try {
     const m = await prisma.marca.findUnique({ where: { id: marcaId }, select: { usuarioId: true } });
@@ -48,6 +51,7 @@ export async function guardaMarca(marcaId: string): Promise<Guarda> {
 export async function guardaConteudo(id: string): Promise<Guarda> {
   const s = await sessaoAtual();
   if (!s) return NEGADO;
+  if (acessoExpirado(s)) return VENCIDO;
   if (!id) return { ok: false, erro: "Conteúdo não informado." };
   try {
     const c = await prisma.conteudo.findUnique({ where: { id }, select: { marca: { select: { usuarioId: true } } } });
@@ -63,6 +67,7 @@ export async function guardaConteudo(id: string): Promise<Guarda> {
 export async function guardaPublicacao(id: string): Promise<Guarda> {
   const s = await sessaoAtual();
   if (!s) return NEGADO;
+  if (acessoExpirado(s)) return VENCIDO;
   if (!id) return { ok: false, erro: "Publicação não informada." };
   try {
     const p = await prisma.publicacao.findUnique({ where: { id }, select: { marca: { select: { usuarioId: true } } } });
@@ -78,6 +83,7 @@ export async function guardaPublicacao(id: string): Promise<Guarda> {
 export async function guardaImagem(id: string): Promise<Guarda> {
   const s = await sessaoAtual();
   if (!s) return NEGADO;
+  if (acessoExpirado(s)) return VENCIDO;
   if (!id) return { ok: false, erro: "Imagem não informada." };
   try {
     const img = await prisma.imagemMarca.findUnique({ where: { id }, select: { marca: { select: { usuarioId: true } } } });
