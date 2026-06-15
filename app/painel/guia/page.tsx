@@ -1,8 +1,27 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { sessaoAtual } from "@/lib/auth";
+import { CopiarMensagem } from "@/components/copiar-mensagem";
 
 export const dynamic = "force-dynamic";
+
+// Mensagem pronta pra o admin mandar pro CLIENTE no WhatsApp — é o "lado do cliente":
+// o que ele precisa deixar pronto ANTES de você (concierge) conectar a conta dele.
+const MSG_CLIENTE = `Oi! 😊 Que bom que vamos colocar o seu Instagram no automático!
+
+Pra eu cuidar de tudo pra você (a Bia, nossa assistente, cria e posta as artes sozinha), preciso que você faça só 3 passinhos rapidinhos — depois é comigo:
+
+1) Deixe seu Instagram como conta PROFISSIONAL
+No app do Instagram: Configurações → Conta → "Mudar para conta profissional" → escolha Comercial. É grátis e não muda nada pra quem te segue.
+
+2) Ligue seu Instagram a uma PÁGINA DO FACEBOOK do seu negócio
+Se ainda não tiver uma Página, dá pra criar em 2 minutinhos — me avisa que eu te ajudo.
+
+3) Me dê ACESSO pra eu configurar
+Me dá um "ok" que eu te mando o passo a passo (com print) pra você me adicionar como parceiro — ou, mais fácil ainda, a gente faz juntos numa chamada de 5 minutos.
+
+Assim que estiver pronto, é só me avisar que eu já deixo tudo no ar pra você. 🚀
+Qualquer dúvida, é só chamar!`;
 
 const PASSOS: { n: string; titulo: string; corpo: React.ReactNode }[] = [
   {
@@ -119,6 +138,22 @@ export default async function GuiaPage() {
         e estar ligada a uma <strong className="text-white">Página do Facebook</strong>. E você precisa de acesso ao <strong className="text-white">Gerenciador de Negócios</strong> dele (ele te adiciona como admin).
       </div>
 
+      {/* Lado do cliente: a mensagem que ele recebe ANTES de você conectar */}
+      <div className="mt-5 rounded-xl border border-[#7c3aed]/30 bg-[#7c3aed]/5 p-4 sm:p-5">
+        <h2 className="text-base font-bold text-white">📩 Primeiro: peça o lado do cliente</h2>
+        <p className="mt-1 text-sm text-muted">
+          O passo mais chatinho (conectar a conta) só funciona depois que o cliente deixa o Instagram dele pronto. Manda essa mensagem pra ele no <strong className="text-white">WhatsApp</strong> —
+          é só copiar, trocar o nome se quiser, e enviar:
+        </p>
+        <div className="mt-3">
+          <CopiarMensagem texto={MSG_CLIENTE} />
+        </div>
+        <p className="mt-2 text-xs text-muted">
+          Quando ele responder que está pronto (Instagram <strong className="text-white/80">Profissional</strong> + <strong className="text-white/80">Página do Facebook</strong> + te
+          deu <strong className="text-white/80">acesso</strong>), aí você segue os passos abaixo. 👇
+        </p>
+      </div>
+
       <ol className="mt-6 space-y-4">
         {PASSOS.map((p) => (
           <li key={p.n} className="flex gap-4 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
@@ -132,7 +167,7 @@ export default async function GuiaPage() {
       </ol>
 
       <div className="mt-6 rounded-xl border border-linha bg-preto-card p-4 text-sm text-muted">
-        <strong className="text-white">Depois que estiver no ar:</strong> acompanhe pelo cartão <strong className="text-white">🛰️ Atividades do piloto</strong> (mostra o que postou ou
+        <strong className="text-white">Depois que estiver no ar:</strong> acompanhe pelo cartão <strong className="text-white">🛰️ Atividades da Bia</strong> (mostra o que ela postou ou
         se algo falhou) e pelo <strong className="text-white">📊 Resumo do negócio</strong> (em Clientes). E renove o acesso antes de vencer (o sistema avisa).
       </div>
 

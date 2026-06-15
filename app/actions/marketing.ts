@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { guardaMarca, guardaConteudo } from "@/lib/acesso";
 import { publicarNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
-import { baseUrl, APP_NAME } from "@/lib/config";
+import { baseUrl, AGENTE } from "@/lib/config";
 import { rotuloPlano } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
@@ -444,7 +444,7 @@ export async function postarInstagram(id: string) {
 
   await prisma.conteudo.update({ where: { id }, data: { status: "postado", postadoEm: new Date() } });
   const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
-  await registrarAtividade(APP_NAME, `Postei "${c.titulo}" no ${onde} de ${c.marca.nome}.`, c.marcaId);
+  await registrarAtividade(AGENTE, `Postei "${c.titulo}" no ${onde} de ${c.marca.nome}.`, c.marcaId);
   revalidatePath(`/painel/marcas/${c.marcaId}`);
   return { ok: true as const, permalink: r.ig.permalink, facebook: r.fb?.ok ?? null, erroFacebook: r.fb && !r.fb.ok ? r.fb.erro : undefined };
 }

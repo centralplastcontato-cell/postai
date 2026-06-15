@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { registrarAtividade } from "@/lib/atividade";
-import { APP_NAME } from "@/lib/config";
+import { AGENTE } from "@/lib/config";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -64,7 +64,7 @@ export async function alertarTokenSeVencendo(marca: { id: string; nome: string; 
       dias <= 0
         ? `⚠️ O token do Instagram de ${marca.nome} VENCEU — reconecte em Configurações pra o piloto voltar a postar.`
         : `⏳ O token do Instagram de ${marca.nome} vence em ${dias} ${dias === 1 ? "dia" : "dias"} — reconecte em Configurações antes disso.`;
-    await registrarAtividade(APP_NAME, texto, marca.id);
+    await registrarAtividade(AGENTE, texto, marca.id);
   } catch {
     /* best-effort */
   }

@@ -28,7 +28,7 @@ export function AtividadesRecentes({ atividades }: { atividades: Ativ[] }) {
   return (
     <div className="mt-5 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
       <button type="button" onClick={painel.alternar} className="flex w-full items-center justify-between gap-3 text-left">
-        <span className="text-sm font-semibold text-white">🛰️ Atividades do piloto <span className="font-normal text-muted">— o que o Postaí postou ou tentou postar</span></span>
+        <span className="text-sm font-semibold text-white">🛰️ Atividades da Bia <span className="font-normal text-muted">— o que a sua assistente postou ou tentou postar</span></span>
         <span className="shrink-0 rounded-md border border-linha px-2 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white">{painel.aberto ? "▾ recolher" : "▸ expandir"}</span>
       </button>
 
@@ -42,8 +42,18 @@ export function AtividadesRecentes({ atividades }: { atividades: Ativ[] }) {
                 const erro = ehErro(a.texto);
                 return (
                   <li key={a.id} className={`flex gap-2 rounded-md border px-3 py-2 text-xs ${erro ? "border-red-900/60 bg-red-950/30 text-red-200" : "border-linha bg-preto text-white/90"}`}>
-                    <span className="shrink-0 whitespace-nowrap text-muted">{quando(a.criadoEm)}</span>
-                    <span className="min-w-0 break-words">{erro ? "⚠️ " : "✅ "}{a.texto}</span>
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[13px] font-bold ${erro ? "bg-red-500/20 text-red-200" : "bg-[#7c3aed]/25 text-[#c7b2ff]"}`}
+                      title={a.agente}
+                    >
+                      {erro ? "⚠️" : "B"}
+                    </span>
+                    <span className="min-w-0 break-words">
+                      <strong className="font-semibold">{a.agente}</strong>
+                      <span className="text-muted"> · {quando(a.criadoEm)}</span>
+                      <br />
+                      {a.texto}
+                    </span>
                   </li>
                 );
               })}

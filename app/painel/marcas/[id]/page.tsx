@@ -53,7 +53,12 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   // trabalho que o Postaí fez sozinho. Conta carrossel + feed + story já postados.
   const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
   const postados = [...conteudos, ...pubs].filter((x) => x.status === "postado" && x.postadoEm);
-  const entregue = { total: postados.length, mes: postados.filter((x) => x.postadoEm!.getTime() >= inicioMes).length };
+  const storiesPostados = pubs.filter((p) => p.formato === "story" && p.status === "postado" && p.postadoEm).length;
+  const entregue = {
+    total: postados.length,
+    mes: postados.filter((x) => x.postadoEm!.getTime() >= inicioMes).length,
+    stories: storiesPostados,
+  };
 
   const posts: Post[] = conteudos.map((c) => {
     let slides: string[] = [];

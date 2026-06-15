@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { sessaoAtual } from "@/lib/auth";
 import { acessoExpirado } from "@/lib/plano";
 import { PainelHeader } from "@/components/painel-header";
+import { ChatBia } from "@/components/chat-bia";
 
 export const dynamic = "force-dynamic";
 
@@ -33,10 +35,23 @@ export default async function PainelLayout({
     );
   }
 
+  // Badge de novidades no suporte: pro admin, chamados com mensagem nova do cliente;
+  // pro cliente, chamados com resposta nova do suporte. Best-effort (se a tabela ainda
+  // não existir, fica 0 e não quebra o painel).
+  let chamadosBadge = 0;
+  try {
+    chamadosBadge = await prisma.chamado.count({
+      where: s.admin ? { naoLidoAdmin: true } : { usuarioId: s.id, naoLidoCliente: true },
+    });
+  } catch {
+    /* tabela ainda não criada (db push pendente) — segue com 0 */
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
-      <PainelHeader nome={s.nome} admin={s.admin} />
+      <PainelHeader nome={s.nome} admin={s.admin} chamados={chamadosBadge} />
       <main className="flex-1">{children}</main>
+      <ChatBia nome={s.nome} />
     </div>
   );
 }

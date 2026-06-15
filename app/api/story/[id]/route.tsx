@@ -4,7 +4,7 @@ import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } fro
 import { fotoSegura } from "@/lib/foto-arte";
 import { LayoutStory, type DadosArte } from "@/lib/arte-layouts";
 import { registrarAtividade } from "@/lib/atividade";
-import { APP_NAME } from "@/lib/config";
+import { AGENTE } from "@/lib/config";
 
 function msg(e: unknown): string {
   return (e instanceof Error ? e.message : String(e)).slice(0, 200);
@@ -64,7 +64,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   } catch (e) {
     console.error("STORY render COM foto falhou:", e);
     if (imagemUrl) {
-      registrarAtividade(APP_NAME, `A arte do Story "${p.titulo}" não renderizou COM a foto (${msg(e)}) — caiu no fundo colorido.`, p.marcaId).catch(() => {});
+      registrarAtividade(AGENTE, `A arte do Story "${p.titulo}" não renderizou COM a foto (${msg(e)}) — caiu no fundo colorido.`, p.marcaId).catch(() => {});
     }
     try {
       const buf = await new ImageResponse(LayoutStory({ ...dados, imagemUrl: undefined }), opts).arrayBuffer();

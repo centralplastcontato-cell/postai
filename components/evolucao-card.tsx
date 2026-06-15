@@ -77,6 +77,7 @@ export function EvolucaoCard({ pontos }: { pontos: Ponto[] }) {
         ))}
       </svg>
       <p className="mt-1 text-[11px] text-muted">Crescimento dos seguidores enquanto o Postaí publica sozinho. 🚀</p>
+      <p className="mt-0.5 text-[11px] text-muted">📌 “Novos posts” conta só o feed permanente — os Stories não entram aqui (o Instagram não os conta como post fixo). Veja quantos Stories saíram no card 🟣 acima.</p>
     </div>
   );
 }

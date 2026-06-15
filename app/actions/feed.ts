@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { guardaMarca, guardaPublicacao } from "@/lib/acesso";
 import { publicarNasRedes, publicarStoryNasRedes, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
-import { baseUrl, APP_NAME } from "@/lib/config";
+import { baseUrl, AGENTE } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
 import { planoTemStory, rotuloPlano } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
@@ -599,7 +599,7 @@ export async function postarStory(id: string) {
   const r = await publicarStoryNasRedes(p.marca, `${baseUrl()}/api/story/${p.id}`);
   if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
   await prisma.publicacao.update({ where: { id }, data: { status: "postado", postadoEm: new Date() } });
-  await registrarAtividade(APP_NAME, `Postei o Story "${p.titulo}" no Instagram de ${p.marca.nome}.`, p.marcaId);
+  await registrarAtividade(AGENTE, `Postei o Story "${p.titulo}" no Instagram de ${p.marca.nome}.`, p.marcaId);
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const };
 }
@@ -1020,7 +1020,7 @@ export async function postarPublicacao(id: string) {
   if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
   await prisma.publicacao.update({ where: { id }, data: { status: "postado", postadoEm: new Date() } });
   const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
-  await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no ${onde} de ${p.marca.nome}.`, p.marcaId);
+  await registrarAtividade(AGENTE, `Postei "${p.titulo}" no ${onde} de ${p.marca.nome}.`, p.marcaId);
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const, permalink: r.ig.permalink, facebook: r.fb?.ok ?? null, erroFacebook: r.fb && !r.fb.ok ? r.fb.erro : undefined };
 }

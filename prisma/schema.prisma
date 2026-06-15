@@ -129,6 +129,39 @@ model Usuario {
   criadoEm  DateTime  @default(now())
 
   marcas    Marca[] // marcas que este usuário (cliente) administra
+  chamados  Chamado[] // chamados de suporte que este usuário abriu
+}
+
+// Helpdesk: chamado de suporte que o CLIENTE abre e o ADMIN (Victor) responde dentro do
+// painel. É o atendimento humano — quando a Bia (chat) não resolve, cai aqui. Cada chamado
+// é uma conversa (várias ChamadoMensagem). Os flags naoLido* acendem o badge "novo" pra
+// cada lado (cliente escreveu → novidade pro admin; admin respondeu → novidade pro cliente).
+model Chamado {
+  id             String   @id @default(cuid())
+  usuarioId      String // quem abriu (cliente dono da marca)
+  usuario        Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  marcaId        String? // marca relacionada (opcional, só referência — sem FK pra não travar)
+  assunto        String
+  status         String   @default("aberto") // aberto | resolvido
+  naoLidoAdmin   Boolean  @default(true) // tem novidade pro admin ver (o cliente escreveu)
+  naoLidoCliente Boolean  @default(false) // tem novidade pro cliente ver (o admin respondeu)
+  criadoEm       DateTime @default(now())
+  atualizadoEm   DateTime @updatedAt
+  mensagens      ChamadoMensagem[]
+
+  @@index([status, atualizadoEm])
+  @@index([usuarioId, atualizadoEm])
+}
+
+model ChamadoMensagem {
+  id        String   @id @default(cuid())
+  chamadoId String
+  chamado   Chamado  @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+  deAdmin   Boolean // true = resposta do suporte/admin; false = mensagem do cliente
+  texto     String
+  criadoEm  DateTime @default(now())
+
+  @@index([chamadoId, criadoEm])
 }
 
 // Log de ações ("Postaí postou X pra marca Y") — feed de atividade do painel.

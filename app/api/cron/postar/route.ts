@@ -3,7 +3,7 @@ import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada 
 import { snapshotDeMarca, alertarTokenSeVencendo } from "@/lib/metricas";
 import { acessoExpirado } from "@/lib/plano";
 import { registrarAtividade } from "@/lib/atividade";
-import { baseUrl, APP_NAME } from "@/lib/config";
+import { baseUrl, AGENTE } from "@/lib/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -115,10 +115,10 @@ async function postarCarrossel(m: { id: string; nome: string; igUserId: string |
     const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, urls, legenda);
     if (r.ig.ok) {
       const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
-      await registrarAtividade(APP_NAME, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
+      await registrarAtividade(AGENTE, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
     } else {
       await reverterCarrossel(c.id);
-      await registrarAtividade(APP_NAME, `Não consegui postar o carrossel "${c.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
+      await registrarAtividade(AGENTE, `Não consegui postar o carrossel "${c.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "carrossel", titulo: c.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
   } catch (e) {
@@ -136,15 +136,15 @@ async function postarFeed(m: { id: string; nome: string; igUserId: string | null
     const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, [`${base}/api/feed/${p.id}`], legenda);
     if (r.ig.ok) {
       const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
-      await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
+      await registrarAtividade(AGENTE, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
       // Espelhar no Story (best-effort): ligado na marca ou forçado no post.
       if (p.espelhar ?? m.espelharStory) {
         const rs = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${p.id}`);
-        await registrarAtividade(APP_NAME, rs.ig.ok ? `Espelhei "${p.titulo}" no Story de ${m.nome} (auto).` : `Não consegui espelhar "${p.titulo}" no Story: ${rs.ig.erro}`, m.id).catch(() => {});
+        await registrarAtividade(AGENTE, rs.ig.ok ? `Espelhei "${p.titulo}" no Story de ${m.nome} (auto).` : `Não consegui espelhar "${p.titulo}" no Story: ${rs.ig.erro}`, m.id).catch(() => {});
       }
     } else {
       await reverterPublicacao(p.id);
-      await registrarAtividade(APP_NAME, `Não consegui postar "${p.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
+      await registrarAtividade(AGENTE, `Não consegui postar "${p.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "feed", titulo: p.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
   } catch (e) {
@@ -160,10 +160,10 @@ async function postarStory(m: { id: string; nome: string; igUserId: string | nul
 
     const r = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${st.id}`);
     if (r.ig.ok) {
-      await registrarAtividade(APP_NAME, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
+      await registrarAtividade(AGENTE, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
     } else {
       await reverterPublicacao(st.id);
-      await registrarAtividade(APP_NAME, `Não consegui postar o Story "${st.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
+      await registrarAtividade(AGENTE, `Não consegui postar o Story "${st.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
   } catch (e) {

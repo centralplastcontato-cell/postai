@@ -79,6 +79,23 @@ export async function guardaPublicacao(id: string): Promise<Guarda> {
   }
 }
 
+// Guarda por Chamado de suporte — admin acessa qualquer; cliente só os DELE. De
+// propósito NÃO bloqueia por acesso vencido: o suporte é justamente onde o cliente pede
+// pra reativar, então tem que continuar acessível.
+export async function guardaChamado(id: string): Promise<Guarda> {
+  const s = await sessaoAtual();
+  if (!s) return NEGADO;
+  if (!id) return { ok: false, erro: "Chamado não informado." };
+  try {
+    const c = await prisma.chamado.findUnique({ where: { id }, select: { usuarioId: true } });
+    if (!c) return { ok: false, erro: "Chamado não encontrado." };
+    if (!s.admin && c.usuarioId !== s.id) return NEGADO;
+    return { ok: true, sessao: s };
+  } catch {
+    return { ok: false, erro: "O banco demorou a responder. Tente de novo em instantes." };
+  }
+}
+
 // Guarda por ImagemMarca — resolve a marca pela imagem.
 export async function guardaImagem(id: string): Promise<Guarda> {
   const s = await sessaoAtual();
