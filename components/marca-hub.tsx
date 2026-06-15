@@ -34,6 +34,7 @@ export function MarcaHub({
   evolucao,
   conectada,
   assinatura,
+  ehAdmin,
 }: {
   marca: MarcaView;
   posts: Post[];
@@ -43,6 +44,7 @@ export function MarcaHub({
   evolucao: { dia: string; seguidores: number; posts: number }[];
   conectada: boolean;
   assinatura?: Assinatura | null;
+  ehAdmin: boolean;
 }) {
   const [aba, setAba] = useState<"redes" | "imagens" | "config">("redes");
   const cls = (a: boolean) =>
@@ -94,13 +96,13 @@ export function MarcaHub({
       <div className="mt-5 flex flex-wrap gap-2">
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
         <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
-        <button onClick={() => setAba("config")} className={cls(aba === "config")}>⚙️ Configurações</button>
+        {ehAdmin && <button onClick={() => setAba("config")} className={cls(aba === "config")}>⚙️ Configurações</button>}
       </div>
 
       <div className="mt-6">
         {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
-        {aba === "config" && <MarcaForm marca={marca} />}
+        {aba === "config" && ehAdmin && <MarcaForm marca={marca} />}
       </div>
     </div>
   );

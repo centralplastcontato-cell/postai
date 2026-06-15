@@ -137,6 +137,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         evolucao={evolucao}
         conectada={marcaConectada(marca)}
         assinatura={assinatura}
+        ehAdmin={sessao.admin}
       />
       <AtividadesRecentes atividades={atividades} />
     </div>

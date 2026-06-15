@@ -3,8 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { estaLogado } from "@/lib/auth";
-import { guardaMarca, exigirAdmin } from "@/lib/acesso";
+import { exigirAdmin } from "@/lib/acesso";
 import { listarPaginas } from "@/lib/facebook";
 
 function slugify(s: string): string {
@@ -64,7 +63,7 @@ type DadosMarca = {
 };
 
 export async function salvarMarca(input: DadosMarca) {
-  const g = await guardaMarca(input.id);
+  const g = await exigirAdmin(); // config da marca (incl. conexão do Instagram) é só do admin (concierge)
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const { id, ...resto } = input;
   const data: Record<string, unknown> = {};
@@ -88,7 +87,8 @@ export async function excluirMarca(id: string) {
 // Lê o logotipo (visão do GPT-4o) e devolve a paleta de cores vivas da marca,
 // a cor principal (a mais marcante) e uma cor de fundo escura que combine.
 export async function extrairCoresLogo(logoUrl: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   if (!logoUrl) return { ok: false as const, erro: "Suba o logo primeiro." };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
@@ -156,7 +156,8 @@ export async function extrairCoresLogo(logoUrl: string) {
 
 // Testa a conexão com o Instagram da marca (lê o @ e valida o token na Meta).
 export async function testarConexao(input: { igUserId: string; accessToken: string }) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   const { igUserId, accessToken } = input;
   if (!igUserId || !accessToken) {
     return { ok: false as const, erro: "Preencha o IG User ID e o token primeiro." };
@@ -184,7 +185,8 @@ export async function testarConexao(input: { igUserId: string; accessToken: stri
 
 // Lista as Páginas do Facebook que o token administra — pra escolher qual conectar.
 export async function buscarPaginasFacebook(accessToken: string) {
-  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
   if (!accessToken) return { ok: false as const, erro: "Conecte o Instagram (token) primeiro." };
   try {
     const paginas = await listarPaginas(accessToken);
