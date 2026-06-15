@@ -420,7 +420,7 @@ export function LayoutAnivCapa(d: DadosArte) {
 }
 
 // 🎂 Aniversariantes da Semana — CARD de um aniversariante (foto + nome + idade).
-export function LayoutAnivCard(d: DadosArte & { nome?: string; idade?: string; fotoUrl?: string }) {
+export function LayoutAnivCard(d: DadosArte & { nome?: string; idade?: string; fotoUrl?: string; recado?: string }) {
   const [c1, c2, c3, c4, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[3] || d.paleta[0], d.paleta[4] || d.paleta[0]];
   const fundo = d.corFundo || c4;
   const logoW = Math.round(72 * 1.76);
@@ -467,6 +467,13 @@ export function LayoutAnivCard(d: DadosArte & { nome?: string; idade?: string; f
       {d.idade ? (
         <div style={{ display: "flex", marginTop: 20, fontFamily: "Fredoka", fontSize: 48, color: PRETO, backgroundColor: c2, padding: "12px 40px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.22)" }}>
           {d.idade}
+        </div>
+      ) : null}
+
+      {/* Recado opcional pra criança (ex: "Parabéns, princesa!") */}
+      {d.recado ? (
+        <div style={{ display: "flex", marginTop: 24, maxWidth: 880, textAlign: "center", fontFamily: "Fredoka", fontSize: 42, color: BRANCO, lineHeight: 1.25, textShadow: "0 2px 6px rgba(0,0,0,0.55)" }}>
+          {d.recado}
         </div>
       ) : null}
 

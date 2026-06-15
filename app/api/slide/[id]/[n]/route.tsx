@@ -13,7 +13,7 @@ export const maxDuration = 60;
 // ?v= troca sozinho quando o conteúdo muda.
 const CACHE = { "cache-control": "public, max-age=31536000, immutable" };
 
-type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string; fotos?: string[]; corFundo?: string };
+type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string; fotos?: string[]; corFundo?: string; recado?: string };
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: string }> }) {
   const { id, n } = await ctx.params;
@@ -92,11 +92,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
   // Slides festivos (Aniversariantes da Semana): layout colorido com a cara da marca.
   if (slide.tipo === "aniv-capa" || slide.tipo === "aniv") {
     const fonts = carregarFontes();
-    const dados = { paleta, logoSrc, site, telefone, titulo: montarTituloColorido(slide.titulo || "Aniversariantes da Semana", paleta) };
+    const dados = { paleta, logoSrc, site, telefone, titulo: montarTituloColorido(slide.titulo || "Aniversariantes da Semana", paleta), corFundo: slide.corFundo };
     const el =
       slide.tipo === "aniv-capa"
         ? LayoutAnivCapa({ ...dados, textoApoio: slide.texto })
-        : LayoutAnivCard({ ...dados, nome: slide.titulo, idade: slide.texto, fotoUrl: fotoSlide });
+        : LayoutAnivCard({ ...dados, nome: slide.titulo, idade: slide.texto, fotoUrl: fotoSlide, recado: slide.recado });
     return new ImageResponse(el, { width: 1080, height: 1350, fonts, headers: CACHE });
   }
 

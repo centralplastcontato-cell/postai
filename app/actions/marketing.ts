@@ -19,6 +19,7 @@ type SlideTexto = {
   imagemUrl?: string;
   fotos?: string[]; // tipo "mosaico": as 4 fotos reais do banco que vão nos círculos
   corFundo?: string; // cor de fundo escolhida pra capa (templates de capa)
+  recado?: string; // Aniversariantes: recado opcional por criança (aparece no slide dela)
 };
 
 // Estilos de CAPA de carrossel que o usuário pode escolher (ou "aleatorio" sorteia).
@@ -231,7 +232,10 @@ export async function criarAniversariantes(input: {
   marcaId: string;
   data: string; // YYYY-MM-DD
   semana?: string;
-  aniversariantes: { nome: string; idade?: string; fotoUrl: string }[];
+  tituloCapa?: string; // título da capa (vazio = "Aniversariantes da Semana")
+  legenda?: string; // legenda custom (vazio = gera automático com os nomes)
+  corFundo?: string; // cor de fundo do carrossel (vazio = cor da marca)
+  aniversariantes: { nome: string; idade?: string; fotoUrl: string; recado?: string }[];
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -239,17 +243,21 @@ export async function criarAniversariantes(input: {
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
 
   const lista = (input.aniversariantes || [])
-    .map((a) => ({ nome: (a.nome || "").trim(), idade: (a.idade || "").trim(), fotoUrl: (a.fotoUrl || "").trim() }))
+    .map((a) => ({ nome: (a.nome || "").trim(), idade: (a.idade || "").trim(), fotoUrl: (a.fotoUrl || "").trim(), recado: (a.recado || "").trim() }))
     .filter((a) => a.nome && a.fotoUrl);
   if (lista.length === 0) return { ok: false as const, erro: "Adicione pelo menos um aniversariante com foto e nome." };
 
+  const cor = input.corFundo?.trim() || undefined;
+  const tituloCapa = input.tituloCapa?.trim() || "Aniversariantes da Semana";
   const slides: SlideTexto[] = [
-    { tipo: "aniv-capa", titulo: "Aniversariantes da Semana", texto: input.semana?.trim() || undefined },
-    ...lista.map((a): SlideTexto => ({ tipo: "aniv", titulo: a.nome, texto: a.idade || undefined, imagemUrl: a.fotoUrl })),
+    { tipo: "aniv-capa", titulo: tituloCapa, texto: input.semana?.trim() || undefined, corFundo: cor },
+    ...lista.map((a): SlideTexto => ({ tipo: "aniv", titulo: a.nome, texto: a.idade || undefined, imagemUrl: a.fotoUrl, recado: a.recado || undefined, corFundo: cor })),
   ];
 
   const nomes = lista.map((a) => a.nome).join(", ");
-  const legenda = `🎉 Parabéns aos aniversariantes da semana! 🎂\n\nUm viva pra: ${nomes}! 🥳\n\nQue esse novo ciclo seja cheio de alegria, sorrisos e muita diversão. Felicidades!\n\nQuer comemorar com a gente? Chama no WhatsApp! 📲`;
+  const legenda =
+    input.legenda?.trim() ||
+    `🎉 Parabéns aos aniversariantes da semana! 🎂\n\nUm viva pra: ${nomes}! 🥳\n\nQue esse novo ciclo seja cheio de alegria, sorrisos e muita diversão. Felicidades!\n\nQuer comemorar com a gente? Chama no WhatsApp! 📲`;
   const hashtags = "#aniversario #aniversariantes #festainfantil #parabens #felizaniversario #buffetinfantil #festa #diversao";
 
   const horaC = String(marca.horaCarrossel ?? 10).padStart(2, "0");
@@ -260,7 +268,7 @@ export async function criarAniversariantes(input: {
       marcaId: marca.id,
       slug,
       data,
-      titulo: "Aniversariantes da Semana",
+      titulo: tituloCapa,
       legenda,
       hashtags,
       slides: "[]",

@@ -24,6 +24,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
 import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
+import { CORES_EXTRAS } from "@/lib/cores-fundo";
 
 // Temas prontos de carrossel (clique preenche o campo Tema). Ângulos que funcionam
 // pro público de um buffet infantil — o dono ajusta ou pede "Sugerir temas com IA".
@@ -50,9 +51,6 @@ const ESTILOS_CAPA: { valor: string; emoji: string; nome: string; dica: string }
   { valor: "moldura", emoji: "🪟", nome: "Moldura", dica: "Título dentro de uma moldura branca lúdica, sobre fundo festivo." },
   { valor: "faixa", emoji: "📐", nome: "Faixa", dica: "Foto de fundo com uma faixa diagonal trazendo o título." },
 ];
-
-// Paleta de cores pra capa (além do 🎲 Auto, que usa a cor da marca).
-const CORES_CAPA = ["#FF4F4F", "#FF7A00", "#FFC400", "#22C55E", "#06B6D4", "#3B82F6", "#8B5CF6", "#EC4899", "#111827"];
 
 export type Post = {
   id: string;
@@ -145,6 +143,8 @@ export function MarketingCalendario({
   const [hora, setHora] = useState(horaPadrao); // hora do post (BRT) — vários no mesmo dia
   const [estiloCapa, setEstiloCapa] = useState("aleatorio");
   const [corCapa, setCorCapa] = useState("");
+  // Modo do gerador: "tema" = carrossel por IA; "aniver" = montar Aniversariantes da semana.
+  const [modoGerador, setModoGerador] = useState<"tema" | "aniver">("tema");
   const [trocaEstilo, setTrocaEstilo] = useState("aleatorio"); // troca SÓ a capa (na tela de edição)
   const [trocaCor, setTrocaCor] = useState("");
   const [trocandoCapa, setTrocandoCapa] = useState(false);
@@ -390,10 +390,16 @@ export function MarketingCalendario({
       {/* Gerar carrossel */}
       <div className="mb-8 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
         <button type="button" onClick={gerador.alternar} className="flex w-full items-center justify-between gap-3 text-left">
-          <span className="text-sm font-semibold text-white">Gerar carrossel com IA</span>
+          <span className="text-sm font-semibold text-white">Gerar carrossel <span className="font-normal text-muted">— por tema (IA) ou Aniversariantes</span></span>
           <span className="shrink-0 rounded-md border border-linha px-2 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white">{gerador.aberto ? "▾ recolher" : "▸ expandir"}</span>
         </button>
         {gerador.aberto && (<>
+        {/* Modo: gerar por tema (IA) ou montar os Aniversariantes da semana (manual) */}
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          <button type="button" onClick={() => setModoGerador("tema")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${modoGerador === "tema" ? "border-orange-500 bg-orange-500/15 text-white" : "border-linha text-muted hover:text-white"}`}>📚 Por tema (IA)</button>
+          <button type="button" onClick={() => setModoGerador("aniver")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${modoGerador === "aniver" ? "border-orange-500 bg-orange-500/15 text-white" : "border-linha text-muted hover:text-white"}`}>🎂 Aniversariantes da semana</button>
+        </div>
+        {modoGerador === "tema" ? (<>
         <div className="mb-3 mt-3">
           <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Temas prontos (clique pra preencher)</p>
           <div className="flex flex-wrap gap-2">
@@ -470,23 +476,24 @@ export function MarketingCalendario({
               </button>
             ))}
           </div>
-          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
             <span className="mr-1 text-xs text-muted">Cor:</span>
             <button
               type="button"
               onClick={() => setCorCapa("")}
               title="Deixa o Postaí escolher uma cor da marca"
-              className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${corCapa === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}
+              className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${corCapa === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}
             >
               🎲 Auto
             </button>
-            {CORES_CAPA.map((c) => (
+            {CORES_EXTRAS.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => setCorCapa(c)}
                 title={c}
-                className={`h-7 w-7 rounded-full border-2 transition ${corCapa === c ? "border-white scale-110" : "border-linha hover:border-white/60"}`}
+                aria-label={`Cor ${c}`}
+                className={`h-9 w-9 rounded-lg border-2 transition ${corCapa.toLowerCase() === c.toLowerCase() ? "border-white ring-2 ring-white/40" : "border-linha hover:border-white/60"}`}
                 style={{ backgroundColor: c }}
               />
             ))}
@@ -505,12 +512,11 @@ export function MarketingCalendario({
           )}
         </div>
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
+        </>) : (
+          slotGerador
+        )}
         </>)}
       </div>
-
-      {/* Aniversariantes da Semana entra AQUI, logo abaixo do gerador principal — é
-          outro jeito de gerar carrossel, então fica na mesma área (não solto no fim). */}
-      {slotGerador}
 
       {/* Contagem + paginação (o filtro por dia + "Ver todos" agora ficam no topo,
           acima das abas, pois são globais — ver redes-sociais.tsx). */}
@@ -611,11 +617,11 @@ export function MarketingCalendario({
                   </button>
                 ))}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="mr-1 text-xs text-muted">Cor:</span>
-                <button type="button" onClick={() => setTrocaCor("")} title="Cor automática da marca" className={`rounded-lg border px-2.5 py-1 text-xs font-semibold transition ${trocaCor === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>🎲 Auto</button>
-                {CORES_CAPA.map((c) => (
-                  <button key={c} type="button" onClick={() => setTrocaCor(c)} title={c} className={`h-6 w-6 rounded-full border-2 transition ${trocaCor === c ? "border-white scale-110" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
+                <button type="button" onClick={() => setTrocaCor("")} title="Cor automática da marca" className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${trocaCor === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>🎲 Auto</button>
+                {CORES_EXTRAS.map((c) => (
+                  <button key={c} type="button" onClick={() => setTrocaCor(c)} title={c} aria-label={`Cor ${c}`} className={`h-9 w-9 rounded-lg border-2 transition ${trocaCor.toLowerCase() === c.toLowerCase() ? "border-white ring-2 ring-white/40" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
                 ))}
                 <button type="button" onClick={() => handleTrocarCapa(selecionado.id)} disabled={trocandoCapa} className="ml-auto rounded-lg bg-vermelho px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
                   {trocandoCapa ? "Trocando…" : "Aplicar à capa"}

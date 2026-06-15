@@ -372,7 +372,7 @@ export function StoriesAba({
       ) : filtrados.length === 0 ? (
         <p className="mb-8 rounded-xl border border-dashed border-linha bg-preto-card p-8 text-center text-sm text-muted">Nenhum Story nesse dia. <button type="button" onClick={() => onLimparDia?.()} className="font-semibold text-orange-300 underline">Ver todos</button> ou gere um acima.</p>
       ) : (
-        <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtrados.map((s) => {
             const postado = s.status === "postado";
             const ocupado = isPending || proc === s.id || postando;
