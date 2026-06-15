@@ -10,6 +10,7 @@ import {
   alternarAprovacao,
   excluirPublicacao,
   sugerirPromocao,
+  editarPublicacao,
 } from "@/app/actions/feed";
 import { sugerirTemas } from "@/app/actions/marketing";
 import { type Template } from "@/lib/feed-templates";
@@ -37,6 +38,9 @@ const MODELOS_STORY: { rotulo: string; tema: string }[] = [
   { rotulo: "💬 Chama no WhatsApp", tema: "convite direto pra chamar no WhatsApp e tirar dúvidas da festa" },
   { rotulo: "📋 Dica rápida", tema: "uma dica rápida e útil pra quem vai organizar uma festa infantil" },
 ];
+
+// Paleta de cores pro fundo do Story (além do 🎲 Auto, que usa a cor da marca).
+const CORES_STORY = ["#FF4F4F", "#FF7A00", "#FFC400", "#22C55E", "#06B6D4", "#3B82F6", "#8B5CF6", "#EC4899", "#111827"];
 
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "short" });
@@ -93,6 +97,13 @@ export function StoriesAba({
   const [temasIA, setTemasIA] = useState<string[]>([]);
   const [sugerindo, setSugerindo] = useState(false);
   const [sugerindoOferta, setSugerindoOferta] = useState(false);
+  const [estilo, setEstilo] = useState<"colorida" | "foto">("colorida");
+  const [cor, setCor] = useState("");
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [edTitulo, setEdTitulo] = useState("");
+  const [edLegenda, setEdLegenda] = useState("");
+  const [edOferta, setEdOferta] = useState("");
+  const [edValidade, setEdValidade] = useState("");
 
   const ehPromo = TEMPLATES_STORY.find((t) => t.v === template)?.oferta;
   const filtrados = dataAlvo ? stories.filter((s) => chaveDiaSP(s.data) === dataAlvo) : stories;
@@ -116,6 +127,8 @@ export function StoriesAba({
         formato: "story",
         oferta: ehPromo ? oferta : undefined,
         validade: ehPromo ? validade : undefined,
+        corFundo: estilo === "colorida" ? (cor || undefined) : undefined,
+        comFoto: estilo === "foto",
       });
       if (r.ok) {
         setTema("");
@@ -173,6 +186,36 @@ export function StoriesAba({
     startTransition(async () => {
       const r = await regerarPublicacao(s.id);
       if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  function handleEditar(s: PublicacaoView) {
+    setErro(null);
+    setEditandoId(s.id);
+    setEdTitulo(s.titulo);
+    setEdLegenda(s.legenda);
+    let ex: { oferta?: string; validade?: string } = {};
+    try { ex = JSON.parse(s.extra || "{}"); } catch {}
+    setEdOferta(ex.oferta ?? "");
+    setEdValidade(ex.validade ?? "");
+  }
+  function handleSalvarEdicao(s: PublicacaoView) {
+    setProc(s.id);
+    startTransition(async () => {
+      // Repassa a cor de fundo antiga pra editar texto NÃO randomizar a cor do Story.
+      let ex: { corFundo?: string; corFundoTravada?: string } = {};
+      try { ex = JSON.parse(s.extra || "{}"); } catch {}
+      const r = await editarPublicacao({
+        id: s.id,
+        titulo: edTitulo,
+        legenda: edLegenda,
+        oferta: edOferta,
+        validade: edValidade,
+        corFundo: ex.corFundoTravada || ex.corFundo || undefined,
+      });
+      if (!r.ok) setErro(r.erro);
+      else setEditandoId(null);
       router.refresh();
       setProc(null);
     });
@@ -254,6 +297,23 @@ export function StoriesAba({
             {isPending ? "Gerando…" : "Gerar Story"}
           </button>
         </div>
+        <div className="mt-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-xs text-muted">Estilo:</span>
+            <button type="button" onClick={() => setEstilo("colorida")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${estilo === "colorida" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>🎨 Colorida</button>
+            <button type="button" onClick={() => setEstilo("foto")} title="Usa uma foto real do seu banco como fundo (tela cheia)" className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${estilo === "foto" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>📷 Foto real</button>
+          </div>
+          {estilo === "colorida" && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="mr-1 text-xs text-muted">Cor:</span>
+              <button type="button" onClick={() => setCor("")} title="Cor automática da marca" className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${cor === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>🎲 Auto</button>
+              {CORES_STORY.map((c) => (
+                <button key={c} type="button" onClick={() => setCor(c)} title={c} className={`h-7 w-7 rounded-full border-2 transition ${cor === c ? "border-white scale-110" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
+              ))}
+            </div>
+          )}
+          {estilo === "foto" && <p className="mt-2 text-[11px] text-muted">📷 Usa uma foto real do seu <strong className="text-white/80">banco de imagens</strong> como fundo. Se o banco estiver vazio, cai na cor.</p>}
+        </div>
         {ehPromo && (
           <div className="mt-3">
             <button type="button" onClick={handleSugerirOferta} disabled={sugerindoOferta} className="mb-2 flex items-center gap-1 text-xs uppercase tracking-wider text-amber-300 transition hover:text-amber-200 disabled:opacity-50">
@@ -325,11 +385,28 @@ export function StoriesAba({
 
                 <div className="mt-2 flex flex-wrap gap-1">
                   <button onClick={() => handleAprovar(s)} disabled={ocupado} title="Revisão interna" className={`rounded px-1.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${s.aprovado ? "bg-green-600 text-white" : "border border-linha text-muted hover:text-white"}`}>{s.aprovado ? "✓" : "Aprovar"}</button>
-                  {s.tema && <button onClick={() => handleRegerar(s)} disabled={ocupado} title="Regerar texto" className="rounded border border-linha px-1.5 py-1 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻</button>}
+                  {!postado && <button onClick={() => handleEditar(s)} disabled={ocupado} title="Editar texto (sem IA)" className="rounded border border-linha px-1.5 py-1 text-[11px] text-muted transition hover:border-sky-500 hover:text-white disabled:opacity-40">✏️</button>}
+                  {s.tema && <button onClick={() => handleRegerar(s)} disabled={ocupado} title="Regerar texto (com IA)" className="rounded border border-linha px-1.5 py-1 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻</button>}
                   <button onClick={() => copiar(s)} className="rounded border border-linha px-1.5 py-1 text-[11px] text-muted transition hover:border-vermelho hover:text-white">{copiadoId === s.id ? "✓" : "Copiar"}</button>
                   {!postado && <button onClick={() => setPostarAlvo(s)} disabled={postando} className="rounded bg-[#C13584] px-1.5 py-1 text-[11px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50">📲 Story</button>}
                   <button onClick={() => setExcluirAlvo(s)} disabled={ocupado} title="Excluir" className="rounded border border-red-900 px-1.5 py-1 text-[11px] text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">🗑</button>
                 </div>
+                {editandoId === s.id && (
+                  <div className="mt-2 space-y-2 rounded-lg border border-sky-500/40 bg-sky-500/5 p-2">
+                    <input value={edTitulo} onChange={(e) => setEdTitulo(e.target.value)} placeholder="Título" className="input-base" />
+                    {s.template === "promocao" && (
+                      <div className="flex gap-2">
+                        <input value={edOferta} onChange={(e) => setEdOferta(e.target.value)} placeholder="Oferta" className="input-base" />
+                        <input value={edValidade} onChange={(e) => setEdValidade(e.target.value)} placeholder="Validade" className="input-base" />
+                      </div>
+                    )}
+                    <textarea value={edLegenda} onChange={(e) => setEdLegenda(e.target.value)} rows={3} placeholder="Legenda" className="input-base" />
+                    <div className="flex gap-2">
+                      <button onClick={() => handleSalvarEdicao(s)} disabled={ocupado} className="rounded bg-vermelho px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">💾 Salvar</button>
+                      <button onClick={() => setEditandoId(null)} className="rounded border border-linha px-3 py-1.5 text-xs text-muted transition hover:text-white">Cancelar</button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

@@ -88,10 +88,13 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
     });
   }
   if (template === "dica") {
-    // Guarda a categoria do banco escolhida pra foto, pra o botão "🎲 Banco" sortear
-    // da mesma categoria depois (ex: dica de cardápio → foto de comida).
+    // Guarda a categoria do banco (pro botão "🎲 Banco") e a cor de fundo escolhida —
+    // usada quando a dica vira Story Colorida (sem foto).
     const cat = categoria && categoria !== "geral" ? categoria : "";
-    return cat ? JSON.stringify({ categoria: cat }) : null;
+    const obj: Record<string, unknown> = {};
+    if (cat) obj.categoria = cat;
+    if (travas?.corFundo) { obj.corFundo = travas.corFundo; obj.corFundoTravada = travas.corFundo; }
+    return Object.keys(obj).length ? JSON.stringify(obj) : null;
   }
   if (template === "preco") {
     const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
@@ -440,6 +443,7 @@ export async function gerarPublicacao(input: {
   modoPreco?: string; // preco: "promo" (De→Por) | "unico" | "apartir"
   hora?: number; // hora do post (BRT) — permite vários posts no mesmo dia em horas diferentes
   formato?: string; // "feed" (padrão, 4:5) | "story" (9:16, vai pro Story)
+  comFoto?: boolean; // força (true) ou impede (false) foto de fundo; undefined = padrão do template
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -483,13 +487,16 @@ export async function gerarPublicacao(input: {
   // Templates com foto: prioriza FOTO REAL do banco da marca (da categoria pedida,
   // ex: dica de cardápio → foto de comida); só se o banco estiver vazio é que a IA
   // gera um fundo decorativo abstrato. (Promoção/Divulgação usam fundo colorido.)
-  if (USA_FOTO[template]) {
-    const real = await sortearImagemBanco(marca.id, input.categoria);
-    if (real) await definirImagemPublicacao({ id: criado.id, url: real }).catch(() => {});
-    else await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
-  } else if (template === "mosaico") {
+  const querFoto = input.comFoto === undefined ? USA_FOTO[template] : input.comFoto;
+  if (template === "mosaico") {
     // Puxa as 4 fotos reais do banco (rodízio) e grava no extra.
     await aplicarFotosMosaico(criado.id, marca.id, input.categoria).catch(() => {});
+  } else if (querFoto) {
+    const real = await sortearImagemBanco(marca.id, input.categoria);
+    if (real) await definirImagemPublicacao({ id: criado.id, url: real }).catch(() => {});
+    // Só cai pro fundo de IA nos templates que normalmente usam foto (não quando o
+    // Story força "Foto" e o banco está vazio — aí fica na cor mesmo).
+    else if (input.comFoto === undefined && USA_FOTO[template]) await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
   }
   revalidatePath(`/painel/marcas/${marca.id}`);
   // Devolve o DIA (chave SP) da publicação criada — a UI usa pra filtrar a lista só
