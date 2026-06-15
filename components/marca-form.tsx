@@ -24,6 +24,7 @@ export type MarcaView = {
   horaCarrossel: number;
   descricao: string;
   ativa: boolean;
+  espelharStory: boolean;
 };
 
 const DIAS = [
@@ -98,6 +99,7 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         horaCarrossel: f.horaCarrossel,
         descricao: f.descricao,
         ativa: f.ativa,
+        espelharStory: f.espelharStory,
       });
       if (r?.ok) {
         setSalvo(true);
@@ -354,6 +356,10 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         <p className="mt-1.5 text-[11px] text-muted">⏰ O piloto automático posta cada um na sua hora (de hora em hora). Ative o despertador no Supabase pra valer.</p>
         <label className="mt-3 flex items-center gap-2 text-sm text-white">
           <input type="checkbox" checked={f.ativa} onChange={(e) => set("ativa", e.target.checked)} /> Piloto automático ativo
+        </label>
+        <label className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white">
+          <input type="checkbox" checked={f.espelharStory} onChange={(e) => set("espelharStory", e.target.checked)} /> 🟣 Espelhar todo post no Story
+          <span className="text-xs text-muted">— cada post do feed também sobe como Story (dá pra ajustar post a post)</span>
         </label>
       </section>
 

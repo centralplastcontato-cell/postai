@@ -22,6 +22,7 @@ export function RedesSociais({
   horaCarrossel,
   paleta,
   temFacebook,
+  espelharStoryPadrao,
 }: {
   marcaId: string;
   posts: Post[];
@@ -33,6 +34,7 @@ export function RedesSociais({
   horaCarrossel: number; // hora padrão do carrossel (BRT)
   paleta: string; // JSON array de hex da marca (pro seletor de cor)
   temFacebook: boolean; // marca com Página do Facebook conectada → posta nos dois
+  espelharStoryPadrao?: boolean; // padrão da marca pra espelhar o feed no Story
 }) {
   const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes" | "story">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
@@ -122,6 +124,7 @@ export function RedesSociais({
           onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
           paleta={paleta}
           temFacebook={temFacebook}
+          espelharStoryPadrao={espelharStoryPadrao}
         />
       )}
 

@@ -60,6 +60,7 @@ type DadosMarca = {
   horaCarrossel?: number;
   descricao?: string;
   ativa?: boolean;
+  espelharStory?: boolean;
 };
 
 export async function salvarMarca(input: DadosMarca) {

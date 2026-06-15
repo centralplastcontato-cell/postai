@@ -17,6 +17,7 @@ import {
   sugerirDepoimento,
   editarPublicacao,
   reagendarPublicacao,
+  definirEspelhar,
 } from "@/app/actions/feed";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
@@ -100,6 +101,7 @@ export type PublicacaoView = {
   postadoEm?: string | null; // ISO do momento real da publicação (null = não postado)
   extra?: string | null; // JSON dos campos do template (pra pré-preencher a edição)
   categoria?: string | null; // categoria do banco pra foto (template dica)
+  espelhar?: boolean | null; // override do espelho no Story (null = usa o padrão da marca)
 };
 
 // Formata o horário de publicação: "13/jun às 14:05" (fuso de São Paulo).
@@ -148,6 +150,7 @@ export function PublicacoesAba({
   onLimparDia,
   paleta,
   temFacebook,
+  espelharStoryPadrao,
 }: {
   marcaId: string;
   publicacoes: PublicacaoView[];
@@ -158,6 +161,7 @@ export function PublicacoesAba({
   onLimparDia?: () => void;
   paleta?: string; // JSON array de hex da marca (pro seletor de cor de fundo)
   temFacebook?: boolean; // posta também no Facebook → reflete na caixinha "Estamos postando"
+  espelharStoryPadrao?: boolean; // padrão da marca pra espelhar o feed no Story
 }) {
   const router = useRouter();
   const redesTexto = temFacebook ? "no Instagram e Facebook" : "no Instagram";
@@ -404,6 +408,15 @@ export function PublicacoesAba({
       return;
     }
     regerar(p.id, false);
+  }
+  function handleEspelhar(id: string, espelhar: boolean) {
+    setProc(id);
+    startTransition(async () => {
+      const r = await definirEspelhar(id, espelhar);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
   }
   function handleAprovar(id: string) {
     setProc(id);
@@ -1004,6 +1017,9 @@ export function PublicacoesAba({
                   <button onClick={() => handleAprovar(p.id)} disabled={ocupado} title={p.aprovado ? "Você já revisou — clique pra desmarcar" : "Marcar como revisado (interno, não vai pra rede)"} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${p.aprovado ? "bg-green-600 text-white hover:bg-green-500" : "border border-linha text-muted hover:border-green-500 hover:text-white"}`}>{p.aprovado ? "✓ Aprovado" : "Aprovar"}</button>
                   {!postado && (
                     <button onClick={() => handlePostar(p)} disabled={ocupado} className="rounded-md bg-[#C13584] px-2.5 py-1 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50">📷 Postar</button>
+                  )}
+                  {!postado && (
+                    <button onClick={() => handleEspelhar(p.id, !(p.espelhar ?? !!espelharStoryPadrao))} disabled={ocupado} title="Quando este post for ao ar, também sobe como Story no Instagram" className={`rounded-md px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${(p.espelhar ?? !!espelharStoryPadrao) ? "bg-[#7c3aed] text-white hover:opacity-90" : "border border-linha text-muted hover:border-[#7c3aed] hover:text-white"}`}>{(p.espelhar ?? !!espelharStoryPadrao) ? "🟣 Story: sim" : "🟣 Story: não"}</button>
                   )}
                   <button onClick={() => handleExcluir(p.id)} disabled={ocupado} className="rounded-md border border-red-900 px-2.5 py-1 text-xs text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">Excluir</button>
                 </div>

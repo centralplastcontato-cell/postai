@@ -70,6 +70,11 @@ export async function GET(req: Request) {
         await prisma.publicacao.update({ where: { id: p.id }, data: { status: "postado", postadoEm: new Date() } });
         const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
         await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id);
+        // Espelhar no Story: ligado na marca (espelharStory) ou forçado no post (espelhar).
+        if (p.espelhar ?? m.espelharStory) {
+          const rs = await publicarStoryNasRedes(m, `${base}/api/story/${p.id}`);
+          await registrarAtividade(APP_NAME, rs.ig.ok ? `Espelhei "${p.titulo}" no Story de ${m.nome} (auto).` : `Não consegui espelhar "${p.titulo}" no Story: ${rs.ig.erro}`, m.id);
+        }
       }
       resultados.push({ marca: m.nome, tipo: "feed", titulo: p.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
     }

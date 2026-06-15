@@ -514,6 +514,16 @@ export async function postarStory(id: string) {
   return { ok: true as const };
 }
 
+// Define se ESTE post de feed também vira Story ao ser publicado (override do padrão
+// da marca). O piloto usa `espelhar ?? marca.espelharStory`.
+export async function definirEspelhar(id: string, espelhar: boolean) {
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const p = await prisma.publicacao.update({ where: { id }, data: { espelhar }, select: { marcaId: true } });
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const };
+}
+
 // Edição PONTUAL: muda só os campos informados (título, textos, valores…) SEM chamar a
 // IA e SEM trocar a foto. Reaproveita montarTravas/montarExtra; preserva o que não é
 // editável (fotos do mosaico, categoria, selo). É o "ajuste fino" da arte.
