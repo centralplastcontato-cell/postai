@@ -326,9 +326,65 @@ async function proximaDataFeed(marca: Marca): Promise<Date> {
   return new Date(`${amanha.toISOString().slice(0, 10)}T10:00:00-03:00`);
 }
 
+// Erro da OpenAI com mensagem JÁ pronta pro usuário (a UI mostra direto, em vez do
+// genérico "confira a chave" — que enganava quando a chave estava certa).
+class ErroOpenAI extends Error {}
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Chama o chat da OpenAI com RETRY automático: erros transitórios (limite de uso 429,
+// instabilidade 5xx, queda de conexão) são tentados de novo com uma pausinha — é o que
+// resolve o "deu erro mas a chave está certa". Erros definitivos (chave inválida, sem
+// crédito) NÃO insistem e devolvem uma mensagem clara do que aconteceu.
+async function chatOpenAI(key: string, body: object, tentativas = 3): Promise<string> {
+  let motivo: "limite" | "instavel" | "rede" | "vazia" = "instavel";
+  for (let i = 0; i < tentativas; i++) {
+    let resp: Response;
+    try {
+      resp = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      motivo = "rede";
+      await esperar(400 * (i + 1));
+      continue;
+    }
+    if (resp.ok) {
+      const data = await resp.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (content) return content as string;
+      motivo = "vazia";
+      await esperar(400 * (i + 1));
+      continue;
+    }
+    const corpo = (await resp.text().catch(() => "")).slice(0, 300);
+    if (resp.status === 401) throw new ErroOpenAI("A chave da OpenAI parece inválida ou expirou. Confira a OPENAI_API_KEY nas variáveis de ambiente.");
+    if (resp.status === 429) {
+      // 429 pode ser limite de ritmo (vale tentar de novo) OU falta de crédito (não adianta).
+      if (/insufficient_quota|exceeded your current quota|billing/i.test(corpo)) {
+        throw new ErroOpenAI("Os créditos da OpenAI acabaram (ou o limite de cobrança foi atingido). Recarregue créditos na conta da OpenAI.");
+      }
+      motivo = "limite";
+      await esperar(900 * (i + 1));
+      continue;
+    }
+    if (resp.status >= 500) {
+      motivo = "instavel";
+      await esperar(700 * (i + 1));
+      continue;
+    }
+    throw new ErroOpenAI(`A OpenAI recusou o pedido (erro ${resp.status}). Tente de novo em instantes.`);
+  }
+  if (motivo === "limite") throw new ErroOpenAI("A OpenAI está limitando as gerações (muitas seguidas em pouco tempo). Espere alguns segundos e tente de novo.");
+  if (motivo === "rede") throw new ErroOpenAI("Não consegui falar com a OpenAI agora (conexão). Tente de novo em instantes.");
+  if (motivo === "vazia") throw new ErroOpenAI("A OpenAI devolveu uma resposta vazia. Tente gerar de novo.");
+  throw new ErroOpenAI("A OpenAI está instável agora. Tente de novo em instantes.");
+}
+
 async function gerarTexto(marca: Marca, template: Template, tema?: string, travas?: Travas): Promise<Gerado> {
   const key = process.env.OPENAI_API_KEY;
-  if (!key) throw new Error("OPENAI_API_KEY não configurada.");
+  if (!key) throw new ErroOpenAI("A chave da OpenAI não está configurada (OPENAI_API_KEY).");
   let pedido = tema?.trim()
     ? `${GUIA[template]} Tema/assunto sugerido: "${tema.trim()}".`
     : `${GUIA[template]} Escolha um ângulo novo e útil.`;
@@ -365,23 +421,15 @@ async function gerarTexto(marca: Marca, template: Template, tema?: string, trava
     if (travas.validade?.trim()) partes.push(`validade: ${travas.validade.trim()}`);
     pedido += ` VALORES OFICIAIS (use EXATAMENTE estes na legenda — é PROIBIDO citar qualquer outro número de preço, desconto ou parcela): ${partes.join("; ")}.`;
   }
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      response_format: { type: "json_object" },
-      temperature: 0.85,
-      messages: [
-        { role: "system", content: sistema(marca, template) },
-        { role: "user", content: pedido },
-      ],
-    }),
+  const content = await chatOpenAI(key, {
+    model: "gpt-4o-mini",
+    response_format: { type: "json_object" },
+    temperature: 0.85,
+    messages: [
+      { role: "system", content: sistema(marca, template) },
+      { role: "user", content: pedido },
+    ],
   });
-  if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
-  const data = await resp.json();
-  const content = data.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Resposta vazia da OpenAI.");
   const g = JSON.parse(content) as Gerado;
   // Blindagem final: garante que nenhum preço inventado escape pra legenda/título.
   if (template === "preco") {
@@ -462,7 +510,8 @@ export async function gerarPublicacao(input: {
     gerado = await gerarTexto(marca, template, input.tema, travas);
   } catch (e) {
     console.error("Erro ao gerar publicação:", e);
-    return { ok: false as const, erro: "Não consegui gerar agora. Confira a chave da OpenAI." };
+    const msg = e instanceof ErroOpenAI ? e.message : "Não consegui gerar agora. Tente de novo em instantes.";
+    return { ok: false as const, erro: msg };
   }
   const horaFeed = typeof input.hora === "number" ? input.hora : marca.horaPost;
   const data = input.data
