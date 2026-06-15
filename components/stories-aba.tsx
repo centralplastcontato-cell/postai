@@ -87,6 +87,7 @@ export function StoriesAba({
   const [validade, setValidade] = useState("");
   const [hora, setHora] = useState(horaPadrao);
   const [erro, setErro] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
   const [postando, setPostando] = useState(false);
   const [postandoId, setPostandoId] = useState<string | null>(null);
@@ -113,6 +114,7 @@ export function StoriesAba({
 
   function handleGerar() {
     setErro(null);
+    setAviso(null);
     if (!dataAlvo) {
       setErro("Clique num dia no calendário pra escolher a data do Story.");
       return;
@@ -135,6 +137,7 @@ export function StoriesAba({
         setTema("");
         setOferta("");
         setValidade("");
+        if (r.aviso) setAviso(r.aviso);
         onGerado(r.dia ?? dataAlvo ?? undefined);
         router.refresh();
       } else setErro(r.erro);
@@ -318,7 +321,7 @@ export function StoriesAba({
               ))}
             </div>
           )}
-          {(estilo === "foto" || estilo === "faixa") && <p className="mt-2 text-[11px] text-muted">📷 Usa uma foto real do seu <strong className="text-white/80">banco de imagens</strong> como fundo. Se o banco estiver vazio, cai na cor.</p>}
+          {(estilo === "foto" || estilo === "faixa") && <p className="mt-2 text-[11px] text-muted">📷 Usa uma foto real do seu <strong className="text-white/80">banco de imagens</strong> como fundo. Sem fotos no banco, geramos um fundo artístico de IA — adicione fotos em <strong className="text-white/80">📸 Imagens</strong> pra usar o seu espaço real.</p>}
         </div>
         {ehPromo && (
           <div className="mt-3">
@@ -350,6 +353,7 @@ export function StoriesAba({
           )}
         </div>
         {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
+        {aviso && <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">💡 {aviso}</p>}
         <p className="mt-2 text-[11px] text-muted">O Story some sozinho em 24h no Instagram — perfeito pra novidades e urgência.</p>
       </div>
 

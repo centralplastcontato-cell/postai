@@ -489,15 +489,21 @@ export async function gerarPublicacao(input: {
   // ex: dica de cardápio → foto de comida); só se o banco estiver vazio é que a IA
   // gera um fundo decorativo abstrato. (Promoção/Divulgação usam fundo colorido.)
   const querFoto = input.comFoto === undefined ? USA_FOTO[template] : input.comFoto;
+  let avisoFoto = false; // usuário PEDIU foto (Story Foto/Faixa) mas o banco estava vazio
   if (template === "mosaico") {
     // Puxa as 4 fotos reais do banco (rodízio) e grava no extra.
     await aplicarFotosMosaico(criado.id, marca.id, input.categoria).catch(() => {});
   } else if (querFoto) {
     const real = await sortearImagemBanco(marca.id, input.categoria);
     if (real) await definirImagemPublicacao({ id: criado.id, url: real }).catch(() => {});
-    // Só cai pro fundo de IA nos templates que normalmente usam foto (não quando o
-    // Story força "Foto" e o banco está vazio — aí fica na cor mesmo).
-    else if (input.comFoto === undefined && USA_FOTO[template]) await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
+    else {
+      // Banco vazio: gera um fundo decorativo de IA pra o post NUNCA sair em branco —
+      // vale tanto pros templates de foto quanto quando o Story FORÇA "Foto/Faixa".
+      await gerarImagemPublicacao({ id: criado.id }).catch(() => {});
+      // Quando o usuário PEDIU foto (Story) e o banco estava vazio, avisa que caiu no
+      // fundo de IA — pra ele saber que, pra usar o espaço real, precisa cadastrar fotos.
+      if (input.comFoto === true) avisoFoto = true;
+    }
   }
   // Guarda o estilo do Story no extra (o render usa pra escolher a variante, ex: faixa).
   if (input.formato === "story" && input.estiloStory) {
@@ -510,7 +516,10 @@ export async function gerarPublicacao(input: {
   // Devolve o DIA (chave SP) da publicação criada — a UI usa pra filtrar a lista só
   // nesse dia (em vez de abrir tudo). Ver mais é só clicar em "Ver todas".
   const dia = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(data);
-  return { ok: true as const, id: criado.id, dia };
+  const aviso = avisoFoto
+    ? "Essa marca ainda não tem fotos no banco — gerei um fundo artístico de IA. Pra usar fotos reais do seu espaço no Story, adicione fotos em 📸 Imagens."
+    : undefined;
+  return { ok: true as const, id: criado.id, dia, aviso };
 }
 
 // Posta um STORY (9:16) no Instagram da marca AGORA. Renderiza /api/story/[id] (vertical),
@@ -574,6 +583,9 @@ export async function editarPublicacao(input: {
   let exNovo: Record<string, unknown> = {};
   try { exNovo = JSON.parse(montarExtra(p.marca, template, geradoFake, seed, travas, categoria) || "{}"); } catch {}
   if (Array.isArray(exAntigo.fotos)) exNovo.fotos = exAntigo.fotos;
+  // Preserva o estilo do Story (foto/faixa/colorida) — montarExtra não o conhece, então
+  // sem isso editar o texto faria um Story "faixa" voltar a renderizar como "colorida".
+  if (typeof exAntigo.estiloStory === "string") exNovo.estiloStory = exAntigo.estiloStory;
 
   await prisma.publicacao.update({
     where: { id: input.id },
@@ -615,8 +627,10 @@ export async function regerarPublicacao(id: string) {
   // Recupera o que o usuário havia fixado pra manter a oferta/validade no regerar.
   let travas: Travas = {};
   let categoria: string | undefined;
+  let estiloStory: string | undefined; // foto/faixa/colorida — preservado no regerar
   try {
     const ex = JSON.parse(p.extra || "{}");
+    estiloStory = typeof ex.estiloStory === "string" ? ex.estiloStory : undefined;
     travas = {
       oferta: ex.ofertaTravada || undefined,
       validade: ex.validadeTravada || undefined,
@@ -650,6 +664,12 @@ export async function regerarPublicacao(id: string) {
     return { ok: false as const, erro: "Não consegui regerar agora." };
   }
   const seed = p.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  // Remonta o extra e reinjeta o estiloStory (montarExtra não o conhece) — senão regerar
+  // o texto faria um Story "foto"/"faixa" voltar a renderizar como "colorida".
+  let extraNovo = montarExtra(p.marca, template, gerado, seed, travas, categoria);
+  if (estiloStory) {
+    try { const o = JSON.parse(extraNovo || "{}"); o.estiloStory = estiloStory; extraNovo = JSON.stringify(o); } catch {}
+  }
   await prisma.publicacao.update({
     where: { id },
     data: {
@@ -657,7 +677,7 @@ export async function regerarPublicacao(id: string) {
       texto: gerado.texto || "",
       legenda: gerado.legenda || "",
       hashtags: gerado.hashtags || "",
-      extra: montarExtra(p.marca, template, gerado, seed, travas, categoria),
+      extra: extraNovo,
       status: "a_postar",
     },
   });
