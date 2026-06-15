@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
-import { snapshotDeMarca } from "@/lib/metricas";
+import { snapshotDeMarca, alertarTokenSeVencendo } from "@/lib/metricas";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 
@@ -46,6 +46,7 @@ export async function GET(req: Request) {
     if (!marcaConectada(m)) continue;
     try {
       await snapshotDeMarca(m).catch(() => {}); // best-effort, nunca derruba o piloto
+      await alertarTokenSeVencendo(m).catch(() => {}); // avisa nas Atividades se o token estiver vencendo
 
       await postarCarrossel(m, agora, base, resultados);
       await postarFeed(m, agora, base, resultados);
