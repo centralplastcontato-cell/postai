@@ -379,20 +379,16 @@ export function StoriesAba({
             return (
               <div key={s.id} className="flex flex-col rounded-xl border border-linha bg-preto-card p-2.5">
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted">{dataBR(s.data)}</span>
-                    {!postado && (
-                      <select value={horaSP(s.data)} onChange={(e) => handleReagendar(s.id, Number(e.target.value))} disabled={ocupado} title="Hora da postagem" className="rounded border border-linha bg-preto px-1 py-0.5 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
-                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
-                      </select>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {s.aprovado && !postado && <span title="Você já aprovou este Story" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Aprovado</span>}
-                    <span title={postado && s.postadoEm ? `Publicado em ${dataHoraBR(s.postadoEm)}` : undefined} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "✓ Postado" : "● A postar"}</span>
-                  </div>
+                  <span className="truncate text-xs text-muted">{dataBR(s.data)}</span>
+                  <span title={postado && s.postadoEm ? `Publicado em ${dataHoraBR(s.postadoEm)}` : undefined} className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "✓ Postado" : "● A postar"}</span>
                 </div>
-                {postado && s.postadoEm && <p className="-mt-1 mb-2 text-[11px] text-green-400/80">📢 Publicado {dataHoraBR(s.postadoEm)}</p>}
+                {!postado ? (
+                  <select value={horaSP(s.data)} onChange={(e) => handleReagendar(s.id, Number(e.target.value))} disabled={ocupado} title="Hora da postagem" className="mb-2 w-fit rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
+                    {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
+                  </select>
+                ) : (
+                  s.postadoEm && <p className="mb-2 text-[11px] text-green-400/80">📢 Publicado {dataHoraBR(s.postadoEm)}</p>
+                )}
                 <div className="relative">
                   <button type="button" onClick={() => setImgExpandida(verStory(s))} title="Ampliar" className="block w-full overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
                     {/* eslint-disable-next-line @next/next/no-img-element */}

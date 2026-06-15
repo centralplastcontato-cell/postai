@@ -540,20 +540,16 @@ export function MarketingCalendario({
             return (
               <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${aberto ? "border-orange-500 ring-2 ring-orange-500/50" : "border-linha"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted">{dataBR(p.data)}</span>
-                    {!postado && (
-                      <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={isPending} title="Hora da postagem (o piloto posta nesse horário) — permite vários posts no mesmo dia" className="rounded border border-linha bg-preto px-1 py-0.5 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
-                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
-                      </select>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {p.aprovado && !postado && <span title="Você já aprovou este carrossel" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Aprovado</span>}
-                    <span title={postado && p.postadoEm ? `Publicado em ${dataHoraBR(p.postadoEm)}` : undefined} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "✓ Postado" : "● A postar"}</span>
-                  </div>
+                  <span className="truncate text-xs text-muted">{dataBR(p.data)}</span>
+                  <span title={postado && p.postadoEm ? `Publicado em ${dataHoraBR(p.postadoEm)}` : undefined} className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "✓ Postado" : "● A postar"}</span>
                 </div>
-                {postado && p.postadoEm && <p className="-mt-1 mb-2 text-[11px] text-green-400/80">📢 Publicado {dataHoraBR(p.postadoEm)}</p>}
+                {!postado ? (
+                  <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={isPending} title="Hora da postagem (o piloto posta nesse horário) — permite vários posts no mesmo dia" className="mb-2 w-fit rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
+                    {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
+                  </select>
+                ) : (
+                  p.postadoEm && <p className="mb-2 text-[11px] text-green-400/80">📢 Publicado {dataHoraBR(p.postadoEm)}</p>
+                )}
                 <div className="relative">
                   <button type="button" onClick={() => onSelId(aberto ? null : p.id)} title={aberto ? "Fechar detalhe" : "Abrir / editar slides"} className="block w-full overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
                     {capa ? (
