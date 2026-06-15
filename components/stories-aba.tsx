@@ -19,6 +19,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
 import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
+import { CORES_EXTRAS } from "@/lib/cores-fundo";
 
 // Templates que fazem sentido pro Story (vertical, chamativo). Promoção mostra o selo
 // de oferta; os demais usam só título + texto. Tudo renderizado em 9:16.
@@ -40,9 +41,6 @@ const MODELOS_STORY: { rotulo: string; tema: string }[] = [
   { rotulo: "💬 Chama no WhatsApp", tema: "convite direto pra chamar no WhatsApp e tirar dúvidas da festa" },
   { rotulo: "📋 Dica rápida", tema: "uma dica rápida e útil pra quem vai organizar uma festa infantil" },
 ];
-
-// Paleta de cores pro fundo do Story (além do 🎲 Auto, que usa a cor da marca).
-const CORES_STORY = ["#FF4F4F", "#FF7A00", "#FFC400", "#22C55E", "#06B6D4", "#3B82F6", "#8B5CF6", "#EC4899", "#111827"];
 
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "short", day: "2-digit", month: "short" });
@@ -320,11 +318,11 @@ export function StoriesAba({
             <button type="button" onClick={() => setEstilo("faixa")} title="Foto real com uma faixa diagonal trazendo o título" className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${estilo === "faixa" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>📐 Faixa</button>
           </div>
           {estilo === "colorida" && (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="mr-1 text-xs text-muted">Cor:</span>
-              <button type="button" onClick={() => setCor("")} title="Cor automática da marca" className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${cor === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>🎲 Auto</button>
-              {CORES_STORY.map((c) => (
-                <button key={c} type="button" onClick={() => setCor(c)} title={c} className={`h-7 w-7 rounded-full border-2 transition ${cor === c ? "border-white scale-110" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
+              <button type="button" onClick={() => setCor("")} title="Cor automática da marca" className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${cor === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>🎲 Auto</button>
+              {CORES_EXTRAS.map((c) => (
+                <button key={c} type="button" onClick={() => setCor(c)} title={c} aria-label={`Cor ${c}`} className={`h-9 w-9 rounded-lg border-2 transition ${cor.toLowerCase() === c.toLowerCase() ? "border-white ring-2 ring-white/40" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
               ))}
             </div>
           )}
@@ -380,17 +378,21 @@ export function StoriesAba({
             const ocupado = isPending || proc === s.id || postando;
             return (
               <div key={s.id} className="flex flex-col rounded-xl border border-linha bg-preto-card p-2.5">
-                <div className="mb-2 flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[11px] text-muted">{dataBR(s.data)}</span>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-muted">{dataBR(s.data)}</span>
                     {!postado && (
-                      <select value={horaSP(s.data)} onChange={(e) => handleReagendar(s.id, Number(e.target.value))} disabled={ocupado} title="Hora da postagem" className="rounded border border-linha bg-preto px-1 py-0.5 text-[10px] text-white transition hover:border-vermelho disabled:opacity-40">
-                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {String(h).padStart(2, "0")}h</option>)}
+                      <select value={horaSP(s.data)} onChange={(e) => handleReagendar(s.id, Number(e.target.value))} disabled={ocupado} title="Hora da postagem" className="rounded border border-linha bg-preto px-1 py-0.5 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
+                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
                       </select>
                     )}
                   </div>
-                  <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
+                  <div className="flex items-center gap-1.5">
+                    {s.aprovado && !postado && <span title="Você já aprovou este Story" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Aprovado</span>}
+                    <span title={postado && s.postadoEm ? `Publicado em ${dataHoraBR(s.postadoEm)}` : undefined} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "✓ Postado" : "● A postar"}</span>
+                  </div>
                 </div>
+                {postado && s.postadoEm && <p className="-mt-1 mb-2 text-[11px] text-green-400/80">📢 Publicado {dataHoraBR(s.postadoEm)}</p>}
                 <div className="relative">
                   <button type="button" onClick={() => setImgExpandida(verStory(s))} title="Ampliar" className="block w-full overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -399,7 +401,6 @@ export function StoriesAba({
                   {postandoId === s.id && <CaixaPostando redes="no Instagram (Story)" />}
                 </div>
                 <p className="mt-2 line-clamp-2 text-xs text-white">{s.titulo}</p>
-                {postado && s.postadoEm && <p className="mt-1 text-[10px] text-green-400/80">📢 {dataHoraBR(s.postadoEm)}</p>}
 
                 <div className="mt-2 flex flex-wrap gap-1">
                   <button onClick={() => handleAprovar(s)} disabled={ocupado} title="Revisão interna" className={`rounded px-1.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${s.aprovado ? "bg-green-600 text-white" : "border border-linha text-muted hover:text-white"}`}>{s.aprovado ? "✓" : "Aprovar"}</button>

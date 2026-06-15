@@ -17,7 +17,8 @@ export type MarcaView = {
   site: string;
   telefone: string;
   igUserId: string;
-  accessToken: string;
+  accessToken: string; // write-only: vem vazio do servidor; só é enviado quando o admin digita um novo
+  temToken: boolean; // sinaliza que já existe um token salvo (sem expor o valor)
   fbPageId: string;
   diasCarrossel: string;
   diasFeed: string;
@@ -93,7 +94,7 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         site: f.site,
         telefone: f.telefone,
         igUserId: f.igUserId,
-        accessToken: f.accessToken,
+        accessToken: f.accessToken.trim() || undefined, // só envia se digitaram um novo (não apaga o salvo)
         diasCarrossel: f.diasCarrossel,
         diasFeed: f.diasFeed,
         horaPost: f.horaPost,
@@ -296,7 +297,10 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         <p className="mb-3 text-xs text-muted">Cole o IG User ID e o token do Usuário do Sistema desta conta (com permissão de publicar). Ao testar com sucesso, a conexão é <strong className="text-white">salva na hora</strong> — não precisa clicar em Salvar embaixo.</p>
         <div className="grid grid-cols-1 gap-3">
           <label className="text-xs text-muted">IG User ID<input value={f.igUserId} onChange={(e) => set("igUserId", e.target.value)} placeholder="17841400000000000" autoComplete="off" className={inp} /></label>
-          <label className="text-xs text-muted">Access Token<input value={f.accessToken} onChange={(e) => set("accessToken", e.target.value)} placeholder="EAA..." autoComplete="off" className={inp} /></label>
+          <label className="text-xs text-muted">Access Token
+            <input value={f.accessToken} onChange={(e) => set("accessToken", e.target.value)} placeholder={f.temToken ? "•••• já conectado — cole um novo só pra trocar" : "EAA..."} autoComplete="off" className={inp} />
+            {f.temToken && !f.accessToken && <span className="mt-1 block text-[11px] text-green-400/80">✓ Token já configurado (guardado em segurança no servidor — não aparece aqui).</span>}
+          </label>
         </div>
         <div className="mt-3 flex items-center gap-3">
           <button onClick={handleTestar} disabled={testando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho disabled:opacity-50">{testando ? "Testando…" : "Testar e salvar conexão"}</button>

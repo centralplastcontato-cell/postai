@@ -22,7 +22,7 @@ import {
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
 import { CATEGORIAS, CATEGORIA_LABEL } from "@/lib/categorias-imagem";
-import { parsePaleta, coresDeFundo } from "@/lib/cores-fundo";
+import { parsePaleta, paletaComExtras, CORES_EXTRAS } from "@/lib/cores-fundo";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
@@ -203,7 +203,7 @@ export function PublicacoesAba({
   const [legendaEdit, setLegendaEdit] = useState("");
   const [hashtagsEdit, setHashtagsEdit] = useState("");
   // Cores da marca que servem de fundo (escuras). Vazio se a marca não tem paleta.
-  const coresFundo = coresDeFundo(parsePaleta(paleta));
+  const coresFundo = paletaComExtras(parsePaleta(paleta));
   // Templates de fundo COLORIDO (onde escolher a cor faz sentido — os com foto não).
   const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico", "moldura", "faixa", "preco"];
   const [erro, setErro] = useState<string | null>(null);
@@ -862,10 +862,10 @@ export function PublicacoesAba({
             </div>
             <div>
               <span className="text-xs text-muted">Cor do balão</span>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                <button type="button" onClick={() => setCorCard("")} className={`rounded-lg border px-3 py-1 text-xs font-semibold transition ${corCard === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>⬜ Branco</button>
-                {["#C1121F", "#1D4ED8", "#047857", "#7C3AED", "#DB2777", "#EA580C", "#0E7490", "#111827"].map((c) => (
-                  <button key={c} type="button" onClick={() => setCorCard(c)} title={c} className={`h-7 w-7 rounded-full border-2 transition ${corCard === c ? "border-white scale-110" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setCorCard("")} className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold transition ${corCard === "" ? "border-vermelho bg-vermelho/15 text-white" : "border-linha text-muted hover:text-white"}`}>⬜ Branco</button>
+                {CORES_EXTRAS.map((c) => (
+                  <button key={c} type="button" onClick={() => setCorCard(c)} title={c} aria-label={`Cor ${c}`} className={`h-9 w-9 rounded-lg border-2 transition ${corCard.toLowerCase() === c.toLowerCase() ? "border-white ring-2 ring-white/40" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
                 ))}
               </div>
             </div>
@@ -973,8 +973,8 @@ export function PublicacoesAba({
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {p.aprovado && <span title="Você já aprovou este post" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Aprovado</span>}
-                    <span title={postado && p.postadoEm ? `Publicado em ${dataHoraBR(p.postadoEm)}` : undefined} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
+                    {p.aprovado && !postado && <span title="Você já aprovou este post" className="rounded-full border border-green-500/40 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-300">✓ Aprovado</span>}
+                    <span title={postado && p.postadoEm ? `Publicado em ${dataHoraBR(p.postadoEm)}` : undefined} className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "✓ Postado" : "● A postar"}</span>
                   </div>
                 </div>
                 {postado && p.postadoEm && <p className="-mt-1 mb-2 text-[11px] text-green-400/80">📢 Publicado {dataHoraBR(p.postadoEm)}</p>}

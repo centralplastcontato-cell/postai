@@ -15,9 +15,36 @@ function ehDataUriSuportado(url: string): boolean {
   return url.startsWith("data:image/png") || url.startsWith("data:image/jpeg") || url.startsWith("data:image/jpg");
 }
 
+// Guard de SSRF: a foto externa só é buscada se for http(s) público. Bloqueia loopback,
+// IP privado, link-local e o endereço de metadados de nuvem (169.254.169.254) — pra um
+// usuário não conseguir fazer o servidor buscar URLs internas via campo de imagem.
+function urlExternaSegura(url: string): boolean {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return false;
+  }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return false;
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, ""); // tira colchetes de IPv6
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+  if (host === "::1" || host === "0.0.0.0") return false;
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a === 0 || a === 127 || a === 10) return false; // "this host" / loopback / privado
+    if (a === 169 && b === 254) return false; // link-local + metadados de nuvem
+    if (a === 172 && b >= 16 && b <= 31) return false; // 172.16/12
+    if (a === 192 && b === 168) return false; // 192.168/16
+  }
+  return true;
+}
+
 export async function fotoSegura(url?: string | null): Promise<string | undefined> {
   if (!url) return undefined;
   if (ehDataUriSuportado(url)) return url; // já embutido e suportado — sem custo
+  if (!urlExternaSegura(url)) return undefined; // SSRF: nunca busca host interno/privado
   try {
     const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) return undefined;

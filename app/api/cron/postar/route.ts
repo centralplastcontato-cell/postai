@@ -4,6 +4,7 @@ import { snapshotDeMarca, alertarTokenSeVencendo } from "@/lib/metricas";
 import { acessoExpirado } from "@/lib/plano";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, AGENTE } from "@/lib/config";
+import { timingSafeEqual } from "crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,9 +29,21 @@ type Resultado = { marca: string; tipo: Tipo; titulo: string; ok: boolean; erro?
  *
  * Protegido por CRON_SECRET (header Authorization: Bearer <segredo>).
  */
+// Compara o header Authorization com o segredo de forma timing-safe (tamanhos iguais).
+function autorizado(header: string | null, secret: string): boolean {
+  const a = Buffer.from(header || "");
+  const b = Buffer.from(`Bearer ${secret}`);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get("authorization") !== `Bearer ${secret}`) {
+  // Fail-closed: sem segredo configurado, NINGUÉM dispara o piloto. (Antes, se a env var
+  // sumisse, a rota ficava aberta e qualquer um postaria no Instagram de todos os clientes.)
+  if (!secret) {
+    return Response.json({ ok: false, erro: "Cron não configurado." }, { status: 503 });
+  }
+  if (!autorizado(req.headers.get("authorization"), secret)) {
     return Response.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
   }
 

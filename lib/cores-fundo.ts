@@ -25,3 +25,20 @@ export function coresDeFundo(paleta: string[]): string[] {
   const escuras = paleta.filter((c) => luminancia(c) < 0.62);
   return escuras.length ? escuras : paleta;
 }
+
+// Paleta fixa de cores de fundo bonitas e variadas (todas escuras o suficiente pro texto
+// branco ficar legível). Sempre disponível no seletor, além das cores da própria marca —
+// pra dar variedade quando a marca tem poucas cores na paleta.
+export const CORES_EXTRAS = [
+  "#DC2626", "#EA580C", "#D97706", "#16A34A", "#059669", "#0D9488",
+  "#0891B2", "#2563EB", "#4F46E5", "#7C3AED", "#9333EA", "#C026D3",
+  "#DB2777", "#E11D48", "#BE185D", "#334155", "#1F2937", "#0F172A",
+];
+
+// Cores do seletor de fundo do feed: as da MARCA primeiro (identidade dela) + a paleta
+// extra, sem repetir (comparação case-insensitive).
+export function paletaComExtras(paleta: string[]): string[] {
+  const daMarca = coresDeFundo(paleta);
+  const vistas = new Set(daMarca.map((c) => c.toLowerCase()));
+  return [...daMarca, ...CORES_EXTRAS.filter((c) => !vistas.has(c.toLowerCase()))];
+}

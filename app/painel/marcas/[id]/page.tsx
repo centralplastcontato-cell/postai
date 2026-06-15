@@ -49,15 +49,17 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   ]);
   const atividades = ativ.map((a) => ({ id: a.id, agente: a.agente, texto: a.texto, criadoEm: a.criadoEm.toISOString() }));
 
-  // Resumo de valor: quantos posts o piloto JÁ publicou (total e neste mês) — mostra o
-  // trabalho que o Postaí fez sozinho. Conta carrossel + feed + story já postados.
-  const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-  const postados = [...conteudos, ...pubs].filter((x) => x.status === "postado" && x.postadoEm);
+  // Resumo de valor: o que o piloto JÁ publicou sozinho, pelos 3 tipos (as 3 abas:
+  // Carrosséis, Publicações, Story). A soma fecha certinho (carrosseis + feed + stories
+  // = total).
+  const carrosseisPostados = conteudos.filter((c) => c.status === "postado" && c.postadoEm).length;
+  const feedPostados = pubs.filter((p) => p.formato !== "story" && p.status === "postado" && p.postadoEm).length;
   const storiesPostados = pubs.filter((p) => p.formato === "story" && p.status === "postado" && p.postadoEm).length;
   const entregue = {
-    total: postados.length,
-    mes: postados.filter((x) => x.postadoEm!.getTime() >= inicioMes).length,
+    carrosseis: carrosseisPostados,
+    feed: feedPostados,
     stories: storiesPostados,
+    total: carrosseisPostados + feedPostados + storiesPostados,
   };
 
   const posts: Post[] = conteudos.map((c) => {
@@ -126,7 +128,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     site: marca.site,
     telefone: marca.telefone,
     igUserId: marca.igUserId,
-    accessToken: marca.accessToken,
+    accessToken: "", // SEGURANÇA: nunca enviar o token da Meta ao navegador (write-only)
+    temToken: Boolean(marca.accessToken), // só sinaliza que já existe um token salvo
     fbPageId: marca.fbPageId,
     diasCarrossel: marca.diasCarrossel,
     diasFeed: marca.diasFeed,

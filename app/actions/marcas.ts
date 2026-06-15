@@ -68,7 +68,9 @@ export async function salvarMarca(input: DadosMarca) {
   const { id, ...resto } = input;
   const data: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(resto)) {
-    if (v !== undefined) data[k] = v;
+    if (v === undefined) continue;
+    if (k === "accessToken" && v === "") continue; // token write-only: vazio = "mantém o que está salvo" (nunca apaga)
+    data[k] = v;
   }
   await prisma.marca.update({ where: { id }, data });
   revalidatePath(`/painel/marcas/${id}`);

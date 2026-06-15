@@ -14,7 +14,6 @@ export function EvolucaoCard({ pontos }: { pontos: Ponto[] }) {
   const atual = pontos[pontos.length - 1];
   const primeiro = pontos[0];
   const deltaSeg = atual.seguidores - primeiro.seguidores;
-  const deltaPosts = atual.posts - primeiro.posts;
   const desde = dataCurta(primeiro.dia);
 
   // Ainda magro pra desenhar um gráfico — mostra só o ponto de partida.
@@ -54,12 +53,8 @@ export function EvolucaoCard({ pontos }: { pontos: Ponto[] }) {
           <p className="text-2xl font-bold text-white">{atual.seguidores.toLocaleString("pt-BR")}</p>
         </div>
         <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted">Desde o início</p>
+          <p className="text-[10px] uppercase tracking-wider text-muted">Seguidores ganhos</p>
           <p className={`text-2xl font-bold ${subiu ? "text-green-400" : "text-red-400"}`}>{subiu ? "+" : ""}{deltaSeg.toLocaleString("pt-BR")}</p>
-        </div>
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted">Novos posts</p>
-          <p className="text-2xl font-bold text-white">{deltaPosts >= 0 ? "+" : ""}{deltaPosts.toLocaleString("pt-BR")}</p>
         </div>
       </div>
 
@@ -77,7 +72,6 @@ export function EvolucaoCard({ pontos }: { pontos: Ponto[] }) {
         ))}
       </svg>
       <p className="mt-1 text-[11px] text-muted">Crescimento dos seguidores enquanto o Postaí publica sozinho. 🚀</p>
-      <p className="mt-0.5 text-[11px] text-muted">📌 “Novos posts” conta só o feed permanente — os Stories não entram aqui (o Instagram não os conta como post fixo). Veja quantos Stories saíram no card 🟣 acima.</p>
     </div>
   );
 }

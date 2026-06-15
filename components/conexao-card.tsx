@@ -97,7 +97,7 @@ export function ConexaoCard({ marcaId, temConexao }: { marcaId: string; temConex
           {info?.token?.estado === "valido" && typeof info.token.dias === "number" && info.token.dias <= 14 && (
             <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">⏳ O token vence em <strong>{info.token.dias} {info.token.dias === 1 ? "dia" : "dias"}</strong> — reconecte em ⚙️ Configurações antes disso pra não interromper o piloto.</p>
           )}
-          <p className="mt-3 text-xs text-muted">Carrosséis, posts e stories vão pra esta conta automaticamente (piloto, na hora agendada).</p>
+          <p className="mt-3 text-xs text-muted">Carrosséis, posts e stories vão pra esta conta automaticamente — a Bia posta na hora agendada. 💜</p>
           {info?.erro && <p className="mt-2 text-xs text-red-400">⚠ {info.erro}</p>}
           <button onClick={verificar} disabled={carregando} className="mt-3 rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-vermelho disabled:opacity-50">
             {carregando ? "Verificando…" : "↻ Verificar agora"}

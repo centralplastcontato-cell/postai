@@ -46,7 +46,7 @@ export function MarcaHub({
   conectada: boolean;
   assinatura?: Assinatura | null;
   ehAdmin: boolean;
-  entregue: { total: number; mes: number; stories: number };
+  entregue: { carrosseis: number; feed: number; stories: number; total: number };
 }) {
   const [aba, setAba] = useState<"redes" | "imagens" | "config">("redes");
   const cls = (a: boolean) =>
@@ -95,21 +95,24 @@ export function MarcaHub({
         {entregue.total > 0 && (
           <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
             <p className="text-sm font-semibold text-white">🤖 A Bia já trabalhou por você</p>
+            <p className="mt-1 text-xs text-muted">
+              A Bia já fez <strong className="text-white">{entregue.total}</strong> {entregue.total === 1 ? "publicação" : "publicações"} sozinha — sem você levantar um dedo. 🚀
+            </p>
             <div className="mt-3 grid grid-cols-3 gap-3">
               <div className="rounded-lg border border-linha bg-preto px-4 py-3">
-                <p className="text-[10px] uppercase tracking-wider text-muted">Posts publicados</p>
-                <p className="mt-0.5 text-2xl font-bold text-white">{entregue.total}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted">🎠 Carrosséis</p>
+                <p className="mt-0.5 text-2xl font-bold text-white">{entregue.carrosseis}</p>
+              </div>
+              <div className="rounded-lg border border-linha bg-preto px-4 py-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted">🖼️ Publicações</p>
+                <p className="mt-0.5 text-2xl font-bold text-white">{entregue.feed}</p>
               </div>
               <div className="rounded-lg border border-linha bg-preto px-4 py-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted">🟣 Stories</p>
                 <p className="mt-0.5 text-2xl font-bold text-white">{entregue.stories}</p>
               </div>
-              <div className="rounded-lg border border-linha bg-preto px-4 py-3">
-                <p className="text-[10px] uppercase tracking-wider text-muted">Este mês</p>
-                <p className="mt-0.5 text-2xl font-bold text-green-400">{entregue.mes}</p>
-              </div>
             </div>
-            <p className="mt-2 text-xs text-muted">É tudo que a Bia publicou sozinha — feed, carrossel e Stories — sem você levantar um dedo. 🚀</p>
+            <p className="mt-2 text-[11px] text-muted">Carrosséis e Publicações ficam fixos no seu perfil · os Stories somem em 24h.</p>
           </div>
         )}
         <EvolucaoCard pontos={evolucao} />
