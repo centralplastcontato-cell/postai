@@ -2,17 +2,33 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { criarCliente, excluirCliente, redefinirSenhaCliente, atribuirMarca } from "@/app/actions/usuarios";
+import { criarCliente, excluirCliente, redefinirSenhaCliente, atribuirMarca, definirPacote, renovarAcesso, removerValidade } from "@/app/actions/usuarios";
+import { PLANOS, rotuloPlano, diasDeAcesso } from "@/lib/plano";
 import { ConfirmDialog } from "./confirm-dialog";
 
-type Cliente = { id: string; nome: string; marcas: { id: string; nome: string }[] };
+type Cliente = { id: string; nome: string; plano: string | null; acessoAte: string | null; marcas: { id: string; nome: string }[] };
 type MarcaItem = { id: string; nome: string; usuarioId: string | null };
+
+function dataBR(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+// Texto + cor do status de acesso de um cliente (pra lista do admin).
+function statusAcesso(acessoAte: string | null): { txt: string; cls: string } {
+  const dias = diasDeAcesso(acessoAte);
+  if (dias === null) return { txt: "acesso aberto (sem validade)", cls: "text-muted" };
+  if (dias < 0) return { txt: `🔴 vencido há ${Math.abs(dias)} ${Math.abs(dias) === 1 ? "dia" : "dias"}`, cls: "text-red-400" };
+  if (dias === 0) return { txt: "🔴 vence hoje", cls: "text-red-400" };
+  const cls = dias <= 7 ? "text-red-400" : dias <= 30 ? "text-amber-300" : "text-green-400";
+  return { txt: `ativo · ${dias} ${dias === 1 ? "dia" : "dias"} (até ${dataBR(acessoAte!)})`, cls };
+}
 
 export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marcas: MarcaItem[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [nome, setNome] = useState("");
   const [senha, setSenha] = useState("");
+  const [novoPlano, setNovoPlano] = useState("profissional");
+  const [novoMeses, setNovoMeses] = useState(1);
   const [erro, setErro] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [excluirAlvo, setExcluirAlvo] = useState<Cliente | null>(null);
@@ -27,7 +43,7 @@ export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marca
   function handleCriar() {
     setErro(null);
     startTransition(async () => {
-      const r = await criarCliente(nome, senha);
+      const r = await criarCliente(nome, senha, novoPlano, novoMeses);
       if (!r.ok) setErro(r.erro);
       else {
         setNome("");
@@ -35,6 +51,31 @@ export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marca
         aviso("Cliente criado!");
         router.refresh();
       }
+    });
+  }
+
+  function handleDefinirPacote(id: string, plano: string) {
+    setErro(null);
+    startTransition(async () => {
+      const r = await definirPacote(id, plano);
+      if (!r.ok) setErro(r.erro);
+      else { aviso("Pacote atualizado!"); router.refresh(); }
+    });
+  }
+  function handleRenovar(id: string, meses: number) {
+    setErro(null);
+    startTransition(async () => {
+      const r = await renovarAcesso(id, meses);
+      if (!r.ok) setErro(r.erro);
+      else { aviso(`Acesso +${meses} ${meses === 1 ? "mês" : "meses"}!`); router.refresh(); }
+    });
+  }
+  function handleRemoverValidade(id: string) {
+    setErro(null);
+    startTransition(async () => {
+      const r = await removerValidade(id);
+      if (!r.ok) setErro(r.erro);
+      else { aviso("Validade removida (acesso aberto)."); router.refresh(); }
     });
   }
 
@@ -107,11 +148,26 @@ export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marca
             Senha
             <input value={senha} onChange={(e) => setSenha(e.target.value)} type="text" placeholder="mínimo 4 caracteres" className="input-base" />
           </label>
+          <label className="text-xs text-muted">
+            Pacote
+            <select value={novoPlano} onChange={(e) => setNovoPlano(e.target.value)} className="input-base">
+              {PLANOS.map((p) => <option key={p} value={p}>{rotuloPlano(p)}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-muted">
+            Acesso
+            <select value={novoMeses} onChange={(e) => setNovoMeses(Number(e.target.value))} className="input-base">
+              <option value={1}>1 mês</option>
+              <option value={3}>3 meses</option>
+              <option value={12}>1 ano</option>
+              <option value={0}>sem validade</option>
+            </select>
+          </label>
           <button onClick={handleCriar} disabled={pending || !nome.trim() || senha.length < 4} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
             Criar cliente
           </button>
         </div>
-        <p className="mt-2 text-[11px] text-muted">Anote a senha pra passar ao cliente. Você pode redefinir depois.</p>
+        <p className="mt-2 text-[11px] text-muted">Anote a senha pra passar ao cliente. O pacote e a validade você ajusta depois também.</p>
       </div>
 
       {/* Atribuição de marcas */}
@@ -165,6 +221,24 @@ export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marca
                     <button onClick={() => setExcluirAlvo(u)} disabled={pending} className="rounded-md border border-red-900 px-3 py-1.5 text-xs text-red-400 transition hover:bg-red-950/40 disabled:opacity-50">🗑 Excluir</button>
                   </div>
                 </div>
+
+                {/* Assinatura: pacote + validade do acesso */}
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-linha pt-3">
+                  <label className="text-xs text-muted">
+                    📦 Pacote:{" "}
+                    <select value={u.plano ?? ""} onChange={(e) => handleDefinirPacote(u.id, e.target.value)} disabled={pending} className="input-compact ml-1 w-36">
+                      <option value="">— nenhum —</option>
+                      {PLANOS.map((p) => <option key={p} value={p}>{rotuloPlano(p)}</option>)}
+                    </select>
+                  </label>
+                  <span className={`text-xs font-semibold ${statusAcesso(u.acessoAte).cls}`}>{statusAcesso(u.acessoAte).txt}</span>
+                  <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                    <button onClick={() => handleRenovar(u.id, 1)} disabled={pending} className="rounded-md border border-linha px-2.5 py-1 text-xs text-muted transition hover:border-green-500 hover:text-white disabled:opacity-50">+1 mês</button>
+                    <button onClick={() => handleRenovar(u.id, 3)} disabled={pending} className="rounded-md border border-linha px-2.5 py-1 text-xs text-muted transition hover:border-green-500 hover:text-white disabled:opacity-50">+3 meses</button>
+                    {u.acessoAte && <button onClick={() => handleRemoverValidade(u.id)} disabled={pending} className="rounded-md border border-linha px-2.5 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-50">remover validade</button>}
+                  </div>
+                </div>
+
                 {redefinindoId === u.id && (
                   <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-linha pt-3">
                     <label className="flex-1 text-xs text-muted">

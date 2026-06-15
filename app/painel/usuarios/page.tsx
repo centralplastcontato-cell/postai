@@ -10,11 +10,12 @@ export default async function UsuariosPage() {
   if (!s) redirect("/login");
   if (!s.admin) redirect("/painel"); // cliente não acessa a gestão de clientes
 
-  const usuarios = await prisma.usuario.findMany({
+  const usuariosRaw = await prisma.usuario.findMany({
     where: { admin: false },
     orderBy: { criadoEm: "asc" },
-    select: { id: true, nome: true, marcas: { select: { id: true, nome: true }, orderBy: { nome: "asc" } } },
+    select: { id: true, nome: true, plano: true, acessoAte: true, marcas: { select: { id: true, nome: true }, orderBy: { nome: "asc" } } },
   });
+  const usuarios = usuariosRaw.map((u) => ({ ...u, acessoAte: u.acessoAte ? u.acessoAte.toISOString() : null }));
   const marcas = await prisma.marca.findMany({
     orderBy: { nome: "asc" },
     select: { id: true, nome: true, usuarioId: true },

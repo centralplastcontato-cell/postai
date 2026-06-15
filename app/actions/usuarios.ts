@@ -4,12 +4,20 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { exigirAdmin } from "@/lib/acesso";
 import { hashSenha } from "@/lib/auth";
+import { ehPlano } from "@/lib/plano";
 
 // Gestão de CLIENTES (logins) — tudo aqui é só pro admin (você). Um cliente nunca
 // cria/exclui outro cliente nem reatribui marcas.
 
-// Cria um login de cliente (admin=false). Depois você atribui marcas a ele.
-export async function criarCliente(nome: string, senha: string) {
+// Soma N meses a uma data (mantém o dia; pula meses curtos sem estourar).
+function addMeses(base: Date, meses: number): Date {
+  const d = new Date(base);
+  d.setMonth(d.getMonth() + meses);
+  return d;
+}
+
+// Cria um login de cliente (admin=false) — opcionalmente já com pacote + validade.
+export async function criarCliente(nome: string, senha: string, plano?: string, meses?: number) {
   const g = await exigirAdmin();
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const n = (nome || "").trim().toLowerCase();
@@ -18,7 +26,46 @@ export async function criarCliente(nome: string, senha: string) {
   if (await prisma.usuario.findUnique({ where: { nome: n } })) {
     return { ok: false as const, erro: "Já existe um cliente com esse usuário." };
   }
-  await prisma.usuario.create({ data: { nome: n, senhaHash: hashSenha(senha), admin: false } });
+  await prisma.usuario.create({
+    data: {
+      nome: n,
+      senhaHash: hashSenha(senha),
+      admin: false,
+      plano: ehPlano(plano) ? plano : null,
+      acessoAte: typeof meses === "number" && meses > 0 ? addMeses(new Date(), meses) : null,
+    },
+  });
+  revalidatePath("/painel/usuarios");
+  return { ok: true as const };
+}
+
+// Define o pacote do cliente (essencial|profissional|turbo, ou vazio pra limpar).
+export async function definirPacote(id: string, plano: string) {
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  await prisma.usuario.update({ where: { id }, data: { plano: ehPlano(plano) ? plano : null } });
+  revalidatePath("/painel/usuarios");
+  return { ok: true as const };
+}
+
+// Renova/estende o acesso em N meses. Se ainda está válido, soma a partir do vencimento
+// atual (não perde dias); se vencido/sem data, conta a partir de HOJE.
+export async function renovarAcesso(id: string, meses: number) {
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const u = await prisma.usuario.findUnique({ where: { id }, select: { acessoAte: true } });
+  if (!u) return { ok: false as const, erro: "Cliente não encontrado." };
+  const base = u.acessoAte && u.acessoAte.getTime() > Date.now() ? u.acessoAte : new Date();
+  await prisma.usuario.update({ where: { id }, data: { acessoAte: addMeses(base, Math.max(1, meses)) } });
+  revalidatePath("/painel/usuarios");
+  return { ok: true as const };
+}
+
+// Remove a validade — acesso aberto (sem expiração). Use pra liberar geral.
+export async function removerValidade(id: string) {
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  await prisma.usuario.update({ where: { id }, data: { acessoAte: null } });
   revalidatePath("/painel/usuarios");
   return { ok: true as const };
 }
