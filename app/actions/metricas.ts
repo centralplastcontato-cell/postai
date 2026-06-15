@@ -38,9 +38,15 @@ export async function verificarConexaoMarca(marcaId: string) {
       await gravarSnapshot(marcaId, j.followers_count, typeof j.media_count === "number" ? j.media_count : 0);
     }
 
-    // Validade do token (best-effort): debug_token pode falhar sem app token — aí
-    // mostramos "ativo". Token de Usuário do Sistema costuma vir expires_at = 0 (não expira).
-    let tokenExpira: string | null = null;
+    // Validade do token: debug_token dá o expires_at; calculamos QUANTOS DIAS faltam.
+    // Útil pros tokens de cliente (long-lived ~60 dias) — dá pra reconectar ANTES de
+    // quebrar. System User costuma vir expires_at = 0 (não expira). Sem app token o
+    // debug pode falhar → "desconhecido" (mostramos "ativo").
+    let token: { estado: "nunca" | "valido" | "expirado" | "desconhecido"; dias: number | null; dataBR: string | null } = {
+      estado: "desconhecido",
+      dias: null,
+      dataBR: null,
+    };
     try {
       const d = await fetch(
         `${GRAPH}/debug_token?input_token=${marca.accessToken}&access_token=${marca.accessToken}`,
@@ -48,8 +54,16 @@ export async function verificarConexaoMarca(marcaId: string) {
       );
       const dj = (await d.json()) as { data?: { expires_at?: number; is_valid?: boolean } };
       const exp = dj.data?.expires_at;
-      if (exp === 0) tokenExpira = "não expira";
-      else if (typeof exp === "number" && exp > 0) tokenExpira = `expira ${new Date(exp * 1000).toLocaleDateString("pt-BR")}`;
+      if (exp === 0) {
+        token = { estado: "nunca", dias: null, dataBR: null };
+      } else if (typeof exp === "number" && exp > 0) {
+        const dias = Math.ceil((exp * 1000 - Date.now()) / 86_400_000);
+        token = {
+          estado: dias <= 0 ? "expirado" : "valido",
+          dias,
+          dataBR: new Date(exp * 1000).toLocaleDateString("pt-BR"),
+        };
+      }
     } catch {}
 
     return {
@@ -59,7 +73,7 @@ export async function verificarConexaoMarca(marcaId: string) {
       nome: j.name ?? "",
       seguidores: typeof j.followers_count === "number" ? j.followers_count : null,
       posts: typeof j.media_count === "number" ? j.media_count : null,
-      tokenExpira,
+      token,
       temFacebook: Boolean(marca.fbPageId),
     };
   } catch (e) {
