@@ -32,6 +32,16 @@ export function PainelHeader({ nome, admin }: { nome: string; admin?: boolean })
             <span>Clientes</span>
           </Link>
         )}
+        {admin && (
+          <Link
+            href="/painel/guia"
+            title="Guia: colocar um cliente no ar"
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
+          >
+            <span>📋</span>
+            <span className="hidden sm:inline">Guia</span>
+          </Link>
+        )}
       </div>
 
       <div className="flex items-center gap-3">
