@@ -34,10 +34,14 @@ export async function guardaMarca(marcaId: string): Promise<Guarda> {
   const s = await sessaoAtual();
   if (!s) return NEGADO;
   if (!marcaId) return { ok: false, erro: "Marca não informada." };
-  const m = await prisma.marca.findUnique({ where: { id: marcaId }, select: { usuarioId: true } });
-  if (!m) return { ok: false, erro: "Marca não encontrada." };
-  if (!pode(s, m.usuarioId)) return NEGADO;
-  return { ok: true, sessao: s };
+  try {
+    const m = await prisma.marca.findUnique({ where: { id: marcaId }, select: { usuarioId: true } });
+    if (!m) return { ok: false, erro: "Marca não encontrada." };
+    if (!pode(s, m.usuarioId)) return NEGADO;
+    return { ok: true, sessao: s };
+  } catch {
+    return { ok: false, erro: "O banco demorou a responder. Tente de novo em instantes." };
+  }
 }
 
 // Guarda por Conteúdo (carrossel) — resolve a marca pelo conteúdo.
@@ -45,10 +49,14 @@ export async function guardaConteudo(id: string): Promise<Guarda> {
   const s = await sessaoAtual();
   if (!s) return NEGADO;
   if (!id) return { ok: false, erro: "Conteúdo não informado." };
-  const c = await prisma.conteudo.findUnique({ where: { id }, select: { marca: { select: { usuarioId: true } } } });
-  if (!c) return { ok: false, erro: "Conteúdo não encontrado." };
-  if (!pode(s, c.marca.usuarioId)) return NEGADO;
-  return { ok: true, sessao: s };
+  try {
+    const c = await prisma.conteudo.findUnique({ where: { id }, select: { marca: { select: { usuarioId: true } } } });
+    if (!c) return { ok: false, erro: "Conteúdo não encontrado." };
+    if (!pode(s, c.marca.usuarioId)) return NEGADO;
+    return { ok: true, sessao: s };
+  } catch {
+    return { ok: false, erro: "O banco demorou a responder. Tente de novo em instantes." };
+  }
 }
 
 // Guarda por Publicação (feed) — resolve a marca pela publicação.
@@ -56,10 +64,14 @@ export async function guardaPublicacao(id: string): Promise<Guarda> {
   const s = await sessaoAtual();
   if (!s) return NEGADO;
   if (!id) return { ok: false, erro: "Publicação não informada." };
-  const p = await prisma.publicacao.findUnique({ where: { id }, select: { marca: { select: { usuarioId: true } } } });
-  if (!p) return { ok: false, erro: "Publicação não encontrada." };
-  if (!pode(s, p.marca.usuarioId)) return NEGADO;
-  return { ok: true, sessao: s };
+  try {
+    const p = await prisma.publicacao.findUnique({ where: { id }, select: { marca: { select: { usuarioId: true } } } });
+    if (!p) return { ok: false, erro: "Publicação não encontrada." };
+    if (!pode(s, p.marca.usuarioId)) return NEGADO;
+    return { ok: true, sessao: s };
+  } catch {
+    return { ok: false, erro: "O banco demorou a responder. Tente de novo em instantes." };
+  }
 }
 
 // Guarda por ImagemMarca — resolve a marca pela imagem.
@@ -67,8 +79,12 @@ export async function guardaImagem(id: string): Promise<Guarda> {
   const s = await sessaoAtual();
   if (!s) return NEGADO;
   if (!id) return { ok: false, erro: "Imagem não informada." };
-  const img = await prisma.imagemMarca.findUnique({ where: { id }, select: { marca: { select: { usuarioId: true } } } });
-  if (!img) return { ok: false, erro: "Imagem não encontrada." };
-  if (!pode(s, img.marca.usuarioId)) return NEGADO;
-  return { ok: true, sessao: s };
+  try {
+    const img = await prisma.imagemMarca.findUnique({ where: { id }, select: { marca: { select: { usuarioId: true } } } });
+    if (!img) return { ok: false, erro: "Imagem não encontrada." };
+    if (!pode(s, img.marca.usuarioId)) return NEGADO;
+    return { ok: true, sessao: s };
+  } catch {
+    return { ok: false, erro: "O banco demorou a responder. Tente de novo em instantes." };
+  }
 }

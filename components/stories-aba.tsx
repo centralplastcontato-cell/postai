@@ -237,8 +237,12 @@ export function StoriesAba({
   function confirmarExcluir(s: PublicacaoView) {
     setProc(s.id);
     startTransition(async () => {
-      const r = await excluirPublicacao(s.id);
-      if (!r.ok) setErro(r.erro);
+      try {
+        const r = await excluirPublicacao(s.id);
+        if (!r.ok) setErro(r.erro);
+      } catch {
+        setErro("Não consegui excluir agora (o banco demorou). Tente de novo.");
+      }
       router.refresh();
       setProc(null);
     });
