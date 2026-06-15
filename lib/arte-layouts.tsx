@@ -104,6 +104,63 @@ export function LayoutPromocao(d: DadosArte) {
   );
 }
 
+// 🟣 STORY (1080x1920, 9:16) — vertical tela cheia pro Story do Instagram. Fundo:
+// foto real (com degradê pra leitura) OU cor festiva + confete. Título grande,
+// oferta opcional, validade, CTA WhatsApp e site no rodapé. Mesmos helpers do feed.
+export function LayoutStory(d: DadosArte & { imagemUrl?: string }) {
+  const [c1, c2, c3, , c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[3] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || d.paleta[3] || d.paleta[0];
+  const temFoto = Boolean(d.imagemUrl);
+  const nLinhas = d.titulo.length;
+  const fonteTitulo = nLinhas >= 4 ? 100 : nLinhas === 3 ? 116 : 132;
+  return (
+    <div style={{ width: "1080px", height: "1920px", display: "flex", flexDirection: "column", position: "relative", backgroundColor: fundo, backgroundImage: temFoto ? undefined : "radial-gradient(circle at 50% 28%, rgba(255,255,255,0.22), rgba(0,0,0,0.18) 72%)", fontFamily: "Baloo" }}>
+      {temFoto ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={d.imagemUrl} width={1080} height={1920} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1920px", objectFit: "cover" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1920px", display: "flex", backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0) 32%, rgba(0,0,0,0.35) 58%, rgba(0,0,0,0.85) 100%)" }} />
+        </>
+      ) : (
+        <Confete cores={[c2, c3, c5, c1]} />
+      )}
+
+      {d.logoSrc ? <LogoSolto src={d.logoSrc} top={150} right={80} h={130} /> : null}
+
+      <div style={{ display: "flex", flexDirection: "column", padding: "0 90px", marginTop: temFoto ? 1000 : 720, flexGrow: 1 }}>
+        <TituloMulticolor linhas={d.titulo} fontSize={fonteTitulo} fundo={temFoto ? PRETO : fundo} />
+
+        {d.oferta ? (
+          <div style={{ display: "flex", marginTop: 38 }}>
+            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 62, color: PRETO, backgroundColor: c3, padding: "20px 40px", borderRadius: 22, transform: "rotate(-2deg)", boxShadow: "0 8px 0 rgba(0,0,0,0.2)" }}>
+              {d.oferta}
+            </div>
+          </div>
+        ) : d.textoApoio ? (
+          <div style={{ display: "flex", marginTop: 30, fontSize: 50, color: BRANCO, lineHeight: 1.25, textShadow: "0 2px 10px rgba(0,0,0,0.6)", maxWidth: 880 }}>
+            {d.textoApoio}
+          </div>
+        ) : null}
+
+        {d.validade ? (
+          <div style={{ display: "flex", marginTop: 24, fontSize: 36, color: "rgba(255,255,255,0.92)", fontFamily: "Fredoka", textShadow: "0 2px 6px rgba(0,0,0,0.5)" }}>
+            {rotularValidade(d.validade)}
+          </div>
+        ) : null}
+
+        <div style={{ display: "flex", marginTop: 50 }}>
+          {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
+        </div>
+      </div>
+
+      {temFoto ? null : <OndaBase cor={c1} top={1700} />}
+      <div style={{ position: "absolute", bottom: 78, left: 0, width: "1080px", display: "flex", justifyContent: "center", fontFamily: "Fredoka", fontSize: 34, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.5)" }}>
+        {d.site}
+      </div>
+    </div>
+  );
+}
+
 // 💡 Dica / Conteúdo — foto de IA de fundo (ou cor sólida) + texto ancorado embaixo.
 export function LayoutFoto(d: DadosArte & { imagemUrl?: string }) {
   const fundo = d.corFundo || escolherFundoFesta(d.paleta);

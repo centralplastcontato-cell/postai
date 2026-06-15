@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MarketingCalendario, type Post } from "./marketing-calendario";
 import { PublicacoesAba, type PublicacaoView } from "./publicacoes-aba";
+import { StoriesAba } from "./stories-aba";
 import { CalendarioRedes, type SelecaoRede } from "./calendario-redes";
 import { AniversariantesForm } from "./aniversariantes-form";
 
@@ -14,6 +15,7 @@ export function RedesSociais({
   marcaId,
   posts,
   publicacoes,
+  stories,
   diasCarrossel,
   diasFeed,
   horaPost,
@@ -24,6 +26,7 @@ export function RedesSociais({
   marcaId: string;
   posts: Post[];
   publicacoes: PublicacaoView[];
+  stories: PublicacaoView[];
   diasCarrossel: string;
   diasFeed: string;
   horaPost: number; // hora padrão do feed (BRT)
@@ -31,7 +34,7 @@ export function RedesSociais({
   paleta: string; // JSON array de hex da marca (pro seletor de cor)
   temFacebook: boolean; // marca com Página do Facebook conectada → posta nos dois
 }) {
-  const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes">("carrosseis");
+  const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes" | "story">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
   const [dataAlvo, setDataAlvo] = useState<string | null>(null);
 
@@ -90,6 +93,7 @@ export function RedesSociais({
       <div className="mb-5 flex flex-wrap gap-2">
         <button onClick={() => setSubaba("carrosseis")} className={cls(subaba === "carrosseis", "bg-orange-500")}>🖼️ Carrosséis</button>
         <button onClick={() => setSubaba("publicacoes")} className={cls(subaba === "publicacoes", "bg-sky-600")}>📱 Publicações</button>
+        <button onClick={() => setSubaba("story")} className={cls(subaba === "story", "bg-[#7c3aed]")}>🟣 Story</button>
       </div>
 
       {subaba === "carrosseis" && (
@@ -118,6 +122,17 @@ export function RedesSociais({
           onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
           paleta={paleta}
           temFacebook={temFacebook}
+        />
+      )}
+
+      {subaba === "story" && (
+        <StoriesAba
+          marcaId={marcaId}
+          stories={stories}
+          dataAlvo={dataAlvo}
+          horaPadrao={horaPost}
+          onGerado={(dia) => setDataAlvo(dia ?? null)}
+          onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
         />
       )}
     </div>

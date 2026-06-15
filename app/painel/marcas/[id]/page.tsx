@@ -66,7 +66,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     where: { marcaId: id },
     orderBy: { data: "asc" },
   });
-  const publicacoes: PublicacaoView[] = pubs.map((p) => ({
+  const mapPub = (p: (typeof pubs)[number]): PublicacaoView => ({
     id: p.id,
     slug: p.slug,
     data: p.data.toISOString(),
@@ -82,7 +82,10 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     postadoEm: p.postadoEm?.toISOString() ?? null,
     extra: p.extra ?? null, // JSON dos campos do template — pra pré-preencher a edição
     categoria: (() => { try { return JSON.parse(p.extra || "{}").categoria ?? null; } catch { return null; } })(),
-  }));
+  });
+  // Feed (4:5) vai pra aba Publicações; Story (9:16) vai pra aba Story.
+  const publicacoes: PublicacaoView[] = pubs.filter((p) => p.formato !== "story").map(mapPub);
+  const stories: PublicacaoView[] = pubs.filter((p) => p.formato === "story").map(mapPub);
 
   const imgs = await prisma.imagemMarca.findMany({
     where: { marcaId: id },
@@ -117,6 +120,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         marca={marcaView}
         posts={posts}
         publicacoes={publicacoes}
+        stories={stories}
         imagens={imagens}
         conectada={marcaConectada(marca)}
       />

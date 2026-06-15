@@ -33,6 +33,9 @@ model Marca {
   diasFeed      String @default("2,4,6") // ter/qui/sáb
   horaPost      Int    @default(10) // hora do FEED (BRT) — nome mantido por compatibilidade
   horaCarrossel Int    @default(10) // hora do CARROSSEL (BRT)
+  // Espelhar no Story: ligado = todo post de feed que o piloto publica também sobe
+  // como Story (cada publicação pode sobrescrever isso no campo `espelhar`).
+  espelharStory Boolean @default(false)
   // Contexto pra IA escrever no tom da marca
   descricao   String   @default("") // o que é o negócio, público, produtos
   ativa       Boolean  @default(true)
@@ -103,6 +106,12 @@ model Publicacao {
   status    String   @default("a_postar") // a_postar | postado
   aprovado  Boolean  @default(false) // revisão INTERNA do dono (não vai pra rede) — só marca "eu já revisei"
   postadoEm DateTime? // momento REAL em que foi publicado (null = ainda não postado)
+  // formato: "feed" (4:5, post normal) | "story" (9:16, vai pro Story). O Story usa a
+  // mesma máquina da publicação — só muda o render (vertical) e o jeito de postar.
+  formato   String   @default("feed")
+  // espelhar (só p/ formato feed): null = usa o padrão da marca; true/false = força.
+  // Ligado: ao postar o feed, o piloto também sobe a versão Story automaticamente.
+  espelhar  Boolean?
   createdAt DateTime @default(now())
 
   @@index([marcaId, data])

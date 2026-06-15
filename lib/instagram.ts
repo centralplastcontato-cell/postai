@@ -189,6 +189,53 @@ export async function publicarNasRedes(
   return { ig, fb };
 }
 
+/**
+ * Publica UM Story (imagem 9:16) no Instagram da marca. Mesmo fluxo de mídia, mas com
+ * media_type=STORIES. Story não tem legenda (a Meta ignora). Recebe URL JÁ materializada.
+ */
+export async function publicarStoryIG(conn: ConexaoIG, url: string): Promise<ResultadoPostagem> {
+  if (!marcaConectada(conn)) return { ok: false, erro: "Marca sem conexão com o Instagram." };
+  try {
+    const c = await graphRetry(conn, `${conn.igUserId}/media`, { image_url: url, media_type: "STORIES" });
+    const containerId = String(c.id);
+    let mediaId: string | null = null;
+    let ultimoErro = "";
+    for (let i = 0; i < 5; i++) {
+      try {
+        const pub = await graph(conn, `${conn.igUserId}/media_publish`, { creation_id: containerId });
+        mediaId = String(pub.id);
+        break;
+      } catch (e) {
+        ultimoErro = e instanceof Error ? e.message : String(e);
+        await espera(3000);
+      }
+    }
+    if (!mediaId) return { ok: false, erro: `Não consegui publicar o Story: ${ultimoErro}` };
+    return { ok: true, mediaId, permalink: null };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "Erro na Meta API (Story)." };
+  }
+}
+
+/**
+ * Materializa a arte vertical (9:16) e posta como Story no Instagram da marca.
+ * (FB Story fica pra uma fase posterior — exige /{page}/photo_stories.)
+ */
+export async function publicarStoryNasRedes(
+  marca: { igUserId: string; accessToken: string; fbPageId?: string },
+  urlAbsoluta: string
+): Promise<ResultadoRedes> {
+  let estatica: string;
+  try {
+    [estatica] = await materializarArtes([urlAbsoluta]);
+  } catch (e) {
+    const erro = e instanceof Error ? `Não consegui preparar o Story: ${e.message}` : "Falha ao preparar o Story.";
+    return { ig: { ok: false, erro } };
+  }
+  const ig = await publicarStoryIG({ igUserId: marca.igUserId, accessToken: marca.accessToken }, estatica);
+  return { ig };
+}
+
 /** Monta URLs públicas absolutas a partir de caminhos relativos (/api/...). */
 export function urlsAbsolutas(base: string, caminhos: string[]): string[] {
   const b = base.replace(/\/$/, "");

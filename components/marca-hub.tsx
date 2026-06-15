@@ -12,12 +12,14 @@ export function MarcaHub({
   marca,
   posts,
   publicacoes,
+  stories,
   imagens,
   conectada,
 }: {
   marca: MarcaView;
   posts: Post[];
   publicacoes: PublicacaoView[];
+  stories: PublicacaoView[];
   imagens: ImagemView[];
   conectada: boolean;
 }) {
@@ -59,7 +61,7 @@ export function MarcaHub({
       </div>
 
       <div className="mt-6">
-        {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} />}
+        {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
         {aba === "config" && <MarcaForm marca={marca} />}
       </div>

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca, guardaPublicacao } from "@/lib/acesso";
-import { publicarNasRedes, marcaConectada } from "@/lib/instagram";
+import { publicarNasRedes, publicarStoryNasRedes, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
@@ -439,6 +439,7 @@ export async function gerarPublicacao(input: {
   condicoes?: string[]; // preco: condições (ex: "Seg a Sex", "50 a 70 convidados")
   modoPreco?: string; // preco: "promo" (De→Por) | "unico" | "apartir"
   hora?: number; // hora do post (BRT) — permite vários posts no mesmo dia em horas diferentes
+  formato?: string; // "feed" (padrão, 4:5) | "story" (9:16, vai pro Story)
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -476,6 +477,7 @@ export async function gerarPublicacao(input: {
       extra: montarExtra(marca, template, gerado, Date.now(), travas, input.categoria),
       tema: input.tema?.trim() || null,
       status: "a_postar",
+      formato: input.formato === "story" ? "story" : "feed",
     },
   });
   // Templates com foto: prioriza FOTO REAL do banco da marca (da categoria pedida,
@@ -494,6 +496,22 @@ export async function gerarPublicacao(input: {
   // nesse dia (em vez de abrir tudo). Ver mais é só clicar em "Ver todas".
   const dia = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(data);
   return { ok: true as const, id: criado.id, dia };
+}
+
+// Posta um STORY (9:16) no Instagram da marca AGORA. Renderiza /api/story/[id] (vertical),
+// materializa e sobe como Story (media_type=STORIES). Marca como postado.
+export async function postarStory(id: string) {
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
+  if (!p) return { ok: false as const, erro: "Story não encontrado." };
+  if (!marcaConectada(p.marca)) return { ok: false as const, erro: "Conecte o Instagram da marca primeiro." };
+  const r = await publicarStoryNasRedes(p.marca, `${baseUrl()}/api/story/${p.id}`);
+  if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
+  await prisma.publicacao.update({ where: { id }, data: { status: "postado", postadoEm: new Date() } });
+  await registrarAtividade(APP_NAME, `Postei o Story "${p.titulo}" no Instagram de ${p.marca.nome}.`, p.marcaId);
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const };
 }
 
 // Edição PONTUAL: muda só os campos informados (título, textos, valores…) SEM chamar a

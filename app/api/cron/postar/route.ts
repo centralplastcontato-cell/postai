@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { publicarNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
+import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 
   const resultados: {
     marca: string;
-    tipo: "carrossel" | "feed";
+    tipo: "carrossel" | "feed" | "story";
     titulo: string;
     ok: boolean;
     erro?: string;
@@ -58,9 +58,9 @@ export async function GET(req: Request) {
       }
     }
 
-    // Feed
+    // Feed (4:5) — só formato feed (Story tem o bloco próprio abaixo)
     const p = await prisma.publicacao.findFirst({
-      where: { marcaId: m.id, status: "a_postar", data: { lte: agora } },
+      where: { marcaId: m.id, status: "a_postar", data: { lte: agora }, formato: "feed" },
       orderBy: { data: "asc" },
     });
     if (p) {
@@ -72,6 +72,20 @@ export async function GET(req: Request) {
         await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id);
       }
       resultados.push({ marca: m.nome, tipo: "feed", titulo: p.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
+    }
+
+    // Story (9:16): posta o mais antigo "a_postar" com data <= agora.
+    const st = await prisma.publicacao.findFirst({
+      where: { marcaId: m.id, status: "a_postar", data: { lte: agora }, formato: "story" },
+      orderBy: { data: "asc" },
+    });
+    if (st) {
+      const r = await publicarStoryNasRedes(m, `${base}/api/story/${st.id}`);
+      if (r.ig.ok) {
+        await prisma.publicacao.update({ where: { id: st.id }, data: { status: "postado", postadoEm: new Date() } });
+        await registrarAtividade(APP_NAME, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id);
+      }
+      resultados.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
     }
   }
 
