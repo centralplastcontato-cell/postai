@@ -1,6 +1,45 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { APP_NAME } from "@/lib/config";
+import { prisma } from "@/lib/prisma";
+
+// Landing cacheada (ISR) — atualiza a cada 30min. Mostra artes REAIS sem pesar a página.
+export const revalidate = 1800;
+
+// Marca "vitrine" cujas artes reais aparecem no hero (o Castelo da Diversão).
+const VITRINE_ID = "cmq4gdsdb0000ipik9w4cakf3";
+
+function hashCurto(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+// Busca as artes REAIS da vitrine pro feed do hero. Carrossel usa a capa (slide[0], já
+// estática no Blob = instantânea); feed usa a rota de arte (cacheada). Best-effort: se
+// falhar (banco fora, marca sem conteúdo), o hero cai no mock desenhado.
+async function buscarArtesVitrine(): Promise<string[]> {
+  try {
+    const [conteudos, pubs] = await Promise.all([
+      prisma.conteudo.findMany({ where: { marcaId: VITRINE_ID }, orderBy: { data: "desc" }, take: 8, select: { slides: true } }),
+      prisma.publicacao.findMany({ where: { marcaId: VITRINE_ID, formato: "feed" }, orderBy: { data: "desc" }, take: 3, select: { id: true, titulo: true, texto: true, imagemUrl: true, extra: true } }),
+    ]);
+    const capas: string[] = [];
+    for (const c of conteudos) {
+      try { const s = JSON.parse(c.slides) as string[]; if (s[0]) capas.push(s[0]); } catch {}
+    }
+    const feeds = pubs.map((p) => `/api/feed/${p.id}?v=${hashCurto(`${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`)}`);
+    // intercala capa de carrossel com feed pra dar variedade
+    const artes: string[] = [];
+    for (let i = 0; i < Math.max(capas.length, feeds.length); i++) {
+      if (capas[i]) artes.push(capas[i]);
+      if (feeds[i]) artes.push(feeds[i]);
+    }
+    return artes.slice(0, 10);
+  } catch {
+    return [];
+  }
+}
 
 export const metadata: Metadata = {
   title: `${APP_NAME} — o Instagram do seu buffet infantil postando sozinho`,
@@ -72,7 +111,7 @@ const PLANOS: { nome: string; posts: string; preco: string; porPost: string; mel
     resumo: "O mais escolhido — presença forte na temporada de festas.",
     itens: [
       "Tudo do Essencial, e mais:",
-      "Carrosséis · Feed · Stories no automático",
+      "🟣 Stories à vontade (não contam no limite)",
       "Todos os modelos (promoção, depoimento, datas comemorativas…)",
       "Vários horários no mesmo dia",
     ],
@@ -86,7 +125,7 @@ const PLANOS: { nome: string; posts: string; preco: string; porPost: string; mel
     resumo: "Máximo de alcance pra encher a agenda de festas.",
     itens: [
       "Tudo do Profissional, e mais:",
-      "Story todo dia (espelha o feed)",
+      "Volume máximo: 3 posts por dia",
       "Prioridade nas datas quentes",
       "Suporte e relatório de crescimento",
     ],
@@ -110,6 +149,23 @@ const ARTES = ["foto", "preco", "depo", "espaco", "promo", "data"] as const;
 function FotoBuffet({ src, alt }: { src: string; alt: string }) {
   // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover" />;
+}
+
+// Card de uma ARTE REAL do Postaí (capa de carrossel ou feed do Castelo) pro feed do hero.
+function ArteReal({ url }: { url: string }) {
+  return (
+    <div className="mb-4 overflow-hidden rounded-2xl border border-linha bg-preto shadow-lg">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#a78bfa] to-[#ec4899]" />
+        <span className="text-[11px] font-semibold text-white">castelodadiversao</span>
+        <span className="ml-auto text-sm leading-none text-muted">•••</span>
+      </div>
+      <div className="relative aspect-[4/5] overflow-hidden bg-preto-card">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt="Arte real criada pelo Postaí" className="absolute inset-0 h-full w-full object-cover" />
+      </div>
+    </div>
+  );
 }
 
 // Mini publicação (cabeçalho + arte + ações) — exemplo de arte gerada pelo Postaí.
@@ -196,7 +252,8 @@ function MiniPost({ v }: { v: string }) {
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const artesReais = await buscarArtesVitrine();
   return (
     <main className="min-h-screen bg-preto text-white">
       {/* ===== NAV ===== */}
@@ -258,13 +315,13 @@ export default function Home() {
               <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-10 h-20 bg-gradient-to-b from-preto-card to-transparent" />
               <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-t from-preto-card to-transparent" />
               <div className="flex flex-col animate-postai-feed hover:[animation-play-state:paused]">
-                {[...ARTES, ...ARTES].map((v, i) => (
-                  <MiniPost key={i} v={v} />
-                ))}
+                {artesReais.length > 0
+                  ? [...artesReais, ...artesReais].map((url, i) => <ArteReal key={i} url={url} />)
+                  : [...ARTES, ...ARTES].map((v, i) => <MiniPost key={i} v={v} />)}
               </div>
             </div>
             <span className="absolute -bottom-3.5 left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-vermelho px-3.5 py-1.5 text-[11px] font-bold text-white shadow-lg shadow-[#7c3aed]/40">
-              ✨ postando no automático
+              {artesReais.length > 0 ? "✨ artes reais, postando sozinho" : "✨ postando no automático"}
             </span>
           </div>
         </div>
@@ -365,6 +422,7 @@ export default function Home() {
             <span className="rounded-full border border-linha bg-preto-card px-3 py-1.5 text-white">📱 Feed</span>
             <span className="rounded-full border border-linha bg-preto-card px-3 py-1.5 text-white">🟣 Stories</span>
           </div>
+          <p className="mx-auto mt-3 max-w-xl text-xs text-muted">🟣 Stories entram a partir do <strong className="text-white/80">Profissional</strong>, <strong className="text-white/80">à vontade</strong> — e não contam no seu limite de posts/dia.</p>
         </div>
         <div className="mt-12 grid gap-5 md:grid-cols-3">
           {PLANOS.map((pl) => (
