@@ -20,7 +20,10 @@ function hashCurto(s: string): string {
 
 export default async function MarcaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const marca = await prisma.marca.findUnique({ where: { id } });
+  const marca = await prisma.marca.findUnique({
+    where: { id },
+    include: { usuario: { select: { nome: true, plano: true, acessoAte: true } } },
+  });
   if (!marca) notFound();
 
   // Autorização multi-tenant: o cliente só abre a própria marca; o admin abre qualquer
@@ -28,6 +31,12 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const sessao = await sessaoAtual();
   if (!sessao) notFound();
   if (!sessao.admin && marca.usuarioId !== sessao.id) notFound();
+
+  // Assinatura do dono (cliente) — mostrada no topo da página da marca. null = marca sem
+  // dono (sua, admin) → sem cartão de assinatura.
+  const assinatura = marca.usuario
+    ? { cliente: marca.usuario.nome, plano: marca.usuario.plano, acessoAte: marca.usuario.acessoAte ? marca.usuario.acessoAte.toISOString() : null }
+    : null;
 
   // Todas as queries da marca em PARALELO (Promise.all) — antes eram sequenciais e
   // somavam ~4-5s + pressionavam o pool de conexões. Em paralelo cai pra ~1 query.
@@ -127,6 +136,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         imagens={imagens}
         evolucao={evolucao}
         conectada={marcaConectada(marca)}
+        assinatura={assinatura}
       />
       <AtividadesRecentes atividades={atividades} />
     </div>

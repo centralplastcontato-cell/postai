@@ -9,6 +9,21 @@ import { type PublicacaoView } from "./publicacoes-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { ConexaoCard } from "./conexao-card";
 import { EvolucaoCard } from "./evolucao-card";
+import { rotuloPlano, diasDeAcesso } from "@/lib/plano";
+
+type Assinatura = { cliente: string; plano: string | null; acessoAte: string | null };
+
+function dataCurta(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+}
+function statusAssinatura(acessoAte: string | null): { txt: string; cls: string } {
+  const dias = diasDeAcesso(acessoAte);
+  if (dias === null) return { txt: "Acesso aberto (sem validade)", cls: "text-muted" };
+  if (dias < 0) return { txt: `🔴 Vencido há ${Math.abs(dias)} ${Math.abs(dias) === 1 ? "dia" : "dias"} — piloto pausado`, cls: "text-red-400" };
+  if (dias === 0) return { txt: "🔴 Vence hoje", cls: "text-red-400" };
+  const cls = dias <= 7 ? "text-red-400" : dias <= 30 ? "text-amber-300" : "text-green-400";
+  return { txt: `Ativo · ${dias} ${dias === 1 ? "dia" : "dias"} (até ${dataCurta(acessoAte!)})`, cls };
+}
 
 export function MarcaHub({
   marca,
@@ -18,6 +33,7 @@ export function MarcaHub({
   imagens,
   evolucao,
   conectada,
+  assinatura,
 }: {
   marca: MarcaView;
   posts: Post[];
@@ -26,10 +42,12 @@ export function MarcaHub({
   imagens: ImagemView[];
   evolucao: { dia: string; seguidores: number; posts: number }[];
   conectada: boolean;
+  assinatura?: Assinatura | null;
 }) {
   const [aba, setAba] = useState<"redes" | "imagens" | "config">("redes");
   const cls = (a: boolean) =>
     `rounded-lg px-4 py-2 text-sm font-semibold transition ${a ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"}`;
+  const stAssin = assinatura ? statusAssinatura(assinatura.acessoAte) : null;
 
   return (
     <div>
@@ -59,6 +77,16 @@ export function MarcaHub({
       )}
 
       <div className="mt-5 space-y-4">
+        {assinatura && stAssin && (
+          <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-white">📦 Assinatura <span className="font-normal text-muted">— cliente {assinatura.cliente}</span></p>
+              <span className="rounded-full border border-vermelho/40 bg-vermelho/15 px-2.5 py-0.5 text-xs font-semibold text-white">{assinatura.plano ? rotuloPlano(assinatura.plano) : "sem pacote"}</span>
+            </div>
+            <p className={`mt-2 text-sm font-semibold ${stAssin.cls}`}>{stAssin.txt}</p>
+            <p className="mt-1 text-xs text-muted">Pacote e validade você ajusta em 👥 Clientes.</p>
+          </div>
+        )}
         <ConexaoCard marcaId={marca.id} temConexao={conectada} />
         <EvolucaoCard pontos={evolucao} />
       </div>
