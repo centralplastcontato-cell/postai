@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
+import { snapshotDeMarca } from "@/lib/metricas";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, APP_NAME } from "@/lib/config";
 
@@ -34,6 +35,9 @@ export async function GET(req: Request) {
 
   for (const m of marcas) {
     if (!marcaConectada(m)) continue;
+
+    // Snapshot diário dos números da conta (best-effort) — alimenta o gráfico de evolução.
+    await snapshotDeMarca(m);
 
     // Carrossel
     const c = await prisma.conteudo.findFirst({

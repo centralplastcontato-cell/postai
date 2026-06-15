@@ -8,6 +8,7 @@ import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { ConexaoCard } from "./conexao-card";
+import { EvolucaoCard } from "./evolucao-card";
 
 export function MarcaHub({
   marca,
@@ -15,6 +16,7 @@ export function MarcaHub({
   publicacoes,
   stories,
   imagens,
+  evolucao,
   conectada,
 }: {
   marca: MarcaView;
@@ -22,6 +24,7 @@ export function MarcaHub({
   publicacoes: PublicacaoView[];
   stories: PublicacaoView[];
   imagens: ImagemView[];
+  evolucao: { dia: string; seguidores: number; posts: number }[];
   conectada: boolean;
 }) {
   const [aba, setAba] = useState<"redes" | "imagens" | "config">("redes");
@@ -55,8 +58,9 @@ export function MarcaHub({
         </p>
       )}
 
-      <div className="mt-5">
+      <div className="mt-5 space-y-4">
         <ConexaoCard marcaId={marca.id} temConexao={conectada} />
+        <EvolucaoCard pontos={evolucao} />
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">

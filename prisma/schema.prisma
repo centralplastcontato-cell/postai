@@ -49,6 +49,7 @@ model Marca {
   conteudos   Conteudo[]
   publicacoes Publicacao[]
   imagens     ImagemMarca[]
+  metricas    MetricaMarca[]
 
   @@index([usuarioId])
 }
@@ -137,4 +138,19 @@ model AtividadeAgente {
   criadoEm DateTime @default(now())
 
   @@index([criadoEm])
+}
+
+// Snapshot diário dos números da conta (seguidores/posts) — alimenta o gráfico de
+// evolução "desde que usa o Postaí". 1 linha por marca por dia (upsert).
+model MetricaMarca {
+  id         String   @id @default(cuid())
+  marcaId    String
+  marca      Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  dia        DateTime // data do snapshot (00:00 BRT)
+  seguidores Int
+  posts      Int      @default(0)
+  criadoEm   DateTime @default(now())
+
+  @@unique([marcaId, dia])
+  @@index([marcaId, dia])
 }

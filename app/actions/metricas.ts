@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
+import { gravarSnapshot } from "@/lib/metricas";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -31,6 +32,11 @@ export async function verificarConexaoMarca(marcaId: string) {
       error?: { message?: string };
     };
     if (j.error?.message) return { ok: true as const, conectada: false, erro: j.error.message };
+
+    // Grava o snapshot do dia (alimenta o gráfico de evolução "desde que usa o Postaí").
+    if (typeof j.followers_count === "number") {
+      await gravarSnapshot(marcaId, j.followers_count, typeof j.media_count === "number" ? j.media_count : 0);
+    }
 
     // Validade do token (best-effort): debug_token pode falhar sem app token — aí
     // mostramos "ativo". Token de Usuário do Sistema costuma vir expires_at = 0 (não expira).

@@ -94,6 +94,15 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   });
   const imagens: ImagemView[] = imgs.map((i) => ({ id: i.id, url: i.url, categoria: i.categoria }));
 
+  // Histórico de seguidores/posts (snapshots diários) — alimenta o gráfico de evolução.
+  const metricas = await prisma.metricaMarca.findMany({
+    where: { marcaId: id },
+    orderBy: { dia: "desc" },
+    take: 90,
+    select: { dia: true, seguidores: true, posts: true },
+  });
+  const evolucao = metricas.reverse().map((m) => ({ dia: m.dia.toISOString(), seguidores: m.seguidores, posts: m.posts }));
+
   const marcaView: MarcaView = {
     id: marca.id,
     nome: marca.nome,
@@ -124,6 +133,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         publicacoes={publicacoes}
         stories={stories}
         imagens={imagens}
+        evolucao={evolucao}
         conectada={marcaConectada(marca)}
       />
     </div>
