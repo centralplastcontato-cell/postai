@@ -7,6 +7,7 @@ import { type Post } from "@/components/marketing-calendario";
 import { type PublicacaoView } from "@/components/publicacoes-aba";
 import { type MarcaView } from "@/components/marca-form";
 import { type ImagemView } from "@/components/banco-imagens";
+import { AtividadesRecentes } from "@/components/atividades-recentes";
 
 export const dynamic = "force-dynamic";
 
@@ -30,12 +31,14 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
 
   // Todas as queries da marca em PARALELO (Promise.all) — antes eram sequenciais e
   // somavam ~4-5s + pressionavam o pool de conexões. Em paralelo cai pra ~1 query.
-  const [conteudos, pubs, imgs, metricas] = await Promise.all([
+  const [conteudos, pubs, imgs, metricas, ativ] = await Promise.all([
     prisma.conteudo.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.publicacao.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.imagemMarca.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
     prisma.metricaMarca.findMany({ where: { marcaId: id }, orderBy: { dia: "desc" }, take: 90, select: { dia: true, seguidores: true, posts: true } }),
+    prisma.atividadeAgente.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" }, take: 25, select: { id: true, agente: true, texto: true, criadoEm: true } }),
   ]);
+  const atividades = ativ.map((a) => ({ id: a.id, agente: a.agente, texto: a.texto, criadoEm: a.criadoEm.toISOString() }));
 
   const posts: Post[] = conteudos.map((c) => {
     let slides: string[] = [];
@@ -125,6 +128,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         evolucao={evolucao}
         conectada={marcaConectada(marca)}
       />
+      <AtividadesRecentes atividades={atividades} />
     </div>
   );
 }
