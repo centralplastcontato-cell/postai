@@ -28,10 +28,15 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   if (!sessao) notFound();
   if (!sessao.admin && marca.usuarioId !== sessao.id) notFound();
 
-  const conteudos = await prisma.conteudo.findMany({
-    where: { marcaId: id },
-    orderBy: { data: "asc" },
-  });
+  // Todas as queries da marca em PARALELO (Promise.all) — antes eram sequenciais e
+  // somavam ~4-5s + pressionavam o pool de conexões. Em paralelo cai pra ~1 query.
+  const [conteudos, pubs, imgs, metricas] = await Promise.all([
+    prisma.conteudo.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
+    prisma.publicacao.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
+    prisma.imagemMarca.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
+    prisma.metricaMarca.findMany({ where: { marcaId: id }, orderBy: { dia: "desc" }, take: 90, select: { dia: true, seguidores: true, posts: true } }),
+  ]);
+
   const posts: Post[] = conteudos.map((c) => {
     let slides: string[] = [];
     try {
@@ -62,10 +67,6 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     };
   });
 
-  const pubs = await prisma.publicacao.findMany({
-    where: { marcaId: id },
-    orderBy: { data: "asc" },
-  });
   const mapPub = (p: (typeof pubs)[number]): PublicacaoView => ({
     id: p.id,
     slug: p.slug,
@@ -88,19 +89,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const publicacoes: PublicacaoView[] = pubs.filter((p) => p.formato !== "story").map(mapPub);
   const stories: PublicacaoView[] = pubs.filter((p) => p.formato === "story").map(mapPub);
 
-  const imgs = await prisma.imagemMarca.findMany({
-    where: { marcaId: id },
-    orderBy: { criadoEm: "desc" },
-  });
   const imagens: ImagemView[] = imgs.map((i) => ({ id: i.id, url: i.url, categoria: i.categoria }));
-
-  // Histórico de seguidores/posts (snapshots diários) — alimenta o gráfico de evolução.
-  const metricas = await prisma.metricaMarca.findMany({
-    where: { marcaId: id },
-    orderBy: { dia: "desc" },
-    take: 90,
-    select: { dia: true, seguidores: true, posts: true },
-  });
   const evolucao = metricas.reverse().map((m) => ({ dia: m.dia.toISOString(), seguidores: m.seguidores, posts: m.posts }));
 
   const marcaView: MarcaView = {
