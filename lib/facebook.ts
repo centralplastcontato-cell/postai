@@ -37,6 +37,25 @@ async function fbPost(path: string, params: Record<string, string>, token: strin
   return json;
 }
 
+const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Posta na Página com algumas tentativas. A Meta solta erros transitórios (code 2
+// "retry later", limite de ritmo, 5xx) ou demora pra baixar a image_url — e o Facebook
+// não tinha retry (só o Instagram tinha), então caía de primeira enquanto o IG se
+// recuperava. Agora os dois reagem igual à instabilidade temporária.
+async function fbPostRetry(path: string, params: Record<string, string>, token: string, tentativas = 3): Promise<Record<string, unknown>> {
+  let ultimo: unknown;
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      return await fbPost(path, params, token);
+    } catch (e) {
+      ultimo = e;
+      if (i < tentativas - 1) await espera(2000 * (i + 1)); // 2s, 4s
+    }
+  }
+  throw ultimo instanceof Error ? ultimo : new Error("Falha ao postar no Facebook.");
+}
+
 // A postagem na Página exige um PAGE access token. Com um System User que administra
 // a Página, dá pra obter o token da Página a partir do token do usuário. Se não vier,
 // cai no próprio token (System User costuma funcionar direto nas páginas que admin).
@@ -64,17 +83,17 @@ export async function publicarFacebook(
   try {
     let postId: string;
     if (imgs.length === 1) {
-      const j = await fbPost(`${pageId}/photos`, { url: imgs[0], caption: mensagem, published: "true" }, token);
+      const j = await fbPostRetry(`${pageId}/photos`, { url: imgs[0], caption: mensagem, published: "true" }, token);
       postId = String(j.post_id ?? j.id);
     } else {
       // Sobe cada foto sem publicar e junta tudo num post de álbum.
       const fbids: string[] = [];
       for (const url of imgs) {
-        const j = await fbPost(`${pageId}/photos`, { url, published: "false" }, token);
+        const j = await fbPostRetry(`${pageId}/photos`, { url, published: "false" }, token);
         fbids.push(String(j.id));
       }
       const attached = JSON.stringify(fbids.map((id) => ({ media_fbid: id })));
-      const j = await fbPost(`${pageId}/feed`, { message: mensagem, attached_media: attached }, token);
+      const j = await fbPostRetry(`${pageId}/feed`, { message: mensagem, attached_media: attached }, token);
       postId = String(j.id);
     }
     const permalink = postId ? `https://www.facebook.com/${postId}` : null;
