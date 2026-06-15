@@ -18,6 +18,18 @@ export const ROTULO_PLANO: Record<Plano, string> = {
   turbo: "Turbo",
 };
 
+// Preço mensal de cada pacote (R$) — usado pra calcular a receita (MRR) no painel admin.
+// Mesmos valores da landing; se mudar lá, mudar aqui.
+export const PRECO_PLANO: Record<Plano, number> = {
+  essencial: 159,
+  profissional: 289,
+  turbo: 399,
+};
+
+export function precoPlano(plano: string | null | undefined): number {
+  return ehPlano(plano) ? PRECO_PLANO[plano] : 0;
+}
+
 export const PLANOS: Plano[] = ["essencial", "profissional", "turbo"];
 
 export function ehPlano(v: string | null | undefined): v is Plano {

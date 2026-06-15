@@ -8,6 +8,16 @@ import { ConfirmDialog } from "./confirm-dialog";
 
 type Cliente = { id: string; nome: string; plano: string | null; acessoAte: string | null; marcas: { id: string; nome: string }[] };
 type MarcaItem = { id: string; nome: string; usuarioId: string | null };
+type Resumo = { total: number; ativos: number; mrr: number; porPacote: { essencial: number; profissional: number; turbo: number } };
+
+function Metrica({ rotulo, valor, cor = "text-white" }: { rotulo: string; valor: string; cor?: string }) {
+  return (
+    <div className="rounded-lg border border-linha bg-preto px-4 py-3">
+      <p className="text-[10px] uppercase tracking-wider text-muted">{rotulo}</p>
+      <p className={`mt-0.5 text-xl font-bold ${cor}`}>{valor}</p>
+    </div>
+  );
+}
 
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -22,7 +32,7 @@ function statusAcesso(acessoAte: string | null): { txt: string; cls: string } {
   return { txt: `ativo · ${dias} ${dias === 1 ? "dia" : "dias"} (até ${dataBR(acessoAte!)})`, cls };
 }
 
-export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marcas: MarcaItem[] }) {
+export function ClientesAdmin({ usuarios, marcas, resumo }: { usuarios: Cliente[]; marcas: MarcaItem[]; resumo: Resumo }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [nome, setNome] = useState("");
@@ -132,6 +142,24 @@ export function ClientesAdmin({ usuarios, marcas }: { usuarios: Cliente[]; marca
       <p className="mt-1 text-sm text-muted">
         Crie um login para cada cliente e atribua a marca dele. O cliente entra e vê só a marca que é dele; você (admin) vê todas.
       </p>
+
+      {/* Resumo do negócio */}
+      <div className="mt-5 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
+        <p className="mb-3 text-sm font-semibold text-white">📊 Resumo do negócio</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Metrica rotulo="Clientes" valor={String(resumo.total)} />
+          <Metrica rotulo="Ativos (pagantes)" valor={String(resumo.ativos)} cor="text-green-400" />
+          <Metrica rotulo="Receita / mês" valor={`R$ ${resumo.mrr.toLocaleString("pt-BR")}`} cor="text-green-400" />
+          <Metrica rotulo="Ticket médio" valor={resumo.ativos > 0 ? `R$ ${Math.round(resumo.mrr / resumo.ativos).toLocaleString("pt-BR")}` : "—"} />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-muted">Pacotes ativos:</span>
+          <span className="rounded-full border border-linha bg-preto px-3 py-1 text-muted">Essencial <strong className="text-white">{resumo.porPacote.essencial}</strong></span>
+          <span className="rounded-full border border-linha bg-preto px-3 py-1 text-muted">Profissional <strong className="text-white">{resumo.porPacote.profissional}</strong></span>
+          <span className="rounded-full border border-linha bg-preto px-3 py-1 text-muted">Turbo <strong className="text-white">{resumo.porPacote.turbo}</strong></span>
+        </div>
+        {resumo.total === 0 && <p className="mt-3 text-xs text-muted">Crie seu primeiro cliente abaixo — os números aparecem aqui conforme você fecha e dá pacote a cada um.</p>}
+      </div>
 
       {erro && <p className="mt-4 rounded-md border border-red-800 bg-red-950/40 p-3 text-sm text-red-300">{erro}</p>}
       {msg && <p className="mt-4 rounded-md border border-green-800 bg-green-950/40 p-3 text-sm text-green-300">{msg}</p>}
