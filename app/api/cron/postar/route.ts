@@ -105,7 +105,7 @@ async function postarCarrossel(m: { id: string; nome: string; igUserId: string |
     const legenda = `${c.legenda}\n\n${c.hashtags}`.trim().slice(0, 2200);
     const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, urls, legenda);
     if (r.ig.ok) {
-      const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
+      const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
       await registrarAtividade(APP_NAME, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
     } else {
       await reverterCarrossel(c.id);
@@ -126,7 +126,7 @@ async function postarFeed(m: { id: string; nome: string; igUserId: string | null
     const legenda = `${p.legenda}\n\n${p.hashtags}`.trim().slice(0, 2200);
     const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, [`${base}/api/feed/${p.id}`], legenda);
     if (r.ig.ok) {
-      const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
+      const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
       await registrarAtividade(APP_NAME, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
       // Espelhar no Story (best-effort): ligado na marca ou forçado no post.
       if (p.espelhar ?? m.espelharStory) {
