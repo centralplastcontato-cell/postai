@@ -18,6 +18,7 @@ import { type PublicacaoView } from "./publicacoes-aba";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
 import { usePainelColapsavel } from "./use-painel-colapsavel";
+import { rotuloHora } from "@/lib/horarios";
 
 // Templates que fazem sentido pro Story (vertical, chamativo). Promoção mostra o selo
 // de oferta; os demais usam só título + texto. Tudo renderizado em 9:16.
@@ -304,7 +305,7 @@ export function StoriesAba({
           <label className="text-xs text-muted">
             Hora <span className="text-muted/70">(BRT)</span>
             <select value={hora} onChange={(e) => setHora(Number(e.target.value))} className="input-base">
-              {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+              {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{rotuloHora(h)}</option>)}
             </select>
           </label>
           <button onClick={handleGerar} disabled={isPending || !tema.trim()} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">

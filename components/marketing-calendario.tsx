@@ -23,6 +23,7 @@ import { excluirConteudo } from "@/app/actions/excluir";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
 import { usePainelColapsavel } from "./use-painel-colapsavel";
+import { rotuloHora } from "@/lib/horarios";
 
 // Temas prontos de carrossel (clique preenche o campo Tema). Ângulos que funcionam
 // pro público de um buffet infantil — o dono ajusta ou pede "Sugerir temas com IA".
@@ -441,7 +442,7 @@ export function MarketingCalendario({
           <label className="text-xs text-muted">
             Hora <span className="text-muted/70">(BRT)</span>
             <select value={hora} onChange={(e) => setHora(Number(e.target.value))} className="input-base" title="Permite vários posts no mesmo dia em horas diferentes (ex: 13h, 18h)">
-              {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+              {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{rotuloHora(h)}</option>)}
             </select>
           </label>
           <div className="text-xs text-muted">
@@ -543,7 +544,7 @@ export function MarketingCalendario({
                     <span className="text-xs text-muted">{dataBR(p.data)}</span>
                     {!postado && (
                       <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={isPending} title="Hora da postagem (o piloto posta nesse horário) — permite vários posts no mesmo dia" className="rounded border border-linha bg-preto px-1 py-0.5 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
-                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {String(h).padStart(2, "0")}:00</option>)}
+                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
                       </select>
                     )}
                   </div>

@@ -27,6 +27,7 @@ import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
 import { usePainelColapsavel } from "./use-painel-colapsavel";
+import { rotuloHora } from "@/lib/horarios";
 
 type Confirmacao = { titulo: string; descricao?: string; textoConfirmar: string; acao: () => void };
 
@@ -582,7 +583,7 @@ export function PublicacoesAba({
           <label className="text-xs text-muted">
             Hora <span className="text-muted/70">(BRT)</span>
             <select value={hora} onChange={(e) => setHora(Number(e.target.value))} className="input-base" title="Permite vários posts no mesmo dia em horas diferentes (ex: 10h, 16h, 20h)">
-              {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+              {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{rotuloHora(h)}</option>)}
             </select>
           </label>
         </div>
@@ -967,7 +968,7 @@ export function PublicacoesAba({
                     <span className="text-xs text-muted">{dataBR(p.data)}</span>
                     {!postado && (
                       <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={ocupado} title="Hora da postagem (muda quando o piloto posta)" className="rounded border border-linha bg-preto px-1 py-0.5 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
-                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {String(h).padStart(2, "0")}:00</option>)}
+                        {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
                       </select>
                     )}
                   </div>

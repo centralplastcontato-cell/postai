@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { salvarMarca, excluirMarca, testarConexao, extrairCoresLogo, buscarPaginasFacebook } from "@/app/actions/marcas";
 import { ConfirmDialog } from "./confirm-dialog";
+import { rotuloHora } from "@/lib/horarios";
 
 export type MarcaView = {
   id: string;
@@ -344,15 +345,16 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-xs text-muted">🖼️ Hora do carrossel (BRT)
             <select value={f.horaCarrossel} onChange={(e) => set("horaCarrossel", Number(e.target.value))} className="input-base">
-              {Array.from({ length: 24 }, (_, h) => h).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+              {Array.from({ length: 24 }, (_, h) => h).map((h) => <option key={h} value={h}>{rotuloHora(h)}</option>)}
             </select>
           </label>
           <label className="text-xs text-muted">📱 Hora do feed (BRT)
             <select value={f.horaPost} onChange={(e) => set("horaPost", Number(e.target.value))} className="input-base">
-              {Array.from({ length: 24 }, (_, h) => h).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
+              {Array.from({ length: 24 }, (_, h) => h).map((h) => <option key={h} value={h}>{rotuloHora(h)}</option>)}
             </select>
           </label>
         </div>
+        <p className="mt-1.5 text-[11px] text-muted">⭐ = melhores horários pro público de buffet (manhã, almoço e noite). Muda só os <strong className="text-white/70">próximos</strong> posts — o que já está agendado fica como está.</p>
         <p className="mt-1.5 text-[11px] text-muted">⏰ O piloto automático posta cada um na sua hora (de hora em hora). Ative o despertador no Supabase pra valer.</p>
         <label className="mt-3 flex items-center gap-2 text-sm text-white">
           <input type="checkbox" checked={f.ativa} onChange={(e) => set("ativa", e.target.checked)} /> Piloto automático ativo
