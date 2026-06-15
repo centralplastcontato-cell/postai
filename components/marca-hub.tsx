@@ -35,6 +35,7 @@ export function MarcaHub({
   conectada,
   assinatura,
   ehAdmin,
+  entregue,
 }: {
   marca: MarcaView;
   posts: Post[];
@@ -45,6 +46,7 @@ export function MarcaHub({
   conectada: boolean;
   assinatura?: Assinatura | null;
   ehAdmin: boolean;
+  entregue: { total: number; mes: number };
 }) {
   const [aba, setAba] = useState<"redes" | "imagens" | "config">("redes");
   const cls = (a: boolean) =>
@@ -90,6 +92,22 @@ export function MarcaHub({
           </div>
         )}
         <ConexaoCard marcaId={marca.id} temConexao={conectada} />
+        {entregue.total > 0 && (
+          <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
+            <p className="text-sm font-semibold text-white">🤖 O Postaí já trabalhou por você</p>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-linha bg-preto px-4 py-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted">Posts publicados</p>
+                <p className="mt-0.5 text-2xl font-bold text-white">{entregue.total}</p>
+              </div>
+              <div className="rounded-lg border border-linha bg-preto px-4 py-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted">Este mês</p>
+                <p className="mt-0.5 text-2xl font-bold text-green-400">{entregue.mes}</p>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted">É o que o piloto publicou sozinho no Instagram/Facebook — sem você levantar um dedo. 🚀</p>
+          </div>
+        )}
         <EvolucaoCard pontos={evolucao} />
       </div>
 

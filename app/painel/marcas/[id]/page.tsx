@@ -49,6 +49,12 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   ]);
   const atividades = ativ.map((a) => ({ id: a.id, agente: a.agente, texto: a.texto, criadoEm: a.criadoEm.toISOString() }));
 
+  // Resumo de valor: quantos posts o piloto JÁ publicou (total e neste mês) — mostra o
+  // trabalho que o Postaí fez sozinho. Conta carrossel + feed + story já postados.
+  const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+  const postados = [...conteudos, ...pubs].filter((x) => x.status === "postado" && x.postadoEm);
+  const entregue = { total: postados.length, mes: postados.filter((x) => x.postadoEm!.getTime() >= inicioMes).length };
+
   const posts: Post[] = conteudos.map((c) => {
     let slides: string[] = [];
     try {
@@ -138,6 +144,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         conectada={marcaConectada(marca)}
         assinatura={assinatura}
         ehAdmin={sessao.admin}
+        entregue={entregue}
       />
       <AtividadesRecentes atividades={atividades} />
     </div>
