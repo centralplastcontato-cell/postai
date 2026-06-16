@@ -33,6 +33,16 @@ export function PainelHeader({ nome, admin, chamados = 0 }: { nome: string; admi
             <span className="rounded-full bg-vermelho px-1.5 py-0.5 text-[10px] font-bold text-white">{chamados}</span>
           )}
         </Link>
+        {!admin && (
+          <Link
+            href="/assinar"
+            title="Planos e assinatura"
+            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
+          >
+            <span>💳</span>
+            <span className="hidden sm:inline">Planos</span>
+          </Link>
+        )}
         {admin && (
           <Link
             href="/painel/usuarios"

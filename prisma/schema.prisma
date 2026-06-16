@@ -151,6 +151,28 @@ model Usuario {
 
   marcas    Marca[] // marcas que este usuário (cliente) administra
   chamados  Chamado[] // chamados de suporte que este usuário abriu
+  pagamentos Pagamento[] // checkouts/pagamentos deste cliente (Mercado Pago)
+}
+
+// Registro de cada PAGAMENTO do checkout próprio (Mercado Pago). Ao ser aprovado, o webhook
+// estende o `acessoAte` do usuário pelos `meses` do pedido. `refExterna` (id do pagamento no
+// provedor) é única → garante IDEMPOTÊNCIA (webhook duplicado não estende o acesso 2x).
+// Serve também de livro-caixa da receita real (≠ MRR estimado dos pacotes).
+model Pagamento {
+  id         String    @id @default(cuid())
+  usuarioId  String
+  usuario    Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  plano      String // essencial | profissional | turbo
+  periodo    String // mensal | anual
+  meses      Int // meses de acesso liberados (1 ou 12)
+  valor      Int // R$ cobrado (inteiro)
+  provedor   String    @default("mercadopago")
+  refExterna String    @unique // id do pagamento no provedor (idempotência)
+  status     String    @default("aprovado") // aprovado | pendente | recusado
+  criadoEm   DateTime  @default(now())
+  aprovadoEm DateTime?
+
+  @@index([usuarioId, criadoEm])
 }
 
 // Helpdesk: chamado de suporte que o CLIENTE abre e o ADMIN (Victor) responde dentro do

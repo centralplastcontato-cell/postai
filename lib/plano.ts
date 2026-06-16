@@ -30,6 +30,31 @@ export function precoPlano(plano: string | null | undefined): number {
   return ehPlano(plano) ? PRECO_PLANO[plano] : 0;
 }
 
+// ── Período de cobrança (mensal × anual) ──────────────────────────────────────────────
+// O plano ANUAL é pago de uma vez e dá 12 meses de acesso, com 2 MESES GRÁTIS: o cliente
+// paga só 10 mensalidades. (Decisão do dono, 2026-06-16.)
+export type Periodo = "mensal" | "anual";
+export const MESES_GRATIS_ANUAL = 2;
+
+export function ehPeriodo(v: string | null | undefined): v is Periodo {
+  return v === "mensal" || v === "anual";
+}
+
+// Quantos meses de acesso o pedido libera (anual = 12, mensal = 1).
+export function mesesDoPeriodo(periodo: Periodo): number {
+  return periodo === "anual" ? 12 : 1;
+}
+
+// Valor a cobrar (R$) por plano + período. Anual = 10 mensalidades (paga 10, leva 12).
+export function precoDoPedido(plano: Plano, periodo: Periodo): number {
+  return periodo === "anual" ? PRECO_PLANO[plano] * (12 - MESES_GRATIS_ANUAL) : PRECO_PLANO[plano];
+}
+
+// Quanto o cliente ECONOMIZA no anual vs pagar 12 meses avulsos (= 2 mensalidades).
+export function economiaAnual(plano: Plano): number {
+  return PRECO_PLANO[plano] * MESES_GRATIS_ANUAL;
+}
+
 export const PLANOS: Plano[] = ["essencial", "profissional", "turbo"];
 
 export function ehPlano(v: string | null | undefined): v is Plano {
