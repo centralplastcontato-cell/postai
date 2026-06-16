@@ -446,11 +446,12 @@ export default async function Home() {
                 ))}
               </ul>
               <a
-                href={CONTATO}
+                href={`/assinar?plano=${pl.nome.toLowerCase()}`}
                 className={`mt-7 rounded-xl px-5 py-3 text-center text-sm font-semibold transition ${pl.destaque ? "bg-vermelho text-white hover:bg-vermelho-hover" : "border border-linha text-white hover:border-vermelho"}`}
               >
-                Quero esse plano
+                Assinar agora
               </a>
+              <p className="mt-2 text-center text-[11px] text-muted">no Pix ou cartão · ou anual com 2 meses grátis 🎁</p>
             </div>
           ))}
         </div>

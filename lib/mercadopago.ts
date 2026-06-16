@@ -53,6 +53,70 @@ export async function criarPreferencia(opts: {
   }
 }
 
+// Dados que o Payment Brick (checkout embutido) entrega no onSubmit. Cartão traz `token`;
+// Pix vem só com `payment_method_id: "pix"`.
+type FormDataBrick = {
+  token?: string;
+  payment_method_id?: string;
+  issuer_id?: string;
+  installments?: number;
+  payer?: { email?: string; identification?: { type?: string; number?: string } };
+};
+
+// Cria o pagamento DIRETO pela API (checkout embutido / Bricks) — sem redirecionar pro MP.
+// Cartão volta "approved" na hora; Pix volta "pending" + o QR Code pra mostrar na página
+// (a confirmação cai depois no webhook).
+export async function criarPagamento(opts: {
+  valor: number;
+  descricao: string;
+  externalReference: string;
+  base: string;
+  formData: FormDataBrick;
+}): Promise<
+  | { ok: true; id: string; status: string; statusDetail: string; pix: { qrBase64: string; copiaECola: string; ticketUrl: string } | null }
+  | { ok: false; erro: string }
+> {
+  const t = token();
+  if (!t) return { ok: false, erro: "Pagamento ainda não configurado (falta a chave do Mercado Pago)." };
+  const f = opts.formData || {};
+  const body: Record<string, unknown> = {
+    transaction_amount: opts.valor,
+    description: opts.descricao,
+    external_reference: opts.externalReference,
+    notification_url: `${opts.base}/api/pagamento/webhook`,
+    payment_method_id: f.payment_method_id,
+    payer: f.payer,
+  };
+  if (f.token) body.token = f.token; // cartão
+  if (typeof f.installments === "number") body.installments = f.installments;
+  if (f.issuer_id) body.issuer_id = f.issuer_id;
+  try {
+    const resp = await fetch(`${API}/v1/payments`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const j = (await resp.json()) as {
+      id?: number | string;
+      status?: string;
+      status_detail?: string;
+      message?: string;
+      point_of_interaction?: { transaction_data?: { qr_code?: string; qr_code_base64?: string; ticket_url?: string } };
+    };
+    if (!resp.ok || !j.id) return { ok: false, erro: j?.message || "O pagamento não foi aceito. Confira os dados e tente de novo." };
+    const tx = j.point_of_interaction?.transaction_data;
+    return {
+      ok: true,
+      id: String(j.id),
+      status: j.status || "",
+      statusDetail: j.status_detail || "",
+      pix: tx?.qr_code ? { qrBase64: tx.qr_code_base64 || "", copiaECola: tx.qr_code || "", ticketUrl: tx.ticket_url || "" } : null,
+    };
+  } catch {
+    return { ok: false, erro: "Falha ao falar com o Mercado Pago. Tente de novo em instantes." };
+  }
+}
+
 // Busca um pagamento pelo id (fonte AUTORITATIVA — o webhook só confia nisto, nunca no que
 // chega no corpo da notificação). Devolve status + a external_reference que setamos.
 export async function buscarPagamento(id: string): Promise<{ status: string; externalReference: string; valor: number | null } | null> {
