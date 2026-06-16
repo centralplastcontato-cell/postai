@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
-import { gravarSnapshot, backfillMediaIdsDaMarca } from "@/lib/metricas";
+import { gravarSnapshot, backfillMediaIdsDaMarca, rawInsightsDeUmPost } from "@/lib/metricas";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -93,8 +93,9 @@ export async function backfillEngajamento(marcaId: string) {
   if (!marca.igUserId || !marca.accessToken) return { ok: false as const, erro: "Conecte o Instagram da marca primeiro." };
   try {
     const r = await backfillMediaIdsDaMarca(marca);
+    const debug = await rawInsightsDeUmPost(marca); // resposta crua da Meta (diagnóstico)
     revalidatePath(`/painel/marcas/${marcaId}`);
-    return { ok: true as const, vinculados: r.vinculados, total: r.total };
+    return { ok: true as const, vinculados: r.vinculados, atualizados: r.atualizados, total: r.total, debug };
   } catch (e) {
     return { ok: false as const, erro: e instanceof Error ? e.message : "Falha ao vincular os posts." };
   }

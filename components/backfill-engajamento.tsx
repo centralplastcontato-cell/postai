@@ -11,20 +11,20 @@ export function BackfillEngajamento({ marcaId }: { marcaId: string }) {
   const [carregando, setCarregando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [erro, setErro] = useState(false);
+  const [debug, setDebug] = useState<string | null>(null);
 
   async function rodar() {
     setCarregando(true);
     setMsg(null);
     setErro(false);
+    setDebug(null);
     const r = await backfillEngajamento(marcaId);
     setCarregando(false);
     if (r.ok) {
       setErro(false);
-      setMsg(
-        r.total === 0
-          ? "Tudo já está vinculado. ✅"
-          : `Vinculei ${r.vinculados} de ${r.total} ${r.total === 1 ? "post antigo" : "posts antigos"}. Os números vão aparecer nos cards. 🎉`
-      );
+      const novos = r.vinculados > 0 ? `Vinculei ${r.vinculados} ${r.vinculados === 1 ? "post novo" : "posts novos"} e ` : "";
+      setMsg(`${novos}atualizei o engajamento de ${r.atualizados} ${r.atualizados === 1 ? "post" : "posts"}. 🎉`);
+      setDebug(r.debug ?? null);
       router.refresh();
     } else {
       setErro(true);
@@ -48,6 +48,12 @@ export function BackfillEngajamento({ marcaId }: { marcaId: string }) {
         {carregando ? "Vinculando…" : "🔗 Puxar agora"}
       </button>
       {msg && <p className={`mt-2 text-xs ${erro ? "text-red-400" : "text-muted"}`}>{msg}</p>}
+      {debug && (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-[11px] text-muted transition hover:text-white">🔬 Resposta da Meta (se o alcance não aparecer, me manda isto)</summary>
+          <pre className="scroll-bonito mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md border border-linha bg-preto p-2 text-[11px] text-white/80">{debug}</pre>
+        </details>
+      )}
     </div>
   );
 }

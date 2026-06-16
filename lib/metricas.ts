@@ -193,40 +193,73 @@ function melhorMidia(legenda: string, tRec: number, midias: MidiaIG[], usados: S
 
 // Vincula os posts ANTIGOS (sem mediaId) às mídias da conta e JÁ busca o engajamento deles
 // (não espera o cron e ignora a janela de 14 dias). Feed/Carrossel só — Story já sumiu.
-export async function backfillMediaIdsDaMarca(marca: { id: string; igUserId: string | null; accessToken: string | null }): Promise<{ vinculados: number; total: number }> {
-  if (!marca.igUserId || !marca.accessToken) return { vinculados: 0, total: 0 };
+export async function backfillMediaIdsDaMarca(marca: { id: string; igUserId: string | null; accessToken: string | null }): Promise<{ vinculados: number; atualizados: number; total: number }> {
+  if (!marca.igUserId || !marca.accessToken) return { vinculados: 0, atualizados: 0, total: 0 };
   const token = marca.accessToken;
 
-  const [conteudos, pubs] = await Promise.all([
+  // 1) VINCULAR os posts que ainda não têm mediaId (casa por legenda + horário).
+  const [semIdC, semIdP] = await Promise.all([
     prisma.conteudo.findMany({ where: { marcaId: marca.id, status: "postado", mediaId: null, postadoEm: { not: null } }, select: { id: true, legenda: true, postadoEm: true } }),
     prisma.publicacao.findMany({ where: { marcaId: marca.id, status: "postado", mediaId: null, postadoEm: { not: null }, formato: "feed" }, select: { id: true, legenda: true, postadoEm: true } }),
   ]);
-  const total = conteudos.length + pubs.length;
-  if (total === 0) return { vinculados: 0, total: 0 };
-
-  const midias = await buscarMidiasDaConta(marca.igUserId, token);
-  if (midias.length === 0) return { vinculados: 0, total };
-
-  const usados = new Set<string>();
+  const total = semIdC.length + semIdP.length;
   let vinculados = 0;
 
-  async function vincular(legenda: string, postadoEm: Date | null, salvar: (mediaId: string, ins: Insights) => Promise<unknown>) {
-    if (!postadoEm) return;
-    const m = melhorMidia(legenda, postadoEm.getTime(), midias, usados);
-    if (!m) return;
-    usados.add(m.id);
-    const ins = (await buscarInsights(token, m.id, false)) || {};
-    await salvar(m.id, ins).catch(() => {});
-    vinculados++;
+  if (total > 0) {
+    const midias = await buscarMidiasDaConta(marca.igUserId, token);
+    if (midias.length > 0) {
+      const usados = new Set<string>();
+      const casar = (legenda: string, postadoEm: Date | null): string | null => {
+        if (!postadoEm) return null;
+        const m = melhorMidia(legenda, postadoEm.getTime(), midias, usados);
+        if (!m) return null;
+        usados.add(m.id);
+        return m.id;
+      };
+      for (const c of semIdC.sort((a, b) => a.postadoEm!.getTime() - b.postadoEm!.getTime())) {
+        const mid = casar(c.legenda, c.postadoEm);
+        if (mid) { await prisma.conteudo.update({ where: { id: c.id }, data: { mediaId: mid } }).catch(() => {}); vinculados++; }
+      }
+      for (const p of semIdP.sort((a, b) => a.postadoEm!.getTime() - b.postadoEm!.getTime())) {
+        const mid = casar(p.legenda, p.postadoEm);
+        if (mid) { await prisma.publicacao.update({ where: { id: p.id }, data: { mediaId: mid } }).catch(() => {}); vinculados++; }
+      }
+    }
   }
 
-  // Casa do mais antigo pro mais novo (estável).
-  for (const c of conteudos.sort((a, b) => a.postadoEm!.getTime() - b.postadoEm!.getTime())) {
-    await vincular(c.legenda, c.postadoEm, (mediaId, ins) => prisma.conteudo.update({ where: { id: c.id }, data: { mediaId, ...ins, insightsEm: new Date() } }));
+  // 2) (RE)BUSCAR o engajamento de TODOS os posts com mediaId — FORÇADO (ignora as janelas).
+  //    Assim, ao re-clicar (ex: depois de ajustar a permissão na Meta), os números atualizam.
+  let atualizados = 0;
+  const comIdC = await prisma.conteudo.findMany({ where: { marcaId: marca.id, mediaId: { not: null } }, select: { id: true, mediaId: true } });
+  for (const c of comIdC) {
+    const ins = await buscarInsights(token, c.mediaId!, false);
+    if (ins) { await prisma.conteudo.update({ where: { id: c.id }, data: { ...ins, insightsEm: new Date() } }).catch(() => {}); atualizados++; }
   }
-  for (const p of pubs.sort((a, b) => a.postadoEm!.getTime() - b.postadoEm!.getTime())) {
-    await vincular(p.legenda, p.postadoEm, (mediaId, ins) => prisma.publicacao.update({ where: { id: p.id }, data: { mediaId, ...ins, insightsEm: new Date() } }));
+  const agora = Date.now();
+  const comIdP = await prisma.publicacao.findMany({ where: { marcaId: marca.id, mediaId: { not: null } }, select: { id: true, mediaId: true, formato: true, postadoEm: true } });
+  for (const p of comIdP) {
+    const ehStory = p.formato === "story";
+    if (ehStory && p.postadoEm && agora - p.postadoEm.getTime() > 24 * 3_600_000) continue;
+    const ins = await buscarInsights(token, p.mediaId!, ehStory);
+    if (ins) { await prisma.publicacao.update({ where: { id: p.id }, data: { ...ins, insightsEm: new Date() } }).catch(() => {}); atualizados++; }
   }
 
-  return { vinculados, total };
+  return { vinculados, atualizados, total };
+}
+
+// Diagnóstico: devolve a RESPOSTA CRUA da Meta ao pedir insights de UM post (o mais
+// recente com mediaId). Serve pra ver o erro exato quando o alcance não aparece (ex:
+// permissão faltando, métrica não suportada). NÃO inclui o token na resposta.
+export async function rawInsightsDeUmPost(marca: { id: string; accessToken: string | null }): Promise<string> {
+  if (!marca.accessToken) return "(marca sem token)";
+  const c = await prisma.conteudo.findFirst({ where: { marcaId: marca.id, mediaId: { not: null } }, select: { mediaId: true }, orderBy: { postadoEm: "desc" } });
+  const p = c ? null : await prisma.publicacao.findFirst({ where: { marcaId: marca.id, mediaId: { not: null }, formato: "feed" }, select: { mediaId: true }, orderBy: { postadoEm: "desc" } });
+  const mediaId = c?.mediaId || p?.mediaId;
+  if (!mediaId) return "(nenhum post vinculado ainda — clique em Puxar primeiro)";
+  try {
+    const r = await fetch(`${GRAPH}/${mediaId}/insights?metric=reach,saved&access_token=${marca.accessToken}`, { cache: "no-store" });
+    return (await r.text()).slice(0, 600);
+  } catch (e) {
+    return `erro de rede: ${e instanceof Error ? e.message : String(e)}`;
+  }
 }
