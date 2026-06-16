@@ -361,9 +361,9 @@ export function PlanosCheckout({
                 <label className="block text-xs text-muted">E-mail
                   <input id="fc-email" type="email" defaultValue={email} placeholder="seu@email.com" className="input-base" />
                 </label>
-                <label className="block text-xs text-muted">Banco emissor
-                  <select id="fc-issuer" className="input-base" />
-                </label>
+                {/* Banco emissor: o MP detecta pelo número do cartão. Fica OCULTO (mas no DOM,
+                    porque o MP precisa dele pra processar) — não mostramos pro cliente. */}
+                <select id="fc-issuer" className="hidden" aria-hidden="true" />
                 <label className="block text-xs text-muted">Parcelas
                   <select id="fc-installments" className="input-base" />
                 </label>
