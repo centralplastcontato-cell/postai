@@ -207,6 +207,8 @@ export function PublicacoesAba({
   const [estrelasFb, setEstrelasFb] = useState(5);
   const [destaqueFb, setDestaqueFb] = useState(""); // vazio = IA extrai do depoimento
   const [corCard, setCorCard] = useState(""); // "" = card branco
+  const [fotoAutor, setFotoAutor] = useState(""); // feedback: foto do cliente (opcional)
+  const [googleFb, setGoogleFb] = useState(false); // feedback: selo "Avaliação no Google"
   const [gerandoExemplo, setGerandoExemplo] = useState(false);
   // Preço / Pacote — valores SEMPRE do dono (a IA não inventa preço).
   const [precoDe, setPrecoDe] = useState("");
@@ -318,6 +320,8 @@ export function PublicacoesAba({
     setCondicoesTxt(arr(ex.condicoes));
     setLadoA(s(ex.ladoA));
     setLadoB(s(ex.ladoB));
+    setFotoAutor(s(ex.fotoAutor));
+    setGoogleFb(ex.google === true);
     setEditandoId(p.id);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -330,6 +334,7 @@ export function PublicacoesAba({
     setDepoimento(""); setAutorFb(""); setEstrelasFb(5); setDestaqueFb(""); setCorCard("");
     setPrecoDe(""); setPrecoPor(""); setLabelPor("À vista"); setParcelas(""); setEconomiaInput(""); setCondicoesTxt(""); setModoPreco("promo");
     setLadoA(""); setLadoB("");
+    setFotoAutor(""); setGoogleFb(false);
   }
 
   function handleSalvarEdicao() {
@@ -344,7 +349,7 @@ export function PublicacoesAba({
         titulo: tituloEdit, texto: textoEdit, legenda: legendaEdit, hashtags: hashtagsEdit,
         oferta, validade, inclui: itens, regras, diferenciais: difs, corFundo,
         depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard,
-        precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB,
+        precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb,
       });
       if (r.ok) {
         cancelarEdicao();
@@ -360,7 +365,7 @@ export function PublicacoesAba({
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
       const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback" || template === "enquete";
       const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, hora });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -384,6 +389,8 @@ export function PublicacoesAba({
         setModoPreco("promo");
         setLadoA("");
         setLadoB("");
+        setFotoAutor("");
+        setGoogleFb(false);
         onGerado?.(r.dia); // filtra a lista no dia da nova publicação (não abre todas)
         router.refresh();
       } else setErro(r.erro);
@@ -543,6 +550,23 @@ export function PublicacoesAba({
       router.refresh();
       setProc(null);
     });
+  }
+  async function handleUploadFotoAutor(file: File | undefined) {
+    if (!file) return;
+    setProc("fotoAutor");
+    setErro(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const resp = await fetch("/api/marketing/upload", { method: "POST", body: form });
+      const data = await resp.json();
+      if (data.ok) setFotoAutor(data.url);
+      else setErro(data.erro || "Falha ao subir a foto do cliente.");
+    } catch {
+      setErro("Falha ao subir a foto. Tente de novo.");
+    } finally {
+      setProc(null);
+    }
   }
   function copiar(p: PublicacaoView) {
     navigator.clipboard.writeText(`${p.legenda}\n\n${p.hashtags}`);
@@ -940,6 +964,30 @@ export function PublicacoesAba({
                 {CORES_EXTRAS.map((c) => (
                   <button key={c} type="button" onClick={() => setCorCard(c)} title={c} aria-label={`Cor ${c}`} className={`h-9 w-9 rounded-lg border-2 transition ${corCard.toLowerCase() === c.toLowerCase() ? "border-white ring-2 ring-white/40" : "border-linha hover:border-white/60"}`} style={{ backgroundColor: c }} />
                 ))}
+              </div>
+            </div>
+            {/* Selo "Avaliação no Google" + foto do cliente (igual às referências de prova social) */}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-linha bg-preto px-3 py-2.5 text-xs text-white">
+                <input type="checkbox" checked={googleFb} onChange={(e) => setGoogleFb(e.target.checked)} className="h-4 w-4 accent-vermelho" />
+                <span>🌟 Mostrar selo <strong>&quot;Avaliação no Google&quot;</strong></span>
+              </label>
+              <div className="text-xs text-muted">
+                Foto do cliente <span className="text-muted/70">(opcional — círculo)</span>
+                <div className="mt-1 flex items-center gap-2">
+                  {fotoAutor ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={fotoAutor} alt="cliente" className="h-9 w-9 rounded-full object-cover" />
+                      <button type="button" onClick={() => setFotoAutor("")} className="rounded-md border border-linha px-2 py-1 text-[11px] text-muted transition hover:border-vermelho hover:text-white">✕ remover</button>
+                    </>
+                  ) : (
+                    <label className="cursor-pointer rounded-md border border-linha px-3 py-1.5 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white">
+                      {proc === "fotoAutor" ? "Subindo…" : "📷 Subir foto"}
+                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUploadFotoAutor(e.target.files?.[0])} />
+                    </label>
+                  )}
+                </div>
               </div>
             </div>
             <p className="text-[11px] text-amber-400/90">⭐ Usa 1 foto REAL do seu Banco (rodízio) — você troca depois se não ficar boa. Sem foto, fica um fundo colorido.</p>

@@ -17,7 +17,7 @@ import type { Marca } from "@prisma/client";
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
 // `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
-type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string };
+type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean };
 
 // Parse/format de valores em R$ no formato brasileiro ("12.000" / "8.500,00").
 // Usado pra calcular a economia (De − Por) automaticamente no template de preço.
@@ -140,12 +140,17 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
       destaque: travas?.destaque || g.destaque || "",
       corCard: travas?.corCard || "",
       categoria: cat || undefined,
+      // Foto do cliente (opcional) + selo "Avaliação no Google".
+      fotoAutor: travas?.fotoAutor || "",
+      google: travas?.google || false,
       // Travados — preservados ao regerar (só a legenda/destaque-IA mudam).
       depoimentoTravado: travas?.depoimento || undefined,
       autorTravado: travas?.autor || undefined,
       estrelasTravada: typeof travas?.estrelas === "number" ? travas.estrelas : undefined,
       destaqueTravado: travas?.destaque || undefined,
       corCardTravada: travas?.corCard || undefined,
+      fotoAutorTravada: travas?.fotoAutor || undefined,
+      googleTravado: travas?.google || undefined,
     });
   }
   if (template === "moldura" || template === "faixa") {
@@ -475,7 +480,7 @@ type CamposTemplate = {
   oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string;
   depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string;
   precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string;
-  ladoA?: string; ladoB?: string;
+  ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean;
 };
 
 // Monta as "travas" (valores fixos do dono) conforme o template. Cada template usa só
@@ -489,7 +494,7 @@ function montarTravas(template: Template, c: CamposTemplate): Travas {
   } else if (template === "mosaico") {
     travas = { oferta: c.oferta?.trim() || undefined, validade: c.validade?.trim() || undefined };
   } else if (template === "feedback") {
-    travas = { depoimento: c.depoimento?.trim() || undefined, autor: c.autor?.trim() || undefined, estrelas: typeof c.estrelas === "number" ? Math.max(1, Math.min(5, c.estrelas)) : 5, destaque: c.destaque?.trim() || undefined, corCard: c.corCard?.trim() || undefined };
+    travas = { depoimento: c.depoimento?.trim() || undefined, autor: c.autor?.trim() || undefined, estrelas: typeof c.estrelas === "number" ? Math.max(1, Math.min(5, c.estrelas)) : 5, destaque: c.destaque?.trim() || undefined, corCard: c.corCard?.trim() || undefined, fotoAutor: c.fotoAutor?.trim() || undefined, google: c.google || undefined };
   } else if (template === "preco") {
     travas = { modoPreco: c.modoPreco || "promo", precoDe: c.precoDe?.trim() || undefined, precoPor: c.precoPor?.trim() || undefined, labelPor: c.labelPor?.trim() || undefined, parcelas: c.parcelas?.trim() || undefined, economia: c.economia?.trim() || undefined, condicoes: (c.condicoes || []).map((s) => s.trim()).filter(Boolean), validade: c.validade?.trim() || undefined };
   } else if (template === "enquete") {
@@ -516,6 +521,8 @@ export async function gerarPublicacao(input: {
   estrelas?: number; // feedback: nota 1-5
   destaque?: string; // feedback: frase de destaque (vazio = IA extrai do depoimento)
   corCard?: string; // feedback: cor do balão (vazio = branco)
+  fotoAutor?: string; // feedback: foto do cliente (círculo) — opcional
+  google?: boolean; // feedback: mostra o selo "Avaliação no Google"
   precoDe?: string; // preco: valor antigo (riscado) — opcional
   precoPor?: string; // preco: valor da oferta (obrigatório)
   labelPor?: string; // preco: forma (ex: "À vista")
@@ -747,6 +754,8 @@ export async function regerarPublicacao(id: string) {
       estrelas: typeof ex.estrelasTravada === "number" ? ex.estrelasTravada : undefined,
       destaque: typeof ex.destaqueTravado === "string" ? ex.destaqueTravado : undefined,
       corCard: typeof ex.corCardTravada === "string" ? ex.corCardTravada : undefined,
+      fotoAutor: typeof ex.fotoAutorTravada === "string" ? ex.fotoAutorTravada : undefined,
+      google: typeof ex.googleTravado === "boolean" ? ex.googleTravado : undefined,
       // Preço: os valores são preservados ao regerar (só título/legenda da IA mudam).
       modoPreco: typeof ex.modoPrecoTravado === "string" ? ex.modoPrecoTravado : undefined,
       precoDe: typeof ex.precoDeTravado === "string" ? ex.precoDeTravado : undefined,
@@ -832,6 +841,8 @@ export async function regerarComoNova(id: string) {
     estrelas: num(ex.estrelasTravada),
     destaque: str(ex.destaqueTravado),
     corCard: str(ex.corCardTravada),
+    fotoAutor: str(ex.fotoAutorTravada),
+    google: ex.googleTravado === true,
     modoPreco: str(ex.modoPrecoTravado),
     precoDe: str(ex.precoDeTravado),
     precoPor: str(ex.precoPorTravado),

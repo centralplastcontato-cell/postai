@@ -744,7 +744,7 @@ export function LayoutCapaFaixa(d: DadosArte & { imagemUrl?: string; arraste?: b
 // 5 estrelas, "FEEDBACK" colorido, frase de destaque + depoimento REAL do cliente +
 // autor + logo. O texto do depoimento NUNCA é inventado pela IA — vem do cliente.
 export function LayoutFeedback(
-  d: DadosArte & { imagemUrl?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string }
+  d: DadosArte & { imagemUrl?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; fotoAutor?: string; google?: boolean }
 ) {
   const paleta = d.paleta;
   const fundo = d.corFundo || escolherFundoFesta(paleta);
@@ -775,6 +775,11 @@ export function LayoutFeedback(
       {/* Área central que centraliza o card (deixa espaço pro logo no rodapé) */}
       <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", alignItems: "center", justifyContent: "center", padding: "70px 64px 180px" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 936, backgroundColor: card, borderRadius: 46, padding: "64px 64px 58px", boxShadow: "0 30px 80px rgba(0,0,0,0.45)" }}>
+          {/* Foto do cliente (opcional) num círculo emoldurado */}
+          {d.fotoAutor ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={d.fotoAutor} width={172} height={172} style={{ width: "172px", height: "172px", objectFit: "cover", borderRadius: 9999, border: `6px solid ${corMarca}`, marginBottom: 22, boxShadow: "0 8px 22px rgba(0,0,0,0.22)" }} />
+          ) : null}
           {/* Estrelas */}
           <div style={{ display: "flex", alignItems: "center" }}>
             {Array.from({ length: n }).map((_, i) => (
@@ -809,6 +814,16 @@ export function LayoutFeedback(
           {/* Autor */}
           {d.autor ? (
             <div style={{ display: "flex", marginTop: 26, fontFamily: "Fredoka", fontSize: 36, color: corMarca }}>— {d.autor}</div>
+          ) : null}
+
+          {/* Selo "Avaliação no Google" (com o Google multicolor autêntico) — prova social forte */}
+          {d.google ? (
+            <div style={{ display: "flex", alignItems: "center", marginTop: 24, padding: "10px 26px", borderRadius: 999, backgroundColor: cardEscuro ? "rgba(255,255,255,0.12)" : "#f3f4f6", border: `1px solid ${cardEscuro ? "rgba(255,255,255,0.22)" : "#e4e4ea"}` }}>
+              <span style={{ display: "flex", fontFamily: "Fredoka", fontSize: 28, color: cardEscuro ? "rgba(255,255,255,0.85)" : "#5f6368", marginRight: 10 }}>Avaliação no</span>
+              {["G", "o", "o", "g", "l", "e"].map((L, i) => (
+                <span key={i} style={{ display: "flex", fontFamily: "Fredoka", fontSize: 34, color: ["#4285F4", "#EA4335", "#FBBC05", "#4285F4", "#34A853", "#EA4335"][i] }}>{L}</span>
+              ))}
+            </div>
           ) : null}
         </div>
       </div>

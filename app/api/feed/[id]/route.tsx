@@ -30,7 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string } = {};
+  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -91,8 +91,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   }
 
   if (p.template === "feedback") {
+    const fotoAutorUrl = extra.fotoAutor ? await fotoSegura(extra.fotoAutor) : undefined;
     return new ImageResponse(
-      LayoutFeedback({ ...base, titulo: [], imagemUrl: fotoUrl, depoimento: extra.depoimento, autor: extra.autor, estrelas: extra.estrelas, destaque: extra.destaque, corCard: extra.corCard }),
+      LayoutFeedback({ ...base, titulo: [], imagemUrl: fotoUrl, depoimento: extra.depoimento, autor: extra.autor, estrelas: extra.estrelas, destaque: extra.destaque, corCard: extra.corCard, fotoAutor: fotoAutorUrl, google: extra.google }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
