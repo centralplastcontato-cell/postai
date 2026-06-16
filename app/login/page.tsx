@@ -64,6 +64,16 @@ export default function LoginPage() {
         >
           {pending ? "Entrando…" : "Entrar"}
         </button>
+
+        <div className="mt-5 border-t border-linha pt-5 text-center">
+          <p className="text-sm text-muted">Ainda não tem conta?</p>
+          <Link
+            href="/assinar"
+            className="mt-2 inline-block w-full rounded-lg border border-vermelho/50 px-6 py-3 text-sm font-semibold text-white transition hover:bg-vermelho/10"
+          >
+            ✨ Criar conta e assinar
+          </Link>
+        </div>
       </form>
     </div>
   );
