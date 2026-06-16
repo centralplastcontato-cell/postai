@@ -8,6 +8,7 @@ import { publicarNasRedes, publicarStoryNasRedes, marcaConectada } from "@/lib/i
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, AGENTE } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
+import { categoriaDoTemplate } from "@/lib/categorias";
 import { planoTemStory, rotuloPlano } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
@@ -547,6 +548,9 @@ export async function gerarPublicacao(input: {
       hashtags: gerado.hashtags || "",
       extra: montarExtra(marca, template, gerado, Date.now(), travas, input.categoria),
       tema: input.tema?.trim() || null,
+      // Categoria de intenção (pra inteligência) — vem do template, sem IA. NÃO confundir
+      // com `input.categoria`, que é a categoria de FOTO do banco (espaco|comida|…).
+      categoria: categoriaDoTemplate(template),
       status: "a_postar",
       formato: input.formato === "story" ? "story" : "feed",
     },

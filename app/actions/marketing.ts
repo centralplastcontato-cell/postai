@@ -10,6 +10,7 @@ import { baseUrl, AGENTE } from "@/lib/config";
 import { rotuloPlano } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
+import { classificarCategoriasIA } from "@/lib/inteligencia";
 import type { Marca } from "@prisma/client";
 
 type SlideTexto = {
@@ -217,9 +218,12 @@ export async function gerarCarrossel(input: {
   // Gera foto de IA pra cada slide. Se alguma falhar, aquele slide fica em cor sólida.
   const slidesFinais = await comFotosDeIA(marca, criado.id, slidesBase);
   const slides = JSON.stringify(slidesFinais.map((_, i) => `/api/slide/${criado.id}/${i + 1}`));
+  // Classifica a categoria de intenção (pra inteligência) a partir do tema + legenda.
+  // Best-effort: se a IA falhar, fica null e o backfill resgata depois.
+  const mapaCat = await classificarCategoriasIA([{ ref: criado.id, texto: `${tema}. ${gerado.legenda || ""}` }]);
   await prisma.conteudo.update({
     where: { id: criado.id },
-    data: { slides, slidesTexto: JSON.stringify(slidesFinais) },
+    data: { slides, slidesTexto: JSON.stringify(slidesFinais), categoria: mapaCat[criado.id] ?? null },
   });
 
   revalidatePath(`/painel/marcas/${marca.id}`);
@@ -274,6 +278,7 @@ export async function criarAniversariantes(input: {
       slides: "[]",
       slidesTexto: JSON.stringify(slides),
       tema: null, // não foi gerado por IA → não aparece o botão "Regerar"
+      categoria: "sazonal", // aniversariantes da semana é sempre sazonal
       status: "a_postar",
     },
   });

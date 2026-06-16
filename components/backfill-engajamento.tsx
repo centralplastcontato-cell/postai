@@ -23,7 +23,8 @@ export function BackfillEngajamento({ marcaId }: { marcaId: string }) {
     if (r.ok) {
       setErro(false);
       const novos = r.vinculados > 0 ? `Vinculei ${r.vinculados} ${r.vinculados === 1 ? "post novo" : "posts novos"} e ` : "";
-      setMsg(`${novos}atualizei o engajamento de ${r.atualizados} ${r.atualizados === 1 ? "post" : "posts"}. 🎉`);
+      const cat = r.categorias && r.categorias > 0 ? ` Classifiquei ${r.categorias} ${r.categorias === 1 ? "post por categoria" : "posts por categoria"}. 🏷️` : "";
+      setMsg(`${novos}atualizei o engajamento de ${r.atualizados} ${r.atualizados === 1 ? "post" : "posts"}. 🎉${cat}`);
       setDebug(r.debug ?? null);
       router.refresh();
     } else {
@@ -34,10 +35,11 @@ export function BackfillEngajamento({ marcaId }: { marcaId: string }) {
 
   return (
     <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-      <p className="text-sm font-semibold text-white">🔗 Engajamento dos posts antigos</p>
+      <p className="text-sm font-semibold text-white">🔗 Atualizar posts antigos</p>
       <p className="mt-1 text-xs text-muted">
-        Puxa as curtidas/comentários/alcance dos posts que já estavam no Instagram (casa por legenda e horário). É só rodar
-        uma vez. <span className="text-white/70">Stories antigos não dá — eles somem em 24h.</span>
+        Puxa as curtidas/comentários/alcance dos posts que já estavam no Instagram (casa por legenda e horário) e
+        classifica cada um por categoria pra alimentar a inteligência da Bia. É só rodar uma vez.
+        <span className="text-white/70"> Stories antigos não dá — eles somem em 24h.</span>
       </p>
       <button
         type="button"

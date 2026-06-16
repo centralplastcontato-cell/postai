@@ -81,6 +81,10 @@ model Conteudo {
   slides      String // JSON: URLs das artes dos slides
   slidesTexto String? // JSON: texto de cada slide
   tema        String?
+  // Categoria de INTENÇÃO de marketing (espaco|prova_social|oferta|institucional|sazonal|conteudo).
+  // É o eixo da inteligência do Postaí: cruza categoria × engajamento pra descobrir que TIPO
+  // de post mais vende festa. null = ainda não classificado (o backfill preenche).
+  categoria   String?
   status      String   @default("a_postar") // a_postar | postado
   aprovado    Boolean  @default(false) // revisão INTERNA do dono (não vai pra rede) — só marca "eu já revisei"
   postadoEm   DateTime? // momento REAL em que foi publicado (null = ainda não postado)
@@ -111,6 +115,9 @@ model Publicacao {
   imagemUrl String?
   extra     String? // JSON com dados específicos do template (oferta, validade, selo, linhas do título, cor de fundo...)
   tema      String?
+  // Categoria de INTENÇÃO de marketing (ver Conteudo.categoria) — eixo da inteligência.
+  // No feed, vem direto do template (determinístico); no carrossel, da IA.
+  categoria String?
   status    String   @default("a_postar") // a_postar | postado
   aprovado  Boolean  @default(false) // revisão INTERNA do dono (não vai pra rede) — só marca "eu já revisei"
   postadoEm DateTime? // momento REAL em que foi publicado (null = ainda não postado)

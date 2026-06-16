@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { gravarSnapshot, backfillMediaIdsDaMarca, rawInsightsDeUmPost } from "@/lib/metricas";
+import { classificarCategoriasFaltantes } from "@/lib/inteligencia";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -93,9 +94,15 @@ export async function backfillEngajamento(marcaId: string) {
   if (!marca.igUserId || !marca.accessToken) return { ok: false as const, erro: "Conecte o Instagram da marca primeiro." };
   try {
     const r = await backfillMediaIdsDaMarca(marca);
+    // De quebra, classifica por categoria (intenção) os posts que ainda não têm — feed pelo
+    // template (instantâneo) e carrossel pela IA. Best-effort: não derruba o backfill.
+    let categorias = 0;
+    try {
+      categorias = await classificarCategoriasFaltantes(marcaId);
+    } catch {}
     const debug = await rawInsightsDeUmPost(marca); // resposta crua da Meta (diagnóstico)
     revalidatePath(`/painel/marcas/${marcaId}`);
-    return { ok: true as const, vinculados: r.vinculados, atualizados: r.atualizados, total: r.total, debug };
+    return { ok: true as const, vinculados: r.vinculados, atualizados: r.atualizados, categorias, total: r.total, debug };
   } catch (e) {
     return { ok: false as const, erro: e instanceof Error ? e.message : "Falha ao vincular os posts." };
   }
