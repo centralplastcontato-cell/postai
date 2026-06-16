@@ -294,8 +294,7 @@ export function PlanosCheckout({
         <button type="button" onClick={voltarPraSelecao} className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-linha px-4 py-2.5 text-sm font-semibold text-muted transition hover:border-vermelho hover:text-white">← Trocar plano</button>
         <div className="rounded-2xl border border-linha bg-preto-card p-6">
           <ResumoTopo />
-          {erro && <p className="mt-4 rounded-md border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-300">{erro}</p>}
-          {aviso && <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{aviso}</p>}
+          {metodo === "escolha" && erro && <p className="mt-4 rounded-md border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-300">{erro}</p>}
 
           {metodo === "escolha" ? (
             <div className="mt-5 space-y-3">
@@ -368,6 +367,8 @@ export function PlanosCheckout({
                 <label className="block text-xs text-muted">Parcelas
                   <select id="fc-installments" className="input-base" />
                 </label>
+                {erro && <p className="rounded-md border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-300">{erro}</p>}
+                {aviso && <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{aviso}</p>}
                 <button type="submit" id="fc-submit" disabled={processandoCartao} className="mt-1 w-full rounded-xl bg-vermelho px-5 py-3 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
                   {processandoCartao ? "Processando…" : `🔒 Pagar R$ ${fmt(valor)}`}
                 </button>
