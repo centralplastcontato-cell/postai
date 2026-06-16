@@ -19,7 +19,10 @@ export async function criarConta(input: { email: string; senha: string }) {
   const existe = await prisma.usuario.findUnique({ where: { nome: email } });
   if (existe) return { ok: false as const, erro: "Já existe uma conta com esse e-mail. Faça login pra assinar." };
 
-  const u = await prisma.usuario.create({ data: { nome: email, senhaHash: hashSenha(senha), admin: false } });
+  // Nasce BLOQUEADA (acessoAte = agora, já vencido): a conta de auto-cadastro só passa a
+  // funcionar depois que o pagamento confirma e estende o acesso. Não afeta os clientes que
+  // o admin cria com "sem validade" (acessoAte null = acesso aberto).
+  const u = await prisma.usuario.create({ data: { nome: email, senhaHash: hashSenha(senha), admin: false, acessoAte: new Date() } });
   await abrirSessao(u.id);
   return { ok: true as const };
 }
