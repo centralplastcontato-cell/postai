@@ -125,7 +125,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const publicacoes: PublicacaoView[] = pubs.filter((p) => p.formato !== "story").map(mapPub);
   const stories: PublicacaoView[] = pubs.filter((p) => p.formato === "story").map(mapPub);
 
-  const imagens: ImagemView[] = imgs.map((i) => ({ id: i.id, url: i.url, categoria: i.categoria }));
+  const imagens: ImagemView[] = imgs.map((i) => ({ id: i.id, url: i.url, categoria: i.categoria, descricao: i.descricao }));
   const evolucao = metricas.reverse().map((m) => ({ dia: m.dia.toISOString(), seguidores: m.seguidores, posts: m.posts }));
 
   // Inteligência: cruza categoria × horário × intenção (carrossel + feed; Story fica fora,

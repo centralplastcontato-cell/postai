@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adicionarImagemMarca, removerImagemMarca } from "@/app/actions/imagens";
+import { adicionarImagemMarca, removerImagemMarca, descreverImagensDaMarca } from "@/app/actions/imagens";
 import { CATEGORIAS, CATEGORIA_LABEL as ROTULO } from "@/lib/categorias-imagem";
 
-export type ImagemView = { id: string; url: string; categoria: string };
+export type ImagemView = { id: string; url: string; categoria: string; descricao?: string };
 
 // 🏰 Banco de fotos REAIS do negócio. O dono sobe fotos do espaço/brinquedos/festas
 // e os posts usam elas no lugar de imagens de IA — nada de espaço "fake".
@@ -15,6 +15,8 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
   const [subindo, setSubindo] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+  const [descrevendo, setDescrevendo] = useState(false);
+  const [msgDesc, setMsgDesc] = useState<string | null>(null);
 
   async function upload(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -46,6 +48,23 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
       router.refresh();
     });
   }
+  // A IA "olha" cada foto sem descrição e descreve (1x) — pra casar a foto certa com o texto
+  // do post. Fotos novas já nascem descritas; este botão é pras antigas.
+  async function descrever() {
+    setMsgDesc(null);
+    setDescrevendo(true);
+    try {
+      const n = await descreverImagensDaMarca(marcaId);
+      setMsgDesc(n > 0 ? `✓ A IA descreveu ${n} ${n === 1 ? "foto" : "fotos"}. 📷` : "Todas as fotos já estavam descritas. ✅");
+      router.refresh();
+    } catch {
+      setMsgDesc("Não consegui descrever agora. Tente de novo.");
+    } finally {
+      setDescrevendo(false);
+    }
+  }
+
+  const descritas = imagens.filter((i) => i.descricao && i.descricao.trim()).length;
 
   return (
     <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
@@ -68,6 +87,17 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
         </label>
         <span className="text-[11px] text-muted">Dá pra subir várias de uma vez.</span>
       </div>
+
+      {/* Descrever com IA — pra a foto certa casar com o texto do post (a "visão" roda 1x por foto) */}
+      {imagens.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-purple-500/30 bg-purple-500/5 p-3">
+          <button type="button" onClick={descrever} disabled={descrevendo} className="shrink-0 rounded-md border border-purple-400/50 bg-purple-500/15 px-3 py-2 text-xs font-semibold text-purple-100 transition hover:bg-purple-500/25 disabled:opacity-50">
+            {descrevendo ? "🔍 Descrevendo…" : "🔍 Descrever fotos com IA"}
+          </button>
+          <span className="text-[11px] text-muted">A IA olha cada foto e escreve uma descrição, pra escolher a foto certa pra cada post. <strong className="text-white/80">{descritas} de {imagens.length}</strong> descritas. <span className="text-white/60">As novas já nascem descritas.</span></span>
+        </div>
+      )}
+      {msgDesc && <p className="mb-3 text-sm text-purple-200">{msgDesc}</p>}
       {erro && <p className="mb-3 text-sm text-red-400">{erro}</p>}
 
       {imagens.length === 0 ? (
@@ -87,6 +117,9 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
               >
                 ✕
               </button>
+              {img.descricao ? (
+                <span title={img.descricao} className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-1.5 py-1 text-[9px] leading-tight text-white/90">🔍 {img.descricao}</span>
+              ) : null}
             </div>
           ))}
         </div>
