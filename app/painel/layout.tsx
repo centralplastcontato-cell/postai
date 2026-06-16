@@ -25,14 +25,15 @@ export default async function PainelLayout({
       <div className="flex min-h-screen flex-col">
         <PainelHeader nome={s.nome} admin={s.admin} />
         <main className="flex flex-1 items-center justify-center p-6">
-          <div className="w-full max-w-md rounded-2xl border border-red-900/50 bg-preto-card p-8 text-center">
-            <p className="text-5xl">🔒</p>
-            <h1 className="display mt-4 text-2xl text-white">Seu acesso expirou</h1>
-            <p className="mt-3 text-sm text-muted">O período de acesso do seu Postaí terminou. Pra reativar e voltar a postar no automático, é só escolher um plano e pagar com Pix ou cartão — libera na hora.</p>
-            <div className="mt-6 flex flex-col items-center gap-3">
-              <Link href="/assinar" className="inline-block rounded-lg bg-vermelho px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-vermelho-hover">💳 Ver planos e reativar</Link>
-              <a href={WHATS} target="_blank" rel="noopener noreferrer" className="text-xs text-muted underline transition hover:text-white">ou fale com a gente no WhatsApp</a>
+          <div className="w-full max-w-md rounded-2xl border border-linha bg-preto-card p-8 text-center">
+            <p className="text-5xl">🚀</p>
+            <h1 className="display mt-4 text-2xl text-white">Falta ativar seu Postaí</h1>
+            <p className="mt-3 text-sm text-muted">Escolha um plano e pague com Pix ou cartão — o painel libera na hora. <span className="text-white/80">Acabou de pagar no Pix?</span> Pode levar uns minutinhos pra confirmar — é só clicar em atualizar.</p>
+            <div className="mt-6 space-y-3">
+              <Link href="/assinar" className="block w-full rounded-xl bg-vermelho px-6 py-3 text-sm font-semibold text-white transition hover:bg-vermelho-hover">💳 Ver planos e ativar</Link>
+              <a href="/painel" className="block w-full rounded-xl border border-linha px-6 py-3 text-sm font-semibold text-white transition hover:border-vermelho">🔄 Já paguei — atualizar</a>
             </div>
+            <a href={WHATS} target="_blank" rel="noopener noreferrer" className="mt-4 inline-block text-xs text-muted underline transition hover:text-white">ou fale com a gente no WhatsApp</a>
           </div>
         </main>
       </div>
