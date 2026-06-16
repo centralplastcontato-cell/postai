@@ -62,6 +62,9 @@ model ImagemMarca {
   marca     Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
   url       String
   categoria String   @default("geral") // espaco | brinquedos | festa | comida | geral
+  // Descrição curta gerada pela IA (visão) UMA vez no upload (ex: "Mesa de doces colorida").
+  // Serve pra casar a foto certa com o texto do post — sem pagar "visão" a cada geração.
+  descricao String   @default("")
   usos      Int      @default(0) // contador pra rodízio: sorteia sempre a menos usada
   criadoEm  DateTime @default(now())
 

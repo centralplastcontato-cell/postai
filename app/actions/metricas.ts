@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { gravarSnapshot, backfillMediaIdsDaMarca, rawInsightsDeUmPost } from "@/lib/metricas";
 import { classificarCategoriasFaltantes } from "@/lib/inteligencia";
+import { descreverImagensDaMarca } from "@/app/actions/imagens";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -100,9 +101,15 @@ export async function backfillEngajamento(marcaId: string) {
     try {
       categorias = await classificarCategoriasFaltantes(marcaId);
     } catch {}
+    // Descreve (visão IA, 1x) as fotos do banco que ainda não têm descrição — pra casar
+    // foto×texto na geração. Best-effort.
+    let fotos = 0;
+    try {
+      fotos = await descreverImagensDaMarca(marcaId);
+    } catch {}
     const debug = await rawInsightsDeUmPost(marca); // resposta crua da Meta (diagnóstico)
     revalidatePath(`/painel/marcas/${marcaId}`);
-    return { ok: true as const, vinculados: r.vinculados, atualizados: r.atualizados, categorias, total: r.total, debug };
+    return { ok: true as const, vinculados: r.vinculados, atualizados: r.atualizados, categorias, fotos, total: r.total, debug };
   } catch (e) {
     return { ok: false as const, erro: e instanceof Error ? e.message : "Falha ao vincular os posts." };
   }

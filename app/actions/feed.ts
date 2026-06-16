@@ -11,7 +11,7 @@ import { TEMPLATES, type Template } from "@/lib/feed-templates";
 import { categoriaDoTemplate } from "@/lib/categorias";
 import { planoTemStory, rotuloPlano } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
-import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
+import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import type { Marca } from "@prisma/client";
 
@@ -604,7 +604,10 @@ export async function gerarPublicacao(input: {
     // Puxa as 4 fotos reais do banco (rodízio) e grava no extra.
     await aplicarFotosMosaico(criado.id, marca.id, input.categoria).catch(() => {});
   } else if (querFoto) {
-    const real = await sortearImagemBanco(marca.id, input.categoria);
+    // Escolhe a foto que MAIS combina com o texto do post (pelas descrições da IA);
+    // cai no rodízio normal se não houver descrições/texto.
+    const textoFoto = [input.tema, gerado.titulo, gerado.ladoA, gerado.ladoB].filter(Boolean).join(" ");
+    const real = await escolherImagemPorTexto(marca.id, input.categoria, textoFoto);
     if (real) await definirImagemPublicacao({ id: criado.id, url: real }).catch(() => {});
     else {
       // Banco vazio: gera um fundo decorativo de IA pra o post NUNCA sair em branco —

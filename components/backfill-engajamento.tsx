@@ -24,7 +24,8 @@ export function BackfillEngajamento({ marcaId }: { marcaId: string }) {
       setErro(false);
       const novos = r.vinculados > 0 ? `Vinculei ${r.vinculados} ${r.vinculados === 1 ? "post novo" : "posts novos"} e ` : "";
       const cat = r.categorias && r.categorias > 0 ? ` Classifiquei ${r.categorias} ${r.categorias === 1 ? "post por categoria" : "posts por categoria"}. 🏷️` : "";
-      setMsg(`${novos}atualizei o engajamento de ${r.atualizados} ${r.atualizados === 1 ? "post" : "posts"}. 🎉${cat}`);
+      const fot = r.fotos && r.fotos > 0 ? ` Descrevi ${r.fotos} ${r.fotos === 1 ? "foto do banco" : "fotos do banco"}. 📷` : "";
+      setMsg(`${novos}atualizei o engajamento de ${r.atualizados} ${r.atualizados === 1 ? "post" : "posts"}. 🎉${cat}${fot}`);
       setDebug(r.debug ?? null);
       router.refresh();
     } else {
