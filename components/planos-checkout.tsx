@@ -83,6 +83,7 @@ export function PlanosCheckout({
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [gerandoPix, setGerandoPix] = useState(false);
   const [processandoCartao, setProcessandoCartao] = useState(false);
@@ -163,6 +164,7 @@ export function PlanosCheckout({
             onSubmit: (event: { preventDefault: () => void }) => {
               event.preventDefault();
               setErro(null);
+              setAviso(null);
               setProcessandoCartao(true);
               const d = cardForm.getCardFormData();
               processarPagamento({
@@ -181,8 +183,10 @@ export function PlanosCheckout({
                   if (r.status === "approved") {
                     setEtapa("sucesso");
                     setTimeout(() => { window.location.href = "/painel"; }, 2500);
+                  } else if (r.status === "rejected") {
+                    setErro("Pagamento recusado — confira os dados do cartão e tente de novo, ou pague no Pix.");
                   } else {
-                    setErro("Pagamento em análise. Assim que aprovar, seu acesso libera sozinho.");
+                    setAviso("Pagamento em análise pelo banco. Assim que aprovar, seu acesso libera sozinho.");
                   }
                 })
                 .catch(() => setErro("Não consegui processar agora. Tente de novo."))
@@ -210,6 +214,8 @@ export function PlanosCheckout({
   function voltarPraSelecao() {
     try { brickRef.current?.unmount?.(); } catch {}
     brickRef.current = null;
+    setErro(null);
+    setAviso(null);
     setMetodo("escolha");
     setEtapa("selecao");
   }
@@ -289,6 +295,7 @@ export function PlanosCheckout({
         <div className="rounded-2xl border border-linha bg-preto-card p-6">
           <ResumoTopo />
           {erro && <p className="mt-4 rounded-md border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-300">{erro}</p>}
+          {aviso && <p className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{aviso}</p>}
 
           {metodo === "escolha" ? (
             <div className="mt-5 space-y-3">
@@ -325,7 +332,7 @@ export function PlanosCheckout({
             </div>
           ) : (
             <div className="mt-5">
-              <button type="button" onClick={() => { try { brickRef.current?.unmount?.(); } catch {} brickRef.current = null; setMetodo("escolha"); setErro(null); }} className="inline-flex items-center gap-1.5 rounded-lg border border-linha px-4 py-2.5 text-sm font-semibold text-muted transition hover:border-vermelho hover:text-white">← Outras formas de pagar</button>
+              <button type="button" onClick={() => { try { brickRef.current?.unmount?.(); } catch {} brickRef.current = null; setMetodo("escolha"); setErro(null); setAviso(null); }} className="inline-flex items-center gap-1.5 rounded-lg border border-linha px-4 py-2.5 text-sm font-semibold text-muted transition hover:border-vermelho hover:text-white">← Outras formas de pagar</button>
               <form id="form-checkout" className="mt-4 space-y-3">
                 <div>
                   <label className="text-xs text-muted">Número do cartão</label>
