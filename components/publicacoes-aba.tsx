@@ -100,6 +100,16 @@ const MODELOS_ENQUETE: { rotulo: string; assunto: string; ladoA: string; ladoB: 
   { rotulo: "🎂 Bolo x Doces", assunto: "o que você ataca primeiro na festa", ladoA: "Bolo", ladoB: "Doces", categoria: "comida" },
 ];
 
+// Modelos prontos de Vitrine (clique preenche o assunto + a categoria das 6 fotos).
+const MODELOS_VITRINE: { rotulo: string; assunto: string; categoria: string }[] = [
+  { rotulo: "🍱 Comidinhas deliciosas", assunto: "as comidinhas deliciosas do buffet", categoria: "comida" },
+  { rotulo: "🎠 Nossos brinquedos", assunto: "os brinquedos e atrações que a criançada ama", categoria: "brinquedos" },
+  { rotulo: "🏰 Conheça o espaço", assunto: "conheça o nosso espaço completo", categoria: "espaco" },
+  { rotulo: "🎉 Festas inesquecíveis", assunto: "festas inesquecíveis que rolaram aqui", categoria: "festa" },
+  { rotulo: "🍰 Mesa de doces", assunto: "a nossa mesa de doces", categoria: "comida" },
+  { rotulo: "✨ Tudo que oferecemos", assunto: "tudo que a sua festa tem aqui", categoria: "geral" },
+];
+
 export type PublicacaoView = {
   id: string;
   slug: string;
@@ -865,6 +875,14 @@ export function PublicacoesAba({
 
         {template === "vitrine" && (
           <div className="mb-3">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique preenche o assunto + a categoria das fotos)</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {MODELOS_VITRINE.map((m) => (
+                <button key={m.rotulo} type="button" onClick={() => { setTema(m.assunto); setCategoriaFoto(m.categoria); }} className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
+                  {m.rotulo}
+                </button>
+              ))}
+            </div>
             <label className="text-xs text-muted">
               Fotos do banco <span className="text-muted/70">(de qual categoria puxar as 6 fotos)</span>
               <select value={categoriaFoto} onChange={(e) => setCategoriaFoto(e.target.value)} className="input-base">
