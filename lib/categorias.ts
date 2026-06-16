@@ -25,7 +25,7 @@ export const CATEGORIAS: { id: CategoriaId; rotulo: string; emoji: string; desc:
   { id: "institucional", rotulo: "Divulgação", emoji: "💎", desc: "diferenciais, confiança, qualidade, motivos pra fechar com a marca" },
   { id: "sazonal", rotulo: "Data comemorativa", emoji: "🎂", desc: "datas comemorativas (Natal, Dia das Crianças), aniversariantes da semana" },
   { id: "conteudo", rotulo: "Dica", emoji: "💡", desc: "dica útil, ideia de festa, conteúdo de valor sem oferta" },
-  { id: "interacao", rotulo: "Enquete / Interação", emoji: "🎲", desc: "enquete, 'qual lado você fica', pergunta/VS — feito pra gerar COMENTÁRIO e interação" },
+  { id: "interacao", rotulo: "Enquete", emoji: "⚔️", desc: "enquete, 'qual lado você fica', pergunta/VS — feito pra gerar COMENTÁRIO e interação" },
 ];
 
 const POR_ID: Record<string, (typeof CATEGORIAS)[number]> = Object.fromEntries(CATEGORIAS.map((c) => [c.id, c]));
