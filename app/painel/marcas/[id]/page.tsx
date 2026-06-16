@@ -8,6 +8,7 @@ import { type PublicacaoView } from "@/components/publicacoes-aba";
 import { type MarcaView } from "@/components/marca-form";
 import { type ImagemView } from "@/components/banco-imagens";
 import { AtividadesRecentes } from "@/components/atividades-recentes";
+import { analisarEngajamento } from "@/lib/inteligencia";
 
 export const dynamic = "force-dynamic";
 
@@ -125,6 +126,14 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const imagens: ImagemView[] = imgs.map((i) => ({ id: i.id, url: i.url, categoria: i.categoria }));
   const evolucao = metricas.reverse().map((m) => ({ dia: m.dia.toISOString(), seguidores: m.seguidores, posts: m.posts }));
 
+  // Inteligência: cruza categoria × horário × intenção (carrossel + feed; Story fica fora,
+  // suas métricas não se comparam). Calculado aqui (servidor) com os posts já carregados —
+  // sem query extra — e passado pronto pro cartão da Bia.
+  const analise = analisarEngajamento([
+    ...conteudos.map((c) => ({ categoria: c.categoria, curtidas: c.curtidas, comentarios: c.comentarios, alcance: c.alcance, salvamentos: c.salvamentos, quando: c.postadoEm ?? c.data, titulo: c.titulo })),
+    ...pubs.filter((p) => p.formato !== "story").map((p) => ({ categoria: p.categoria, curtidas: p.curtidas, comentarios: p.comentarios, alcance: p.alcance, salvamentos: p.salvamentos, quando: p.postadoEm ?? p.data, titulo: p.titulo })),
+  ]);
+
   const marcaView: MarcaView = {
     id: marca.id,
     nome: marca.nome,
@@ -161,6 +170,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         assinatura={assinatura}
         ehAdmin={sessao.admin}
         entregue={entregue}
+        analise={analise}
       />
       <AtividadesRecentes atividades={atividades} />
     </div>

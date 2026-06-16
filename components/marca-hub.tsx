@@ -10,6 +10,8 @@ import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { ConexaoCard } from "./conexao-card";
 import { EvolucaoCard } from "./evolucao-card";
 import { BackfillEngajamento } from "./backfill-engajamento";
+import { BiaDescobriu } from "./bia-descobriu";
+import { type AnaliseInsights } from "@/lib/inteligencia";
 import { rotuloPlano, diasDeAcesso } from "@/lib/plano";
 
 type Assinatura = { cliente: string; plano: string | null; acessoAte: string | null };
@@ -37,6 +39,7 @@ export function MarcaHub({
   assinatura,
   ehAdmin,
   entregue,
+  analise,
 }: {
   marca: MarcaView;
   posts: Post[];
@@ -48,6 +51,7 @@ export function MarcaHub({
   assinatura?: Assinatura | null;
   ehAdmin: boolean;
   entregue: { carrosseis: number; feed: number; stories: number; total: number };
+  analise: AnaliseInsights;
 }) {
   const [aba, setAba] = useState<"redes" | "imagens" | "config">("redes");
   const cls = (a: boolean) =>
@@ -116,6 +120,7 @@ export function MarcaHub({
             <p className="mt-2 text-[11px] text-muted">Carrosséis e Publicações ficam fixos no seu perfil · os Stories somem em 24h.</p>
           </div>
         )}
+        {entregue.total > 0 && <BiaDescobriu analise={analise} />}
         <EvolucaoCard pontos={evolucao} />
         {ehAdmin && <BackfillEngajamento marcaId={marca.id} />}
       </div>
