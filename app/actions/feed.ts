@@ -947,6 +947,12 @@ export async function sugerirDepoimento(marcaId: string, destaque?: string) {
   // Se o dono já escolheu uma frase de destaque, o depoimento é gerado COERENTE com ela
   // (e o destaque escolhido é mantido). Senão, a IA cria também o destaque.
   const dest = (destaque || "").trim();
+  // A IA tende a repetir sempre o mesmo nome (ex: "Juliana M.") nos exemplos. Pra cada
+  // exemplo vir com um nome DIFERENTE, sorteamos um nome brasileiro + inicial e FORÇAMOS
+  // no resultado (ignorando o que a IA inventaria). O dono troca pelo nome real ao postar.
+  const NOMES = ["Mariana", "Juliana", "Patrícia", "Fernanda", "Camila", "Aline", "Renata", "Carla", "Bruna", "Tatiane", "Vanessa", "Priscila", "Daniela", "Letícia", "Bianca", "Amanda", "Jéssica", "Rafael", "Bruno", "Thiago", "Felipe", "Rodrigo", "Marcelo", "André", "Diego", "Leandro", "Gustavo", "Paula", "Simone", "Adriana", "Cristiane", "Débora", "Sabrina", "Michele"];
+  const INICIAIS = "ABCDFGLMNOPRSTV".split("");
+  const nomeExemplo = `${NOMES[Math.floor(Math.random() * NOMES.length)]} ${INICIAIS[Math.floor(Math.random() * INICIAIS.length)]}.`;
   const userMsg = dest
     ? `Escreva um EXEMPLO realista de depoimento de um cliente satisfeito (pai ou mãe que fez a festa do filho) sobre "${marca.nome}", que combine e justifique este elogio em destaque: "${dest}". ${marca.descricao || ""} Tom natural, espontâneo e específico, sem exagero. 3 a 5 frases. Responda só com JSON: {"depoimento":"o texto","autor":"primeiro nome + inicial do sobrenome (ex: Mariana S.)"}`
     : `Escreva um EXEMPLO realista de depoimento de um cliente satisfeito (um pai ou mãe que fez a festa do filho) sobre "${marca.nome}". ${marca.descricao || ""} Tom natural, espontâneo e específico (cite atendimento, espaço, equipe ou a alegria das crianças) — sem soar publicitário nem exagerado. 3 a 5 frases. Responda só com JSON: {"depoimento":"o texto do depoimento","autor":"primeiro nome + inicial do sobrenome (ex: Mariana S.)","destaque":"frase BEM curta de 2 a 4 palavras que resume o elogio (ex: Festa inesquecível!)"}`;
@@ -969,7 +975,8 @@ export async function sugerirDepoimento(marcaId: string, destaque?: string) {
     const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { depoimento?: string; autor?: string; destaque?: string };
     const depoimento = (j.depoimento ?? "").trim();
     if (!depoimento) throw new Error("Resposta vazia.");
-    return { ok: true as const, depoimento, autor: (j.autor ?? "").trim(), destaque: dest || (j.destaque ?? "").trim() };
+    // Força o nome sorteado (não repete) — o do exemplo serve só de rascunho.
+    return { ok: true as const, depoimento, autor: nomeExemplo, destaque: dest || (j.destaque ?? "").trim() };
   } catch (e) {
     console.error("Erro ao sugerir depoimento:", e);
     return { ok: false as const, erro: "Não consegui criar o exemplo agora. Confira a chave da OpenAI." };
