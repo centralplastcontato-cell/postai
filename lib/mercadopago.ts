@@ -5,6 +5,8 @@
 //
 // Server-only — usa a chave secreta MP_ACCESS_TOKEN (nunca exposta ao navegador).
 
+import { randomUUID } from "crypto";
+
 const API = "https://api.mercadopago.com";
 
 function token(): string | null {
@@ -93,7 +95,9 @@ export async function criarPagamento(opts: {
   try {
     const resp = await fetch(`${API}/v1/payments`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      // X-Idempotency-Key é OBRIGATÓRIO no /v1/payments: identifica unicamente a tentativa
+      // pra o MP nunca cobrar a mesma coisa duas vezes (ex: se a rede repetir o request).
+      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json", "X-Idempotency-Key": randomUUID() },
       body: JSON.stringify(body),
     });
     const j = (await resp.json()) as {
