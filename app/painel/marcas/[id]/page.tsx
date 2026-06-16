@@ -8,7 +8,7 @@ import { type PublicacaoView } from "@/components/publicacoes-aba";
 import { type MarcaView } from "@/components/marca-form";
 import { type ImagemView } from "@/components/banco-imagens";
 import { AtividadesRecentes } from "@/components/atividades-recentes";
-import { analisarEngajamento } from "@/lib/inteligencia";
+import { analisarEngajamento, sugerirProximoPost } from "@/lib/inteligencia";
 
 export const dynamic = "force-dynamic";
 
@@ -136,6 +136,15 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     ...pubs.filter((p) => p.formato !== "story").map((p) => ({ categoria: p.categoria, curtidas: p.curtidas, comentarios: p.comentarios, alcance: p.alcance, salvamentos: p.salvamentos, quando: p.postadoEm ?? p.data, titulo: p.titulo })),
   ]);
 
+  // Sugestão da Bia pro próximo post de feed: o que vende × o que faz tempo que não sai.
+  // Recência só conta os que JÁ foram postados (postadoEm preenchido).
+  const sugestao = sugerirProximoPost(
+    [...conteudos, ...pubs.filter((p) => p.formato !== "story")]
+      .filter((p) => p.postadoEm)
+      .map((p) => ({ categoria: p.categoria, postadoEm: p.postadoEm as Date })),
+    analise,
+  );
+
   const marcaView: MarcaView = {
     id: marca.id,
     nome: marca.nome,
@@ -173,6 +182,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         ehAdmin={sessao.admin}
         entregue={entregue}
         analise={analise}
+        sugestao={sugestao}
       />
       <AtividadesRecentes atividades={atividades} />
     </div>

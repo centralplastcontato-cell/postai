@@ -206,6 +206,67 @@ export function analisarEngajamento(posts: PostAnalise[]): AnaliseInsights {
   return base;
 }
 
+// Categoria → template de feed que melhor a representa (pro botão "Usar essa ideia" já
+// deixar o gerador no formato certo).
+const CATEGORIA_TEMPLATE: Record<CategoriaId, string> = {
+  espaco: "mosaico",
+  prova_social: "feedback",
+  oferta: "promocao",
+  institucional: "divulgacao",
+  sazonal: "data-comemorativa",
+  conteudo: "dica",
+};
+
+export type SugestaoBia = { categoria: string; emoji: string; nome: string; motivo: string; template: string };
+
+// A Bia decide O QUE sugerir como próximo post — onde o loop deixa de observar e AGE.
+// Combina três sinais: (1) valor da categoria (número real quando confiável, senão o prior
+// do nicho), (2) recência (faz tempo que não posta isso?), (3) nunca-postou (variedade).
+// Roda no servidor (página) — Date.now() é permitido aqui.
+export function sugerirProximoPost(postados: { categoria: string | null; postadoEm: Date }[], analise: AnaliseInsights): SugestaoBia | null {
+  const agora = Date.now();
+  // Dias desde o último post de cada categoria (ausente = nunca postou).
+  const ultimoDias = new Map<string, number>();
+  for (const p of postados) {
+    if (!p.categoria) continue;
+    const dias = (agora - p.postadoEm.getTime()) / 86_400_000;
+    const atual = ultimoDias.get(p.categoria);
+    if (atual === undefined || dias < atual) ultimoDias.set(p.categoria, dias);
+  }
+
+  const maxTaxa = analise.categorias[0]?.taxa || 1;
+  const taxaPorId = new Map(analise.categorias.map((c) => [c.id, c.taxa]));
+  const valorDe = (id: CategoriaId): number => {
+    if (analise.confianca === "boa" && taxaPorId.has(id)) return Math.max(0.2, taxaPorId.get(id)! / maxTaxa);
+    const idx = PRIOR_NICHO.indexOf(id);
+    return idx < 0 ? 0.3 : (PRIOR_NICHO.length - idx) / PRIOR_NICHO.length;
+  };
+
+  let melhor: { id: CategoriaId; score: number; dias: number } | null = null;
+  for (const id of PRIOR_NICHO) {
+    const dias = ultimoDias.has(id) ? ultimoDias.get(id)! : 60; // nunca postou = bem "atrasado"
+    const recencia = 1 + Math.min(dias, 21) / 21; // até dobra o peso após ~3 semanas sem postar
+    const score = valorDe(id) * recencia;
+    if (!melhor || score > melhor.score) melhor = { id, score, dias };
+  }
+  if (!melhor) return null;
+
+  const id = melhor.id;
+  const ehLiderReal = analise.confianca === "boa" && analise.categorias[0]?.id === id;
+  const nuncaPostou = !ultimoDias.has(id);
+  const diasInt = Math.round(melhor.dias);
+
+  const partes: string[] = [];
+  if (ehLiderReal) partes.push("é o que mais desperta intenção de fechar festa no seu perfil");
+  if (nuncaPostou) partes.push("e você ainda não tem nenhum post assim");
+  else if (diasInt >= 7) partes.push(`faz ${diasInt} dias que você não posta isso`);
+  if (partes.length === 0) partes.push("costuma vender bem pro seu público");
+  let motivo = partes.join(" — ");
+  motivo = motivo.charAt(0).toUpperCase() + motivo.slice(1);
+
+  return { categoria: id, emoji: emojiCategoria(id), nome: nomeCategoria(id), motivo, template: CATEGORIA_TEMPLATE[id] };
+}
+
 // Preenche a categoria dos posts da marca que ainda estão SEM ela. Feed (Publicacao): direto
 // do template, sem IA. Carrossel (Conteudo): pela IA, lendo tema/título/legenda, em lotes.
 // Idempotente — só toca no que está null, então pode rodar quantas vezes quiser. Devolve

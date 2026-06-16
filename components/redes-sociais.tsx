@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MarketingCalendario, type Post } from "./marketing-calendario";
 import { PublicacoesAba, type PublicacaoView } from "./publicacoes-aba";
 import { StoriesAba } from "./stories-aba";
+import { type SugestaoBia } from "@/lib/inteligencia";
 import { CalendarioRedes, type SelecaoRede } from "./calendario-redes";
 import { ResumoDoDia } from "./resumo-dia";
 import { AniversariantesForm } from "./aniversariantes-form";
@@ -24,6 +25,7 @@ export function RedesSociais({
   paleta,
   temFacebook,
   espelharStoryPadrao,
+  sugestao,
 }: {
   marcaId: string;
   posts: Post[];
@@ -36,6 +38,7 @@ export function RedesSociais({
   paleta: string; // JSON array de hex da marca (pro seletor de cor)
   temFacebook: boolean; // marca com Página do Facebook conectada → posta nos dois
   espelharStoryPadrao?: boolean; // padrão da marca pra espelhar o feed no Story
+  sugestao?: SugestaoBia | null; // sugestão da Bia pro próximo post (gerador de feed)
 }) {
   const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes" | "story">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
@@ -138,6 +141,7 @@ export function RedesSociais({
           paleta={paleta}
           temFacebook={temFacebook}
           espelharStoryPadrao={espelharStoryPadrao}
+          sugestao={sugestao}
         />
       )}
 

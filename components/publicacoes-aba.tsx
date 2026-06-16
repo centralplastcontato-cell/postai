@@ -30,6 +30,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
 import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
+import { type SugestaoBia } from "@/lib/inteligencia";
 
 type Confirmacao = { titulo: string; descricao?: string; textoConfirmar: string; acao: () => void };
 
@@ -161,6 +162,7 @@ export function PublicacoesAba({
   paleta,
   temFacebook,
   espelharStoryPadrao,
+  sugestao,
 }: {
   marcaId: string;
   publicacoes: PublicacaoView[];
@@ -172,6 +174,7 @@ export function PublicacoesAba({
   paleta?: string; // JSON array de hex da marca (pro seletor de cor de fundo)
   temFacebook?: boolean; // posta também no Facebook → reflete na caixinha "Estamos postando"
   espelharStoryPadrao?: boolean; // padrão da marca pra espelhar o feed no Story
+  sugestao?: SugestaoBia | null; // sugestão da Bia pro próximo post (banner no gerador)
 }) {
   const router = useRouter();
   const gerador = usePainelColapsavel("feed");
@@ -556,6 +559,20 @@ export function PublicacoesAba({
         )}
 
         {(gerador.aberto || editandoId) && (<>
+        {!editandoId && sugestao && (
+          <div className="mb-3 mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-purple-500/30 bg-purple-500/10 px-3 py-2.5">
+            <span className="text-sm text-purple-100">
+              💡 <strong className="font-semibold text-white">A Bia sugere:</strong> {sugestao.emoji} {sugestao.nome} — <span className="text-purple-200/90">{sugestao.motivo}</span>.
+            </span>
+            <button
+              type="button"
+              onClick={() => { setTemplate(sugestao.template as Template); formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+              className="shrink-0 rounded-md border border-purple-400/50 bg-purple-500/15 px-3 py-1 text-xs font-semibold text-purple-100 transition hover:bg-purple-500/25"
+            >
+              Usar essa ideia →
+            </button>
+          </div>
+        )}
         <div className="mb-3 mt-3 flex flex-wrap gap-2">
           {TEMPLATES.map((t) => (
             <button key={t} type="button" onClick={() => { if (!editandoId) setTemplate(t); }} disabled={!!editandoId && template !== t} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${template === t ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"} ${editandoId && template !== t ? "cursor-not-allowed opacity-30" : ""}`}>

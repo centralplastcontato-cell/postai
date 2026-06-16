@@ -11,7 +11,7 @@ import { ConexaoCard } from "./conexao-card";
 import { EvolucaoCard } from "./evolucao-card";
 import { BackfillEngajamento } from "./backfill-engajamento";
 import { BiaDescobriu } from "./bia-descobriu";
-import { type AnaliseInsights } from "@/lib/inteligencia";
+import { type AnaliseInsights, type SugestaoBia } from "@/lib/inteligencia";
 import { rotuloPlano, diasDeAcesso } from "@/lib/plano";
 
 type Assinatura = { cliente: string; plano: string | null; acessoAte: string | null };
@@ -40,6 +40,7 @@ export function MarcaHub({
   ehAdmin,
   entregue,
   analise,
+  sugestao,
 }: {
   marca: MarcaView;
   posts: Post[];
@@ -52,6 +53,7 @@ export function MarcaHub({
   ehAdmin: boolean;
   entregue: { carrosseis: number; feed: number; stories: number; total: number };
   analise: AnaliseInsights;
+  sugestao: SugestaoBia | null;
 }) {
   const [aba, setAba] = useState<"redes" | "imagens" | "config">("redes");
   const cls = (a: boolean) =>
@@ -132,7 +134,7 @@ export function MarcaHub({
       </div>
 
       <div className="mt-6">
-        {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} />}
+        {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} sugestao={sugestao} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
         {aba === "config" && ehAdmin && <MarcaForm marca={marca} />}
       </div>
