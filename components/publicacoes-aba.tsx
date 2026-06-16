@@ -231,7 +231,7 @@ export function PublicacoesAba({
   // Cores da marca que servem de fundo (escuras). Vazio se a marca não tem paleta.
   const coresFundo = paletaComExtras(parsePaleta(paleta));
   // Templates de fundo COLORIDO (onde escolher a cor faz sentido — os com foto não).
-  const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico", "moldura", "faixa", "preco", "enquete"];
+  const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico", "moldura", "faixa", "preco", "enquete", "vitrine"];
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
@@ -363,7 +363,7 @@ export function PublicacoesAba({
     startTransition(async () => {
       const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
-      const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback" || template === "enquete";
+      const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback" || template === "enquete" || template === "vitrine";
       const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
       const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora });
       if (r.ok) {
@@ -853,6 +853,18 @@ export function PublicacoesAba({
               </label>
             </div>
             <p className="mt-1 text-[11px] text-amber-400/90">⚔️ Enquete pra ENGAJAR: o público comenta qual lado prefere. Lados vazios = a IA sugere. A foto vem do seu Banco (sem foto, vira fundo colorido).</p>
+          </div>
+        )}
+
+        {template === "vitrine" && (
+          <div className="mb-3">
+            <label className="text-xs text-muted">
+              Fotos do banco <span className="text-muted/70">(de qual categoria puxar as 6 fotos)</span>
+              <select value={categoriaFoto} onChange={(e) => setCategoriaFoto(e.target.value)} className="input-base">
+                {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
+              </select>
+            </label>
+            <p className="mt-1 text-[11px] text-amber-400/90">🍱 Mostra 6 fotos REAIS do seu Banco (rodízio) numa grade com o título no meio. Suba fotos na aba <strong>Imagens</strong> se ainda não tiver.</p>
           </div>
         )}
 

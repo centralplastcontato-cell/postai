@@ -839,6 +839,64 @@ export function LayoutFeedback(
   );
 }
 
+// 🍱 Vitrine — 6 fotos REAIS em 2 fileiras de 3, com uma FAIXA CENTRAL colorida trazendo o
+// título + subtítulo. Mostra variedade (comidinhas, brinquedos, festas) numa arte só.
+export function LayoutVitrine(d: DadosArte & { fotos?: string[] }) {
+  const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
+  const fundo = d.corFundo || escolherFundoFesta(d.paleta);
+  const fotos = (d.fotos || []).filter(Boolean).slice(0, 6);
+  const logoW = Math.round(58 * 1.76);
+  const slots = [
+    { top: 0, left: 0 }, { top: 0, left: 360 }, { top: 0, left: 720 },
+    { top: 940, left: 0 }, { top: 940, left: 360 }, { top: 940, left: 720 },
+  ];
+  const fillers = [c1, c3, c5, c2, c1, c3];
+  return (
+    <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative", backgroundColor: fundo, fontFamily: "Baloo" }}>
+      {/* 6 fotos (2 fileiras de 3). Slot vazio = bloco de cor da paleta. */}
+      {slots.map((s, i) =>
+        fotos[i] ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={i} src={fotos[i]} width={360} height={410} style={{ position: "absolute", top: s.top, left: s.left, width: "360px", height: "410px", objectFit: "cover" }} />
+        ) : (
+          <div key={i} style={{ position: "absolute", top: s.top, left: s.left, width: "360px", height: "410px", display: "flex", backgroundColor: fillers[i] }} />
+        ),
+      )}
+
+      {/* Faixa central com título + subtítulo */}
+      <div
+        style={{
+          position: "absolute",
+          top: 410,
+          left: 0,
+          width: "1080px",
+          height: "530px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 70px",
+          backgroundColor: fundo,
+          backgroundImage: "radial-gradient(circle at 50% 50%, rgba(255,255,255,0.20), rgba(0,0,0,0.12) 78%)",
+          boxShadow: "0 0 44px rgba(0,0,0,0.4)",
+        }}
+      >
+        {d.logoSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={d.logoSrc} width={logoW} height={58} style={{ objectFit: "contain", marginBottom: 16, filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.5))" }} />
+        ) : null}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+          <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 3 ? 84 : 108} fundo={fundo} />
+        </div>
+        {d.textoApoio ? (
+          <div style={{ display: "flex", marginTop: 20, maxWidth: 880, textAlign: "center", fontSize: 40, color: BRANCO, lineHeight: 1.2, textShadow: "0 2px 6px rgba(0,0,0,0.5)" }}>{d.textoApoio}</div>
+        ) : null}
+        {d.telefone ? <div style={{ display: "flex", marginTop: 22 }}><CtaWhatsApp telefone={d.telefone} /></div> : null}
+      </div>
+    </div>
+  );
+}
+
 // ⚔️ Enquete / VS — ENGAJAMENTO: foto + dois lados ("Salgados VS Docinhos") no topo e a
 // PERGUNTA embaixo ("que lado você fica?"). Feito pra provocar COMENTÁRIO — o sinal que a
 // inteligência da Bia mais valoriza. ladoA/ladoB são os dois times; o título é a pergunta.

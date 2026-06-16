@@ -181,6 +181,16 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
       validadeTravada: travas?.validade || undefined,
     });
   }
+  if (template === "vitrine") {
+    // As 6 fotos são sorteadas e mescladas depois (aplicarFotosMosaico). Aqui só categoria + cor.
+    const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    const cat = categoria && categoria !== "geral" ? categoria : "";
+    return JSON.stringify({
+      categoria: cat || undefined,
+      corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
+      corFundoTravada: travas?.corFundo || undefined,
+    });
+  }
   if (template === "enquete") {
     // VS/Enquete: os dois lados + cor das faixas + categoria da foto de fundo.
     const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
@@ -203,8 +213,8 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
 // Sorteia até 4 fotos reais do banco (rodízio) e MESCLA no extra da publicação
 // Mosaico — sem apagar o selo/cor já gravados por montarExtra. Usado no gerar e no
 // regerar (cada regerar traz fotos novas, graças ao rodízio por menos-usadas).
-async function aplicarFotosMosaico(pubId: string, marcaId: string, categoria?: string) {
-  const fotos = await sortearImagensBanco(marcaId, 4, categoria);
+async function aplicarFotosMosaico(pubId: string, marcaId: string, categoria?: string, n = 4) {
+  const fotos = await sortearImagensBanco(marcaId, n, categoria);
   const p = await prisma.publicacao.findUnique({ where: { id: pubId }, select: { extra: true } });
   let ex: Record<string, unknown> = {};
   try {
@@ -234,6 +244,8 @@ const GUIA: Record<Template, string> = {
     'Crie um post de OFERTA/PACOTE com PREÇO em destaque. Os VALORES (preços, parcelas, economia) são fornecidos e NÃO podem ser alterados nem inventados. O "titulo" é a chamada da promoção, curta e irresistível (ex: "Promoção Especial da Copa", "Pacote Imperdível"). Escreva a "legenda" destacando a oportunidade e convidando a fechar — sem inventar valores ou condições além dos fornecidos.',
   enquete:
     'Crie uma ENQUETE / VS divertida pra ENGAJAR (gerar comentário): duas opções que disputam ("Time X VS Equipe Y"). O "titulo" é a PERGUNTA curta e provocativa (ex: "Que lado você fica?", "Qual time vence?"). Preencha "ladoA" e "ladoB" com os dois lados CURTÍSSIMOS (1 a 2 palavras cada, ex: Salgados / Docinhos, Pula-pula / Piscina de bolinhas). A "legenda" CONVIDA a comentar a escolha (ex: "Comenta aqui o seu time! 👇"). Tom leve e brincalhão. NÃO invente preço/promoção.',
+  vitrine:
+    'Crie uma VITRINE que mostra a VARIEDADE do buffet em fotos reais (ex: comidinhas, brinquedos, festas). O "titulo" é uma chamada CURTA e gostosa (2 a 4 palavras, ex: "Comidinhas deliciosas!", "Diversão garantida"). O "texto" é um subtítulo curto e convidativo (ex: "Muitas opções que todo mundo ama!"). NÃO invente preço/promoção. As fotos vêm do banco automaticamente.',
 };
 
 // Formato de JSON esperado por template (a Promoção pede oferta/validade).
@@ -304,6 +316,12 @@ const FORMATO_JSON: Record<Template, string> = {
   "legenda": "legenda do post (3-5 linhas com \\n) que CONVIDA a comentar a escolha, termina chamando a interação (ex: comenta aqui!)",
   "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
 }`,
+  vitrine: `{
+  "titulo": "chamada curta e gostosa (2 a 4 palavras) — vai GRANDE na faixa central (ex: Comidinhas deliciosas!)",
+  "texto": "subtítulo curto e convidativo (até ~12 palavras, ex: Muitas opções que todo mundo ama!)",
+  "legenda": "legenda do post (3-5 linhas com \\n), convida a conhecer e chamar no WhatsApp",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
 };
 
 function sistema(marca: Marca, template: Template): string {
@@ -326,7 +344,7 @@ type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: stri
 // Templates que usam foto de IA de fundo (os de fundo colorido não geram foto).
 // O Mosaico também usa fotos reais, mas precisa de VÁRIAS (tratadas à parte em
 // aplicarFotosMosaico), por isso fica fora do fluxo de foto única do USA_FOTO.
-const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false, moldura: false, faixa: true, feedback: true, preco: false, enquete: true };
+const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false, moldura: false, faixa: true, feedback: true, preco: false, enquete: true, vitrine: false };
 
 function slugify(s: string): string {
   return s
@@ -603,6 +621,9 @@ export async function gerarPublicacao(input: {
   if (template === "mosaico") {
     // Puxa as 4 fotos reais do banco (rodízio) e grava no extra.
     await aplicarFotosMosaico(criado.id, marca.id, input.categoria).catch(() => {});
+  } else if (template === "vitrine") {
+    // Vitrine: puxa 6 fotos reais do banco (rodízio) e grava no extra.
+    await aplicarFotosMosaico(criado.id, marca.id, input.categoria, 6).catch(() => {});
   } else if (querFoto) {
     // Escolhe a foto que MAIS combina com o texto do post (pelas descrições da IA);
     // cai no rodízio normal se não houver descrições/texto.
@@ -798,9 +819,11 @@ export async function regerarPublicacao(id: string) {
       status: "a_postar",
     },
   });
-  // Mosaico: re-sorteia 4 fotos novas do banco (rodízio) a cada regerar.
+  // Mosaico/Vitrine: re-sorteia fotos novas do banco (rodízio) a cada regerar.
   if (template === "mosaico") {
     await aplicarFotosMosaico(id, p.marcaId, categoria).catch(() => {});
+  } else if (template === "vitrine") {
+    await aplicarFotosMosaico(id, p.marcaId, categoria, 6).catch(() => {});
   }
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const };

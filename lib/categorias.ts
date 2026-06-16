@@ -59,6 +59,7 @@ const TEMPLATE_CATEGORIA: Record<string, CategoriaId> = {
   faixa: "espaco",
   feedback: "prova_social",
   enquete: "interacao",
+  vitrine: "espaco",
 };
 export function categoriaDoTemplate(template: string): CategoriaId {
   return TEMPLATE_CATEGORIA[template] ?? "conteudo";

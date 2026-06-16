@@ -2,7 +2,7 @@
 // arquivo de Server Actions só pode exportar funções async.
 // Templates por finalidade real do negócio (não mais abstratos).
 
-export const TEMPLATES = ["promocao", "data-comemorativa", "divulgacao", "dica", "mosaico", "moldura", "faixa", "feedback", "preco", "enquete"] as const;
+export const TEMPLATES = ["promocao", "data-comemorativa", "divulgacao", "dica", "mosaico", "moldura", "faixa", "feedback", "preco", "enquete", "vitrine"] as const;
 export type Template = (typeof TEMPLATES)[number];
 
 export const TEMPLATE_LABEL: Record<Template, string> = {
@@ -16,4 +16,5 @@ export const TEMPLATE_LABEL: Record<Template, string> = {
   feedback: "⭐ Feedback / Depoimento",
   preco: "💰 Preço / Pacote",
   enquete: "⚔️ Enquete / VS (engajamento)",
+  vitrine: "🍱 Vitrine (6 fotos + título)",
 };
