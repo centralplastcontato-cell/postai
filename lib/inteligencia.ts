@@ -94,7 +94,7 @@ export async function classificarCategoriasIA(
 
 // Prior do NICHO (buffet infantil): o que costuma vender festa quando ainda não há dado
 // suficiente da marca. A inteligência começa por aqui e vai corrigindo com os números reais.
-const PRIOR_NICHO: CategoriaId[] = ["prova_social", "espaco", "oferta", "sazonal", "institucional", "conteudo"];
+const PRIOR_NICHO: CategoriaId[] = ["prova_social", "interacao", "espaco", "oferta", "sazonal", "institucional", "conteudo"];
 const HORAS_NICHO = [12, 20]; // horário de mãe rolando o feed (almoço e depois que a criança dorme)
 
 export type AnaliseInsights = {
@@ -215,6 +215,7 @@ const CATEGORIA_TEMPLATE: Record<CategoriaId, string> = {
   institucional: "divulgacao",
   sazonal: "data-comemorativa",
   conteudo: "dica",
+  interacao: "enquete",
 };
 
 export type SugestaoBia = { categoria: string; emoji: string; nome: string; motivo: string; template: string };

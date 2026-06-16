@@ -90,6 +90,16 @@ const MODELOS_MOSAICO: { rotulo: string; assunto: string; oferta: string; valida
   { rotulo: "✨ Agende uma visita", assunto: "Venha nos visitar", oferta: "AGENDE SUA VISITA", validade: "", categoria: "espaco" },
 ];
 
+// Modelos prontos de Enquete/VS (clique preenche os dois lados + a categoria da foto).
+// Enquetes pra ENGAJAR: o público comenta qual lado prefere (ótimo pra a inteligência da Bia).
+const MODELOS_ENQUETE: { rotulo: string; assunto: string; ladoA: string; ladoB: string; categoria: string }[] = [
+  { rotulo: "🍕 Salgado x Doce", assunto: "batalha salgados vs docinhos", ladoA: "Salgados", ladoB: "Docinhos", categoria: "comida" },
+  { rotulo: "🤸 Pula-pula x Piscina", assunto: "qual brinquedo é o melhor", ladoA: "Pula-pula", ladoB: "Piscina de bolinhas", categoria: "brinquedos" },
+  { rotulo: "🎀 Princesas x Heróis", assunto: "tema de festa preferido", ladoA: "Princesas", ladoB: "Heróis", categoria: "festa" },
+  { rotulo: "🍫 Brigadeiro x Beijinho", assunto: "doce favorito da festa", ladoA: "Brigadeiro", ladoB: "Beijinho", categoria: "comida" },
+  { rotulo: "🎂 Bolo x Doces", assunto: "o que você ataca primeiro na festa", ladoA: "Bolo", ladoB: "Doces", categoria: "comida" },
+];
+
 export type PublicacaoView = {
   id: string;
   slug: string;
@@ -206,6 +216,9 @@ export function PublicacoesAba({
   const [economiaInput, setEconomiaInput] = useState(""); // vazio = calcula De − Por
   const [condicoesTxt, setCondicoesTxt] = useState(""); // uma condição por linha
   const [modoPreco, setModoPreco] = useState("promo"); // promo (De→Por) | unico | apartir
+  // Enquete / VS — os dois lados que disputam (ex: Salgados x Docinhos).
+  const [ladoA, setLadoA] = useState("");
+  const [ladoB, setLadoB] = useState("");
   // Edição PONTUAL de um post já criado (sem IA). Quando editandoId != null, o formulário
   // entra em modo edição: campos pré-preenchidos + título/texto/legenda editáveis.
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -216,7 +229,7 @@ export function PublicacoesAba({
   // Cores da marca que servem de fundo (escuras). Vazio se a marca não tem paleta.
   const coresFundo = paletaComExtras(parsePaleta(paleta));
   // Templates de fundo COLORIDO (onde escolher a cor faz sentido — os com foto não).
-  const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico", "moldura", "faixa", "preco"];
+  const TEMPLATES_COR = ["promocao", "divulgacao", "data-comemorativa", "mosaico", "moldura", "faixa", "preco", "enquete"];
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [proc, setProc] = useState<string | null>(null);
@@ -303,6 +316,8 @@ export function PublicacoesAba({
     setParcelas(s(ex.parcelas));
     setEconomiaInput(s(ex.economiaTravada));
     setCondicoesTxt(arr(ex.condicoes));
+    setLadoA(s(ex.ladoA));
+    setLadoB(s(ex.ladoB));
     setEditandoId(p.id);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -314,6 +329,7 @@ export function PublicacoesAba({
     setCorFundo(""); setCategoriaFoto("geral");
     setDepoimento(""); setAutorFb(""); setEstrelasFb(5); setDestaqueFb(""); setCorCard("");
     setPrecoDe(""); setPrecoPor(""); setLabelPor("À vista"); setParcelas(""); setEconomiaInput(""); setCondicoesTxt(""); setModoPreco("promo");
+    setLadoA(""); setLadoB("");
   }
 
   function handleSalvarEdicao() {
@@ -328,7 +344,7 @@ export function PublicacoesAba({
         titulo: tituloEdit, texto: textoEdit, legenda: legendaEdit, hashtags: hashtagsEdit,
         oferta, validade, inclui: itens, regras, diferenciais: difs, corFundo,
         depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard,
-        precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco,
+        precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB,
       });
       if (r.ok) {
         cancelarEdicao();
@@ -342,9 +358,9 @@ export function PublicacoesAba({
     startTransition(async () => {
       const itens = inclui.split("\n").map((s) => s.trim()).filter(Boolean);
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
-      const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback";
+      const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback" || template === "enquete";
       const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, hora });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, hora });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -366,6 +382,8 @@ export function PublicacoesAba({
         setEconomiaInput("");
         setCondicoesTxt("");
         setModoPreco("promo");
+        setLadoA("");
+        setLadoB("");
         onGerado?.(r.dia); // filtra a lista no dia da nova publicação (não abre todas)
         router.refresh();
       } else setErro(r.erro);
@@ -781,6 +799,36 @@ export function PublicacoesAba({
               </select>
             </label>
             <p className="mt-1 text-[11px] text-amber-400/90">📐 Usa 1 foto REAL do seu Banco de Imagens de fundo. Suba fotos na aba <strong>Imagens</strong> se ainda não tiver — sem foto, vira um fundo colorido.</p>
+          </div>
+        )}
+
+        {template === "enquete" && (
+          <div className="mb-3">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique preenche os dois lados + a foto)</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {MODELOS_ENQUETE.map((m) => (
+                <button key={m.rotulo} type="button" onClick={() => { setTema(m.assunto); setLadoA(m.ladoA); setLadoB(m.ladoB); setCategoriaFoto(m.categoria); }} className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
+                  {m.rotulo}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="text-xs text-muted">
+                Lado A <span className="text-muted/70">(ex: Salgados)</span>
+                <input value={ladoA} onChange={(e) => setLadoA(e.target.value)} placeholder="Time A" className="input-base" />
+              </label>
+              <label className="text-xs text-muted">
+                Lado B <span className="text-muted/70">(ex: Docinhos)</span>
+                <input value={ladoB} onChange={(e) => setLadoB(e.target.value)} placeholder="Time B" className="input-base" />
+              </label>
+              <label className="text-xs text-muted sm:col-span-2">
+                Foto de fundo <span className="text-muted/70">(de qual categoria puxar a imagem real)</span>
+                <select value={categoriaFoto} onChange={(e) => setCategoriaFoto(e.target.value)} className="input-base">
+                  {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="mt-1 text-[11px] text-amber-400/90">⚔️ Enquete pra ENGAJAR: o público comenta qual lado prefere. Lados vazios = a IA sugere. A foto vem do seu Banco (sem foto, vira fundo colorido).</p>
           </div>
         )}
 

@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
 import { fotoSegura, fotosSeguras } from "@/lib/foto-arte";
-import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, LayoutCapaMoldura, LayoutCapaFaixa, LayoutFeedback, LayoutPreco, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, LayoutCapaMoldura, LayoutCapaFaixa, LayoutFeedback, LayoutPreco, LayoutEnquete, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string } = {};
+  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -100,6 +100,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (p.template === "preco") {
     return new ImageResponse(
       LayoutPreco({ ...base, modoPreco: extra.modoPreco, precoDe: extra.precoDe, precoPor: extra.precoPor, labelPor: extra.labelPor, parcelas: extra.parcelas, economia: extra.economia, condicoes: extra.condicoes, validade: extra.validade, corFundo: extra.corFundo }),
+      { width: 1080, height: 1350, fonts, headers: CACHE }
+    );
+  }
+
+  if (p.template === "enquete") {
+    return new ImageResponse(
+      LayoutEnquete({ ...base, imagemUrl: fotoUrl, ladoA: extra.ladoA, ladoB: extra.ladoB, corFundo: extra.corFundo }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }

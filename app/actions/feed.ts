@@ -17,7 +17,7 @@ import type { Marca } from "@prisma/client";
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
 // `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
-type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string };
+type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string };
 
 // Parse/format de valores em R$ no formato brasileiro ("12.000" / "8.500,00").
 // Usado pra calcular a economia (De − Por) automaticamente no template de preço.
@@ -176,6 +176,22 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
       validadeTravada: travas?.validade || undefined,
     });
   }
+  if (template === "enquete") {
+    // VS/Enquete: os dois lados + cor das faixas + categoria da foto de fundo.
+    const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    const cat = categoria && categoria !== "geral" ? categoria : "";
+    const ladoA = travas?.ladoA || g.ladoA?.trim() || "";
+    const ladoB = travas?.ladoB || g.ladoB?.trim() || "";
+    return JSON.stringify({
+      ladoA,
+      ladoB,
+      categoria: cat || undefined,
+      corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
+      corFundoTravada: travas?.corFundo || undefined,
+      ladoATravado: travas?.ladoA || undefined,
+      ladoBTravado: travas?.ladoB || undefined,
+    });
+  }
   return null;
 }
 
@@ -211,6 +227,8 @@ const GUIA: Record<Template, string> = {
     'Você está criando um post de DEPOIMENTO de um cliente REAL. O texto do depoimento JÁ EXISTE (é fornecido) e NÃO pode ser alterado nem inventado. Sua tarefa: (1) "destaque" = uma frase BEM curta (2 a 4 palavras) que capture o elogio principal do depoimento (ex: "Excelente atendimento!", "Festa inesquecível!"); (2) "legenda" = um agradecimento caloroso e humano ao cliente, sem exagerar além do que ele escreveu. Baseie TUDO no depoimento fornecido. Nunca invente elogios.',
   preco:
     'Crie um post de OFERTA/PACOTE com PREÇO em destaque. Os VALORES (preços, parcelas, economia) são fornecidos e NÃO podem ser alterados nem inventados. O "titulo" é a chamada da promoção, curta e irresistível (ex: "Promoção Especial da Copa", "Pacote Imperdível"). Escreva a "legenda" destacando a oportunidade e convidando a fechar — sem inventar valores ou condições além dos fornecidos.',
+  enquete:
+    'Crie uma ENQUETE / VS divertida pra ENGAJAR (gerar comentário): duas opções que disputam ("Time X VS Equipe Y"). O "titulo" é a PERGUNTA curta e provocativa (ex: "Que lado você fica?", "Qual time vence?"). Preencha "ladoA" e "ladoB" com os dois lados CURTÍSSIMOS (1 a 2 palavras cada, ex: Salgados / Docinhos, Pula-pula / Piscina de bolinhas). A "legenda" CONVIDA a comentar a escolha (ex: "Comenta aqui o seu time! 👇"). Tom leve e brincalhão. NÃO invente preço/promoção.',
 };
 
 // Formato de JSON esperado por template (a Promoção pede oferta/validade).
@@ -273,6 +291,14 @@ const FORMATO_JSON: Record<Template, string> = {
   "legenda": "legenda do post (3-5 linhas com \\n) destacando a oportunidade e convidando a fechar no WhatsApp. NÃO invente valores nem condições",
   "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
 }`,
+  enquete: `{
+  "titulo": "a PERGUNTA da enquete, curta (2 a 6 palavras) — ex: Que lado você fica?",
+  "ladoA": "primeiro lado, 1-2 palavras (ex: Salgados)",
+  "ladoB": "segundo lado, 1-2 palavras (ex: Docinhos)",
+  "texto": "frase de apoio curta — opcional",
+  "legenda": "legenda do post (3-5 linhas com \\n) que CONVIDA a comentar a escolha, termina chamando a interação (ex: comenta aqui!)",
+  "hashtags": "8 a 12 hashtags relevantes separadas por espaço, começando com #"
+}`,
 };
 
 function sistema(marca: Marca, template: Template): string {
@@ -290,12 +316,12 @@ ${FORMATO_JSON[template]}
 Português do Brasil.`;
 }
 
-type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; selo?: string; diferenciais?: string[]; destaque?: string; legenda: string; hashtags: string };
+type Gerado = { titulo: string; texto?: string; oferta?: string; validade?: string; selo?: string; diferenciais?: string[]; destaque?: string; ladoA?: string; ladoB?: string; legenda: string; hashtags: string };
 
 // Templates que usam foto de IA de fundo (os de fundo colorido não geram foto).
 // O Mosaico também usa fotos reais, mas precisa de VÁRIAS (tratadas à parte em
 // aplicarFotosMosaico), por isso fica fora do fluxo de foto única do USA_FOTO.
-const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false, moldura: false, faixa: true, feedback: true, preco: false };
+const USA_FOTO: Record<Template, boolean> = { promocao: false, "data-comemorativa": true, divulgacao: false, dica: true, mosaico: false, moldura: false, faixa: true, feedback: true, preco: false, enquete: true };
 
 function slugify(s: string): string {
   return s
@@ -400,6 +426,8 @@ async function gerarTexto(marca: Marca, template: Template, tema?: string, trava
   if (travas?.regras) fixos.push(`as regras/condições são: "${travas.regras}"`);
   const difs = (travas?.diferenciais || []).map((s) => s.trim()).filter(Boolean);
   if (difs.length) fixos.push(`os diferenciais a destacar são EXATAMENTE: ${difs.join(", ")}`);
+  if (travas?.ladoA) fixos.push(`o LADO A da enquete é EXATAMENTE "${travas.ladoA}"`);
+  if (travas?.ladoB) fixos.push(`o LADO B da enquete é EXATAMENTE "${travas.ladoB}"`);
   if (fixos.length) {
     pedido += ` IMPORTANTE: ${fixos.join("; ")}. Use esses dados sem alterar e escreva o título e a legenda de forma coerente com eles. NÃO invente outros valores, descontos, itens ou condições.`;
   }
@@ -447,6 +475,7 @@ type CamposTemplate = {
   oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string;
   depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string;
   precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string;
+  ladoA?: string; ladoB?: string;
 };
 
 // Monta as "travas" (valores fixos do dono) conforme o template. Cada template usa só
@@ -463,6 +492,8 @@ function montarTravas(template: Template, c: CamposTemplate): Travas {
     travas = { depoimento: c.depoimento?.trim() || undefined, autor: c.autor?.trim() || undefined, estrelas: typeof c.estrelas === "number" ? Math.max(1, Math.min(5, c.estrelas)) : 5, destaque: c.destaque?.trim() || undefined, corCard: c.corCard?.trim() || undefined };
   } else if (template === "preco") {
     travas = { modoPreco: c.modoPreco || "promo", precoDe: c.precoDe?.trim() || undefined, precoPor: c.precoPor?.trim() || undefined, labelPor: c.labelPor?.trim() || undefined, parcelas: c.parcelas?.trim() || undefined, economia: c.economia?.trim() || undefined, condicoes: (c.condicoes || []).map((s) => s.trim()).filter(Boolean), validade: c.validade?.trim() || undefined };
+  } else if (template === "enquete") {
+    travas = { ladoA: c.ladoA?.trim() || undefined, ladoB: c.ladoB?.trim() || undefined };
   }
   travas.corFundo = c.corFundo?.trim() || undefined;
   return travas;
@@ -496,6 +527,8 @@ export async function gerarPublicacao(input: {
   formato?: string; // "feed" (padrão, 4:5) | "story" (9:16, vai pro Story)
   comFoto?: boolean; // força (true) ou impede (false) foto de fundo; undefined = padrão do template
   estiloStory?: string; // colorida | foto | faixa — guardado no extra pro render do Story
+  ladoA?: string; // enquete: lado A (ex: Salgados)
+  ladoB?: string; // enquete: lado B (ex: Docinhos)
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -722,6 +755,8 @@ export async function regerarPublicacao(id: string) {
       parcelas: typeof ex.parcelasTravado === "string" ? ex.parcelasTravado : undefined,
       economia: typeof ex.economiaTravada === "string" ? ex.economiaTravada : undefined,
       condicoes: Array.isArray(ex.condicoesTravadas) ? ex.condicoesTravadas : undefined,
+      ladoA: typeof ex.ladoATravado === "string" ? ex.ladoATravado : undefined,
+      ladoB: typeof ex.ladoBTravado === "string" ? ex.ladoBTravado : undefined,
     };
     categoria = typeof ex.categoria === "string" ? ex.categoria : undefined;
   } catch {}
@@ -804,6 +839,8 @@ export async function regerarComoNova(id: string) {
     parcelas: str(ex.parcelasTravado),
     economia: str(ex.economiaTravada),
     condicoes: arr(ex.condicoesTravadas),
+    ladoA: str(ex.ladoATravado),
+    ladoB: str(ex.ladoBTravado),
   });
 }
 

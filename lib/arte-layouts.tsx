@@ -824,6 +824,52 @@ export function LayoutFeedback(
   );
 }
 
+// ⚔️ Enquete / VS — ENGAJAMENTO: foto + dois lados ("Salgados VS Docinhos") no topo e a
+// PERGUNTA embaixo ("que lado você fica?"). Feito pra provocar COMENTÁRIO — o sinal que a
+// inteligência da Bia mais valoriza. ladoA/ladoB são os dois times; o título é a pergunta.
+export function LayoutEnquete(d: DadosArte & { imagemUrl?: string; ladoA?: string; ladoB?: string }) {
+  const [c1, c2, c3] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0]];
+  const fundo = d.corFundo || c1;
+  const ladoA = (d.ladoA || "Time A").trim();
+  const ladoB = (d.ladoB || "Time B").trim();
+  const logoW = Math.round(70 * 1.76);
+  const fA = ladoA.length > 14 ? 50 : ladoA.length > 9 ? 64 : 78;
+  const fB = ladoB.length > 14 ? 50 : ladoB.length > 9 ? 64 : 78;
+  return (
+    <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative", backgroundColor: fundo, fontFamily: "Baloo" }}>
+      {d.imagemUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={d.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
+      ) : null}
+      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.62) 0%, rgba(0,0,0,0.10) 26%, rgba(0,0,0,0.10) 58%, rgba(0,0,0,0.86) 100%)" }} />
+
+      {/* Faixa VS no topo: ladoA  (VS)  ladoB */}
+      <div style={{ position: "absolute", top: 84, left: 0, width: "1080px", display: "flex", alignItems: "center", justifyContent: "center", padding: "0 56px" }}>
+        <div style={{ display: "flex", flex: 1, justifyContent: "flex-end", textAlign: "right", fontFamily: "Fredoka", fontSize: fA, color: c2, textShadow: contorno(), letterSpacing: 1 }}>{ladoA}</div>
+        <div style={{ display: "flex", width: 132, height: 132, borderRadius: 9999, backgroundColor: BRANCO, border: `8px solid ${c1}`, alignItems: "center", justifyContent: "center", margin: "0 24px", boxShadow: "0 10px 26px rgba(0,0,0,0.45)" }}>
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 60, color: c1 }}>VS</div>
+        </div>
+        <div style={{ display: "flex", flex: 1, justifyContent: "flex-start", fontFamily: "Fredoka", fontSize: fB, color: c3, textShadow: contorno(), letterSpacing: 1 }}>{ladoB}</div>
+      </div>
+
+      {/* Pergunta (título) num balão + logo embaixo */}
+      <div style={{ position: "absolute", bottom: 0, left: 0, width: "1080px", display: "flex", flexDirection: "column", alignItems: "center", padding: "0 64px 64px" }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", backgroundColor: fundo, borderRadius: 30, padding: "30px 44px", boxShadow: "0 14px 34px rgba(0,0,0,0.45)", marginBottom: 24 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
+            <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 2 ? 58 : 70} fundo={fundo} />
+          </div>
+        </div>
+        {d.logoSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={d.logoSrc} width={logoW} height={70} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.7))" }} />
+        ) : (
+          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{d.site}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // 💰 Preço / Pacote — oferta com VALORES em destaque: de/por, forma de pagamento,
 // parcelas e economia. Os números são SEMPRE do dono (a IA não inventa preço).
 export function LayoutPreco(
