@@ -26,6 +26,7 @@ import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
 import { CORES_EXTRAS } from "@/lib/cores-fundo";
 import { SeloEngajamento } from "./selo-engajamento";
+import { EtiquetaCategoria } from "./etiqueta-categoria";
 
 // Temas prontos de carrossel (clique preenche o campo Tema). Ângulos que funcionam
 // pro público de um buffet infantil — o dono ajusta ou pede "Sugerir temas com IA".
@@ -67,6 +68,7 @@ export type Post = {
   postadoEm?: string | null; // ISO do momento real da publicação (null = não postado)
   imagensSlides?: (string | null)[];
   tiposSlides?: (string | undefined)[]; // tipo de cada slide (capa/conteudo/mosaico/capa-*)
+  categoria?: string | null; // categoria de intenção (pra etiqueta + inteligência)
   // Engajamento no Instagram (coletado pelo piloto após postar)
   curtidas?: number | null;
   comentarios?: number | null;
@@ -575,6 +577,7 @@ export function MarketingCalendario({
                 </div>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted">🖼️ Carrossel · {p.slides.length} slides</p>
                 <p className="line-clamp-2 text-sm text-white">{p.titulo}</p>
+                {p.categoria && <div className="mt-1.5"><EtiquetaCategoria categoria={p.categoria} /></div>}
                 {postado && <SeloEngajamento p={p} />}
 
                 <div className="mt-2">

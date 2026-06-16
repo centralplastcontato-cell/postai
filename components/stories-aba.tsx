@@ -21,6 +21,7 @@ import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
 import { CORES_EXTRAS } from "@/lib/cores-fundo";
 import { SeloEngajamento } from "./selo-engajamento";
+import { EtiquetaCategoria } from "./etiqueta-categoria";
 
 // Templates que fazem sentido pro Story (vertical, chamativo). Promoção mostra o selo
 // de oferta; os demais usam só título + texto. Tudo renderizado em 9:16.
@@ -398,6 +399,7 @@ export function StoriesAba({
                   {postandoId === s.id && <CaixaPostando redes="no Instagram (Story)" />}
                 </div>
                 <p className="mt-2 line-clamp-2 text-xs text-white">{s.titulo}</p>
+                {s.categoriaIntencao && <div className="mt-1.5"><EtiquetaCategoria categoria={s.categoriaIntencao} /></div>}
                 {postado && <SeloEngajamento p={s} ehStory />}
 
                 <div className="mt-2 flex flex-wrap gap-1">

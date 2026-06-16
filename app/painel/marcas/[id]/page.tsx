@@ -90,6 +90,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       postadoEm: c.postadoEm?.toISOString() ?? null,
       imagensSlides,
       tiposSlides,
+      categoria: c.categoria,
       curtidas: c.curtidas,
       comentarios: c.comentarios,
       alcance: c.alcance,
@@ -113,6 +114,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     postadoEm: p.postadoEm?.toISOString() ?? null,
     extra: p.extra ?? null, // JSON dos campos do template — pra pré-preencher a edição
     categoria: (() => { try { return JSON.parse(p.extra || "{}").categoria ?? null; } catch { return null; } })(),
+    categoriaIntencao: p.categoria, // categoria de intenção (coluna do banco) — pra etiqueta
     espelhar: p.espelhar ?? null,
     curtidas: p.curtidas,
     comentarios: p.comentarios,

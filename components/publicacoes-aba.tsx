@@ -24,6 +24,7 @@ import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
 import { CATEGORIAS, CATEGORIA_LABEL } from "@/lib/categorias-imagem";
 import { parsePaleta, paletaComExtras, CORES_EXTRAS } from "@/lib/cores-fundo";
 import { SeloEngajamento } from "./selo-engajamento";
+import { EtiquetaCategoria } from "./etiqueta-categoria";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
@@ -104,6 +105,7 @@ export type PublicacaoView = {
   postadoEm?: string | null; // ISO do momento real da publicação (null = não postado)
   extra?: string | null; // JSON dos campos do template (pra pré-preencher a edição)
   categoria?: string | null; // categoria do banco pra foto (template dica)
+  categoriaIntencao?: string | null; // categoria de INTENÇÃO (etiqueta + inteligência) — ≠ foto do banco
   espelhar?: boolean | null; // override do espelho no Story (null = usa o padrão da marca)
   // Engajamento no Instagram (coletado pelo piloto após postar)
   curtidas?: number | null;
@@ -989,6 +991,7 @@ export function PublicacoesAba({
                 </div>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted">{TEMPLATE_LABEL[p.template as Template] ?? p.template}</p>
                 <p className="line-clamp-2 text-sm text-white">{p.titulo}</p>
+                {p.categoriaIntencao && <div className="mt-1.5"><EtiquetaCategoria categoria={p.categoriaIntencao} /></div>}
                 {postado && <SeloEngajamento p={p} />}
 
                 <div className="mt-2">
