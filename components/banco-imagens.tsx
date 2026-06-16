@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { adicionarImagemMarca, removerImagemMarca, descreverImagensDaMarca } from "@/app/actions/imagens";
+import { adicionarImagemMarca, removerImagemMarca, descreverImagensDaMarca, atualizarImagemMarca } from "@/app/actions/imagens";
 import { CATEGORIAS, CATEGORIA_LABEL as ROTULO } from "@/lib/categorias-imagem";
 
 export type ImagemView = { id: string; url: string; categoria: string; descricao?: string };
@@ -17,6 +17,10 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
   const [, startTransition] = useTransition();
   const [descrevendo, setDescrevendo] = useState(false);
   const [msgDesc, setMsgDesc] = useState<string | null>(null);
+  const [aberta, setAberta] = useState<ImagemView | null>(null); // foto aberta no modal
+  const [descEdit, setDescEdit] = useState("");
+  const [catEdit, setCatEdit] = useState("");
+  const [salvandoImg, setSalvandoImg] = useState(false);
 
   async function upload(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -64,10 +68,51 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
     }
   }
 
+  function abrirImagem(img: ImagemView) {
+    setAberta(img);
+    setDescEdit(img.descricao || "");
+    setCatEdit(img.categoria);
+  }
+  async function salvarImagem() {
+    if (!aberta) return;
+    setSalvandoImg(true);
+    try {
+      const r = await atualizarImagemMarca({ id: aberta.id, descricao: descEdit, categoria: catEdit });
+      if (r.ok) { setAberta(null); router.refresh(); }
+      else setErro(r.erro);
+    } finally {
+      setSalvandoImg(false);
+    }
+  }
+
   const descritas = imagens.filter((i) => i.descricao && i.descricao.trim()).length;
 
   return (
     <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
+      {/* Modal: ver a foto grande + ler/editar a descrição e a categoria */}
+      {aberta && (
+        <div onClick={() => setAberta(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+          <div onClick={(e) => e.stopPropagation()} className="flex max-h-[90vh] w-full max-w-3xl flex-col gap-4 overflow-auto rounded-2xl border border-linha bg-preto-card p-4 sm:flex-row">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={aberta.url} alt="foto" className="max-h-[50vh] w-full rounded-lg object-contain sm:max-h-[70vh] sm:w-1/2" />
+            <div className="flex flex-1 flex-col">
+              <p className="text-sm font-semibold text-white">✏️ Editar foto</p>
+              <label className="mt-3 block text-xs text-muted">Categoria
+                <select value={catEdit} onChange={(e) => setCatEdit(e.target.value)} className="input-base">
+                  {CATEGORIAS.map((c) => <option key={c} value={c}>{ROTULO[c] ?? c}</option>)}
+                </select>
+              </label>
+              <label className="mt-3 block text-xs text-muted">Descrição <span className="text-muted/70">(a IA usa pra escolher esta foto quando combinar com o post)</span>
+                <textarea value={descEdit} onChange={(e) => setDescEdit(e.target.value)} rows={3} placeholder="Ex: Mesa de doces colorida" className="input-base resize-none" />
+              </label>
+              <div className="mt-4 flex gap-2">
+                <button type="button" onClick={salvarImagem} disabled={salvandoImg} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">{salvandoImg ? "Salvando…" : "Salvar"}</button>
+                <button type="button" onClick={() => setAberta(null)} className="rounded-lg border border-linha px-4 py-2 text-sm text-muted transition hover:border-vermelho hover:text-white">Fechar</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <h3 className="mb-1 text-sm font-semibold text-white">🏰 Banco de imagens reais</h3>
       <p className="mb-3 text-xs text-muted">Suba fotos <strong className="text-white/80">de verdade</strong> do seu espaço, brinquedos, festas e comida. Os posts usam essas fotos no lugar de imagens de IA — pra nunca mostrar um lugar que não existe.</p>
 
@@ -105,13 +150,13 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
       ) : (
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
           {imagens.map((img) => (
-            <div key={img.id} className="group relative overflow-hidden rounded-lg border border-linha">
+            <div key={img.id} onClick={() => abrirImagem(img)} title="Abrir pra ver/editar" className="group relative cursor-pointer overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={img.url} alt={img.categoria} className="aspect-square w-full object-cover" />
               <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{ROTULO[img.categoria as keyof typeof ROTULO] ?? img.categoria}</span>
               <button
                 type="button"
-                onClick={() => remover(img.id)}
+                onClick={(e) => { e.stopPropagation(); remover(img.id); }}
                 title="Remover"
                 className="absolute right-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-xs text-red-300 transition hover:bg-red-900/70"
               >

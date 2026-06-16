@@ -52,6 +52,20 @@ export async function adicionarImagemMarca(input: { marcaId: string; url: string
   return { ok: true as const, id: img.id, url: img.url, categoria: img.categoria };
 }
 
+// Edita uma foto do banco: a DESCRIÇÃO (que a IA usa pra casar com o texto) e/ou a CATEGORIA.
+// Útil pra corrigir uma descrição que a IA errou ou recategorizar uma foto.
+export async function atualizarImagemMarca(input: { id: string; descricao?: string; categoria?: string }) {
+  const g = await guardaImagem(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const data: { descricao?: string; categoria?: string } = {};
+  if (typeof input.descricao === "string") data.descricao = input.descricao.trim().slice(0, 200);
+  if (input.categoria && (CATEGORIAS as readonly string[]).includes(input.categoria)) data.categoria = input.categoria;
+  if (!Object.keys(data).length) return { ok: true as const };
+  const img = await prisma.imagemMarca.update({ where: { id: input.id }, data, select: { marcaId: true } });
+  revalidatePath(`/painel/marcas/${img.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function removerImagemMarca(id: string) {
   const g = await guardaImagem(id);
   if (!g.ok) return { ok: false as const, erro: g.erro };
