@@ -931,20 +931,24 @@ export function LayoutEnquete(d: DadosArte & { imagemUrl?: string; ladoA?: strin
         <div style={{ display: "flex", flex: 1, justifyContent: "flex-start", fontFamily: "Fredoka", fontSize: fB, color: c3, textShadow: contorno(), letterSpacing: 1 }}>{ladoB}</div>
       </div>
 
-      {/* Pergunta (título) num balão + logo embaixo */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, width: "1080px", display: "flex", flexDirection: "column", alignItems: "center", padding: "0 64px 64px" }}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%", backgroundColor: fundo, borderRadius: 30, padding: "30px 44px", boxShadow: "0 14px 34px rgba(0,0,0,0.45)", marginBottom: 24 }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-            <TituloMulticolor linhas={d.titulo} fontSize={d.titulo.length >= 2 ? 58 : 70} fundo={fundo} />
+      {/* Pergunta num balão LARGO (texto flui, sem quebra apertada) + logo embaixo */}
+      {(() => {
+        const pergunta = d.titulo.map((l) => l.t).join(" ").trim();
+        const fontP = pergunta.length > 42 ? 50 : pergunta.length > 26 ? 60 : 74;
+        return (
+          <div style={{ position: "absolute", bottom: 0, left: 0, width: "1080px", display: "flex", flexDirection: "column", alignItems: "center", padding: "0 40px 54px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: "100%", backgroundColor: fundo, borderRadius: 32, padding: "40px 56px", boxShadow: "0 14px 34px rgba(0,0,0,0.45)", marginBottom: 22 }}>
+              <div style={{ display: "flex", textAlign: "center", fontFamily: "Fredoka", fontSize: fontP, color: corContraste(BRANCO, fundo), lineHeight: 1.08, textShadow: contorno(), letterSpacing: 1, maxWidth: 920 }}>{pergunta}</div>
+            </div>
+            {d.logoSrc ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={d.logoSrc} width={logoW} height={70} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.7))" }} />
+            ) : (
+              <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{d.site}</div>
+            )}
           </div>
-        </div>
-        {d.logoSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={d.logoSrc} width={logoW} height={70} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.7))" }} />
-        ) : (
-          <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>{d.site}</div>
-        )}
-      </div>
+        );
+      })()}
     </div>
   );
 }
