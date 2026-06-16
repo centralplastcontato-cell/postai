@@ -318,7 +318,7 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
 
 // ⭐ Divulgação / Institucional — fundo colorido festa + "por que escolher" com
 // os diferenciais em destaque (lista com checks) + CTA WhatsApp.
-export function LayoutDivulgacao(d: DadosArte) {
+export function LayoutDivulgacao(d: DadosArte & { parcelamento?: string }) {
   const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
   const fundo = d.corFundo || escolherFundoFesta(d.paleta);
   const itens = (d.diferenciais || []).filter((s) => s && s.trim()).slice(0, 4);
@@ -360,7 +360,13 @@ export function LayoutDivulgacao(d: DadosArte) {
           </div>
         ) : null}
 
-        <div style={{ display: "flex", marginTop: 48 }}>
+        {d.parcelamento ? (
+          <div style={{ display: "flex", marginTop: 34 }}>
+            <div style={{ display: "flex", alignItems: "center", fontFamily: "Fredoka", fontSize: 46, color: PRETO, backgroundColor: c3, padding: "14px 36px", borderRadius: 999, transform: "rotate(-2deg)", boxShadow: "0 8px 0 rgba(0,0,0,0.2)" }}>💳 {d.parcelamento}</div>
+          </div>
+        ) : null}
+
+        <div style={{ display: "flex", marginTop: 40 }}>
           {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
         </div>
       </div>

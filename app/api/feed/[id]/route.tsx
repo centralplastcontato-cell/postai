@@ -30,7 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean } = {};
+  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean; parcelamento?: string } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -64,7 +64,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   if (p.template === "divulgacao") {
     return new ImageResponse(
-      LayoutDivulgacao({ ...base, diferenciais: extra.diferenciais, corFundo: extra.corFundo }),
+      LayoutDivulgacao({ ...base, diferenciais: extra.diferenciais, corFundo: extra.corFundo, parcelamento: extra.parcelamento }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }

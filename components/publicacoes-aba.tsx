@@ -198,6 +198,7 @@ export function PublicacoesAba({
   const [inclui, setInclui] = useState("");
   const [regras, setRegras] = useState("");
   const [diferenciais, setDiferenciais] = useState("");
+  const [parcelamento, setParcelamento] = useState(""); // divulgacao: selo "em até 10x sem juros"
   const [categoriaFoto, setCategoriaFoto] = useState("geral");
   const [corFundo, setCorFundo] = useState(""); // "" = automático (sorteia da paleta)
   const [sugerindo, setSugerindo] = useState(false);
@@ -304,6 +305,7 @@ export function PublicacoesAba({
     setInclui(arr(ex.inclui));
     setRegras(s(ex.regras));
     setDiferenciais(arr(ex.diferenciais));
+    setParcelamento(s(ex.parcelamento));
     setCorFundo(s(ex.corFundoTravada));
     setCategoriaFoto(s(ex.categoria) || "geral");
     setDepoimento(s(ex.depoimento));
@@ -329,7 +331,7 @@ export function PublicacoesAba({
   function cancelarEdicao() {
     setEditandoId(null);
     setTituloEdit(""); setTextoEdit(""); setLegendaEdit(""); setHashtagsEdit("");
-    setOferta(""); setValidade(""); setInclui(""); setRegras(""); setDiferenciais("");
+    setOferta(""); setValidade(""); setInclui(""); setRegras(""); setDiferenciais(""); setParcelamento("");
     setCorFundo(""); setCategoriaFoto("geral");
     setDepoimento(""); setAutorFb(""); setEstrelasFb(5); setDestaqueFb(""); setCorCard("");
     setPrecoDe(""); setPrecoPor(""); setLabelPor("À vista"); setParcelas(""); setEconomiaInput(""); setCondicoesTxt(""); setModoPreco("promo");
@@ -347,7 +349,7 @@ export function PublicacoesAba({
       const r = await editarPublicacao({
         id: editandoId,
         titulo: tituloEdit, texto: textoEdit, legenda: legendaEdit, hashtags: hashtagsEdit,
-        oferta, validade, inclui: itens, regras, diferenciais: difs, corFundo,
+        oferta, validade, inclui: itens, regras, diferenciais: difs, parcelamento, corFundo,
         depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard,
         precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb,
       });
@@ -365,7 +367,7 @@ export function PublicacoesAba({
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
       const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback" || template === "enquete" || template === "vitrine";
       const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, parcelamento, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -373,6 +375,7 @@ export function PublicacoesAba({
         setInclui("");
         setRegras("");
         setDiferenciais("");
+        setParcelamento("");
         setCategoriaFoto("geral");
         setCorFundo("");
         setDepoimento("");
@@ -750,6 +753,10 @@ export function PublicacoesAba({
                 </button>
               </span>
               <textarea value={diferenciais} onChange={(e) => setDiferenciais(e.target.value)} rows={4} placeholder={"Ex:\nMonitores treinados\nBuffet completo\nDecoração temática"} className="input-base resize-y" />
+            </label>
+            <label className="mt-3 block text-xs text-muted">
+              💳 Parcelamento <span className="text-muted/70">(opcional — vira um selo na arte)</span>
+              <input value={parcelamento} onChange={(e) => setParcelamento(e.target.value)} placeholder="Ex: em até 10x sem juros" className="input-base" />
             </label>
             <p className="mt-1 text-[11px] text-amber-400/90">⚠ Se deixar vazio, a IA sugere os diferenciais — confira antes de postar. Use “🔄 Variar com IA” pra gerar versões novas do assunto escolhido.</p>
           </div>

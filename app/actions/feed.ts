@@ -17,7 +17,7 @@ import type { Marca } from "@prisma/client";
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
 // `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
-type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean };
+type Travas = { oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean; parcelamento?: string };
 
 // Parse/format de valores em R$ no formato brasileiro ("12.000" / "8.500,00").
 // Usado pra calcular a economia (De − Por) automaticamente no template de preço.
@@ -84,10 +84,12 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
     const diferenciais = (manuais.length ? manuais : g.diferenciais || []).map((s) => s.trim()).filter(Boolean).slice(0, 4);
     return JSON.stringify({
       diferenciais,
+      parcelamento: travas?.parcelamento || "", // ex: "em até 10x sem juros"
       corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
       corFundoTravada: travas?.corFundo || undefined,
-      // Mantém fixos os diferenciais digitados ao regerar o texto.
+      // Mantém fixos os diferenciais e o parcelamento digitados ao regerar o texto.
       diferenciaisTravados: manuais.length ? manuais : undefined,
+      parcelamentoTravado: travas?.parcelamento || undefined,
     });
   }
   if (template === "dica") {
@@ -498,7 +500,7 @@ type CamposTemplate = {
   oferta?: string; validade?: string; inclui?: string[]; regras?: string; diferenciais?: string[]; corFundo?: string;
   depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string;
   precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string;
-  ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean;
+  ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean; parcelamento?: string;
 };
 
 // Monta as "travas" (valores fixos do dono) conforme o template. Cada template usa só
@@ -508,7 +510,7 @@ function montarTravas(template: Template, c: CamposTemplate): Travas {
   if (template === "promocao") {
     travas = { oferta: c.oferta?.trim() || undefined, validade: c.validade?.trim() || undefined, inclui: (c.inclui || []).map((s) => s.trim()).filter(Boolean), regras: c.regras?.trim() || undefined };
   } else if (template === "divulgacao") {
-    travas = { diferenciais: (c.diferenciais || []).map((s) => s.trim()).filter(Boolean) };
+    travas = { diferenciais: (c.diferenciais || []).map((s) => s.trim()).filter(Boolean), parcelamento: c.parcelamento?.trim() || undefined };
   } else if (template === "mosaico") {
     travas = { oferta: c.oferta?.trim() || undefined, validade: c.validade?.trim() || undefined };
   } else if (template === "feedback") {
@@ -532,6 +534,7 @@ export async function gerarPublicacao(input: {
   inclui?: string[];
   regras?: string;
   diferenciais?: string[];
+  parcelamento?: string; // divulgacao: selo de parcelamento (ex: "em até 10x sem juros")
   categoria?: string; // categoria do banco pra puxar a foto (templates com foto)
   corFundo?: string; // cor de fundo escolhida (vazio = automático/sorteio)
   depoimento?: string; // feedback: o depoimento REAL do cliente (obrigatório)
@@ -771,6 +774,7 @@ export async function regerarPublicacao(id: string) {
       inclui: Array.isArray(ex.inclui) ? ex.inclui : [],
       regras: ex.regras || undefined,
       diferenciais: Array.isArray(ex.diferenciaisTravados) ? ex.diferenciaisTravados : [],
+      parcelamento: typeof ex.parcelamentoTravado === "string" ? ex.parcelamentoTravado : undefined,
       corFundo: typeof ex.corFundoTravada === "string" ? ex.corFundoTravada : undefined,
       // Feedback: o depoimento, autor, nota e cor do card são preservados ao regerar.
       depoimento: typeof ex.depoimentoTravado === "string" ? ex.depoimentoTravado : undefined,
@@ -860,6 +864,7 @@ export async function regerarComoNova(id: string) {
     inclui: arr(ex.inclui),
     regras: str(ex.regras),
     diferenciais: arr(ex.diferenciaisTravados),
+    parcelamento: str(ex.parcelamentoTravado),
     categoria: str(ex.categoria),
     corFundo: str(ex.corFundoTravada),
     depoimento: str(ex.depoimentoTravado),
