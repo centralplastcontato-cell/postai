@@ -139,3 +139,94 @@ export async function coletarInsightsDaMarca(marca: { id: string; igUserId: stri
     /* best-effort */
   }
 }
+
+// === Backfill: vincular posts ANTIGOS (publicados antes de termos o mediaId) ============
+
+type MidiaIG = { id: string; caption?: string; timestamp?: string };
+
+function normCaption(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+// Lista as mídias (posts/carrosséis) da conta no Instagram — pagina até ~5x100. Stories
+// NÃO entram aqui (a API /media só traz o feed permanente).
+async function buscarMidiasDaConta(igUserId: string, token: string): Promise<MidiaIG[]> {
+  const out: MidiaIG[] = [];
+  let url = `${GRAPH}/${igUserId}/media?fields=id,caption,timestamp&limit=100&access_token=${token}`;
+  for (let pagina = 0; pagina < 5 && url; pagina++) {
+    try {
+      const r = await fetch(url, { cache: "no-store" });
+      const j = (await r.json()) as { data?: MidiaIG[]; paging?: { next?: string } };
+      if (Array.isArray(j.data)) out.push(...j.data);
+      url = j.paging?.next || "";
+    } catch {
+      break;
+    }
+  }
+  return out;
+}
+
+// Acha a mídia do Instagram que corresponde a um post nosso, por legenda + horário.
+// Prioriza o casamento da legenda; horário muito próximo (±30min) também serve de reforço.
+function melhorMidia(legenda: string, tRec: number, midias: MidiaIG[], usados: Set<string>): MidiaIG | null {
+  const ourKey = normCaption(legenda);
+  let best: MidiaIG | null = null;
+  let bestScore = Infinity;
+  for (const m of midias) {
+    if (usados.has(m.id) || !m.timestamp) continue;
+    const tM = new Date(m.timestamp).getTime();
+    if (!Number.isFinite(tM)) continue;
+    const diff = Math.abs(tM - tRec);
+    if (diff > 48 * 3_600_000) continue; // > 2 dias de diferença → não é o mesmo post
+    const igKey = normCaption(m.caption || "");
+    const legendaBate = ourKey.length >= 15 && igKey.length >= 15 && (igKey.startsWith(ourKey) || ourKey.startsWith(igKey));
+    const horarioColado = diff <= 30 * 60_000;
+    if (!legendaBate && !horarioColado) continue;
+    const score = (legendaBate ? 0 : 1e15) + diff; // legenda sempre ganha; empate pelo horário
+    if (score < bestScore) {
+      bestScore = score;
+      best = m;
+    }
+  }
+  return best;
+}
+
+// Vincula os posts ANTIGOS (sem mediaId) às mídias da conta e JÁ busca o engajamento deles
+// (não espera o cron e ignora a janela de 14 dias). Feed/Carrossel só — Story já sumiu.
+export async function backfillMediaIdsDaMarca(marca: { id: string; igUserId: string | null; accessToken: string | null }): Promise<{ vinculados: number; total: number }> {
+  if (!marca.igUserId || !marca.accessToken) return { vinculados: 0, total: 0 };
+  const token = marca.accessToken;
+
+  const [conteudos, pubs] = await Promise.all([
+    prisma.conteudo.findMany({ where: { marcaId: marca.id, status: "postado", mediaId: null, postadoEm: { not: null } }, select: { id: true, legenda: true, postadoEm: true } }),
+    prisma.publicacao.findMany({ where: { marcaId: marca.id, status: "postado", mediaId: null, postadoEm: { not: null }, formato: "feed" }, select: { id: true, legenda: true, postadoEm: true } }),
+  ]);
+  const total = conteudos.length + pubs.length;
+  if (total === 0) return { vinculados: 0, total: 0 };
+
+  const midias = await buscarMidiasDaConta(marca.igUserId, token);
+  if (midias.length === 0) return { vinculados: 0, total };
+
+  const usados = new Set<string>();
+  let vinculados = 0;
+
+  async function vincular(legenda: string, postadoEm: Date | null, salvar: (mediaId: string, ins: Insights) => Promise<unknown>) {
+    if (!postadoEm) return;
+    const m = melhorMidia(legenda, postadoEm.getTime(), midias, usados);
+    if (!m) return;
+    usados.add(m.id);
+    const ins = (await buscarInsights(token, m.id, false)) || {};
+    await salvar(m.id, ins).catch(() => {});
+    vinculados++;
+  }
+
+  // Casa do mais antigo pro mais novo (estável).
+  for (const c of conteudos.sort((a, b) => a.postadoEm!.getTime() - b.postadoEm!.getTime())) {
+    await vincular(c.legenda, c.postadoEm, (mediaId, ins) => prisma.conteudo.update({ where: { id: c.id }, data: { mediaId, ...ins, insightsEm: new Date() } }));
+  }
+  for (const p of pubs.sort((a, b) => a.postadoEm!.getTime() - b.postadoEm!.getTime())) {
+    await vincular(p.legenda, p.postadoEm, (mediaId, ins) => prisma.publicacao.update({ where: { id: p.id }, data: { mediaId, ...ins, insightsEm: new Date() } }));
+  }
+
+  return { vinculados, total };
+}

@@ -1,8 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
-import { gravarSnapshot } from "@/lib/metricas";
+import { gravarSnapshot, backfillMediaIdsDaMarca } from "@/lib/metricas";
 
 const GRAPH = "https://graph.facebook.com/v21.0";
 
@@ -78,5 +79,23 @@ export async function verificarConexaoMarca(marcaId: string) {
     };
   } catch (e) {
     return { ok: true as const, conectada: false, erro: e instanceof Error ? e.message : "Falha ao falar com a Meta." };
+  }
+}
+
+// Resgata o engajamento dos posts ANTIGOS: casa as publicações que já estavam no Instagram
+// (por legenda + horário) com os posts do Postaí, guarda o ID e já busca os números.
+// Feed/Carrossel só — Story antigo não dá (some em 24h). Disparado por um botão no painel.
+export async function backfillEngajamento(marcaId: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { id: true, igUserId: true, accessToken: true } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  if (!marca.igUserId || !marca.accessToken) return { ok: false as const, erro: "Conecte o Instagram da marca primeiro." };
+  try {
+    const r = await backfillMediaIdsDaMarca(marca);
+    revalidatePath(`/painel/marcas/${marcaId}`);
+    return { ok: true as const, vinculados: r.vinculados, total: r.total };
+  } catch (e) {
+    return { ok: false as const, erro: e instanceof Error ? e.message : "Falha ao vincular os posts." };
   }
 }

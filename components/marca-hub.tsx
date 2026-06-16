@@ -9,6 +9,7 @@ import { type PublicacaoView } from "./publicacoes-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { ConexaoCard } from "./conexao-card";
 import { EvolucaoCard } from "./evolucao-card";
+import { BackfillEngajamento } from "./backfill-engajamento";
 import { rotuloPlano, diasDeAcesso } from "@/lib/plano";
 
 type Assinatura = { cliente: string; plano: string | null; acessoAte: string | null };
@@ -116,6 +117,7 @@ export function MarcaHub({
           </div>
         )}
         <EvolucaoCard pontos={evolucao} />
+        {ehAdmin && <BackfillEngajamento marcaId={marca.id} />}
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
