@@ -257,7 +257,7 @@ export function sugerirProximoPost(postados: { categoria: string | null; postado
   const diasInt = Math.round(melhor.dias);
 
   const partes: string[] = [];
-  if (ehLiderReal) partes.push("é o que mais desperta intenção de fechar festa no seu perfil");
+  if (ehLiderReal) partes.push("é o que mais desperta vontade de fechar festa no seu perfil");
   if (nuncaPostou) partes.push("e você ainda não tem nenhum post assim");
   else if (diasInt >= 7) partes.push(`faz ${diasInt} dias que você não posta isso`);
   if (partes.length === 0) partes.push("costuma vender bem pro seu público");

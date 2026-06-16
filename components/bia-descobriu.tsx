@@ -56,7 +56,7 @@ export function BiaDescobriu({ analise }: { analise: AnaliseInsights }) {
           )}
 
           <p className="text-white/70">
-            📌 Pelo seu nicho, o que mais costuma vender festa é{" "}
+            📌 Em buffets como o seu, o que mais costuma vender festa é{" "}
             <strong className="text-white">{nicho[0]?.emoji} {nicho[0]?.nome}</strong> e{" "}
             <strong className="text-white">{nicho[1]?.emoji} {nicho[1]?.nome}</strong>. Vou apostar nelas e te mostrar os
             números conforme chegam.
@@ -66,7 +66,7 @@ export function BiaDescobriu({ analise }: { analise: AnaliseInsights }) {
         <div className="mt-3 space-y-3 text-sm text-white/85">
           <p>
             <strong className="text-white">{categorias[0].emoji} {categorias[0].nome}</strong> é o que mais desperta
-            intenção de fechar festa no seu perfil
+            vontade de fechar festa no seu perfil
             {analise.pctAcimaMedia ? <> — uns <strong className="text-white">{analise.pctAcimaMedia}%</strong> acima da sua média</> : null}.
             {melhorHora !== null && <> 🕐 E seus posts das <strong className="text-white">{horaBR(melhorHora)}</strong> rendem mais.</>}
           </p>
@@ -84,7 +84,7 @@ export function BiaDescobriu({ analise }: { analise: AnaliseInsights }) {
                 </span>
               </div>
             ))}
-            <p className="text-[11px] text-muted">Índice de intenção (salvar &gt; comentar &gt; curtir), por pessoa alcançada.</p>
+            <p className="text-[11px] text-muted">Conta quem salvou, comentou e curtiu — salvar pesa mais (é quem quer fechar festa).</p>
           </div>
 
           {melhorPost && melhorPost.salvamentos > 0 && (

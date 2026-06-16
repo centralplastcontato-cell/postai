@@ -284,7 +284,7 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
             </div>
           )}
           <label className="text-xs text-muted">Site (rodapé da arte)<input value={f.site} onChange={(e) => set("site", e.target.value)} placeholder="castelodadiversao.com.br" className={inp} /></label>
-          <label className="text-xs text-muted">Telefone/WhatsApp (CTA)<input value={f.telefone} onChange={(e) => set("telefone", e.target.value)} placeholder="(15) 99999-9999" className={inp} /></label>
+          <label className="text-xs text-muted">Telefone/WhatsApp (aparece no convite dos posts)<input value={f.telefone} onChange={(e) => set("telefone", e.target.value)} placeholder="(15) 99999-9999" className={inp} /></label>
         </div>
         <label className="mt-3 block text-xs text-muted">Sobre o negócio (a IA usa pra escrever no tom certo)
           <textarea value={f.descricao} onChange={(e) => set("descricao", e.target.value)} rows={3} placeholder="Ex: Buffet infantil em Sorocaba. Festas temáticas, brinquedos, monitores. Público: famílias com crianças de 1 a 10 anos." className={inp} />
