@@ -14,14 +14,16 @@ export type CategoriaId =
   | "sazonal"
   | "conteudo";
 
-// Ordem e textos pensados pro nicho de BUFFET INFANTIL. `desc` ajuda a IA a classificar.
+// Ordem e textos pensados pro nicho de BUFFET INFANTIL. O `rotulo` (o que a Bia fala e a
+// etiqueta mostra) usa LINGUAGEM SIMPLES que bate com os botões do gerador — nada de jargão
+// ("prova social" virou "Depoimentos"), pra o dono não se perder. `desc` ajuda a IA a classificar.
 export const CATEGORIAS: { id: CategoriaId; rotulo: string; emoji: string; desc: string }[] = [
   { id: "espaco", rotulo: "Mostrar o espaço", emoji: "🏰", desc: "decoração, brinquedos, área kids, estrutura — o lugar onde a festa acontece" },
-  { id: "prova_social", rotulo: "Prova social", emoji: "⭐", desc: "depoimento de cliente, festa que já rolou, 'olha como ficou linda'" },
-  { id: "oferta", rotulo: "Promoção / preço", emoji: "🏷️", desc: "desconto, brinde, pacote, condição especial, valores em destaque" },
-  { id: "institucional", rotulo: "Por que escolher", emoji: "💎", desc: "diferenciais, confiança, qualidade, motivos pra fechar com a marca" },
-  { id: "sazonal", rotulo: "Data / sazonal", emoji: "🎂", desc: "datas comemorativas (Natal, Dia das Crianças), aniversariantes da semana" },
-  { id: "conteudo", rotulo: "Dica / conteúdo", emoji: "💡", desc: "dica útil, ideia de festa, conteúdo de valor sem oferta" },
+  { id: "prova_social", rotulo: "Depoimentos", emoji: "⭐", desc: "depoimento de cliente, festa que já rolou, 'olha como ficou linda'" },
+  { id: "oferta", rotulo: "Promoção", emoji: "🏷️", desc: "desconto, brinde, pacote, condição especial, valores em destaque" },
+  { id: "institucional", rotulo: "Divulgação", emoji: "💎", desc: "diferenciais, confiança, qualidade, motivos pra fechar com a marca" },
+  { id: "sazonal", rotulo: "Data comemorativa", emoji: "🎂", desc: "datas comemorativas (Natal, Dia das Crianças), aniversariantes da semana" },
+  { id: "conteudo", rotulo: "Dica", emoji: "💡", desc: "dica útil, ideia de festa, conteúdo de valor sem oferta" },
 ];
 
 const POR_ID: Record<string, (typeof CATEGORIAS)[number]> = Object.fromEntries(CATEGORIAS.map((c) => [c.id, c]));
