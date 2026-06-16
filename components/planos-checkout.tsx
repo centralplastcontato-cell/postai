@@ -222,7 +222,7 @@ export function PlanosCheckout({
             {copiado ? "✓ Código copiado!" : "📋 Copiar código Pix (copia e cola)"}
           </button>
           <p className="mt-4 text-xs text-muted">Valor: <strong className="text-white">R$ {fmt(valor)}</strong> · pagamento seguro pelo Mercado Pago 🔒</p>
-          <a href="/painel" className="mt-3 inline-block text-xs text-muted underline transition hover:text-white">Já paguei — ir pro painel</a>
+          <a href="/painel" className="mt-3 block w-full rounded-xl border border-linha px-4 py-3 text-center text-sm font-semibold text-white transition hover:border-vermelho">✓ Já paguei — ir pro painel</a>
         </div>
       </div>
     );
@@ -232,7 +232,7 @@ export function PlanosCheckout({
   if (etapa === "conta") {
     return (
       <div className="mx-auto max-w-md">
-        <button type="button" onClick={() => setEtapa("selecao")} className="mb-3 text-sm text-muted transition hover:text-white">← Trocar plano</button>
+        <button type="button" onClick={() => setEtapa("selecao")} className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-linha px-4 py-2.5 text-sm font-semibold text-muted transition hover:border-vermelho hover:text-white">← Trocar plano</button>
         <div className="rounded-2xl border border-linha bg-preto-card p-6">
           <ResumoTopo />
           <div className="my-5 h-px bg-linha" />
@@ -256,7 +256,7 @@ export function PlanosCheckout({
   if (etapa === "pagamento") {
     return (
       <div className="mx-auto max-w-md">
-        <button type="button" onClick={voltarPraSelecao} className="mb-3 text-sm text-muted transition hover:text-white">← Trocar plano</button>
+        <button type="button" onClick={voltarPraSelecao} className="mb-4 inline-flex items-center gap-1.5 rounded-lg border border-linha px-4 py-2.5 text-sm font-semibold text-muted transition hover:border-vermelho hover:text-white">← Trocar plano</button>
         <div className="rounded-2xl border border-linha bg-preto-card p-6">
           <ResumoTopo />
           {erro && <p className="mt-4 rounded-md border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-300">{erro}</p>}
@@ -296,8 +296,8 @@ export function PlanosCheckout({
             </div>
           ) : (
             <div className="mt-5">
-              <button type="button" onClick={() => { try { brickRef.current?.unmount(); } catch {} brickRef.current = null; setMetodo("escolha"); setErro(null); }} className="text-xs text-muted underline transition hover:text-white">← outras formas de pagar</button>
-              <div id="cardBrick_container" className="mt-3" />
+              <button type="button" onClick={() => { try { brickRef.current?.unmount(); } catch {} brickRef.current = null; setMetodo("escolha"); setErro(null); }} className="inline-flex items-center gap-1.5 rounded-lg border border-linha px-4 py-2.5 text-sm font-semibold text-muted transition hover:border-vermelho hover:text-white">← Outras formas de pagar</button>
+              <div id="cardBrick_container" className="mt-4" />
             </div>
           )}
 
