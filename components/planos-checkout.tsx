@@ -273,7 +273,7 @@ export function PlanosCheckout({
         disabled={carregando || !plano}
         className="mt-6 w-full rounded-xl bg-vermelho px-5 py-3 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50 sm:w-auto"
       >
-        {carregando ? "Um instante…" : plano ? `Continuar pro pagamento · R$ ${fmt(valor)}` : "Escolha um plano acima"}
+        {carregando ? "Um instante…" : plano ? `Ir para o pagamento · R$ ${fmt(valor)}` : "Escolha um plano acima"}
       </button>
 
       <p className="mt-4 text-xs text-muted">Pagamento seguro pelo Mercado Pago · Pix ou cartão · o cartão não passa pelo Postaí 🔒</p>
