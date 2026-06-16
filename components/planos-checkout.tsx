@@ -12,9 +12,9 @@ import {
   type Plano,
   type Periodo,
 } from "@/lib/plano";
-import { criarConta, processarPagamento } from "@/app/actions/pagamento";
+import { criarConta, processarPagamento, pagarComPix } from "@/app/actions/pagamento";
 
-// SDK do Mercado Pago (carregado uma vez, sob demanda).
+// SDK do Mercado Pago (só pro CARTÃO — tokenização segura. O Pix é gerado direto no backend).
 declare global {
   interface Window {
     MercadoPago?: new (
@@ -42,7 +42,7 @@ function carregarSDK(): Promise<void> {
 const fmt = (n: number) => n.toLocaleString("pt-BR");
 const porPost = (p: Plano) => (PRECO_PLANO[p] / (FEED_POR_DIA[p] * 30)).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Mesma comunicação da landing (app/page.tsx) — pra o checkout ter a cara e o discurso da LP.
+// Mesma comunicação da landing — pro checkout ter a cara e o discurso da LP.
 const INFO: Record<Plano, { posts: string; resumo: string; itens: string[]; destaque?: boolean; melhorCusto?: boolean }> = {
   essencial: {
     posts: "1 post por dia",
@@ -76,23 +76,25 @@ export function PlanosCheckout({
   const [periodo, setPeriodo] = useState<Periodo>("anual");
   const [plano, setPlano] = useState<Plano | null>(ehPlano(planoInicial) ? planoInicial : null);
   const [estaLogado, setEstaLogado] = useState(logado);
+  const [metodo, setMetodo] = useState<"escolha" | "cartao">("escolha");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [gerandoPix, setGerandoPix] = useState(false);
   const [pix, setPix] = useState<{ qrBase64: string; copiaECola: string; ticketUrl: string } | null>(null);
   const [copiado, setCopiado] = useState(false);
   const brickRef = useRef<{ unmount: () => void } | null>(null);
 
   const publicKey = process.env.NEXT_PUBLIC_MP_PUBLIC_KEY;
   const valor = plano ? precoDoPedido(plano, periodo) : 0;
+  const resumoPlano = plano ? `${rotuloPlano(plano)} · ${periodo === "anual" ? "Anual (12 meses)" : "Mensal"}` : "";
 
-  // Clicou no "Assinar" de um card: trava o plano e segue pro cadastro (se deslogado) ou
-  // direto pro pagamento (se já é cliente).
   function escolher(p: Plano) {
     setErro(null);
     if (admin) { setErro("O admin não assina. Entre com uma conta de cliente pra testar."); return; }
     setPlano(p);
+    setMetodo("escolha");
     setEtapa(estaLogado ? "pagamento" : "conta");
   }
 
@@ -103,34 +105,44 @@ export function PlanosCheckout({
       const r = await criarConta({ email, senha });
       if (!r.ok) { setErro(r.erro); return; }
       setEstaLogado(true);
+      setMetodo("escolha");
       setEtapa("pagamento");
     } finally {
       setCarregando(false);
     }
   }
 
-  // Monta o Payment Brick quando entra na etapa de pagamento.
+  async function gerarPix() {
+    if (!plano) return;
+    setErro(null);
+    setGerandoPix(true);
+    try {
+      const r = await pagarComPix(plano, periodo);
+      if (!r.ok) { setErro(r.erro); return; }
+      setPix(r.pix);
+      setEtapa("pix");
+    } finally {
+      setGerandoPix(false);
+    }
+  }
+
+  // Formulário de CARTÃO (Card Brick — só cartão, tokenização segura). Montado só quando o
+  // cliente escolhe pagar no cartão.
   useEffect(() => {
-    if (etapa !== "pagamento" || !plano) return;
+    if (etapa !== "pagamento" || metodo !== "cartao" || !plano) return;
     let cancelado = false;
     setErro(null);
-    if (!publicKey) {
-      setErro("Pagamento ainda em configuração (falta a chave pública do Mercado Pago).");
-      return;
-    }
+    if (!publicKey) { setErro("Pagamento por cartão em configuração — use o Pix por enquanto."); return; }
     carregarSDK()
       .then(async () => {
         if (cancelado || !window.MercadoPago) return;
         const mp = new window.MercadoPago(publicKey, { locale: "pt-BR" });
-        const controller = await mp.bricks().create("payment", "paymentBrick_container", {
+        const controller = await mp.bricks().create("cardPayment", "cardBrick_container", {
           initialization: { amount: valor },
-          customization: {
-            visual: { style: { theme: "dark" } },
-            paymentMethods: { creditCard: "all", bankTransfer: ["pix"], maxInstallments: 1 },
-          },
+          customization: { visual: { style: { theme: "dark" } }, paymentMethods: { maxInstallments: 12 } },
           callbacks: {
             onReady: () => {},
-            onError: () => setErro("Algo deu errado ao carregar o pagamento. Recarregue a página."),
+            onError: () => setErro("Erro ao carregar o cartão. Tente o Pix ou recarregue."),
             onSubmit: (arg: { formData: unknown }) =>
               new Promise<void>((resolve) => {
                 processarPagamento({ formData: arg.formData, plano, periodo })
@@ -139,9 +151,6 @@ export function PlanosCheckout({
                     if (r.status === "approved") {
                       setEtapa("sucesso");
                       setTimeout(() => { window.location.href = "/painel"; }, 2500);
-                    } else if (r.pix) {
-                      setPix(r.pix);
-                      setEtapa("pix");
                     } else {
                       setErro("Pagamento em análise. Assim que aprovar, seu acesso libera sozinho.");
                     }
@@ -154,13 +163,13 @@ export function PlanosCheckout({
         if (cancelado) controller.unmount();
         else brickRef.current = controller;
       })
-      .catch(() => setErro("Não consegui carregar o Mercado Pago. Confira sua conexão e recarregue."));
+      .catch(() => setErro("Não consegui carregar o cartão. Use o Pix ou recarregue."));
     return () => {
       cancelado = true;
       try { brickRef.current?.unmount(); } catch {}
       brickRef.current = null;
     };
-  }, [etapa, plano, periodo, valor, publicKey]);
+  }, [etapa, metodo, plano, periodo, valor, publicKey]);
 
   function copiarPix() {
     if (!pix) return;
@@ -169,7 +178,21 @@ export function PlanosCheckout({
     setTimeout(() => setCopiado(false), 2000);
   }
 
-  const resumoPlano = plano ? `${rotuloPlano(plano)} · ${periodo === "anual" ? "Anual (12 meses)" : "Mensal"}` : "";
+  function voltarPraSelecao() {
+    try { brickRef.current?.unmount(); } catch {}
+    brickRef.current = null;
+    setMetodo("escolha");
+    setEtapa("selecao");
+  }
+
+  // Cabeçalho do resumo do plano (reusado nas telas de conta/pagamento).
+  const ResumoTopo = () => (
+    <>
+      <p className="text-xs uppercase tracking-widest text-vermelho">{etapa === "conta" ? "Plano escolhido" : "Você está assinando"}</p>
+      <p className="mt-1 text-lg font-bold text-white">{resumoPlano}</p>
+      <p className="mt-1 text-3xl font-bold text-white">R$ {fmt(valor)}<span className="ml-1 text-base font-medium text-muted">/{periodo === "anual" ? "ano" : "mês"}</span></p>
+    </>
+  );
 
   // ── Sucesso ─────────────────────────────────────────────────────────────────────────
   if (etapa === "sucesso") {
@@ -183,20 +206,24 @@ export function PlanosCheckout({
     );
   }
 
-  // ── Pix (QR) ────────────────────────────────────────────────────────────────────────
+  // ── Pix (QR gerado na nossa tela) ───────────────────────────────────────────────────
   if (etapa === "pix" && pix) {
     return (
-      <div className="mx-auto max-w-md rounded-2xl border border-linha bg-preto-card p-6 text-center">
-        <h1 className="display text-2xl text-white">Pague com Pix pra liberar</h1>
-        <p className="mt-2 text-sm text-muted">Abra o app do seu banco, escaneie o QR Code ou cole o código. Seu acesso libera sozinho assim que o Pix cair.</p>
-        {pix.qrBase64 && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code do Pix" className="mx-auto mt-5 h-56 w-56 rounded-lg bg-white p-2" />
-        )}
-        <button type="button" onClick={copiarPix} className="mt-4 w-full rounded-xl border border-linha px-4 py-3 text-sm font-semibold text-white transition hover:border-vermelho">
-          {copiado ? "✓ Código copiado!" : "📋 Copiar código Pix (copia e cola)"}
-        </button>
-        <a href="/painel" className="mt-3 inline-block text-xs text-muted underline transition hover:text-white">Já paguei — ir pro painel</a>
+      <div className="mx-auto max-w-md">
+        <div className="rounded-2xl border border-linha bg-preto-card p-6 text-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#32BCAD]/15 px-3 py-1 text-xs font-semibold text-[#32BCAD]">💠 Pix · {resumoPlano}</span>
+          <h1 className="display mt-4 text-2xl text-white">Quase lá! Escaneie pra pagar</h1>
+          <p className="mx-auto mt-2 max-w-xs text-sm text-muted">Abra o app do seu banco, aponte pro QR Code (ou copie o código). <strong className="text-white">Seu acesso libera sozinho</strong> assim que o Pix cair.</p>
+          {pix.qrBase64 && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code do Pix" className="mx-auto mt-5 h-60 w-60 rounded-xl bg-white p-2.5" />
+          )}
+          <button type="button" onClick={copiarPix} className="mt-4 w-full rounded-xl bg-[#32BCAD] px-4 py-3 text-sm font-bold text-white transition hover:opacity-90">
+            {copiado ? "✓ Código copiado!" : "📋 Copiar código Pix (copia e cola)"}
+          </button>
+          <p className="mt-4 text-xs text-muted">Valor: <strong className="text-white">R$ {fmt(valor)}</strong> · pagamento seguro pelo Mercado Pago 🔒</p>
+          <a href="/painel" className="mt-3 inline-block text-xs text-muted underline transition hover:text-white">Já paguei — ir pro painel</a>
+        </div>
       </div>
     );
   }
@@ -207,12 +234,8 @@ export function PlanosCheckout({
       <div className="mx-auto max-w-md">
         <button type="button" onClick={() => setEtapa("selecao")} className="mb-3 text-sm text-muted transition hover:text-white">← Trocar plano</button>
         <div className="rounded-2xl border border-linha bg-preto-card p-6">
-          <p className="text-xs uppercase tracking-widest text-vermelho">Plano escolhido</p>
-          <p className="mt-1 text-lg font-bold text-white">{resumoPlano}</p>
-          <p className="mt-1 text-3xl font-bold text-white">R$ {fmt(valor)}<span className="ml-1 text-base font-medium text-muted">/{periodo === "anual" ? "ano" : "mês"}</span></p>
-
+          <ResumoTopo />
           <div className="my-5 h-px bg-linha" />
-
           <h2 className="display text-xl text-white">Crie sua conta</h2>
           <p className="mt-1 text-xs text-muted">Seu e-mail vira seu login. Você entra no painel logo após o pagamento.</p>
           <div className="mt-4 space-y-3">
@@ -229,18 +252,56 @@ export function PlanosCheckout({
     );
   }
 
-  // ── Pagamento (Brick embutido) ──────────────────────────────────────────────────────
+  // ── Pagamento (escolha do meio: Pix instantâneo ou cartão) ──────────────────────────
   if (etapa === "pagamento") {
     return (
       <div className="mx-auto max-w-md">
-        <button type="button" onClick={() => { try { brickRef.current?.unmount(); } catch {} brickRef.current = null; setEtapa("selecao"); }} className="mb-3 text-sm text-muted transition hover:text-white">← Trocar plano</button>
+        <button type="button" onClick={voltarPraSelecao} className="mb-3 text-sm text-muted transition hover:text-white">← Trocar plano</button>
         <div className="rounded-2xl border border-linha bg-preto-card p-6">
-          <p className="text-xs uppercase tracking-widest text-vermelho">Você está assinando</p>
-          <p className="mt-1 text-lg font-bold text-white">{resumoPlano}</p>
-          <p className="mt-1 text-3xl font-bold text-white">R$ {fmt(valor)}<span className="ml-1 text-base font-medium text-muted">/{periodo === "anual" ? "ano" : "mês"}</span></p>
-          {erro && <p className="mt-3 rounded-md border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-300">{erro}</p>}
-          <div id="paymentBrick_container" className="mt-5" />
-          <p className="mt-4 text-center text-[11px] text-muted">Pagamento processado pelo Mercado Pago · seguro 🔒</p>
+          <ResumoTopo />
+          {erro && <p className="mt-4 rounded-md border border-red-600/40 bg-red-600/10 px-3 py-2 text-sm text-red-300">{erro}</p>}
+
+          {metodo === "escolha" ? (
+            <div className="mt-5 space-y-3">
+              <p className="text-sm font-semibold text-white">Como você quer pagar?</p>
+
+              {/* Pix — gerado na hora, sem fricção */}
+              <button
+                type="button"
+                onClick={gerarPix}
+                disabled={gerandoPix}
+                className="flex w-full items-center gap-3 rounded-xl border border-[#32BCAD]/40 bg-[#32BCAD]/10 px-4 py-3.5 text-left transition hover:border-[#32BCAD] disabled:opacity-60"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#32BCAD]/20 text-xl">💠</span>
+                <span className="flex-1">
+                  <span className="block text-sm font-bold text-white">Pix</span>
+                  <span className="block text-xs text-muted">QR Code na hora · aprovação na hora</span>
+                </span>
+                <span className="text-sm font-bold text-[#32BCAD]">{gerandoPix ? "Gerando…" : "→"}</span>
+              </button>
+
+              {/* Cartão — formulário seguro do MP */}
+              <button
+                type="button"
+                onClick={() => { setErro(null); setMetodo("cartao"); }}
+                className="flex w-full items-center gap-3 rounded-xl border border-linha bg-preto px-4 py-3.5 text-left transition hover:border-vermelho"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/5 text-xl">💳</span>
+                <span className="flex-1">
+                  <span className="block text-sm font-bold text-white">Cartão de crédito</span>
+                  <span className="block text-xs text-muted">parcele em até 12x{periodo === "anual" ? " (ótimo pro anual)" : ""}</span>
+                </span>
+                <span className="text-sm font-bold text-muted">→</span>
+              </button>
+            </div>
+          ) : (
+            <div className="mt-5">
+              <button type="button" onClick={() => { try { brickRef.current?.unmount(); } catch {} brickRef.current = null; setMetodo("escolha"); setErro(null); }} className="text-xs text-muted underline transition hover:text-white">← outras formas de pagar</button>
+              <div id="cardBrick_container" className="mt-3" />
+            </div>
+          )}
+
+          <p className="mt-5 text-center text-[11px] text-muted">Pagamento processado pelo Mercado Pago · seguro 🔒</p>
         </div>
       </div>
     );
@@ -261,7 +322,6 @@ export function PlanosCheckout({
         </div>
       )}
 
-      {/* Toggle Mensal × Anual */}
       <div className="mt-7 flex justify-center">
         <div className="inline-flex rounded-full border border-linha bg-preto-card p-1">
           <button type="button" onClick={() => setPeriodo("mensal")} className={`rounded-full px-5 py-2 text-sm font-semibold transition ${periodo === "mensal" ? "bg-vermelho text-white" : "text-muted hover:text-white"}`}>Mensal</button>

@@ -24,6 +24,35 @@ export async function criarConta(input: { email: string; senha: string }) {
   return { ok: true as const };
 }
 
+// Gera um Pix DIRETO (sem o formulário engessado do MP): usa o e-mail que já temos do
+// cadastro e devolve o QR Code na hora, pra mostrar na nossa própria tela. A confirmação
+// do pagamento cai no webhook (que libera o acesso sozinho).
+export async function pagarComPix(plano: string, periodo: string) {
+  const s = await sessaoAtual();
+  if (!s) return { ok: false as const, erro: "Crie sua conta ou faça login pra pagar." };
+  if (s.admin) return { ok: false as const, erro: "O admin não assina. Use uma conta de cliente." };
+  if (!ehPlano(plano) || !ehPeriodo(periodo)) return { ok: false as const, erro: "Plano ou período inválido." };
+
+  const u = await prisma.usuario.findUnique({ where: { id: s.id }, select: { id: true, nome: true } });
+  if (!u) return { ok: false as const, erro: "Conta não encontrada." };
+  // O e-mail do Pix: o login do cliente (que no self-service é o próprio e-mail). Se não for
+  // um e-mail (cliente antigo com usuário), usa um endereço técnico válido do nosso domínio.
+  const email = u.nome.includes("@") ? u.nome : `cliente-${u.id}@meupostai.com.br`;
+
+  const valor = precoDoPedido(plano, periodo);
+  const descricao = `Postaí ${rotuloPlano(plano)} — ${periodo === "anual" ? "Plano anual (12 meses)" : "Plano mensal"}`;
+  const r = await criarPagamento({
+    valor,
+    descricao,
+    externalReference: `${s.id}:${plano}:${periodo}`,
+    base: baseUrl(),
+    formData: { payment_method_id: "pix", payer: { email } },
+  });
+  if (!r.ok) return { ok: false as const, erro: r.erro };
+  if (!r.pix) return { ok: false as const, erro: "Não consegui gerar o Pix agora. Tente o cartão ou tente de novo." };
+  return { ok: true as const, pix: r.pix };
+}
+
 // Processa o pagamento do checkout EMBUTIDO (Mercado Pago Bricks). Recebe o que o Brick
 // montou (cartão tokenizado ou Pix) e cria o pagamento pela API. Cartão aprovado libera o
 // acesso na hora; Pix volta com o QR (a confirmação cai no webhook). NUNCA confia em valor
