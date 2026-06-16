@@ -20,7 +20,10 @@ declare global {
     MercadoPago?: new (
       publicKey: string,
       options?: { locale?: string },
-    ) => { bricks: () => { create: (brick: string, containerId: string, settings: unknown) => Promise<{ unmount: () => void }> } };
+    ) => {
+      bricks: () => { create: (brick: string, containerId: string, settings: unknown) => Promise<{ unmount: () => void }> };
+      cardForm: (settings: unknown) => { getCardFormData: () => Record<string, string>; unmount?: () => void };
+    };
   }
 }
 
@@ -82,9 +85,10 @@ export function PlanosCheckout({
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [gerandoPix, setGerandoPix] = useState(false);
+  const [processandoCartao, setProcessandoCartao] = useState(false);
   const [pix, setPix] = useState<{ qrBase64: string; copiaECola: string; ticketUrl: string } | null>(null);
   const [copiado, setCopiado] = useState(false);
-  const brickRef = useRef<{ unmount: () => void } | null>(null);
+  const brickRef = useRef<{ unmount?: () => void } | null>(null);
 
   const publicKey = process.env.NEXT_PUBLIC_MP_PUBLIC_KEY;
   const valor = plano ? precoDoPedido(plano, periodo) : 0;
@@ -126,47 +130,72 @@ export function PlanosCheckout({
     }
   }
 
-  // Formulário de CARTÃO (Card Brick — só cartão, tokenização segura). Montado só quando o
-  // cliente escolhe pagar no cartão.
+  // Formulário de CARTÃO 100% NOSSO (MP CardForm + campos seguros): os dados sensíveis
+  // (número/validade/CVV) ficam em iframes do MP por trás (PCI), mas o visual é o do Postaí e
+  // o pagamento acontece AQUI — sem ir pra tela do MP. As PARCELAS são preenchidas pelo MP no
+  // nosso <select> assim que o número do cartão é digitado (igual no MP).
   useEffect(() => {
     if (etapa !== "pagamento" || metodo !== "cartao" || !plano) return;
     let cancelado = false;
     setErro(null);
     if (!publicKey) { setErro("Pagamento por cartão em configuração — use o Pix por enquanto."); return; }
     carregarSDK()
-      .then(async () => {
+      .then(() => {
         if (cancelado || !window.MercadoPago) return;
         const mp = new window.MercadoPago(publicKey, { locale: "pt-BR" });
-        const controller = await mp.bricks().create("cardPayment", "cardBrick_container", {
-          initialization: { amount: valor },
-          customization: { visual: { style: { theme: "dark", customVariables: { baseColor: "#7c3aed", buttonTextColor: "#ffffff" } } }, paymentMethods: { maxInstallments: 12 } },
+        const cardForm = mp.cardForm({
+          amount: String(valor),
+          iframe: true,
+          form: {
+            id: "form-checkout",
+            cardNumber: { id: "fc-cardNumber", placeholder: "1234 1234 1234 1234" },
+            expirationDate: { id: "fc-expiration", placeholder: "MM/AA" },
+            securityCode: { id: "fc-cvv", placeholder: "CVV" },
+            cardholderName: { id: "fc-name", placeholder: "Nome como no cartão" },
+            issuer: { id: "fc-issuer" },
+            installments: { id: "fc-installments" },
+            identificationType: { id: "fc-docType" },
+            identificationNumber: { id: "fc-docNumber", placeholder: "Número do documento" },
+            cardholderEmail: { id: "fc-email", placeholder: "seu@email.com" },
+          },
           callbacks: {
-            onReady: () => {},
-            onError: () => setErro("Erro ao carregar o cartão. Tente o Pix ou recarregue."),
-            onSubmit: (arg: { formData: unknown }) =>
-              new Promise<void>((resolve) => {
-                processarPagamento({ formData: arg.formData, plano, periodo })
-                  .then((r) => {
-                    if (!r.ok) { setErro(r.erro); resolve(); return; }
-                    if (r.status === "approved") {
-                      setEtapa("sucesso");
-                      setTimeout(() => { window.location.href = "/painel"; }, 2500);
-                    } else {
-                      setErro("Pagamento em análise. Assim que aprovar, seu acesso libera sozinho.");
-                    }
-                    resolve();
-                  })
-                  .catch(() => { setErro("Não consegui processar agora. Tente de novo."); resolve(); });
-              }),
+            onFormMounted: (error: unknown) => { if (error) setErro("Não consegui montar o cartão. Tente o Pix."); },
+            onSubmit: (event: { preventDefault: () => void }) => {
+              event.preventDefault();
+              setErro(null);
+              setProcessandoCartao(true);
+              const d = cardForm.getCardFormData();
+              processarPagamento({
+                formData: {
+                  token: d.token,
+                  payment_method_id: d.paymentMethodId,
+                  issuer_id: d.issuerId,
+                  installments: Number(d.installments),
+                  payer: { email: d.cardholderEmail, identification: { type: d.identificationType, number: d.identificationNumber } },
+                },
+                plano,
+                periodo,
+              })
+                .then((r) => {
+                  if (!r.ok) { setErro(r.erro); return; }
+                  if (r.status === "approved") {
+                    setEtapa("sucesso");
+                    setTimeout(() => { window.location.href = "/painel"; }, 2500);
+                  } else {
+                    setErro("Pagamento em análise. Assim que aprovar, seu acesso libera sozinho.");
+                  }
+                })
+                .catch(() => setErro("Não consegui processar agora. Tente de novo."))
+                .finally(() => setProcessandoCartao(false));
+            },
           },
         });
-        if (cancelado) controller.unmount();
-        else brickRef.current = controller;
+        if (!cancelado) brickRef.current = cardForm;
       })
       .catch(() => setErro("Não consegui carregar o cartão. Use o Pix ou recarregue."));
     return () => {
       cancelado = true;
-      try { brickRef.current?.unmount(); } catch {}
+      try { brickRef.current?.unmount?.(); } catch {}
       brickRef.current = null;
     };
   }, [etapa, metodo, plano, periodo, valor, publicKey]);
@@ -179,7 +208,7 @@ export function PlanosCheckout({
   }
 
   function voltarPraSelecao() {
-    try { brickRef.current?.unmount(); } catch {}
+    try { brickRef.current?.unmount?.(); } catch {}
     brickRef.current = null;
     setMetodo("escolha");
     setEtapa("selecao");
@@ -296,8 +325,46 @@ export function PlanosCheckout({
             </div>
           ) : (
             <div className="mt-5">
-              <button type="button" onClick={() => { try { brickRef.current?.unmount(); } catch {} brickRef.current = null; setMetodo("escolha"); setErro(null); }} className="inline-flex items-center gap-1.5 rounded-lg border border-linha px-4 py-2.5 text-sm font-semibold text-muted transition hover:border-vermelho hover:text-white">← Outras formas de pagar</button>
-              <div id="cardBrick_container" className="mt-4" />
+              <button type="button" onClick={() => { try { brickRef.current?.unmount?.(); } catch {} brickRef.current = null; setMetodo("escolha"); setErro(null); }} className="inline-flex items-center gap-1.5 rounded-lg border border-linha px-4 py-2.5 text-sm font-semibold text-muted transition hover:border-vermelho hover:text-white">← Outras formas de pagar</button>
+              <form id="form-checkout" className="mt-4 space-y-3">
+                <div>
+                  <label className="text-xs text-muted">Número do cartão</label>
+                  <div id="fc-cardNumber" className="mt-1 flex h-11 items-center rounded-md border border-linha bg-white px-3" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted">Validade</label>
+                    <div id="fc-expiration" className="mt-1 flex h-11 items-center rounded-md border border-linha bg-white px-3" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted">CVV</label>
+                    <div id="fc-cvv" className="mt-1 flex h-11 items-center rounded-md border border-linha bg-white px-3" />
+                  </div>
+                </div>
+                <label className="block text-xs text-muted">Nome no cartão
+                  <input id="fc-name" type="text" placeholder="Como aparece no cartão" className="input-base" />
+                </label>
+                <div className="grid grid-cols-[7rem_1fr] gap-3">
+                  <label className="block text-xs text-muted">Documento
+                    <select id="fc-docType" className="input-base" />
+                  </label>
+                  <label className="block text-xs text-muted">Número do documento
+                    <input id="fc-docNumber" type="text" placeholder="000.000.000-00" className="input-base" />
+                  </label>
+                </div>
+                <label className="block text-xs text-muted">E-mail
+                  <input id="fc-email" type="email" defaultValue={email} placeholder="seu@email.com" className="input-base" />
+                </label>
+                <label className="block text-xs text-muted">Banco emissor
+                  <select id="fc-issuer" className="input-base" />
+                </label>
+                <label className="block text-xs text-muted">Parcelas
+                  <select id="fc-installments" className="input-base" />
+                </label>
+                <button type="submit" id="fc-submit" disabled={processandoCartao} className="mt-1 w-full rounded-xl bg-vermelho px-5 py-3 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
+                  {processandoCartao ? "Processando…" : `🔒 Pagar R$ ${fmt(valor)}`}
+                </button>
+              </form>
             </div>
           )}
 
