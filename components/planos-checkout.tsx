@@ -139,7 +139,7 @@ export function PlanosCheckout({
         const mp = new window.MercadoPago(publicKey, { locale: "pt-BR" });
         const controller = await mp.bricks().create("cardPayment", "cardBrick_container", {
           initialization: { amount: valor },
-          customization: { visual: { style: { theme: "dark" } }, paymentMethods: { maxInstallments: 12 } },
+          customization: { visual: { style: { theme: "dark", customVariables: { baseColor: "#7c3aed", buttonTextColor: "#ffffff" } } }, paymentMethods: { maxInstallments: 12 } },
           callbacks: {
             onReady: () => {},
             onError: () => setErro("Erro ao carregar o cartão. Tente o Pix ou recarregue."),
@@ -211,14 +211,14 @@ export function PlanosCheckout({
     return (
       <div className="mx-auto max-w-md">
         <div className="rounded-2xl border border-linha bg-preto-card p-6 text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#32BCAD]/15 px-3 py-1 text-xs font-semibold text-[#32BCAD]">💠 Pix · {resumoPlano}</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-vermelho/15 px-3 py-1 text-xs font-semibold text-vermelho">💠 Pix · {resumoPlano}</span>
           <h1 className="display mt-4 text-2xl text-white">Quase lá! Escaneie pra pagar</h1>
           <p className="mx-auto mt-2 max-w-xs text-sm text-muted">Abra o app do seu banco, aponte pro QR Code (ou copie o código). <strong className="text-white">Seu acesso libera sozinho</strong> assim que o Pix cair.</p>
           {pix.qrBase64 && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={`data:image/png;base64,${pix.qrBase64}`} alt="QR Code do Pix" className="mx-auto mt-5 h-60 w-60 rounded-xl bg-white p-2.5" />
           )}
-          <button type="button" onClick={copiarPix} className="mt-4 w-full rounded-xl bg-[#32BCAD] px-4 py-3 text-sm font-bold text-white transition hover:opacity-90">
+          <button type="button" onClick={copiarPix} className="mt-4 w-full rounded-xl bg-vermelho px-4 py-3 text-sm font-bold text-white transition hover:bg-vermelho-hover">
             {copiado ? "✓ Código copiado!" : "📋 Copiar código Pix (copia e cola)"}
           </button>
           <p className="mt-4 text-xs text-muted">Valor: <strong className="text-white">R$ {fmt(valor)}</strong> · pagamento seguro pelo Mercado Pago 🔒</p>
@@ -270,14 +270,14 @@ export function PlanosCheckout({
                 type="button"
                 onClick={gerarPix}
                 disabled={gerandoPix}
-                className="flex w-full items-center gap-3 rounded-xl border border-[#32BCAD]/40 bg-[#32BCAD]/10 px-4 py-3.5 text-left transition hover:border-[#32BCAD] disabled:opacity-60"
+                className="flex w-full items-center gap-3 rounded-xl border border-vermelho/40 bg-vermelho/10 px-4 py-3.5 text-left transition hover:border-vermelho disabled:opacity-60"
               >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#32BCAD]/20 text-xl">💠</span>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-vermelho/20 text-xl">💠</span>
                 <span className="flex-1">
                   <span className="block text-sm font-bold text-white">Pix</span>
                   <span className="block text-xs text-muted">QR Code na hora · aprovação na hora</span>
                 </span>
-                <span className="text-sm font-bold text-[#32BCAD]">{gerandoPix ? "Gerando…" : "→"}</span>
+                <span className="text-sm font-bold text-vermelho">{gerandoPix ? "Gerando…" : "→"}</span>
               </button>
 
               {/* Cartão — formulário seguro do MP */}
