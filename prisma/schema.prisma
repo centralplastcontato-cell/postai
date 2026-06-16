@@ -84,6 +84,13 @@ model Conteudo {
   status      String   @default("a_postar") // a_postar | postado
   aprovado    Boolean  @default(false) // revisão INTERNA do dono (não vai pra rede) — só marca "eu já revisei"
   postadoEm   DateTime? // momento REAL em que foi publicado (null = ainda não postado)
+  // Engajamento no Instagram (coletado pelo piloto após postar). null = ainda não medido.
+  mediaId     String? // ID da mídia no Instagram (chave pra buscar os insights)
+  curtidas    Int? // ❤️ curtidas
+  comentarios Int? // 💬 comentários
+  alcance     Int? // 👁️ pessoas alcançadas (reach)
+  salvamentos Int? // 🔖 salvamentos
+  insightsEm  DateTime? // quando os números foram atualizados pela última vez
   createdAt   DateTime @default(now())
 
   @@index([marcaId, data])
@@ -113,6 +120,13 @@ model Publicacao {
   // espelhar (só p/ formato feed): null = usa o padrão da marca; true/false = força.
   // Ligado: ao postar o feed, o piloto também sobe a versão Story automaticamente.
   espelhar  Boolean?
+  // Engajamento no Instagram (coletado pelo piloto após postar). Story: alcance = views.
+  mediaId     String? // ID da mídia no Instagram (chave pra buscar os insights)
+  curtidas    Int? // ❤️ curtidas
+  comentarios Int? // 💬 comentários
+  alcance     Int? // 👁️ alcance (reach) — no Story, é a contagem de visualizações
+  salvamentos Int? // 🔖 salvamentos (feed/carrossel)
+  insightsEm  DateTime? // quando os números foram atualizados pela última vez
   createdAt DateTime @default(now())
 
   @@index([marcaId, data])

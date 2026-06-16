@@ -23,6 +23,7 @@ import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
 import { CATEGORIAS, CATEGORIA_LABEL } from "@/lib/categorias-imagem";
 import { parsePaleta, paletaComExtras, CORES_EXTRAS } from "@/lib/cores-fundo";
+import { SeloEngajamento } from "./selo-engajamento";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
@@ -104,6 +105,11 @@ export type PublicacaoView = {
   extra?: string | null; // JSON dos campos do template (pra pré-preencher a edição)
   categoria?: string | null; // categoria do banco pra foto (template dica)
   espelhar?: boolean | null; // override do espelho no Story (null = usa o padrão da marca)
+  // Engajamento no Instagram (coletado pelo piloto após postar)
+  curtidas?: number | null;
+  comentarios?: number | null;
+  alcance?: number | null;
+  salvamentos?: number | null;
 };
 
 // Formata o horário de publicação: "13/jun às 14:05" (fuso de São Paulo).
@@ -983,6 +989,7 @@ export function PublicacoesAba({
                 </div>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted">{TEMPLATE_LABEL[p.template as Template] ?? p.template}</p>
                 <p className="line-clamp-2 text-sm text-white">{p.titulo}</p>
+                {postado && <SeloEngajamento p={p} />}
 
                 <div className="mt-2">
                   <button type="button" onClick={() => setLegendaAbertaId((c) => (c === p.id ? null : p.id))} className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted transition hover:text-white">

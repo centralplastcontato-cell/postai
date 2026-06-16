@@ -450,7 +450,7 @@ export async function postarInstagram(id: string) {
   const r = await publicarNasRedes(c.marca, urls, legenda);
   if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
 
-  await prisma.conteudo.update({ where: { id }, data: { status: "postado", postadoEm: new Date() } });
+  await prisma.conteudo.update({ where: { id }, data: { status: "postado", postadoEm: new Date(), mediaId: r.ig.mediaId } });
   const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
   await registrarAtividade(AGENTE, `Postei "${c.titulo}" no ${onde} de ${c.marca.nome}.`, c.marcaId);
   revalidatePath(`/painel/marcas/${c.marcaId}`);

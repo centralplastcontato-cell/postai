@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
-import { snapshotDeMarca, alertarTokenSeVencendo } from "@/lib/metricas";
+import { snapshotDeMarca, alertarTokenSeVencendo, coletarInsightsDaMarca } from "@/lib/metricas";
 import { acessoExpirado } from "@/lib/plano";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, AGENTE } from "@/lib/config";
@@ -72,6 +72,10 @@ export async function GET(req: Request) {
       await postarCarrossel(m, agora, base, resultados);
       await postarFeed(m, agora, base, resultados);
       await postarStory(m, agora, base, resultados);
+
+      // Coleta o engajamento (curtidas/comentários/alcance) dos posts recentes — Story só
+      // dentro de 24h. Best-effort: nunca derruba o piloto.
+      await coletarInsightsDaMarca(m).catch(() => {});
     } catch (e) {
       resultados.push({ marca: m.nome, tipo: "carrossel", titulo: "(marca)", ok: false, erro: msg(e) });
     }
@@ -129,6 +133,7 @@ async function postarCarrossel(m: { id: string; nome: string; igUserId: string |
     if (r.ig.ok) {
       const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
       await registrarAtividade(AGENTE, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
+      await prisma.conteudo.update({ where: { id: c.id }, data: { mediaId: r.ig.mediaId } }).catch(() => {}); // guarda o ID pra coletar o engajamento depois
     } else {
       await reverterCarrossel(c.id);
       await registrarAtividade(AGENTE, `Não consegui postar o carrossel "${c.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
@@ -150,6 +155,7 @@ async function postarFeed(m: { id: string; nome: string; igUserId: string | null
     if (r.ig.ok) {
       const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
       await registrarAtividade(AGENTE, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
+      await prisma.publicacao.update({ where: { id: p.id }, data: { mediaId: r.ig.mediaId } }).catch(() => {}); // guarda o ID pra coletar o engajamento depois
       // Espelhar no Story (best-effort): ligado na marca ou forçado no post.
       if (p.espelhar ?? m.espelharStory) {
         const rs = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${p.id}`);
@@ -174,6 +180,7 @@ async function postarStory(m: { id: string; nome: string; igUserId: string | nul
     const r = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${st.id}`);
     if (r.ig.ok) {
       await registrarAtividade(AGENTE, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
+      await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.ig.mediaId } }).catch(() => {}); // guarda o ID pra coletar as visualizações (dentro de 24h)
     } else {
       await reverterPublicacao(st.id);
       await registrarAtividade(AGENTE, `Não consegui postar o Story "${st.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});

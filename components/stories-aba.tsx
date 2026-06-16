@@ -20,6 +20,7 @@ import { CaixaPostando } from "./caixa-postando";
 import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
 import { CORES_EXTRAS } from "@/lib/cores-fundo";
+import { SeloEngajamento } from "./selo-engajamento";
 
 // Templates que fazem sentido pro Story (vertical, chamativo). Promoção mostra o selo
 // de oferta; os demais usam só título + texto. Tudo renderizado em 9:16.
@@ -397,6 +398,7 @@ export function StoriesAba({
                   {postandoId === s.id && <CaixaPostando redes="no Instagram (Story)" />}
                 </div>
                 <p className="mt-2 line-clamp-2 text-xs text-white">{s.titulo}</p>
+                {postado && <SeloEngajamento p={s} ehStory />}
 
                 <div className="mt-2 flex flex-wrap gap-1">
                   <button onClick={() => handleAprovar(s)} disabled={ocupado} title="Revisão interna" className={`rounded px-1.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${s.aprovado ? "bg-green-600 text-white" : "border border-linha text-muted hover:text-white"}`}>{s.aprovado ? "✓" : "Aprovar"}</button>

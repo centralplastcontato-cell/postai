@@ -89,6 +89,10 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       postadoEm: c.postadoEm?.toISOString() ?? null,
       imagensSlides,
       tiposSlides,
+      curtidas: c.curtidas,
+      comentarios: c.comentarios,
+      alcance: c.alcance,
+      salvamentos: c.salvamentos,
     };
   });
 
@@ -109,6 +113,10 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     extra: p.extra ?? null, // JSON dos campos do template — pra pré-preencher a edição
     categoria: (() => { try { return JSON.parse(p.extra || "{}").categoria ?? null; } catch { return null; } })(),
     espelhar: p.espelhar ?? null,
+    curtidas: p.curtidas,
+    comentarios: p.comentarios,
+    alcance: p.alcance,
+    salvamentos: p.salvamentos,
   });
   // Feed (4:5) vai pra aba Publicações; Story (9:16) vai pra aba Story.
   const publicacoes: PublicacaoView[] = pubs.filter((p) => p.formato !== "story").map(mapPub);

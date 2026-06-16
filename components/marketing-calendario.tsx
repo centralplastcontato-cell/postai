@@ -25,6 +25,7 @@ import { CaixaPostando } from "./caixa-postando";
 import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
 import { CORES_EXTRAS } from "@/lib/cores-fundo";
+import { SeloEngajamento } from "./selo-engajamento";
 
 // Temas prontos de carrossel (clique preenche o campo Tema). Ângulos que funcionam
 // pro público de um buffet infantil — o dono ajusta ou pede "Sugerir temas com IA".
@@ -66,6 +67,11 @@ export type Post = {
   postadoEm?: string | null; // ISO do momento real da publicação (null = não postado)
   imagensSlides?: (string | null)[];
   tiposSlides?: (string | undefined)[]; // tipo de cada slide (capa/conteudo/mosaico/capa-*)
+  // Engajamento no Instagram (coletado pelo piloto após postar)
+  curtidas?: number | null;
+  comentarios?: number | null;
+  alcance?: number | null;
+  salvamentos?: number | null;
 };
 
 // Formata o horário de publicação: "13/jun às 14:05" (fuso de São Paulo).
@@ -569,6 +575,7 @@ export function MarketingCalendario({
                 </div>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-wider text-muted">🖼️ Carrossel · {p.slides.length} slides</p>
                 <p className="line-clamp-2 text-sm text-white">{p.titulo}</p>
+                {postado && <SeloEngajamento p={p} />}
 
                 <div className="mt-2">
                   <button type="button" onClick={() => setLegendaCardId((c) => (c === p.id ? null : p.id))} className="flex items-center gap-1 text-[11px] uppercase tracking-wider text-muted transition hover:text-white"><span>{legendaCardId === p.id ? "▾" : "▸"}</span> Legenda + hashtags</button>

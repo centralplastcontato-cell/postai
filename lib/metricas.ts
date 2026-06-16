@@ -69,3 +69,73 @@ export async function alertarTokenSeVencendo(marca: { id: string; nome: string; 
     /* best-effort */
   }
 }
+
+// === Insights por post (engajamento — Camada 2) ======================================
+
+type Insights = { curtidas?: number; comentarios?: number; alcance?: number; salvamentos?: number };
+
+// Busca o engajamento de UM post no Instagram. Curtidas/comentários vêm dos campos da
+// mídia (permissão básica); alcance/salvamentos exigem instagram_manage_insights. Story
+// só tem alcance (= visualizações) e some em 24h. Devolve só o que a Meta retornou.
+async function buscarInsights(token: string, mediaId: string, ehStory: boolean): Promise<Insights | null> {
+  const out: Insights = {};
+  try {
+    if (!ehStory) {
+      const m = await fetch(`${GRAPH}/${mediaId}?fields=like_count,comments_count&access_token=${token}`, { cache: "no-store" });
+      const mj = (await m.json()) as { like_count?: number; comments_count?: number };
+      if (typeof mj.like_count === "number") out.curtidas = mj.like_count;
+      if (typeof mj.comments_count === "number") out.comentarios = mj.comments_count;
+    }
+    const metric = ehStory ? "reach" : "reach,saved";
+    const i = await fetch(`${GRAPH}/${mediaId}/insights?metric=${metric}&access_token=${token}`, { cache: "no-store" });
+    const ij = (await i.json()) as { data?: { name?: string; values?: { value?: number }[] }[] };
+    for (const d of ij.data || []) {
+      const v = d.values?.[0]?.value;
+      if (typeof v !== "number") continue;
+      if (d.name === "reach") out.alcance = v;
+      if (d.name === "saved") out.salvamentos = v;
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+// Coleta o engajamento dos posts recentes da marca (chamado pelo cron, de hora em hora).
+// - Feed/Carrossel: posts dos últimos 14 dias, re-medindo os que não foram medidos há >3h.
+// - Story: só dentro de 24h (some depois) — fora disso, mantém o último número congelado.
+// Best-effort: qualquer erro é engolido (nunca derruba o piloto).
+export async function coletarInsightsDaMarca(marca: { id: string; igUserId: string | null; accessToken: string | null }): Promise<void> {
+  if (!marca.igUserId || !marca.accessToken) return;
+  const token = marca.accessToken;
+  const agora = Date.now();
+  const desde14 = new Date(agora - 14 * 86_400_000);
+  const stale = new Date(agora - 3 * 3_600_000); // re-mede se foi medido há mais de 3h
+
+  try {
+    const conteudos = await prisma.conteudo.findMany({
+      where: { marcaId: marca.id, status: "postado", mediaId: { not: null }, postadoEm: { gte: desde14 }, OR: [{ insightsEm: null }, { insightsEm: { lt: stale } }] },
+      select: { id: true, mediaId: true },
+      take: 20,
+    });
+    for (const c of conteudos) {
+      const ins = await buscarInsights(token, c.mediaId!, false);
+      if (ins) await prisma.conteudo.update({ where: { id: c.id }, data: { ...ins, insightsEm: new Date() } }).catch(() => {});
+    }
+
+    const pubs = await prisma.publicacao.findMany({
+      where: { marcaId: marca.id, status: "postado", mediaId: { not: null }, postadoEm: { gte: desde14 }, OR: [{ insightsEm: null }, { insightsEm: { lt: stale } }] },
+      select: { id: true, mediaId: true, formato: true, postadoEm: true },
+      take: 20,
+    });
+    for (const p of pubs) {
+      const ehStory = p.formato === "story";
+      // Story some em 24h — depois disso a API não devolve mais; não tenta (mantém o último).
+      if (ehStory && p.postadoEm && agora - p.postadoEm.getTime() > 24 * 3_600_000) continue;
+      const ins = await buscarInsights(token, p.mediaId!, ehStory);
+      if (ins) await prisma.publicacao.update({ where: { id: p.id }, data: { ...ins, insightsEm: new Date() } }).catch(() => {});
+    }
+  } catch {
+    /* best-effort */
+  }
+}
