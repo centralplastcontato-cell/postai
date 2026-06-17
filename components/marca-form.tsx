@@ -202,8 +202,20 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
         return;
       }
       set("logoUrl", data.url);
-      setAviso("✓ Logo enviado (fundo removido)! Agora clique em “Ler cores com IA”.");
-      setTimeout(() => setAviso(null), 5000);
+      // Já lê as cores do logo AUTOMATICAMENTE (sem o usuário precisar clicar em "Ler cores").
+      setLendoCores(true);
+      const cores = await extrairCoresLogo(data.url);
+      if (cores.ok) {
+        set("corPrimaria", cores.corPrimaria);
+        set("corFundo", cores.corFundo);
+        set("paleta", JSON.stringify(cores.paleta));
+        const n = cores.paleta.length;
+        setAviso(`✓ Logo enviado e 🎨 ${n} ${n === 1 ? "cor lida" : "cores lidas"} do logo! Confira e clique em Salvar.`);
+      } else {
+        setAviso("✓ Logo enviado! Não consegui ler as cores agora — ajuste na mão ou tente “Ler cores com IA”.");
+      }
+      setLendoCores(false);
+      setTimeout(() => setAviso(null), 7000);
     } catch {
       setErro("Não consegui subir o logo. (O Blob Store já está configurado?)");
     } finally {

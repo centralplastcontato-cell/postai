@@ -8,6 +8,7 @@ import { type PublicacaoView } from "@/components/publicacoes-aba";
 import { type MarcaView } from "@/components/marca-form";
 import { type ImagemView } from "@/components/banco-imagens";
 import { AtividadesRecentes } from "@/components/atividades-recentes";
+import { OnboardingMarca } from "@/components/onboarding-marca";
 import { analisarEngajamento, sugerirProximoPost } from "@/lib/inteligencia";
 
 export const dynamic = "force-dynamic";
@@ -167,6 +168,13 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     ativa: marca.ativa,
     espelharStory: marca.espelharStory,
   };
+
+  // Cliente (não-admin) cujo buffet ainda está VAZIO (zero conteúdo) → cai no ONBOARDING:
+  // sobe logo (cores automáticas) + fotos e o Postaí gera a semana inteira. Assim que existe
+  // conteúdo, mostra o painel/calendário normal. O admin nunca cai aqui (ele monta concierge).
+  if (!sessao.admin && conteudos.length === 0 && pubs.length === 0) {
+    return <OnboardingMarca marcaId={marca.id} nome={marca.nome} logoUrl={marca.logoUrl} nFotos={imgs.length} />;
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-8">
