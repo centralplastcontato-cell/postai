@@ -750,8 +750,9 @@ export function LayoutCapaFaixa(d: DadosArte & { imagemUrl?: string; arraste?: b
 // 5 estrelas, "FEEDBACK" colorido, frase de destaque + depoimento REAL do cliente +
 // autor + logo. O texto do depoimento NUNCA é inventado pela IA — vem do cliente.
 export function LayoutFeedback(
-  d: DadosArte & { imagemUrl?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; fotoAutor?: string; google?: boolean }
+  d: DadosArte & { imagemUrl?: string; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; fotoAutor?: string; google?: boolean; altura?: number }
 ) {
+  const H = d.altura ?? 1350; // 1350 = feed (4:5); 1920 = story (9:16) — mesma largura (1080), card idêntico
   const paleta = d.paleta;
   const fundo = d.corFundo || escolherFundoFesta(paleta);
   const n = Math.max(1, Math.min(5, d.estrelas ?? 5));
@@ -770,16 +771,16 @@ export function LayoutFeedback(
     `<svg xmlns="http://www.w3.org/2000/svg" width="58" height="58" viewBox="0 0 24 24"><path d="M12 2l2.9 6.26 6.86.55-5.2 4.5 1.6 6.7L12 16.9 5.84 20.5l1.6-6.7-5.2-4.5 6.86-.55z" fill="${cor}"/></svg>`;
   const letras = "FEEDBACK".split("");
   return (
-    <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative", backgroundColor: fundo, fontFamily: "Baloo" }}>
+    <div style={{ width: "1080px", height: `${H}px`, display: "flex", position: "relative", backgroundColor: fundo, fontFamily: "Baloo" }}>
       {/* Foto do espaço de fundo (opcional) + overlay escuro pra dar contraste ao card */}
       {d.imagemUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={d.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
+        <img src={d.imagemUrl} width={1080} height={H} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: `${H}px`, objectFit: "cover" }} />
       ) : null}
-      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", backgroundColor: "rgba(0,0,0,0.5)" }} />
+      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: `${H}px`, display: "flex", backgroundColor: "rgba(0,0,0,0.5)" }} />
 
       {/* Área central que centraliza o card (deixa espaço pro logo no rodapé) */}
-      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", alignItems: "center", justifyContent: "center", padding: "70px 64px 180px" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: `${H}px`, display: "flex", alignItems: "center", justifyContent: "center", padding: "70px 64px 180px" }}>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: 936, backgroundColor: card, borderRadius: 46, padding: "64px 64px 58px", boxShadow: "0 30px 80px rgba(0,0,0,0.45)" }}>
           {/* Foto do cliente (opcional) num círculo emoldurado */}
           {d.fotoAutor ? (

@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
 import { fotoSegura } from "@/lib/foto-arte";
-import { LayoutStory, type DadosArte } from "@/lib/arte-layouts";
+import { LayoutStory, LayoutFeedback, type DadosArte } from "@/lib/arte-layouts";
 import { registrarAtividade } from "@/lib/atividade";
 import { AGENTE } from "@/lib/config";
 
@@ -37,7 +37,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; corFundo?: string; estiloStory?: string } = {};
+  let extra: {
+    oferta?: string; validade?: string; corFundo?: string; estiloStory?: string;
+    depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; fotoAutor?: string; google?: boolean;
+  } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -54,6 +57,36 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const imagemUrl = await fotoSegura(p.imagemUrl);
   const opts = { width: 1080, height: 1920, fonts, headers: CACHE };
   const dados = { ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, variante: extra.estiloStory };
+
+  // FEEDBACK/DEPOIMENTO: o Story usa o MESMO card roxo do feed (LayoutFeedback), só em 9:16
+  // (mesma largura 1080, altura 1920). Sem isso, o espelhamento saía só com a foto de fundo.
+  if (p.template === "feedback") {
+    const fotoAutor = await fotoSegura(extra.fotoAutor);
+    const fb = {
+      ...base,
+      corFundo: extra.corFundo,
+      depoimento: extra.depoimento,
+      autor: extra.autor,
+      estrelas: extra.estrelas,
+      destaque: extra.destaque,
+      corCard: extra.corCard,
+      google: extra.google,
+      altura: 1920,
+    };
+    try {
+      const buf = await new ImageResponse(LayoutFeedback({ ...fb, imagemUrl, fotoAutor }), opts).arrayBuffer();
+      return new Response(buf, { headers: { ...CACHE, "content-type": "image/png" } });
+    } catch (e) {
+      console.error("STORY feedback render COM foto falhou:", e);
+      registrarAtividade(AGENTE, `A arte do Story (depoimento) "${p.titulo}" não renderizou com a foto (${msg(e)}) — caiu no card sobre fundo colorido.`, p.marcaId).catch(() => {});
+      try {
+        const buf = await new ImageResponse(LayoutFeedback({ ...fb, imagemUrl: undefined, fotoAutor: undefined }), opts).arrayBuffer();
+        return new Response(buf, { headers: { ...CACHE, "content-type": "image/png" } });
+      } catch {
+        return new ImageResponse(LayoutFeedback({ ...fb, imagemUrl: undefined, fotoAutor: undefined }), opts);
+      }
+    }
+  }
 
   // Render À PROVA DE FALHA: tenta COM a foto; se o Satori quebrar por causa dela (era o
   // "Arte indisponível 500"), registra o MOTIVO REAL nas Atividades e cai pra versão SEM
