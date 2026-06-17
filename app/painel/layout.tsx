@@ -70,8 +70,8 @@ export default async function PainelLayout({
         <div className="border-b border-[#7c3aed]/40 bg-[#7c3aed]/10">
           <div className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-4 py-2.5 text-center sm:flex-row sm:text-left">
             <p className="flex-1 text-sm text-white">
-              🎁 <strong>Você está no teste grátis</strong> — crie e veja as artes à vontade.{" "}
-              <span className="text-white/70">Pra postar de verdade no seu Instagram, ative seu plano.</span>
+              🎁 <strong>Você está no teste grátis</strong> — veja a sua semana e ajuste o que quiser.{" "}
+              <span className="text-white/70">Pra o Postaí postar de verdade no seu Instagram, ative seu plano.</span>
               {diasTeste > 0 && <span className="text-white/60"> · faltam {diasTeste} {diasTeste === 1 ? "dia" : "dias"}</span>}
             </p>
             <Link href="/assinar" className="shrink-0 rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover">

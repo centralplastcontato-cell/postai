@@ -88,7 +88,7 @@ export function MarcaHub({
       )}
       {!conectada && !ehAdmin && (
         <p className="mt-3 rounded-md border border-[#7c3aed]/40 bg-[#7c3aed]/10 p-3 text-sm text-[#c7b2ff]">
-          🎁 Crie e veja as artes do seu buffet à vontade. Pra o Postaí <strong>postar de verdade</strong> no seu Instagram, <Link href="/assinar" className="font-semibold underline underline-offset-2">ative seu plano</Link> — a gente conecta sua conta pra você.
+          🎁 Veja a sua semana e ajuste as artes. Pra o Postaí <strong>postar de verdade</strong> no seu Instagram, <Link href="/assinar" className="font-semibold underline underline-offset-2">ative seu plano</Link> — a gente conecta sua conta pra você.
         </p>
       )}
 
