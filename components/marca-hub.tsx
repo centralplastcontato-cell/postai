@@ -81,9 +81,14 @@ export function MarcaHub({
         </span>
       </div>
 
-      {!conectada && (
+      {!conectada && ehAdmin && (
         <p className="mt-3 rounded-md border border-amber-800/60 bg-amber-950/30 p-3 text-sm text-amber-200">
           Pra postar de verdade, vá em <strong>Configurações</strong> e conecte o Instagram desta marca (IG User ID + token).
+        </p>
+      )}
+      {!conectada && !ehAdmin && (
+        <p className="mt-3 rounded-md border border-[#7c3aed]/40 bg-[#7c3aed]/10 p-3 text-sm text-[#c7b2ff]">
+          🎁 Crie e veja as artes do seu buffet à vontade. Pra o Postaí <strong>postar de verdade</strong> no seu Instagram, <Link href="/assinar" className="font-semibold underline underline-offset-2">ative seu plano</Link> — a gente conecta sua conta pra você.
         </p>
       )}
 
@@ -95,7 +100,7 @@ export function MarcaHub({
               <span className="rounded-full border border-vermelho/40 bg-vermelho/15 px-2.5 py-0.5 text-xs font-semibold text-white">{assinatura.plano ? rotuloPlano(assinatura.plano) : "sem pacote"}</span>
             </div>
             <p className={`mt-2 text-sm font-semibold ${stAssin.cls}`}>{stAssin.txt}</p>
-            <p className="mt-1 text-xs text-muted">Pacote e validade você ajusta em 👥 Clientes.</p>
+            {ehAdmin && <p className="mt-1 text-xs text-muted">Pacote e validade você ajusta em 👥 Clientes.</p>}
           </div>
         )}
         <ConexaoCard marcaId={marca.id} temConexao={conectada} />
@@ -130,13 +135,13 @@ export function MarcaHub({
       <div className="mt-5 flex flex-wrap gap-2">
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
         <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
-        {ehAdmin && <button onClick={() => setAba("config")} className={cls(aba === "config")}>⚙️ Configurações</button>}
+        <button onClick={() => setAba("config")} className={cls(aba === "config")}>{ehAdmin ? "⚙️ Configurações" : "✏️ Minha marca"}</button>
       </div>
 
       <div className="mt-6">
         {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} sugestao={sugestao} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
-        {aba === "config" && ehAdmin && <MarcaForm marca={marca} />}
+        {aba === "config" && (ehAdmin ? <MarcaForm marca={marca} /> : <MarcaForm marca={marca} somenteIdentidade />)}
       </div>
     </div>
   );

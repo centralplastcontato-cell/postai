@@ -9,7 +9,7 @@ import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, AGENTE } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
 import { categoriaDoTemplate } from "@/lib/categorias";
-import { planoTemStory, rotuloPlano } from "@/lib/plano";
+import { planoTemStory, rotuloPlano, ehTrial, MSG_TRIAL_POSTAR } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
@@ -664,6 +664,7 @@ export async function gerarPublicacao(input: {
 export async function postarStory(id: string) {
   const g = await guardaPublicacao(id);
   if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (ehTrial(g.sessao)) return { ok: false as const, erro: MSG_TRIAL_POSTAR };
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Story não encontrado." };
   if (!marcaConectada(p.marca)) return { ok: false as const, erro: "Conecte o Instagram da marca primeiro." };
@@ -1099,6 +1100,7 @@ export async function alternarAprovacao(id: string) {
 export async function postarPublicacao(id: string) {
   const g = await guardaPublicacao(id);
   if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (ehTrial(g.sessao)) return { ok: false as const, erro: MSG_TRIAL_POSTAR };
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   if (p.status === "postado") return { ok: false as const, erro: "Essa publicação já foi postada." };

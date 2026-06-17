@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { exigirAdmin } from "@/lib/acesso";
+import { exigirAdmin, guardaMarca } from "@/lib/acesso";
+import { estaLogado } from "@/lib/auth";
 import { listarPaginas } from "@/lib/facebook";
 
 function slugify(s: string): string {
@@ -78,6 +79,38 @@ export async function salvarMarca(input: DadosMarca) {
   return { ok: true as const };
 }
 
+// Edição da IDENTIDADE da marca pelo PRÓPRIO DONO (cliente em teste ou pago) — nome, cores,
+// logo, textos. De propósito NÃO toca na conexão (Instagram/Facebook), na agenda, nem exclui:
+// isso continua só do admin (concierge). A whitelist explícita garante que um cliente nunca
+// mexa no token nem em campo que não é dele, mesmo chamando a action na mão.
+const CAMPOS_IDENTIDADE = ["nome", "corPrimaria", "corFundo", "paleta", "logoTexto", "logoUrl", "site", "telefone", "descricao"] as const;
+export async function salvarIdentidadeMarca(input: {
+  id: string;
+  nome?: string;
+  corPrimaria?: string;
+  corFundo?: string;
+  paleta?: string;
+  logoTexto?: string;
+  logoUrl?: string;
+  site?: string;
+  telefone?: string;
+  descricao?: string;
+}) {
+  const g = await guardaMarca(input.id); // admin OU o dono da marca (anti-IDOR + acesso válido)
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const permitidos: Set<string> = new Set(CAMPOS_IDENTIDADE);
+  const data: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (k === "id" || v === undefined) continue;
+    if (permitidos.has(k)) data[k] = v;
+  }
+  if (!Object.keys(data).length) return { ok: true as const };
+  await prisma.marca.update({ where: { id: input.id }, data });
+  revalidatePath(`/painel/marcas/${input.id}`);
+  revalidatePath("/painel");
+  return { ok: true as const };
+}
+
 export async function excluirMarca(id: string) {
   const g = await exigirAdmin(); // excluir marca é ação destrutiva — só admin
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -89,8 +122,9 @@ export async function excluirMarca(id: string) {
 // Lê o logotipo (visão do GPT-4o) e devolve a paleta de cores vivas da marca,
 // a cor principal (a mais marcante) e uma cor de fundo escura que combine.
 export async function extrairCoresLogo(logoUrl: string) {
-  const g = await exigirAdmin();
-  if (!g.ok) return { ok: false as const, erro: g.erro };
+  // Qualquer usuário logado pode usar: só lê uma URL de imagem com a IA e devolve cores —
+  // não acessa nem altera dado de marca. Assim o dono em teste também consegue ler as cores.
+  if (!(await estaLogado())) return { ok: false as const, erro: "Sem permissão." };
   if (!logoUrl) return { ok: false as const, erro: "Suba o logo primeiro." };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };

@@ -7,7 +7,7 @@ import { guardaMarca, guardaConteudo } from "@/lib/acesso";
 import { publicarNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, AGENTE } from "@/lib/config";
-import { rotuloPlano } from "@/lib/plano";
+import { rotuloPlano, ehTrial, MSG_TRIAL_POSTAR } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
 import { classificarCategoriasIA } from "@/lib/inteligencia";
@@ -438,6 +438,7 @@ export async function sugerirTemas(marcaId: string) {
 export async function postarInstagram(id: string) {
   const g = await guardaConteudo(id);
   if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (ehTrial(g.sessao)) return { ok: false as const, erro: MSG_TRIAL_POSTAR };
   const c = await prisma.conteudo.findUnique({ where: { id }, include: { marca: true } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   if (c.status === "postado") return { ok: false as const, erro: "Esse carrossel já foi postado." };

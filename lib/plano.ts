@@ -83,6 +83,25 @@ export function acessoExpirado(u: { admin: boolean; acessoAte?: Date | string | 
   return t < Date.now();
 }
 
+// ── TESTE GRÁTIS (degustação) ──────────────────────────────────────────────────────────
+// Quem se cadastra sozinho entra num teste grátis: PODE criar marca, subir fotos e gerar/ver
+// as artes à vontade — mas NÃO posta no Instagram de verdade (isso só ativando o plano).
+// Representado SEM coluna nova no banco: trial = cliente com acesso no FUTURO mas SEM plano
+// definido (todo pagamento preenche o `plano`, então "sem plano + acesso válido" = ainda testando).
+export const DIAS_TRIAL = 7;
+
+export function ehTrial(u: { admin: boolean; plano?: string | null; acessoAte?: Date | string | null }): boolean {
+  if (u.admin) return false; // admin nunca é trial
+  if (u.plano) return false; // já tem pacote → é cliente pago (ou definido pelo admin)
+  if (!u.acessoAte) return false; // sem validade = conta aberta (admin criou), não é teste
+  const t = u.acessoAte instanceof Date ? u.acessoAte.getTime() : new Date(u.acessoAte).getTime();
+  return t >= Date.now(); // acesso ainda no futuro = teste rolando
+}
+
+// Mensagem padrão quando o trial tenta POSTAR de verdade (os 3 botões "postar agora").
+export const MSG_TRIAL_POSTAR =
+  "🎁 No teste grátis você cria e vê as artes à vontade. Pra postar de verdade no seu Instagram, ative seu plano — Pix, cartão ou anual com 2 meses grátis.";
+
 // Dias restantes de acesso (negativo = venceu há X dias). null = sem data.
 export function diasDeAcesso(acessoAte?: Date | string | null): number | null {
   if (!acessoAte) return null;

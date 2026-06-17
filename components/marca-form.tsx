@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { salvarMarca, excluirMarca, testarConexao, extrairCoresLogo, buscarPaginasFacebook } from "@/app/actions/marcas";
+import { salvarMarca, salvarIdentidadeMarca, excluirMarca, testarConexao, extrairCoresLogo, buscarPaginasFacebook } from "@/app/actions/marcas";
 import { ConfirmDialog } from "./confirm-dialog";
 import { rotuloHora, HORAS_RECOMENDADAS } from "@/lib/horarios";
 
@@ -43,7 +43,9 @@ function parseDias(s: string): number[] {
   return s.split(",").map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
 }
 
-export function MarcaForm({ marca }: { marca: MarcaView }) {
+// somenteIdentidade = formulário enxuto pro DONO (cliente/teste): só a seção de Identidade
+// (nome, cores, logo, textos). Esconde conexão, agenda e exclusão — isso é só do admin.
+export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaView; somenteIdentidade?: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [f, setF] = useState<MarcaView>(marca);
@@ -83,26 +85,40 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
   function handleSalvar() {
     setErro(null);
     startTransition(async () => {
-      const r = await salvarMarca({
-        id: f.id,
-        nome: f.nome,
-        corPrimaria: f.corPrimaria,
-        corFundo: f.corFundo,
-        paleta: f.paleta,
-        logoTexto: f.logoTexto,
-        logoUrl: f.logoUrl,
-        site: f.site,
-        telefone: f.telefone,
-        igUserId: f.igUserId,
-        accessToken: f.accessToken.trim() || undefined, // só envia se digitaram um novo (não apaga o salvo)
-        diasCarrossel: f.diasCarrossel,
-        diasFeed: f.diasFeed,
-        horaPost: f.horaPost,
-        horaCarrossel: f.horaCarrossel,
-        descricao: f.descricao,
-        ativa: f.ativa,
-        espelharStory: f.espelharStory,
-      });
+      // Dono (cliente/teste): salva SÓ a identidade pela action restrita. Admin: salva tudo.
+      const r = somenteIdentidade
+        ? await salvarIdentidadeMarca({
+            id: f.id,
+            nome: f.nome,
+            corPrimaria: f.corPrimaria,
+            corFundo: f.corFundo,
+            paleta: f.paleta,
+            logoTexto: f.logoTexto,
+            logoUrl: f.logoUrl,
+            site: f.site,
+            telefone: f.telefone,
+            descricao: f.descricao,
+          })
+        : await salvarMarca({
+            id: f.id,
+            nome: f.nome,
+            corPrimaria: f.corPrimaria,
+            corFundo: f.corFundo,
+            paleta: f.paleta,
+            logoTexto: f.logoTexto,
+            logoUrl: f.logoUrl,
+            site: f.site,
+            telefone: f.telefone,
+            igUserId: f.igUserId,
+            accessToken: f.accessToken.trim() || undefined, // só envia se digitaram um novo (não apaga o salvo)
+            diasCarrossel: f.diasCarrossel,
+            diasFeed: f.diasFeed,
+            horaPost: f.horaPost,
+            horaCarrossel: f.horaCarrossel,
+            descricao: f.descricao,
+            ativa: f.ativa,
+            espelharStory: f.espelharStory,
+          });
       if (r?.ok) {
         setSalvo(true);
         router.refresh();
@@ -291,6 +307,8 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
         </label>
       </section>
 
+      {!somenteIdentidade && (
+        <>
       {/* Conexão Instagram */}
       <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
         <h3 className="mb-1 text-sm font-semibold text-white">Conexão com o Instagram</h3>
@@ -378,12 +396,16 @@ export function MarcaForm({ marca }: { marca: MarcaView }) {
           <span className="text-xs text-muted">— cada post do feed também sobe como Story (dá pra ajustar post a post)</span>
         </label>
       </section>
+        </>
+      )}
 
       {erro && <p className="text-sm text-red-400">{erro}</p>}
 
       <div className="flex flex-wrap items-center gap-3">
         <button onClick={handleSalvar} disabled={isPending} className="rounded-lg bg-vermelho px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">{isPending ? "Salvando…" : salvo ? "✓ Salvo!" : "Salvar"}</button>
-        <button onClick={handleExcluir} disabled={isPending} className="rounded-lg border border-red-900 px-4 py-2.5 text-sm text-red-400 transition hover:bg-red-950/40 disabled:opacity-50">Excluir marca</button>
+        {!somenteIdentidade && (
+          <button onClick={handleExcluir} disabled={isPending} className="rounded-lg border border-red-900 px-4 py-2.5 text-sm text-red-400 transition hover:bg-red-950/40 disabled:opacity-50">Excluir marca</button>
+        )}
       </div>
 
       <ConfirmDialog

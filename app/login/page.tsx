@@ -68,10 +68,10 @@ export default function LoginPage() {
         <div className="mt-5 border-t border-linha pt-5 text-center">
           <p className="text-sm text-muted">Ainda não tem conta?</p>
           <Link
-            href="/assinar"
+            href="/comecar"
             className="mt-2 inline-block w-full rounded-lg border border-vermelho/50 px-6 py-3 text-sm font-semibold text-white transition hover:bg-vermelho/10"
           >
-            ✨ Criar conta e assinar
+            🎁 Começar grátis
           </Link>
         </div>
       </form>

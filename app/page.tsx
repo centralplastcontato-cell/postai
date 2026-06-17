@@ -137,7 +137,8 @@ const FAQ: { p: string; r: string }[] = [
   { p: "Funciona no Instagram e no Facebook?", r: "Sim, nas duas redes ao mesmo tempo — um post vira presença do buffet nos dois lugares." },
   { p: "Posso revisar antes de publicar?", r: "Pode. Aprove, edite o texto, troque a foto do salão, ou deixe tudo no automático." },
   { p: "Tenho mais de uma unidade de buffet. Dá pra usar?", r: "Sim. Você gerencia mais de um buffet no mesmo painel, cada um no seu tom." },
-  { p: "Como eu começo?", r: "Clique em Acessar o painel para entrar, ou fale com a gente que colocamos o seu buffet no ar." },
+  { p: "Tem fidelidade? Posso cancelar?", r: "Sem fidelidade e sem multa. Você cancela quando quiser — fica só enquanto fizer sentido pro seu buffet." },
+  { p: "Como eu começo?", r: "Clique em Começar grátis e crie sua conta — você já entra e vê a IA montar as artes do seu buffet. Pra postar de verdade no Instagram, é só ativar um plano (Pix, cartão ou anual). Prefere ajuda? Fale com a gente que colocamos seu buffet no ar." },
 ];
 
 // Exemplos de publicações que rolam no feed do hero (um por template).
@@ -295,15 +296,17 @@ export default async function Home() {
               promoções e depoimentos — e publica sozinho no Instagram e no Facebook, nos dias e horários que você escolher.
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link href="/login" className="rounded-xl bg-vermelho px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
-                Acessar o painel →
+              <Link href="/comecar" className="rounded-xl bg-vermelho px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
+                Começar grátis →
               </Link>
               <a href="#como-funciona" className="rounded-xl border border-linha px-6 py-3.5 text-base font-semibold text-white transition hover:border-vermelho">
                 Ver como funciona
               </a>
             </div>
-            <p className="mt-5 text-sm text-muted">
-              Feito para donos de buffet infantil que querem encher a agenda de festas — sem perder tempo postando.
+            <p className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+              <span>✓ Teste grátis</span>
+              <span>✓ Sem cartão de crédito</span>
+              <span>✓ Cancele quando quiser</span>
             </p>
           </div>
 
@@ -404,9 +407,10 @@ export default async function Home() {
             Escolha os dias e horários — até vários posts no mesmo dia. O {APP_NAME} publica sozinho na hora certa,
             no Instagram e no Facebook. Você cuida das festas; a divulgação do buffet roda no automático.
           </p>
-          <Link href="/login" className="mt-8 inline-block rounded-xl bg-vermelho px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
-            Quero no automático →
+          <Link href="/comecar" className="mt-8 inline-block rounded-xl bg-vermelho px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
+            Começar grátis →
           </Link>
+          <p className="mt-3 text-sm text-muted">Teste grátis · sem cartão · cancele quando quiser</p>
         </div>
       </section>
 
@@ -455,6 +459,13 @@ export default async function Home() {
             </div>
           ))}
         </div>
+        <div className="mt-8 text-center">
+          <p className="text-sm text-muted">🔓 <span className="text-white">Cancele quando quiser, sem fidelidade.</span> Sem multa, sem letra miúda.</p>
+          <p className="mt-3 text-sm text-muted">
+            Quer experimentar antes de assinar?{" "}
+            <Link href="/comecar" className="font-semibold text-vermelho underline-offset-2 hover:underline">Comece com o teste grátis →</Link>
+          </p>
+        </div>
       </section>
 
       {/* ===== FAQ ===== */}
@@ -487,13 +498,14 @@ export default async function Home() {
             Deixe o {APP_NAME} cuidar da divulgação enquanto você cuida do que importa: as festas e as famílias.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/login" className="rounded-xl bg-vermelho px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
-              Acessar o painel →
+            <Link href="/comecar" className="rounded-xl bg-vermelho px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
+              Começar grátis →
             </Link>
             <a href={CONTATO} className="rounded-xl border border-linha px-7 py-3.5 text-base font-semibold text-white transition hover:border-vermelho">
               Falar com a gente
             </a>
           </div>
+          <p className="mt-5 text-sm text-muted">Teste grátis · sem cartão de crédito · cancele quando quiser</p>
         </div>
       </section>
 

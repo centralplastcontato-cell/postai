@@ -3,7 +3,7 @@
 import { sessaoAtual, abrirSessao, hashSenha } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { baseUrl } from "@/lib/config";
-import { ehPlano, ehPeriodo, rotuloPlano, precoDoPedido } from "@/lib/plano";
+import { ehPlano, ehPeriodo, rotuloPlano, precoDoPedido, DIAS_TRIAL } from "@/lib/plano";
 import { criarPagamento } from "@/lib/mercadopago";
 import { liberarAcessoPorPagamento } from "@/lib/pagamentos";
 
@@ -19,10 +19,30 @@ export async function criarConta(input: { email: string; senha: string }) {
   const existe = await prisma.usuario.findUnique({ where: { nome: email } });
   if (existe) return { ok: false as const, erro: "Já existe uma conta com esse e-mail. Faça login pra assinar." };
 
-  // Nasce BLOQUEADA (acessoAte = agora, já vencido): a conta de auto-cadastro só passa a
-  // funcionar depois que o pagamento confirma e estende o acesso. Não afeta os clientes que
-  // o admin cria com "sem validade" (acessoAte null = acesso aberto).
-  const u = await prisma.usuario.create({ data: { nome: email, senhaHash: hashSenha(senha), admin: false, acessoAte: new Date() } });
+  // Nasce em TESTE GRÁTIS: acesso válido por DIAS_TRIAL dias, mas SEM plano definido — então o
+  // sistema trata como degustação (cria e vê as artes, mas não posta no IG; ver ehTrial). Ao
+  // pagar, o plano é preenchido e o acesso estendido. Não afeta clientes que o admin cria com
+  // "sem validade" (acessoAte null = acesso aberto).
+  const fimTeste = new Date();
+  fimTeste.setDate(fimTeste.getDate() + DIAS_TRIAL);
+  const u = await prisma.usuario.create({ data: { nome: email, senhaHash: hashSenha(senha), admin: false, acessoAte: fimTeste } });
+
+  // Já cria a marca do buffet dele (na cara do Postaí) pra o teste ter o que gerar logo de
+  // cara — ele personaliza nome/cor/fotos em "✏️ Minha marca". Sem Instagram conectado, o
+  // piloto nunca posta sozinho por ela (a conexão é concierge, ao ativar o plano). Best-effort:
+  // se falhar, o cadastro segue mesmo assim (ele pede ajuda no suporte).
+  try {
+    await prisma.marca.create({
+      data: {
+        nome: "Meu Buffet Infantil",
+        slug: `buffet-${u.id}`,
+        logoTexto: "MEU BUFFET",
+        descricao: "Buffet infantil. Festas temáticas, brinquedos e diversão pra criançada.",
+        usuarioId: u.id,
+      },
+    });
+  } catch {}
+
   await abrirSessao(u.id);
   return { ok: true as const };
 }
