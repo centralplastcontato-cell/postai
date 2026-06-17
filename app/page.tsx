@@ -269,9 +269,14 @@ export default async function Home() {
             <a href="#recursos" className="transition hover:text-white">Recursos</a>
             <a href="#planos" className="transition hover:text-white">Planos</a>
           </div>
-          <Link href="/login" className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover">
-            Entrar
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/login" className="rounded-lg px-3 py-2 text-sm font-semibold text-muted transition hover:text-white">
+              Entrar
+            </Link>
+            <Link href="/comecar" className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover">
+              🎁 Começar grátis
+            </Link>
+          </div>
         </nav>
       </header>
 
