@@ -53,6 +53,26 @@ async function buscarArtesVitrine(): Promise<string[]> {
   }
 }
 
+// Prova social REAL do buffet vitrine (Castelo da Diversão): prova honesta de que tem buffet
+// de verdade usando o Postaí — sem inventar depoimento. `postados` = o que o piloto já publicou
+// sozinho; `criadas` = total de artes que o Postaí montou. A seção aparece sempre que houver
+// arte criada (o hero já mostra que tem); o número de "postadas" entra quando existir.
+async function buscarProvaSocial(): Promise<{ postados: number; criadas: number } | null> {
+  try {
+    const [feedPost, carrosPost, feedTot, carrosTot] = await Promise.all([
+      prisma.publicacao.count({ where: { marcaId: VITRINE_ID, status: "postado" } }),
+      prisma.conteudo.count({ where: { marcaId: VITRINE_ID, status: "postado" } }),
+      prisma.publicacao.count({ where: { marcaId: VITRINE_ID } }),
+      prisma.conteudo.count({ where: { marcaId: VITRINE_ID } }),
+    ]);
+    const postados = feedPost + carrosPost;
+    const criadas = feedTot + carrosTot;
+    return criadas > 0 ? { postados, criadas } : null;
+  } catch {
+    return null;
+  }
+}
+
 export const metadata: Metadata = {
   title: `${APP_NAME} — o Instagram do seu buffet infantil postando sozinho`,
   description:
@@ -268,7 +288,7 @@ function MiniPost({ v }: { v: string }) {
 }
 
 export default async function Home() {
-  const artesReais = await buscarArtesVitrine();
+  const [artesReais, prova] = await Promise.all([buscarArtesVitrine(), buscarProvaSocial()]);
   return (
     <main className="min-h-screen bg-preto text-white">
       {/* ===== NAV ===== */}
@@ -359,6 +379,37 @@ export default async function Home() {
           </p>
         </div>
       </section>
+
+      {/* ===== PROVA SOCIAL (buffet real usando o Postaí) ===== */}
+      {prova && (
+        <section className="border-b border-linha bg-preto-card/30">
+          <div className="mx-auto max-w-4xl px-5 py-16">
+            <div className="text-center">
+              <p className="text-sm font-semibold uppercase tracking-widest text-vermelho">Prova real</p>
+              <h2 className="display mt-2 text-3xl sm:text-4xl">Já tem buffet postando no automático</h2>
+            </div>
+            <div className="mx-auto mt-8 flex max-w-2xl flex-col items-center gap-5 rounded-2xl border border-linha bg-preto-card p-6 sm:flex-row sm:gap-6 sm:p-7">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#a78bfa] to-[#ec4899] text-lg font-bold text-white">CD</div>
+              <div className="flex-1 text-center sm:text-left">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  <p className="font-bold text-white">Castelo da Diversão</p>
+                  <span className="inline-flex items-center gap-1 rounded-full border border-green-500/30 bg-green-500/15 px-2 py-0.5 text-[11px] font-semibold text-green-400">🟢 no automático</span>
+                </div>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                  Buffet infantil que usa o {APP_NAME} pra aparecer todo dia no Instagram — {prova.postados > 0 ? (
+                    <>já são <strong className="text-white">{prova.postados} {prova.postados === 1 ? "publicação postada sozinha" : "publicações postadas sozinhas"}</strong> no feed.</>
+                  ) : (
+                    <>já são <strong className="text-white">{prova.criadas} {prova.criadas === 1 ? "arte criada" : "artes criadas"} pelo {APP_NAME}</strong>, no piloto automático.</>
+                  )}
+                </p>
+                <a href="https://www.instagram.com/castelodadiversao/" target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-vermelho transition hover:underline">
+                  Ver o @castelodadiversao no Instagram →
+                </a>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ===== COMO FUNCIONA ===== */}
       <section id="como-funciona" className="mx-auto max-w-6xl px-5 py-20">
