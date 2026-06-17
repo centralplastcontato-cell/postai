@@ -448,7 +448,7 @@ export function PlanosCheckout({
         })}
       </div>
 
-      <p className="mt-8 text-center text-xs text-muted">Pagamento seguro pelo Mercado Pago · Pix ou cartão · o cartão não passa pelo Postaí 🔒</p>
+      <p className="mt-8 text-center text-xs text-muted">🔒 Pagamento 100% seguro pelo Mercado Pago · Pix ou cartão · cancele quando quiser</p>
     </div>
   );
 }

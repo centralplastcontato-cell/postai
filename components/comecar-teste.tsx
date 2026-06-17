@@ -10,6 +10,9 @@ import { APP_NAME } from "@/lib/config";
 // pro painel — sem passar pelo pagamento. Quem quiser ativar de verdade clica no banner do painel.
 export function ComecarTeste() {
   const router = useRouter();
+  const [nomeBuffet, setNomeBuffet] = useState("");
+  const [telefone, setTelefone] = useState("");
+  const [endereco, setEndereco] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
@@ -19,9 +22,11 @@ export function ComecarTeste() {
   async function comecar(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
+    if (!nomeBuffet.trim()) { setErro("Como chama o seu buffet?"); return; }
+    if (!telefone.trim()) { setErro("Informe um telefone de contato."); return; }
     setEnviando(true);
     try {
-      const r = await criarConta({ email, senha });
+      const r = await criarConta({ email, senha, nomeBuffet, telefone, endereco });
       if (!r.ok) {
         setErro(r.erro);
         setEnviando(false);
@@ -37,10 +42,10 @@ export function ComecarTeste() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-preto px-5">
       <form onSubmit={comecar} className="w-full max-w-sm rounded-2xl border border-linha bg-preto-card p-8">
-        <Link href="/" className="mb-5 inline-flex items-center gap-1 text-xs font-semibold text-muted transition hover:text-white">
+        <Link href="/" className="mb-4 flex w-fit items-center gap-1 text-xs font-semibold text-muted transition hover:text-white">
           ← Voltar ao site
         </Link>
-        <span className="inline-flex items-center gap-2 rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/10 px-3 py-1 text-xs font-semibold text-[#c7b2ff]">
+        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/10 px-3 py-1 text-xs font-semibold text-[#c7b2ff]">
           🎁 Teste grátis · sem cartão
         </span>
         <h1 className="display mt-4 text-3xl text-white">
@@ -51,14 +56,36 @@ export function ComecarTeste() {
         </p>
 
         <input
+          type="text"
+          value={nomeBuffet}
+          onChange={(e) => setNomeBuffet(e.target.value)}
+          placeholder="Nome do seu buffet"
+          autoFocus
+          className="input-base mt-5"
+        />
+        <input
+          type="tel"
+          value={telefone}
+          onChange={(e) => setTelefone(e.target.value)}
+          placeholder="Telefone / WhatsApp de contato"
+          autoComplete="tel"
+          className="input-base mt-3"
+        />
+        <input
+          type="text"
+          value={endereco}
+          onChange={(e) => setEndereco(e.target.value)}
+          placeholder="Endereço do buffet — cidade, bairro (opcional)"
+          className="input-base mt-3"
+        />
+        <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Seu melhor e-mail"
-          autoFocus
           autoCapitalize="none"
           autoComplete="email"
-          className="input-base mt-5"
+          className="input-base mt-3"
         />
 
         <div className="relative mt-3">

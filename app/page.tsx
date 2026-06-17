@@ -3,8 +3,9 @@ import type { Metadata } from "next";
 import { APP_NAME } from "@/lib/config";
 import { prisma } from "@/lib/prisma";
 
-// Landing cacheada (ISR) — atualiza a cada 30min. Mostra artes REAIS sem pesar a página.
-export const revalidate = 1800;
+// Landing cacheada (ISR) — revalida a cada 60s. Leve (poucas linhas) e mantém o hero com as
+// artes REAIS recentes sem pesar a página nem demorar a refletir o que foi gerado.
+export const revalidate = 60;
 
 // Marca "vitrine" cujas artes reais aparecem no hero (o Castelo da Diversão).
 const VITRINE_ID = "cmq4gdsdb0000ipik9w4cakf3";
@@ -22,20 +23,31 @@ async function buscarArtesVitrine(): Promise<string[]> {
   try {
     const [conteudos, pubs] = await Promise.all([
       prisma.conteudo.findMany({ where: { marcaId: VITRINE_ID }, orderBy: { data: "desc" }, take: 8, select: { slides: true } }),
-      prisma.publicacao.findMany({ where: { marcaId: VITRINE_ID, formato: "feed" }, orderBy: { data: "desc" }, take: 3, select: { id: true, titulo: true, texto: true, imagemUrl: true, extra: true } }),
+      prisma.publicacao.findMany({ where: { marcaId: VITRINE_ID, formato: "feed" }, orderBy: { data: "desc" }, take: 24, select: { id: true, titulo: true, texto: true, imagemUrl: true, extra: true, template: true } }),
     ]);
     const capas: string[] = [];
     for (const c of conteudos) {
       try { const s = JSON.parse(c.slides) as string[]; if (s[0]) capas.push(s[0]); } catch {}
     }
-    const feeds = pubs.map((p) => `/api/feed/${p.id}?v=${hashCurto(`${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`)}`);
-    // intercala capa de carrossel com feed pra dar variedade
-    const artes: string[] = [];
-    for (let i = 0; i < Math.max(capas.length, feeds.length); i++) {
-      if (capas[i]) artes.push(capas[i]);
-      if (feeds[i]) artes.push(feeds[i]);
+    // Feeds com VARIEDADE de template: pega o mais recente de CADA template primeiro (assim os
+    // modelos novos — enquete, vitrine, feedback, divulgação… — aparecem), depois completa com o resto.
+    const vistosTpl = new Set<string>();
+    const diversos: typeof pubs = [];
+    const resto: typeof pubs = [];
+    for (const p of pubs) {
+      if (vistosTpl.has(p.template)) resto.push(p);
+      else { vistosTpl.add(p.template); diversos.push(p); }
     }
-    return artes.slice(0, 10);
+    const feeds = [...diversos, ...resto].map((p) => `/api/feed/${p.id}?v=${hashCurto(`${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`)}`);
+    // Intercala capa de carrossel com feed pra dar variedade, SEM repetir nenhuma arte.
+    const artes: string[] = [];
+    const vistos = new Set<string>();
+    for (let i = 0; i < Math.max(capas.length, feeds.length); i++) {
+      for (const u of [capas[i], feeds[i]]) {
+        if (u && !vistos.has(u)) { vistos.add(u); artes.push(u); }
+      }
+    }
+    return artes.slice(0, 12);
   } catch {
     return [];
   }
@@ -84,7 +96,9 @@ const TEMPLATES: { emoji: string; nome: string }[] = [
   { emoji: "🎈", nome: "Data comemorativa" },
   { emoji: "🏆", nome: "Por que nos escolher" },
   { emoji: "💡", nome: "Dica pros pais" },
+  { emoji: "⚔️", nome: "Enquete / VS" },
   { emoji: "🖼️", nome: "Tour pelo espaço" },
+  { emoji: "🍱", nome: "Vitrine de fotos" },
   { emoji: "🪟", nome: "Capas especiais" },
 ];
 

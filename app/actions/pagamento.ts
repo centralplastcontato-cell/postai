@@ -10,7 +10,7 @@ import { liberarAcessoPorPagamento } from "@/lib/pagamentos";
 // Cadastro self-service (na landing/checkout): cria a conta do cliente e já abre a sessão,
 // pra o pagamento em seguida cair na conta certa. O e-mail é o login (campo `nome`). A
 // conexão do Instagram continua sendo feita depois (concierge) — aqui só nasce o acesso.
-export async function criarConta(input: { email: string; senha: string }) {
+export async function criarConta(input: { email: string; senha: string; nomeBuffet?: string; telefone?: string; endereco?: string }) {
   const email = (input.email || "").trim().toLowerCase();
   const senha = input.senha || "";
   if (!email || !email.includes("@") || email.length < 5) return { ok: false as const, erro: "Informe um e-mail válido." };
@@ -27,17 +27,24 @@ export async function criarConta(input: { email: string; senha: string }) {
   fimTeste.setDate(fimTeste.getDate() + DIAS_TRIAL);
   const u = await prisma.usuario.create({ data: { nome: email, senhaHash: hashSenha(senha), admin: false, acessoAte: fimTeste } });
 
-  // Já cria a marca do buffet dele (na cara do Postaí) pra o teste ter o que gerar logo de
-  // cara — ele personaliza nome/cor/fotos em "✏️ Minha marca". Sem Instagram conectado, o
-  // piloto nunca posta sozinho por ela (a conexão é concierge, ao ativar o plano). Best-effort:
-  // se falhar, o cadastro segue mesmo assim (ele pede ajuda no suporte).
+  // Já cria a marca do buffet dele JÁ PERSONALIZADA com o que ele informou no cadastro (nome,
+  // telefone, endereço) — assim a primeira arte já sai com a cara do buffet dele, e o admin
+  // ganha o CONTATO do lead pra dar sequência (concierge). Sem Instagram conectado, o piloto
+  // nunca posta sozinho por ela. Best-effort: se falhar, o cadastro segue mesmo assim.
+  const nomeBuffet = (input.nomeBuffet || "").trim().slice(0, 60);
+  const telefone = (input.telefone || "").trim().slice(0, 40);
+  const endereco = (input.endereco || "").trim().slice(0, 120);
+  const nomeMarca = nomeBuffet || "Meu Buffet Infantil";
+  const sobre = ["Buffet infantil. Festas temáticas, brinquedos e diversão pra criançada."];
+  if (endereco) sobre.push(`Endereço: ${endereco}.`);
   try {
     await prisma.marca.create({
       data: {
-        nome: "Meu Buffet Infantil",
+        nome: nomeMarca,
         slug: `buffet-${u.id}`,
-        logoTexto: "MEU BUFFET",
-        descricao: "Buffet infantil. Festas temáticas, brinquedos e diversão pra criançada.",
+        logoTexto: nomeMarca.toUpperCase().slice(0, 40),
+        telefone,
+        descricao: sobre.join(" "),
         usuarioId: u.id,
       },
     });
