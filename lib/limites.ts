@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { limiteFeedDia } from "@/lib/plano";
+import { limiteFeedDia, ehTrial, TRIAL_MAX_ARTES, TRIAL_ARTES_POR_DIA } from "@/lib/plano";
+import type { Sessao } from "@/lib/auth";
 
 // Liga o PACOTE do cliente ao que ele pode GERAR. O limite é sempre do DONO da marca
 // (modelo concierge: o admin gera pelos clientes, mas o teto é o do pacote do cliente).
@@ -31,4 +32,30 @@ export async function checarLimiteFeed(marcaId: string, data: Date, plano: strin
   ]);
   const jaTem = carr + feed;
   return { bloqueia: jaTem >= limite, limite, jaTem };
+}
+
+// Limite do TESTE GRÁTIS (degustação): o cliente cria no máximo TRIAL_ARTES_POR_DIA por dia e
+// TRIAL_MAX_ARTES no total. Conta carrosséis + publicações de TODAS as marcas do dono. Admin e
+// cliente pago NÃO são trial → liberado. Checado ANTES da IA pra não gastar geração à toa.
+export async function checarLimiteTrial(sessao: Sessao): Promise<{ ok: true } | { ok: false; erro: string }> {
+  if (!ehTrial(sessao)) return { ok: true };
+  const marcas = await prisma.marca.findMany({ where: { usuarioId: sessao.id }, select: { id: true } }).catch(() => []);
+  const ids = marcas.map((m) => m.id);
+  if (!ids.length) return { ok: true };
+  const { ini, fim } = diaSP(new Date());
+  const [totC, totP, hojeC, hojeP] = await Promise.all([
+    prisma.conteudo.count({ where: { marcaId: { in: ids } } }),
+    prisma.publicacao.count({ where: { marcaId: { in: ids } } }),
+    prisma.conteudo.count({ where: { marcaId: { in: ids }, createdAt: { gte: ini, lt: fim } } }),
+    prisma.publicacao.count({ where: { marcaId: { in: ids }, createdAt: { gte: ini, lt: fim } } }),
+  ]);
+  const total = totC + totP;
+  const hoje = hojeC + hojeP;
+  if (total >= TRIAL_MAX_ARTES) {
+    return { ok: false, erro: `🎁 Você já criou as ${TRIAL_MAX_ARTES} artes do teste grátis! Curtiu? Ative seu plano pra criar à vontade e postar de verdade no seu Instagram.` };
+  }
+  if (hoje >= TRIAL_ARTES_POR_DIA) {
+    return { ok: false, erro: `🎁 No teste grátis dá pra criar ${TRIAL_ARTES_POR_DIA === 1 ? "1 arte por dia" : `${TRIAL_ARTES_POR_DIA} artes por dia`} — você já criou a de hoje. Volte amanhã pra criar mais, ou ative seu plano pra liberar tudo agora.` };
+  }
+  return { ok: true };
 }
