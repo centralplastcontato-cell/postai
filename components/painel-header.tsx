@@ -8,16 +8,16 @@ import { APP_NAME } from "@/lib/config";
 // largura à toa com um único item). Libera a área útil inteira pro conteúdo.
 export function PainelHeader({ nome, admin, chamados = 0 }: { nome: string; admin?: boolean; chamados?: number }) {
   return (
-    <header className="flex items-center justify-between gap-3 border-b border-linha bg-preto-card px-4 py-2.5">
-      <div className="flex items-center gap-2 sm:gap-4">
-        <Link href="/painel" className="display text-xl text-white">
+    <header className="flex items-center justify-between gap-2 border-b border-linha bg-preto-card px-3 py-2.5 sm:px-4">
+      <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto sm:gap-4">
+        <Link href="/painel" className="display shrink-0 text-xl text-white">
           {APP_NAME}
           <span className="text-vermelho">.</span>
         </Link>
         <Link
           href="/painel"
           title="Marcas"
-          className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
         >
           <span>🏷️</span>
           <span>Marcas</span>
@@ -25,7 +25,7 @@ export function PainelHeader({ nome, admin, chamados = 0 }: { nome: string; admi
         <Link
           href="/painel/chamados"
           title={admin ? "Chamados de suporte" : "Suporte"}
-          className="relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
+          className="relative flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
         >
           <span>🎫</span>
           <span className="hidden sm:inline">{admin ? "Chamados" : "Suporte"}</span>
@@ -37,7 +37,7 @@ export function PainelHeader({ nome, admin, chamados = 0 }: { nome: string; admi
           <Link
             href="/assinar"
             title="Planos e assinatura"
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
+            className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
           >
             <span>💳</span>
             <span className="hidden sm:inline">Planos</span>
@@ -47,17 +47,17 @@ export function PainelHeader({ nome, admin, chamados = 0 }: { nome: string; admi
           <Link
             href="/painel/usuarios"
             title="Clientes"
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
+            className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
           >
             <span>👥</span>
-            <span>Clientes</span>
+            <span className="hidden sm:inline">Clientes</span>
           </Link>
         )}
         {admin && (
           <Link
             href="/painel/guia"
             title="Guia: colocar um cliente no ar"
-            className="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
+            className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-preto hover:text-white"
           >
             <span>📋</span>
             <span className="hidden sm:inline">Guia</span>
@@ -65,7 +65,7 @@ export function PainelHeader({ nome, admin, chamados = 0 }: { nome: string; admi
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-3">
         <span className="hidden text-xs text-muted sm:block">{nome}</span>
         <form action={sair}>
           <button className="rounded-md border border-linha px-3 py-1.5 text-sm text-muted transition hover:border-vermelho hover:text-white">
