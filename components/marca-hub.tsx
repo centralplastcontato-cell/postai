@@ -77,7 +77,7 @@ export function MarcaHub({
         )}
         <h1 className="display text-3xl text-white">{marca.nome}</h1>
         <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${conectada ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>
-          {conectada ? "✓ Instagram conectado" : "⚠ Falta conectar"}
+          {conectada ? "✓ Instagram conectado" : ehAdmin ? "Conectar Instagram" : "🔒 Ative pra postar"}
         </span>
       </div>
 

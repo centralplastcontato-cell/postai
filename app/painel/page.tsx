@@ -139,7 +139,7 @@ export default async function PainelHome() {
                         : "border-amber-500/30 bg-amber-500/15 text-amber-400"
                     }`}
                   >
-                    {conectada ? "✓ Instagram conectado" : "⚠ Falta conectar"}
+                    {conectada ? "✓ Instagram conectado" : s.admin ? "Conectar Instagram" : "🔒 Ative pra postar"}
                   </span>
                   {/* Dono da marca (só o admin vê) — pra saber de quem é cada uma de relance */}
                   {s.admin && (
