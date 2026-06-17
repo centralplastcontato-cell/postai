@@ -173,7 +173,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   // sobe logo (cores automáticas) + fotos e o Postaí gera a semana inteira. Assim que existe
   // conteúdo, mostra o painel/calendário normal. O admin nunca cai aqui (ele monta concierge).
   if (!sessao.admin && conteudos.length === 0 && pubs.length === 0) {
-    return <OnboardingMarca marcaId={marca.id} nome={marca.nome} logoUrl={marca.logoUrl} nFotos={imgs.length} />;
+    return <OnboardingMarca marcaId={marca.id} nome={marca.nome} logoUrl={marca.logoUrl} fotosIniciais={imagens.map((i) => ({ id: i.id, url: i.url }))} />;
   }
 
   return (

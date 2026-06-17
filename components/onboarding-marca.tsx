@@ -3,11 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { extrairCoresLogo, salvarIdentidadeMarca } from "@/app/actions/marcas";
-import { adicionarImagemMarca } from "@/app/actions/imagens";
+import { adicionarImagemMarca, removerImagemMarca } from "@/app/actions/imagens";
 import { gerarItemSemana } from "@/app/actions/onboarding";
 
 const TOTAL = 14; // 3 carrossel + 4 feed + 7 story (igual ao PLANO_SEMANA no servidor)
+const MIN_FOTOS = 5; // obrigatório pra gerar a semana
 const MAX_FOTOS = 10;
+
+type Foto = { id: string | null; url: string };
 
 // Mensagens que giram na tela de processamento (só pra ficar gostoso de ver).
 const FRASES = [
@@ -24,25 +27,25 @@ export function OnboardingMarca({
   marcaId,
   nome,
   logoUrl: logoInicial,
-  nFotos: nFotosInicial,
+  fotosIniciais,
 }: {
   marcaId: string;
   nome: string;
   logoUrl: string;
-  nFotos: number;
+  fotosIniciais: { id: string; url: string }[];
 }) {
   const router = useRouter();
   const [etapa, setEtapa] = useState<"logo" | "fotos" | "processando">("logo");
   const [logoUrl, setLogoUrl] = useState(logoInicial);
   const [subindoLogo, setSubindoLogo] = useState(false);
   const [coresOk, setCoresOk] = useState(false);
-  const [fotos, setFotos] = useState<string[]>([]);
+  const [fotos, setFotos] = useState<Foto[]>(fotosIniciais);
   const [subindoFoto, setSubindoFoto] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [feito, setFeito] = useState(0);
   const [fraseIdx, setFraseIdx] = useState(0);
 
-  const nFotos = nFotosInicial + fotos.length;
+  const nFotos = fotos.length;
 
   async function handleLogo(file?: File) {
     if (!file) return;
@@ -78,22 +81,41 @@ export function OnboardingMarca({
     if (!lista || !lista.length) return;
     setErro(null);
     setSubindoFoto(true);
-    try {
-      const arr = Array.from(lista).slice(0, MAX_FOTOS - nFotos);
-      for (const file of arr) {
+    const arr = Array.from(lista).slice(0, MAX_FOTOS - fotos.length);
+    let falhas = 0;
+    for (const file of arr) {
+      try {
         const form = new FormData();
         form.append("file", file);
         const resp = await fetch("/api/marketing/upload", { method: "POST", body: form });
         const data = await resp.json();
         if (data.ok && data.url) {
-          await adicionarImagemMarca({ marcaId, url: data.url });
-          setFotos((f) => [...f, data.url]);
+          const url = data.url as string;
+          // Mostra a miniatura NA HORA (otimista); o id chega quando salva no banco.
+          setFotos((f) => [...f, { id: null, url }]);
+          // Salva no banco — a IA "olha" a foto e descreve (igual à produção). Esperamos
+          // terminar pra a semana já casar foto×texto certinho na geração.
+          const add = await adicionarImagemMarca({ marcaId, url });
+          if (add.ok) setFotos((f) => f.map((x) => (x.url === url && !x.id ? { ...x, id: add.id } : x)));
+        } else {
+          falhas++;
         }
+      } catch {
+        falhas++;
       }
-    } catch {
-      setErro("Falha ao subir alguma foto. Tente de novo.");
-    } finally {
-      setSubindoFoto(false);
+    }
+    if (falhas) setErro(`${falhas} foto${falhas > 1 ? "s não subiram" : " não subiu"} (formato não suportado? tente JPG ou PNG).`);
+    setSubindoFoto(false);
+  }
+
+  async function excluirFoto(alvo: Foto) {
+    setFotos((f) => f.filter((x) => x.url !== alvo.url));
+    if (alvo.id) {
+      try {
+        await removerImagemMarca(alvo.id);
+      } catch {
+        /* se falhar, a foto some da tela mesmo assim — best-effort */
+      }
     }
   }
 
@@ -116,6 +138,7 @@ export function OnboardingMarca({
   }
 
   const pct = Math.round((feito / TOTAL) * 100);
+  const faltamFotos = Math.max(0, MIN_FOTOS - nFotos);
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-xl flex-col justify-center px-5 py-10">
@@ -148,7 +171,7 @@ export function OnboardingMarca({
             <span>3. Semana pronta</span>
           </div>
 
-          {/* ===== PASSO LOGO ===== */}
+          {/* ===== PASSO LOGO (obrigatório) ===== */}
           {etapa === "logo" && (
             <div className="mt-5">
               <h1 className="display text-2xl text-white">Suba o logo do seu buffet</h1>
@@ -172,23 +195,42 @@ export function OnboardingMarca({
 
               {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
 
-              <div className="mt-6 flex items-center justify-between">
-                <button onClick={() => setEtapa("fotos")} className="text-sm text-muted underline-offset-2 transition hover:text-white hover:underline">Pular por agora</button>
-                <button onClick={() => setEtapa("fotos")} disabled={subindoLogo} className="rounded-xl bg-vermelho px-6 py-3 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">Continuar →</button>
+              <div className="mt-6 flex items-center justify-end">
+                <button
+                  onClick={() => setEtapa("fotos")}
+                  disabled={subindoLogo || !logoUrl}
+                  className="rounded-xl bg-vermelho px-6 py-3 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Continuar →
+                </button>
               </div>
+              {!logoUrl && <p className="mt-2 text-right text-[11px] text-muted">Suba o logo pra continuar.</p>}
             </div>
           )}
 
-          {/* ===== PASSO FOTOS ===== */}
+          {/* ===== PASSO FOTOS (mín. 5, obrigatório) ===== */}
           {etapa === "fotos" && (
             <div className="mt-5">
-              <h1 className="display text-2xl text-white">Agora, até {MAX_FOTOS} fotos do buffet</h1>
+              <h1 className="display text-2xl text-white">Agora, de {MIN_FOTOS} a {MAX_FOTOS} fotos do buffet</h1>
               <p className="mt-2 text-sm text-muted">Espaço, brinquedos, mesa de doces, festas que já rolaram… É o que deixa as artes com a <strong className="text-white/80">cara de verdade</strong> do seu buffet.</p>
 
               <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                {fotos.map((url, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img key={i} src={url} alt={`Foto ${i + 1}`} className="aspect-square w-full rounded-lg border border-linha object-cover" />
+                {fotos.map((foto, i) => (
+                  <div key={foto.url} className="group relative aspect-square">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={foto.url} alt={`Foto ${i + 1}`} className="h-full w-full rounded-lg border border-linha object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => excluirFoto(foto)}
+                      aria-label="Excluir foto"
+                      className="absolute -right-1.5 -top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white shadow-lg ring-2 ring-preto-card transition hover:bg-red-500"
+                    >
+                      ✕
+                    </button>
+                    {!foto.id && (
+                      <span className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40 text-[10px] text-white">salvando…</span>
+                    )}
+                  </div>
                 ))}
                 {nFotos < MAX_FOTOS && (
                   <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-linha bg-preto text-center text-muted transition hover:border-vermelho active:border-vermelho">
@@ -198,13 +240,20 @@ export function OnboardingMarca({
                   </label>
                 )}
               </div>
-              <p className="mt-2 text-xs text-muted">{nFotos} de {MAX_FOTOS} fotos</p>
+              <p className="mt-2 text-xs text-muted">
+                {nFotos} de {MAX_FOTOS} fotos
+                {faltamFotos > 0 && <span className="text-amber-300"> · faltam {faltamFotos} pra liberar (mín. {MIN_FOTOS})</span>}
+              </p>
 
               {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
 
               <div className="mt-6 flex items-center justify-between gap-3">
                 <button onClick={() => setEtapa("logo")} className="text-sm text-muted underline-offset-2 transition hover:text-white hover:underline">← Voltar</button>
-                <button onClick={gerarSemana} disabled={subindoFoto} className="rounded-xl bg-vermelho px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover disabled:opacity-50">
+                <button
+                  onClick={gerarSemana}
+                  disabled={subindoFoto || nFotos < MIN_FOTOS}
+                  className="rounded-xl bg-vermelho px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-[#7c3aed]/30 transition hover:bg-vermelho-hover disabled:cursor-not-allowed disabled:opacity-40"
+                >
                   ✨ Gerar minha semana
                 </button>
               </div>
