@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { sessaoAtual } from "@/lib/auth";
 import { acessoExpirado, ehTrial, diasDeAcesso } from "@/lib/plano";
+import { creditosTrial } from "@/lib/limites";
 import { PainelHeader } from "@/components/painel-header";
 import { ChatBia } from "@/components/chat-bia";
 
@@ -50,6 +51,7 @@ export default async function PainelLayout({
   // que é teste e que postar de verdade pede ativação. Some assim que ele assina (vira pago).
   const trial = ehTrial(s);
   const diasTeste = trial ? Math.max(0, diasDeAcesso(s.acessoAte) ?? 0) : 0;
+  const cred = trial ? await creditosTrial(s) : null; // medidor de créditos do teste
 
   // Badge de novidades no suporte: pro admin, chamados com mensagem nova do cliente;
   // pro cliente, chamados com resposta nova do suporte. Best-effort (se a tabela ainda
@@ -74,9 +76,19 @@ export default async function PainelLayout({
               <span className="text-white/70">Pra o Postaí postar de verdade no seu Instagram, ative seu plano.</span>
               {diasTeste > 0 && <span className="text-white/60"> · faltam {diasTeste} {diasTeste === 1 ? "dia" : "dias"}</span>}
             </p>
-            <Link href="/assinar" className="shrink-0 rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover">
-              Ativar meu plano →
-            </Link>
+            <div className="flex shrink-0 items-center gap-2">
+              {cred && (
+                <span
+                  title="Créditos pra criar posts novos no teste (a sua semana pronta não gasta)"
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold ${cred.restantes > 0 ? "border-[#7c3aed]/40 bg-[#7c3aed]/15 text-[#c7b2ff]" : "border-amber-500/40 bg-amber-500/15 text-amber-300"}`}
+                >
+                  💳 {cred.restantes}/{cred.total} créditos
+                </span>
+              )}
+              <Link href="/assinar" className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover">
+                Ativar meu plano →
+              </Link>
+            </div>
           </div>
         </div>
       )}

@@ -89,11 +89,11 @@ export function acessoExpirado(u: { admin: boolean; acessoAte?: Date | string | 
 // Representado SEM coluna nova no banco: trial = cliente com acesso no FUTURO mas SEM plano
 // definido (todo pagamento preenche o `plano`, então "sem plano + acesso válido" = ainda testando).
 export const DIAS_TRIAL = 7;
-// Quanto o teste deixa CRIAR (pra não virar ferramenta grátis pra sempre nem estourar custo de
-// IA): no máximo 1 arte por dia e 7 no total — casa com os 7 dias (1/dia × 7). Imagem por IA
-// segue liberada no teste (monitorar uso). Ver checarLimiteTrial em lib/limites.ts.
-export const TRIAL_MAX_ARTES = 7;
-export const TRIAL_ARTES_POR_DIA = 1;
+// Teste grátis: a SEMANA AUTOMÁTICA (TRIAL_SEMANA_GRATIS artes) é de graça; ALÉM dela, o
+// cliente tem TRIAL_CREDITOS "créditos" pra criar posts novos. Acabou → ativa o plano. Sem
+// mexer no banco: o gasto é (total de artes − semana grátis). Ver creditosTrial em lib/limites.ts.
+export const TRIAL_CREDITOS = 10;
+export const TRIAL_SEMANA_GRATIS = 14;
 
 export function ehTrial(u: { admin: boolean; plano?: string | null; acessoAte?: Date | string | null }): boolean {
   if (u.admin) return false; // admin nunca é trial

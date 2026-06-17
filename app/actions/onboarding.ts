@@ -1,7 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
+import { ehTrial } from "@/lib/plano";
 import { paletaDaMarca } from "@/lib/arte";
 import { gerarCarrossel } from "@/app/actions/marketing";
 import { gerarPublicacao, definirImagemPublicacao } from "@/app/actions/feed";
@@ -116,4 +118,17 @@ export async function gerarItemSemana(marcaId: string, indice: number): Promise<
   } catch {
     return { ok: false, rotulo: item.rotulo, total: TOTAL_SEMANA, erro: "Falha ao gerar este item." };
   }
+}
+
+// Limpa a semana do cliente (carrosséis + publicações da marca) pra REGERAR do zero. Só no
+// TESTE GRÁTIS e só do dono da marca — nunca apaga conteúdo de cliente pago. Depois disso o
+// cliente chama gerarItemSemana 0..13 de novo (a contagem volta a 0, então não bate no teto).
+export async function limparSemanaTrial(marcaId: string): Promise<{ ok: boolean; erro?: string }> {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false, erro: g.erro };
+  if (!ehTrial(g.sessao)) return { ok: false, erro: "Disponível só no teste grátis." };
+  await prisma.publicacao.deleteMany({ where: { marcaId } });
+  await prisma.conteudo.deleteMany({ where: { marcaId } });
+  revalidatePath(`/painel/marcas/${marcaId}`);
+  return { ok: true };
 }

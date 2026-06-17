@@ -11,6 +11,7 @@ import { ConexaoCard } from "./conexao-card";
 import { EvolucaoCard } from "./evolucao-card";
 import { BackfillEngajamento } from "./backfill-engajamento";
 import { BiaDescobriu } from "./bia-descobriu";
+import { RegerarCalendario } from "./regerar-calendario";
 import { type AnaliseInsights, type SugestaoBia } from "@/lib/inteligencia";
 import { rotuloPlano, diasDeAcesso } from "@/lib/plano";
 
@@ -38,6 +39,7 @@ export function MarcaHub({
   conectada,
   assinatura,
   ehAdmin,
+  ehTrial,
   entregue,
   analise,
   sugestao,
@@ -51,6 +53,7 @@ export function MarcaHub({
   conectada: boolean;
   assinatura?: Assinatura | null;
   ehAdmin: boolean;
+  ehTrial?: boolean;
   entregue: { carrosseis: number; feed: number; stories: number; total: number };
   analise: AnaliseInsights;
   sugestao: SugestaoBia | null;
@@ -132,10 +135,11 @@ export function MarcaHub({
         {ehAdmin && <BackfillEngajamento marcaId={marca.id} />}
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap items-center gap-2">
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
         <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
         <button onClick={() => setAba("config")} className={cls(aba === "config")}>{ehAdmin ? "⚙️ Configurações" : "✏️ Minha marca"}</button>
+        {ehTrial && <div className="w-full sm:ml-auto sm:w-auto"><RegerarCalendario marcaId={marca.id} /></div>}
       </div>
 
       <div className="mt-6">

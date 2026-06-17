@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sessaoAtual } from "@/lib/auth";
+import { ehTrial } from "@/lib/plano";
 import { marcaConectada } from "@/lib/instagram";
 import { MarcaHub } from "@/components/marca-hub";
 import { type Post } from "@/components/marketing-calendario";
@@ -188,6 +189,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         conectada={marcaConectada(marca)}
         assinatura={assinatura}
         ehAdmin={sessao.admin}
+        ehTrial={ehTrial(sessao)}
         entregue={entregue}
         analise={analise}
         sugestao={sugestao}

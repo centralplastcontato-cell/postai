@@ -8,7 +8,7 @@ import { publicarNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, AGENTE } from "@/lib/config";
 import { rotuloPlano, ehTrial, MSG_TRIAL_POSTAR } from "@/lib/plano";
-import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
+import { planoDaMarca, checarLimiteFeed, checarCreditoTrial } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco } from "@/app/actions/imagens";
 import { classificarCategoriasIA } from "@/lib/inteligencia";
 import type { Marca } from "@prisma/client";
@@ -173,6 +173,8 @@ export async function gerarCarrossel(input: {
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
+  const cred = await checarCreditoTrial(g.sessao); // teste grátis: barra quando os créditos acabam
+  if (!cred.ok) return { ok: false as const, erro: cred.erro };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const tema = input.tema?.trim();

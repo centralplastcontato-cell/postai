@@ -448,6 +448,43 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* ===== A BIA (inteligência) ===== */}
+      <section className="border-y border-linha bg-preto-card/30">
+        <div className="mx-auto max-w-5xl px-5 py-20">
+          <div className="grid items-center gap-10 md:grid-cols-2">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-widest text-vermelho">Sua agente de IA</p>
+              <h2 className="display mt-2 text-3xl sm:text-4xl">Conheça a Bia 🤖</h2>
+              <p className="mt-4 text-base leading-relaxed text-muted sm:text-lg">
+                A Bia é a inteligência do {APP_NAME}. Ela acompanha o que cada post rendeu, descobre que <strong className="text-white">tipo de publicação faz a sua festa vender</strong> e te diz o que postar pra encher a agenda — no automático.
+              </p>
+              <ul className="mt-6 space-y-3 text-sm text-muted">
+                <li className="flex items-start gap-3"><span className="text-lg">📊</span> <span><strong className="text-white">Analisa os resultados</strong> — vê quais posts deram mais alcance, salvamentos e comentários.</span></li>
+                <li className="flex items-start gap-3"><span className="text-lg">💡</span> <span><strong className="text-white">Sugere o próximo post</strong> — fala o que priorizar pra vender mais festa essa semana.</span></li>
+                <li className="flex items-start gap-3"><span className="text-lg">🧠</span> <span><strong className="text-white">Aprende com o seu buffet</strong> — quanto mais posta, mais ela acerta o que funciona pro seu público.</span></li>
+              </ul>
+            </div>
+            <div className="rounded-2xl border border-linha bg-preto-card p-6 shadow-xl">
+              <div className="flex items-center gap-3">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#a78bfa] to-[#ec4899] text-2xl">🤖</span>
+                <div>
+                  <p className="font-bold text-white">Bia</p>
+                  <p className="text-xs text-muted">sua agente do {APP_NAME}</p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                <div className="rounded-2xl rounded-tl-sm border border-[#7c3aed]/30 bg-[#7c3aed]/10 p-4 text-sm text-white">
+                  Essa semana, aposte em <strong>depoimentos de famílias</strong> — foi o tipo de post que mais fez gente salvar o seu perfil. 📈
+                </div>
+                <div className="rounded-2xl rounded-tl-sm border border-linha bg-preto p-4 text-sm text-white/90">
+                  Já deixei <strong>3 prontos</strong> no seu calendário pra essa semana. É só aprovar. ✅
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ===== TEMPLATES ===== */}
       <section className="mx-auto max-w-6xl px-5 py-20">
         <div className="text-center">

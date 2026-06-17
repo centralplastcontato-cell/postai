@@ -10,7 +10,7 @@ import { baseUrl, AGENTE } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
 import { categoriaDoTemplate } from "@/lib/categorias";
 import { planoTemStory, rotuloPlano, ehTrial, MSG_TRIAL_POSTAR } from "@/lib/plano";
-import { planoDaMarca, checarLimiteFeed } from "@/lib/limites";
+import { planoDaMarca, checarLimiteFeed, checarCreditoTrial } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import type { Marca } from "@prisma/client";
@@ -560,6 +560,8 @@ export async function gerarPublicacao(input: {
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
+  const cred = await checarCreditoTrial(g.sessao); // teste grátis: barra quando os créditos acabam
+  if (!cred.ok) return { ok: false as const, erro: cred.erro };
   const marca = await prisma.marca.findUnique({ where: { id: input.marcaId } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const template = (TEMPLATES as readonly string[]).includes(input.template) ? input.template : "dica";
