@@ -121,7 +121,7 @@ export function OnboardingMarca({
     <div className="mx-auto flex min-h-[70vh] max-w-xl flex-col justify-center px-5 py-10">
       {/* ===== PROCESSANDO ===== */}
       {etapa === "processando" ? (
-        <div className="rounded-3xl border border-linha bg-preto-card p-8 text-center">
+        <div className="rounded-3xl border border-linha bg-preto-card p-6 text-center sm:p-8">
           <div className="relative mx-auto h-28 w-28">
             <div aria-hidden className="absolute inset-0 animate-ping rounded-full bg-[#7c3aed]/20" />
             <div className="absolute inset-0 flex items-center justify-center rounded-full bg-gradient-to-br from-[#7c3aed] to-[#ec4899] text-4xl shadow-lg shadow-[#7c3aed]/40">🎨</div>
@@ -135,10 +135,10 @@ export function OnboardingMarca({
           <p className="mt-4 text-[11px] text-muted">Leva cerca de 1 minuto. Não feche esta tela. 🙏</p>
         </div>
       ) : (
-        <div className="rounded-3xl border border-linha bg-preto-card p-7">
+        <div className="rounded-3xl border border-linha bg-preto-card p-5 sm:p-7">
           {/* cabeçalho */}
-          <span className="inline-flex items-center gap-2 rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/10 px-3 py-1 text-xs font-semibold text-[#c7b2ff]">
-            🎁 Vamos preparar o {nome}
+          <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/10 px-3 py-1 text-xs font-semibold text-[#c7b2ff]">
+            <span className="truncate">🎁 Vamos preparar o {nome}</span>
           </span>
           <div className="mt-3 flex items-center gap-2 text-xs text-muted">
             <span className={etapa === "logo" ? "font-bold text-white" : ""}>1. Logo</span>
@@ -185,16 +185,16 @@ export function OnboardingMarca({
               <h1 className="display text-2xl text-white">Agora, até {MAX_FOTOS} fotos do buffet</h1>
               <p className="mt-2 text-sm text-muted">Espaço, brinquedos, mesa de doces, festas que já rolaram… É o que deixa as artes com a <strong className="text-white/80">cara de verdade</strong> do seu buffet.</p>
 
-              <div className="mt-5 grid grid-cols-4 gap-2">
+              <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-4">
                 {fotos.map((url, i) => (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img key={i} src={url} alt={`Foto ${i + 1}`} className="aspect-square w-full rounded-lg border border-linha object-cover" />
                 ))}
                 {nFotos < MAX_FOTOS && (
-                  <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-linha bg-preto text-center text-muted transition hover:border-vermelho">
-                    <span className="text-2xl">{subindoFoto ? "⏳" : "＋"}</span>
+                  <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-linha bg-preto text-center text-muted transition hover:border-vermelho active:border-vermelho">
+                    <span className="text-3xl">{subindoFoto ? "⏳" : "＋"}</span>
                     <span className="text-[10px]">{subindoFoto ? "subindo…" : "add foto"}</span>
-                    <input type="file" accept="image/png,image/jpeg,image/webp" multiple className="hidden" disabled={subindoFoto} onChange={(e) => handleFotos(e.target.files)} />
+                    <input type="file" accept="image/*" multiple className="hidden" disabled={subindoFoto} onChange={(e) => handleFotos(e.target.files)} />
                   </label>
                 )}
               </div>
