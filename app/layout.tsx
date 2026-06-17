@@ -10,10 +10,27 @@ const oswald = Oswald({
   weight: ["500", "600", "700"],
 });
 
+const DESC =
+  "Carrosséis, posts e stories criados por IA e postados sozinhos no Instagram do seu negócio. Você cuida do que importa, o Postaí cuida das redes.";
+
 export const metadata: Metadata = {
-  title: `${APP_NAME} — postagem automática no Instagram`,
-  description:
-    "Crie e agende carrosséis e posts de feed com IA, e poste sozinho no Instagram das suas marcas.",
+  metadataBase: new URL(process.env.SITE_URL || "https://www.meupostai.com.br"),
+  title: `${APP_NAME} — seu Instagram no piloto automático`,
+  description: DESC,
+  // A imagem do cartão (og:image) vem automática de app/opengraph-image.tsx.
+  openGraph: {
+    title: `${APP_NAME} — seu Instagram no piloto automático`,
+    description: DESC,
+    url: "/",
+    siteName: APP_NAME,
+    locale: "pt_BR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${APP_NAME} — seu Instagram no piloto automático`,
+    description: DESC,
+  },
 };
 
 export const viewport: Viewport = {
