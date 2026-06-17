@@ -397,7 +397,7 @@ export default async function Home() {
                 </div>
                 <p className="mt-1.5 text-sm leading-relaxed text-muted">
                   Buffet infantil que usa o {APP_NAME} pra aparecer todo dia no Instagram — {prova.postados > 0 ? (
-                    <>já são <strong className="text-white">{prova.postados} {prova.postados === 1 ? "publicação postada sozinha" : "publicações postadas sozinhas"}</strong> no feed.</>
+                    <>já são <strong className="text-white">{prova.postados} {prova.postados === 1 ? "publicação postada sozinha" : "publicações postadas sozinhas"}</strong> no automático.</>
                   ) : (
                     <>já são <strong className="text-white">{prova.criadas} {prova.criadas === 1 ? "arte criada" : "artes criadas"} pelo {APP_NAME}</strong>, no piloto automático.</>
                   )}
