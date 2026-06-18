@@ -8,6 +8,8 @@ import { type Post } from "@/components/marketing-calendario";
 import { type PublicacaoView } from "@/components/publicacoes-aba";
 import { type MarcaView } from "@/components/marca-form";
 import { type ImagemView } from "@/components/banco-imagens";
+import { type FestaView } from "@/components/album-festa-publico";
+import { baseUrl } from "@/lib/config";
 import { AtividadesRecentes } from "@/components/atividades-recentes";
 import { OnboardingMarca } from "@/components/onboarding-marca";
 import { analisarEngajamento, sugerirProximoPost } from "@/lib/inteligencia";
@@ -43,13 +45,21 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
 
   // Todas as queries da marca em PARALELO (Promise.all) — antes eram sequenciais e
   // somavam ~4-5s + pressionavam o pool de conexões. Em paralelo cai pra ~1 query.
-  const [conteudos, pubs, imgs, metricas, ativ] = await Promise.all([
+  const [conteudos, pubs, imgs, metricas, ativ, festasRaw] = await Promise.all([
     prisma.conteudo.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.publicacao.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.imagemMarca.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
     prisma.metricaMarca.findMany({ where: { marcaId: id }, orderBy: { dia: "desc" }, take: 90, select: { dia: true, seguidores: true, posts: true } }),
     prisma.atividadeAgente.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" }, take: 25, select: { id: true, agente: true, texto: true, criadoEm: true } }),
+    prisma.festa.findMany({ where: { marcaId: id }, orderBy: { data: "desc" }, include: { fotos: { select: { id: true, url: true }, orderBy: { criadoEm: "desc" } } } }),
   ]);
+  const festas: FestaView[] = festasRaw.map((f) => ({
+    id: f.id,
+    dataISO: f.data.toISOString(),
+    aniversariante: f.aniversariante,
+    tema: f.tema,
+    fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url })),
+  }));
   const atividades = ativ.map((a) => ({ id: a.id, agente: a.agente, texto: a.texto, criadoEm: a.criadoEm.toISOString() }));
 
   // Resumo de valor: o que o piloto JÁ publicou sozinho, pelos 3 tipos (as 3 abas:
@@ -185,6 +195,9 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         publicacoes={publicacoes}
         stories={stories}
         imagens={imagens}
+        festas={festas}
+        linkBase={baseUrl()}
+        tokenFotos={marca.tokenFotos}
         evolucao={evolucao}
         conectada={marcaConectada(marca)}
         assinatura={assinatura}

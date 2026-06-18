@@ -39,6 +39,9 @@ model Marca {
   // Contexto pra IA escrever no tom da marca
   descricao   String   @default("") // o que é o negócio, público, produtos
   ativa       Boolean  @default(true)
+  // Álbum da Festa: token SECRETO do link público que o gerente do buffet usa pra subir
+  // fotos das festas (sem login). Vazio = link ainda não gerado. Regerar revoga o anterior.
+  tokenFotos  String   @default("")
   criadoEm    DateTime @default(now())
 
   // Dono (cliente) da marca — null = sem dono, só o admin vê. Multi-tenant: cada
@@ -50,8 +53,27 @@ model Marca {
   publicacoes Publicacao[]
   imagens     ImagemMarca[]
   metricas    MetricaMarca[]
+  festas      Festa[]
 
   @@index([usuarioId])
+}
+
+// Uma festa real do buffet (aniversário). O GERENTE cria pelo link público (Álbum da Festa),
+// informando data + aniversariante + tema, e vai subindo as fotos conforme a festa acontece.
+// As fotos viram ImagemMarca (categoria "festa") amarradas a esta Festa — assim cada festa
+// abastece o banco de imagens (entra no rodízio das artes) E fica organizada por evento.
+model Festa {
+  id             String   @id @default(cuid())
+  marcaId        String
+  marca          Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  data           DateTime // dia da festa
+  aniversariante String // nome de quem faz aniversário (ex: "Maria")
+  tema           String   @default("") // tema da festa (ex: "Frozen", "Super-heróis")
+  criadoEm       DateTime @default(now())
+
+  fotos          ImagemMarca[]
+
+  @@index([marcaId, data])
 }
 
 // Banco de fotos REAIS do negócio (ex: espaço, brinquedos, festas do buffet).
@@ -66,9 +88,14 @@ model ImagemMarca {
   // Serve pra casar a foto certa com o texto do post — sem pagar "visão" a cada geração.
   descricao String   @default("")
   usos      Int      @default(0) // contador pra rodízio: sorteia sempre a menos usada
+  // Festa de origem (Álbum da Festa). null = foto solta do banco (subida no painel).
+  // SetNull: apagar a festa não apaga as fotos (elas seguem no banco da marca).
+  festaId   String?
+  festa     Festa?   @relation(fields: [festaId], references: [id], onDelete: SetNull)
   criadoEm  DateTime @default(now())
 
   @@index([marcaId, categoria])
+  @@index([festaId])
 }
 
 // Carrossel (2 a 10 artes) agendado pra uma marca.

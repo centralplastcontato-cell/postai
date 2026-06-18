@@ -1,6 +1,6 @@
-import { put } from "@vercel/blob";
 import sharp from "sharp";
 import { estaLogado } from "@/lib/auth";
+import { subirFotoNormalizada } from "@/lib/blob-upload";
 
 export const runtime = "nodejs";
 
@@ -70,30 +70,9 @@ export async function POST(req: Request) {
       }
     }
 
-    // Demais imagens (fotos do banco/posts): NORMALIZA pra JPEG. O renderizador das
-    // artes (next/og) só aceita PNG/JPEG — webp/avif/heic quebrariam o render. Também
-    // redimensiona pra não guardar arquivos gigantes (e fica leve pra postar na Meta).
-    const bruto = Buffer.from(await file.arrayBuffer());
-    let saida: Buffer = bruto;
-    let contentType = file.type || "image/png";
-    let ext = (file.name.split(".").pop() || "png").toLowerCase();
-    try {
-      saida = await sharp(bruto)
-        .rotate() // respeita a orientação EXIF
-        .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-        .jpeg({ quality: 85 })
-        .toBuffer();
-      contentType = "image/jpeg";
-      ext = "jpg";
-    } catch (e) {
-      console.error("Não consegui normalizar a imagem (subindo original):", e);
-    }
-    const nomeBase = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "_") || "foto";
-    const blob = await put(`upload/${Date.now()}-${nomeBase}.${ext}`, saida, {
-      access: "public",
-      contentType,
-    });
-    return Response.json({ ok: true, url: blob.url });
+    // Demais imagens (fotos do banco/posts): normaliza pra JPEG e sobe no Blob.
+    const url = await subirFotoNormalizada(file);
+    return Response.json({ ok: true, url });
   } catch (e) {
     console.error("Erro no upload:", e);
     return Response.json({ ok: false, erro: "Falha no upload (confira o Vercel Blob)." });

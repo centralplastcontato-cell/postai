@@ -7,6 +7,8 @@ import { MarcaForm, type MarcaView } from "./marca-form";
 import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
+import { FestasPainel } from "./festas-painel";
+import { type FestaView } from "./album-festa-publico";
 import { ConexaoCard } from "./conexao-card";
 import { EvolucaoCard } from "./evolucao-card";
 import { BackfillEngajamento } from "./backfill-engajamento";
@@ -35,6 +37,9 @@ export function MarcaHub({
   publicacoes,
   stories,
   imagens,
+  festas,
+  linkBase,
+  tokenFotos,
   evolucao,
   conectada,
   assinatura,
@@ -49,6 +54,9 @@ export function MarcaHub({
   publicacoes: PublicacaoView[];
   stories: PublicacaoView[];
   imagens: ImagemView[];
+  festas: FestaView[];
+  linkBase: string;
+  tokenFotos: string;
   evolucao: { dia: string; seguidores: number; posts: number }[];
   conectada: boolean;
   assinatura?: Assinatura | null;
@@ -58,7 +66,7 @@ export function MarcaHub({
   analise: AnaliseInsights;
   sugestao: SugestaoBia | null;
 }) {
-  const [aba, setAba] = useState<"redes" | "imagens" | "config">("redes");
+  const [aba, setAba] = useState<"redes" | "imagens" | "festas" | "config">("redes");
   const cls = (a: boolean) =>
     `rounded-lg px-4 py-2 text-sm font-semibold transition ${a ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"}`;
   const stAssin = assinatura ? statusAssinatura(assinatura.acessoAte) : null;
@@ -138,6 +146,7 @@ export function MarcaHub({
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
         <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
+        <button onClick={() => setAba("festas")} className={cls(aba === "festas")}>📸 Festas</button>
         <button onClick={() => setAba("config")} className={cls(aba === "config")}>{ehAdmin ? "⚙️ Configurações" : "✏️ Minha marca"}</button>
         {ehTrial && <div className="w-full sm:ml-auto sm:w-auto"><RegerarCalendario marcaId={marca.id} /></div>}
       </div>
@@ -145,6 +154,7 @@ export function MarcaHub({
       <div className="mt-6">
         {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} sugestao={sugestao} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
+        {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
         {aba === "config" && (ehAdmin ? <MarcaForm marca={marca} /> : <MarcaForm marca={marca} somenteIdentidade />)}
       </div>
     </div>
