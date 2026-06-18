@@ -5,6 +5,7 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { marcaPorTokenFotos } from "@/lib/festa";
+import { parseAniversariantes, nomesAniversariantes } from "@/lib/aniversariantes";
 
 // ===========================================================================
 // ÁLBUM DA FESTA — server actions
@@ -18,12 +19,25 @@ import { marcaPorTokenFotos } from "@/lib/festa";
 
 // --- PAINEL -----------------------------------------------------------------
 
-// Gera (ou regenera) o link público do Álbum da Festa pra marca. Regerar REVOGA o
-// link anterior (o token antigo deixa de existir) — útil se o link vazou.
+// Código curto e LEGÍVEL pro fim do link (sem caracteres ambíguos: nada de i/l/o/0/1).
+// É a credencial secreta do link — 6 chars de um alfabeto de 31 = ~887 milhões de combinações,
+// inviável de adivinhar. O slug da marca antes dele é só identidade (bonito, dá confiança).
+function codigoCurto(n = 6): string {
+  const abc = "abcdefghjkmnpqrstuvwxyz23456789";
+  const b = randomBytes(n);
+  let s = "";
+  for (let i = 0; i < n; i++) s += abc[b[i] % abc.length];
+  return s;
+}
+
+// Gera (ou regenera) o link público do Álbum da Festa pra marca. Regerar REVOGA o link
+// anterior (o token antigo deixa de existir) — útil se o link vazou. Formato bonito:
+// "<slug-da-marca>-<código>" (ex: castelo-da-diversao-k7p9w2).
 export async function gerarLinkFotos(marcaId: string) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const token = randomBytes(18).toString("base64url"); // ~24 chars url-safe, imprevisível
+  const m = await prisma.marca.findUnique({ where: { id: marcaId }, select: { slug: true } });
+  const token = `${m?.slug || "festa"}-${codigoCurto()}`;
   await prisma.marca.update({ where: { id: marcaId }, data: { tokenFotos: token } });
   revalidatePath(`/painel/marcas/${marcaId}`);
   return { ok: true as const, token };
@@ -53,18 +67,26 @@ export async function excluirFesta(festaId: string) {
 // --- PÚBLICO (validado por TOKEN, sem sessão) -------------------------------
 
 // O gerente cria uma festa pelo link público. Validado pelo token do link, não por sessão.
+// Aceita VÁRIOS aniversariantes (cada um com nome + idade opcional).
 export async function criarFestaPublica(
   token: string,
-  input: { dataISO: string; aniversariante: string; tema?: string },
+  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string },
 ) {
   const m = await marcaPorTokenFotos(token);
   if (!m) return { ok: false as const, erro: "Link inválido ou desativado. Peça um novo ao buffet." };
-  const aniversariante = (input.aniversariante || "").trim().slice(0, 80);
-  if (!aniversariante) return { ok: false as const, erro: "Informe o nome do aniversariante." };
+  // parseAniversariantes limpa/normaliza a lista (descarta sem nome, idade 0–130 ou null).
+  const lista = parseAniversariantes(JSON.stringify(input.aniversariantes || [])).slice(0, 10);
+  if (!lista.length) return { ok: false as const, erro: "Informe o nome de pelo menos um aniversariante." };
   const data = new Date(input.dataISO);
   if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
   const festa = await prisma.festa.create({
-    data: { marcaId: m.id, data, aniversariante, tema: (input.tema || "").trim().slice(0, 80) },
+    data: {
+      marcaId: m.id,
+      data,
+      aniversariante: nomesAniversariantes(lista), // label de exibição derivado
+      aniversariantes: JSON.stringify(lista),
+      tema: (input.tema || "").trim().slice(0, 80),
+    },
   });
   revalidatePath(`/f/${token}`);
   return { ok: true as const, festaId: festa.id };

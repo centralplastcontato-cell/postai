@@ -9,6 +9,7 @@ import { type PublicacaoView } from "@/components/publicacoes-aba";
 import { type MarcaView } from "@/components/marca-form";
 import { type ImagemView } from "@/components/banco-imagens";
 import { type FestaView } from "@/components/album-festa-publico";
+import { parseAniversariantes } from "@/lib/aniversariantes";
 import { baseUrl } from "@/lib/config";
 import { AtividadesRecentes } from "@/components/atividades-recentes";
 import { OnboardingMarca } from "@/components/onboarding-marca";
@@ -56,7 +57,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const festas: FestaView[] = festasRaw.map((f) => ({
     id: f.id,
     dataISO: f.data.toISOString(),
-    aniversariante: f.aniversariante,
+    aniversariantes: parseAniversariantes(f.aniversariantes),
     tema: f.tema,
     fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url })),
   }));

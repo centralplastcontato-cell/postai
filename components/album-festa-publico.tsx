@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { criarFestaPublica } from "@/app/actions/festas";
+import { type Aniversariante, rotuloAniversariantes } from "@/lib/aniversariantes";
 
 export type FotoView = { id: string; url: string };
-export type FestaView = { id: string; dataISO: string; aniversariante: string; tema: string; fotos: FotoView[] };
+export type FestaView = { id: string; dataISO: string; aniversariantes: Aniversariante[]; tema: string; fotos: FotoView[] };
 export type MarcaPublica = { nome: string; logoUrl: string; corPrimaria: string };
 
 function dataBR(iso: string): string {
@@ -24,7 +25,7 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
 
   const [novaAberta, setNovaAberta] = useState(festas.length === 0);
   const [data, setData] = useState("");
-  const [aniversariante, setAniversariante] = useState("");
+  const [pessoas, setPessoas] = useState<{ nome: string; idade: string }[]>([{ nome: "", idade: "" }]);
   const [tema, setTema] = useState("");
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
@@ -33,9 +34,19 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
   const [subindo, setSubindo] = useState<string | null>(null); // id da festa que está recebendo fotos
   const [erroUp, setErroUp] = useState<string | null>(null);
 
+  function setPessoa(i: number, campo: "nome" | "idade", val: string) {
+    setPessoas((ps) => ps.map((p, idx) => (idx === i ? { ...p, [campo]: val } : p)));
+  }
+  function addPessoa() {
+    setPessoas((ps) => (ps.length >= 10 ? ps : [...ps, { nome: "", idade: "" }]));
+  }
+  function removePessoa(i: number) {
+    setPessoas((ps) => ps.filter((_, idx) => idx !== i));
+  }
+
   function abrirNova() {
     setData(hojeBR());
-    setAniversariante("");
+    setPessoas([{ nome: "", idade: "" }]);
     setTema("");
     setErro(null);
     setNovaAberta(true);
@@ -44,10 +55,13 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
   async function criar(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
-    if (!aniversariante.trim()) { setErro("Qual o nome do aniversariante?"); return; }
+    const lista = pessoas
+      .map((p) => ({ nome: p.nome.trim(), idade: p.idade.trim() ? parseInt(p.idade, 10) : null }))
+      .filter((p) => p.nome);
+    if (!lista.length) { setErro("Qual o nome do aniversariante?"); return; }
     setCriando(true);
     try {
-      const r = await criarFestaPublica(token, { dataISO: data || hojeBR(), aniversariante, tema });
+      const r = await criarFestaPublica(token, { dataISO: data || hojeBR(), aniversariantes: lista, tema });
       if (!r.ok) { setErro(r.erro); setCriando(false); return; }
       setNovaAberta(false);
       setFestaAtiva(r.festaId);
@@ -81,7 +95,7 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
   }
 
   return (
-    <div className="min-h-screen bg-preto px-4 py-6">
+    <div className="min-h-screen bg-preto px-4 py-6 sm:px-6 sm:py-10">
       <div className="mx-auto w-full max-w-md">
         {/* Cabeçalho da marca */}
         <div className="flex items-center gap-3">
@@ -93,41 +107,75 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
               {marca.nome.slice(0, 2).toUpperCase()}
             </span>
           )}
-          <div>
+          <div className="min-w-0">
             <h1 className="text-lg font-bold leading-tight text-white">📸 Álbum da Festa</h1>
-            <p className="text-xs text-muted">{marca.nome}</p>
+            <p className="truncate text-xs text-muted">{marca.nome}</p>
           </div>
         </div>
 
-        <p className="mt-4 rounded-xl border border-linha bg-preto-card p-3 text-sm text-muted">
+        <p className="mt-4 rounded-xl border border-linha bg-preto-card p-3 text-sm leading-relaxed text-muted">
           Crie a festa e vá subindo as fotos durante o evento. Elas viram conteúdo do perfil do buffet, automaticamente. 🎉
         </p>
 
         {/* Nova festa */}
         {novaAberta ? (
-          <form onSubmit={criar} className="mt-4 rounded-xl border border-linha bg-preto-card p-4">
+          <form onSubmit={criar} className="mt-4 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
             <p className="text-sm font-semibold text-white">✨ Nova festa</p>
-            <label className="mt-3 block text-xs text-muted">Data da festa
-              <input type="date" value={data} onChange={(e) => setData(e.target.value)} className="input-base" />
+
+            <label className="mt-4 block text-xs font-medium text-muted">Data da festa
+              <input type="date" value={data} onChange={(e) => setData(e.target.value)} className="input-base mt-1" />
             </label>
-            <label className="mt-3 block text-xs text-muted">Nome do aniversariante
-              <input type="text" value={aniversariante} onChange={(e) => setAniversariante(e.target.value)} placeholder="Ex: Maria" autoFocus className="input-base" />
+
+            <div className="mt-4">
+              <p className="text-xs font-medium text-muted">Aniversariante(s) e idade</p>
+              <div className="mt-1 space-y-2">
+                {pessoas.map((p, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={p.nome}
+                      onChange={(e) => setPessoa(i, "nome", e.target.value)}
+                      placeholder={i === 0 ? "Nome (ex: Maria)" : "Outro aniversariante"}
+                      autoFocus={i === 0}
+                      className="input-base mt-0 flex-1"
+                    />
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={130}
+                      value={p.idade}
+                      onChange={(e) => setPessoa(i, "idade", e.target.value)}
+                      placeholder="Idade"
+                      className="input-base mt-0 w-20 shrink-0"
+                    />
+                    {pessoas.length > 1 && (
+                      <button type="button" onClick={() => removePessoa(i)} aria-label="Remover aniversariante" className="shrink-0 rounded-lg border border-linha px-2.5 py-2 text-sm text-muted transition hover:border-red-500/50 hover:text-red-400">✕</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {pessoas.length < 10 && (
+                <button type="button" onClick={addPessoa} className="mt-2 text-xs font-semibold text-muted transition hover:text-white">+ Adicionar outro aniversariante</button>
+              )}
+            </div>
+
+            <label className="mt-4 block text-xs font-medium text-muted">Tema da festa <span className="font-normal text-muted/70">(opcional)</span>
+              <input type="text" value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: Frozen, Super-heróis…" className="input-base mt-1" />
             </label>
-            <label className="mt-3 block text-xs text-muted">Tema da festa <span className="text-muted/70">(opcional)</span>
-              <input type="text" value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: Frozen, Super-heróis…" className="input-base" />
-            </label>
+
             {erro && <p className="mt-3 text-sm text-vermelho">{erro}</p>}
-            <div className="mt-4 flex gap-2">
-              <button type="submit" disabled={criando} className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60" style={{ backgroundColor: cor }}>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button type="submit" disabled={criando} className="rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition disabled:opacity-60" style={{ backgroundColor: cor }}>
                 {criando ? "Criando…" : "Criar festa"}
               </button>
               {festas.length > 0 && (
-                <button type="button" onClick={() => setNovaAberta(false)} className="rounded-lg border border-linha px-4 py-2 text-sm text-muted transition hover:text-white">Cancelar</button>
+                <button type="button" onClick={() => setNovaAberta(false)} className="rounded-lg border border-linha px-4 py-2.5 text-sm text-muted transition hover:text-white">Cancelar</button>
               )}
             </div>
           </form>
         ) : (
-          <button type="button" onClick={abrirNova} className="mt-4 w-full rounded-xl border border-dashed border-linha bg-preto-card py-3 text-sm font-semibold text-white transition hover:border-white/40">
+          <button type="button" onClick={abrirNova} className="mt-4 w-full rounded-xl border border-dashed border-linha bg-preto-card py-3.5 text-sm font-semibold text-white transition hover:border-white/40">
             ➕ Nova festa
           </button>
         )}
@@ -139,16 +187,16 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
             return (
               <div key={f.id} className="overflow-hidden rounded-xl border border-linha bg-preto-card">
                 <button type="button" onClick={() => setFestaAtiva(ativa ? null : f.id)} className="flex w-full items-center justify-between gap-2 p-4 text-left">
-                  <span>
-                    <span className="block text-sm font-semibold text-white">🎂 {f.aniversariante}{f.tema ? <span className="font-normal text-muted"> · {f.tema}</span> : null}</span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold text-white">🎂 {rotuloAniversariantes(f.aniversariantes)}{f.tema ? <span className="font-normal text-muted"> · {f.tema}</span> : null}</span>
                     <span className="block text-xs text-muted">{dataBR(f.dataISO)} · {f.fotos.length} {f.fotos.length === 1 ? "foto" : "fotos"}</span>
                   </span>
-                  <span className="text-muted">{ativa ? "▲" : "▼"}</span>
+                  <span className="shrink-0 text-muted">{ativa ? "▲" : "▼"}</span>
                 </button>
 
                 {ativa && (
                   <div className="border-t border-linha p-4">
-                    <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white transition" style={{ backgroundColor: cor }}>
+                    <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white transition active:opacity-80" style={{ backgroundColor: cor }}>
                       {subindo === f.id ? "Subindo fotos…" : "📷 Adicionar fotos"}
                       <input type="file" accept="image/*" multiple className="hidden" disabled={subindo === f.id} onChange={(e) => subirFotos(f.id, e.target.files)} />
                     </label>

@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 // É a fronteira de autorização do recurso público: quem tem o token, mexe nas fotos da marca.
 export async function marcaPorTokenFotos(token: string) {
   const t = (token || "").trim();
-  if (t.length < 16) return null;
+  if (t.length < 6) return null; // vazio/trivial nunca casa (tokenFotos="" tem length 0)
   try {
     return await prisma.marca.findFirst({
       where: { tokenFotos: t },

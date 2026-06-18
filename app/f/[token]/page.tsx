@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { marcaPorTokenFotos } from "@/lib/festa";
+import { parseAniversariantes } from "@/lib/aniversariantes";
 import { AlbumFestaPublico, type FestaView } from "@/components/album-festa-publico";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +31,7 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
   const festasView: FestaView[] = festas.map((f) => ({
     id: f.id,
     dataISO: f.data.toISOString(),
-    aniversariante: f.aniversariante,
+    aniversariantes: parseAniversariantes(f.aniversariantes),
     tema: f.tema,
     fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url })),
   }));

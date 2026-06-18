@@ -67,7 +67,12 @@ model Festa {
   marcaId        String
   marca          Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
   data           DateTime // dia da festa
-  aniversariante String // nome de quem faz aniversário (ex: "Maria")
+  // Label de exibição (nomes juntados, ex: "Maria e João") — derivado de `aniversariantes`,
+  // mantido pra exibição/busca rápida. A fonte da verdade é o JSON abaixo.
+  aniversariante String
+  // Lista estruturada (JSON): [{ "nome": "Maria", "idade": 5 }] — uma festa pode ter mais de
+  // um aniversariante (gêmeos, irmãos), e cada um tem sua idade (opcional). Ver lib/aniversariantes.ts.
+  aniversariantes String  @default("[]")
   tema           String   @default("") // tema da festa (ex: "Frozen", "Super-heróis")
   criadoEm       DateTime @default(now())
 
