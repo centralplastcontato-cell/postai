@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { criarFestaPublica } from "@/app/actions/festas";
 import { type Aniversariante, rotuloAniversariantes } from "@/lib/aniversariantes";
+import { MOMENTOS_FESTA, LIMITE_FOTOS_FESTA, LIMITE_FOTOS_MOMENTO } from "@/lib/momentos-festa";
 
-export type FotoView = { id: string; url: string };
+export type FotoView = { id: string; url: string; momento: string };
 export type FestaView = { id: string; dataISO: string; aniversariantes: Aniversariante[]; tema: string; fotos: FotoView[] };
 export type MarcaPublica = { nome: string; logoUrl: string; corPrimaria: string };
 
@@ -18,7 +19,8 @@ function hojeBR(): string {
 }
 
 // PÁGINA PÚBLICA do Álbum da Festa — o gerente do buffet abre pelo link (sem login), cria a
-// festa e vai subindo as fotos pelo celular. Cada foto entra no banco da marca e abastece os posts.
+// festa e sobe as fotos por MOMENTO guiado (salão, brinquedos, parabéns…). Cada foto entra
+// no banco da marca e abastece os posts.
 export function AlbumFestaPublico({ token, marca, festas }: { token: string; marca: MarcaPublica; festas: FestaView[] }) {
   const router = useRouter();
   const cor = marca.corPrimaria || "#7C3AED";
@@ -31,7 +33,7 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
   const [erro, setErro] = useState<string | null>(null);
 
   const [festaAtiva, setFestaAtiva] = useState<string | null>(festas[0]?.id ?? null);
-  const [subindo, setSubindo] = useState<string | null>(null); // id da festa que está recebendo fotos
+  const [subindo, setSubindo] = useState<string | null>(null); // "festaId:momento" que está recebendo fotos
   const [erroUp, setErroUp] = useState<string | null>(null);
 
   function setPessoa(i: number, campo: "nome" | "idade", val: string) {
@@ -73,15 +75,16 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
     }
   }
 
-  async function subirFotos(festaId: string, files: FileList | null) {
+  async function subirFotos(festaId: string, momento: string, files: FileList | null) {
     if (!files || files.length === 0) return;
     setErroUp(null);
-    setSubindo(festaId);
+    setSubindo(`${festaId}:${momento}`);
     try {
       for (const file of Array.from(files)) {
         const form = new FormData();
         form.append("file", file);
         form.append("festaId", festaId);
+        form.append("momento", momento);
         const resp = await fetch(`/api/f/${token}/upload`, { method: "POST", body: form });
         const d = await resp.json();
         if (!d.ok) setErroUp(d.erro || "Falha ao subir uma das fotos.");
@@ -114,7 +117,7 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
         </div>
 
         <p className="mt-4 rounded-xl border border-linha bg-preto-card p-3 text-sm leading-relaxed text-muted">
-          Crie a festa e vá subindo as fotos durante o evento. Elas viram conteúdo do perfil do buffet, automaticamente. 🎉
+          Crie a festa e vá subindo as fotos por momento durante o evento. Elas viram conteúdo do perfil do buffet, automaticamente. 🎉
         </p>
 
         {/* Nova festa */}
@@ -189,28 +192,46 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
                 <button type="button" onClick={() => setFestaAtiva(ativa ? null : f.id)} className="flex w-full items-center justify-between gap-2 p-4 text-left">
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-white">🎂 {rotuloAniversariantes(f.aniversariantes)}{f.tema ? <span className="font-normal text-muted"> · {f.tema}</span> : null}</span>
-                    <span className="block text-xs text-muted">{dataBR(f.dataISO)} · {f.fotos.length} {f.fotos.length === 1 ? "foto" : "fotos"}</span>
+                    <span className="block text-xs text-muted">{dataBR(f.dataISO)} · {f.fotos.length}/{LIMITE_FOTOS_FESTA} fotos</span>
                   </span>
                   <span className="shrink-0 text-muted">{ativa ? "▲" : "▼"}</span>
                 </button>
 
                 {ativa && (
-                  <div className="border-t border-linha p-4">
-                    <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold text-white transition active:opacity-80" style={{ backgroundColor: cor }}>
-                      {subindo === f.id ? "Subindo fotos…" : "📷 Adicionar fotos"}
-                      <input type="file" accept="image/*" multiple className="hidden" disabled={subindo === f.id} onChange={(e) => subirFotos(f.id, e.target.files)} />
-                    </label>
-                    <p className="mt-2 text-center text-[11px] text-muted">Dá pra tirar na hora ou escolher da galeria — várias de uma vez.</p>
-                    {erroUp && subindo === null && <p className="mt-2 text-center text-sm text-vermelho">{erroUp}</p>}
+                  <div className="space-y-4 border-t border-linha p-4">
+                    {erroUp && <p className="rounded-lg border border-vermelho/40 bg-vermelho/10 p-2 text-center text-sm text-vermelho">{erroUp}</p>}
 
-                    {f.fotos.length > 0 && (
-                      <div className="mt-4 grid grid-cols-3 gap-2">
-                        {f.fotos.map((foto) => (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img key={foto.id} src={foto.url} alt="foto da festa" className="aspect-square w-full rounded-lg border border-linha object-cover" />
-                        ))}
-                      </div>
-                    )}
+                    {/* Um bloco por MOMENTO guiado */}
+                    {MOMENTOS_FESTA.map((m) => {
+                      const fotosM = f.fotos.filter((ft) => ft.momento === m.id);
+                      const cheio = fotosM.length >= LIMITE_FOTOS_MOMENTO;
+                      const subindoEste = subindo === `${f.id}:${m.id}`;
+                      return (
+                        <div key={m.id} className="rounded-lg border border-linha bg-preto p-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-semibold text-white">{m.emoji} {m.label}</span>
+                            <span className={`shrink-0 text-xs font-semibold ${cheio ? "text-green-400" : "text-muted"}`}>{cheio ? "✓ " : ""}{fotosM.length}/{LIMITE_FOTOS_MOMENTO}</span>
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-muted">{m.dica}</p>
+
+                          {!cheio && (
+                            <label className="mt-3 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-white transition active:opacity-80" style={{ backgroundColor: cor }}>
+                              {subindoEste ? "Subindo…" : "📷 Adicionar fotos"}
+                              <input type="file" accept="image/*" multiple className="hidden" disabled={subindoEste} onChange={(e) => subirFotos(f.id, m.id, e.target.files)} />
+                            </label>
+                          )}
+
+                          {fotosM.length > 0 && (
+                            <div className="mt-3 grid grid-cols-3 gap-2">
+                              {fotosM.map((foto) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img key={foto.id} src={foto.url} alt={m.label} className="aspect-square w-full rounded-lg border border-linha object-cover" />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

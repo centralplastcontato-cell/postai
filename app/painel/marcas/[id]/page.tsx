@@ -52,14 +52,14 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     prisma.imagemMarca.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
     prisma.metricaMarca.findMany({ where: { marcaId: id }, orderBy: { dia: "desc" }, take: 90, select: { dia: true, seguidores: true, posts: true } }),
     prisma.atividadeAgente.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" }, take: 25, select: { id: true, agente: true, texto: true, criadoEm: true } }),
-    prisma.festa.findMany({ where: { marcaId: id }, orderBy: { data: "desc" }, include: { fotos: { select: { id: true, url: true }, orderBy: { criadoEm: "desc" } } } }),
+    prisma.festa.findMany({ where: { marcaId: id }, orderBy: { data: "desc" }, include: { fotos: { select: { id: true, url: true, momento: true }, orderBy: { criadoEm: "desc" } } } }),
   ]);
   const festas: FestaView[] = festasRaw.map((f) => ({
     id: f.id,
     dataISO: f.data.toISOString(),
     aniversariantes: parseAniversariantes(f.aniversariantes),
     tema: f.tema,
-    fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url })),
+    fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento })),
   }));
   const atividades = ativ.map((a) => ({ id: a.id, agente: a.agente, texto: a.texto, criadoEm: a.criadoEm.toISOString() }));
 

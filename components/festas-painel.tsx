@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { gerarLinkFotos, revogarLinkFotos, excluirFesta } from "@/app/actions/festas";
 import { type FestaView } from "@/components/album-festa-publico";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
+import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
 
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" });
@@ -164,14 +165,22 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
                   </div>
                   <button type="button" onClick={() => pedirApagarFesta(f)} title="Excluir festa" className="shrink-0 rounded px-2 py-1 text-xs text-red-400 transition hover:bg-red-900/30">✕ Excluir</button>
                 </div>
-                {f.fotos.length > 0 && (
-                  <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-6">
-                    {f.fotos.map((foto) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={foto.id} src={foto.url} alt="foto da festa" className="aspect-square w-full rounded-md border border-linha object-cover" />
-                    ))}
-                  </div>
-                )}
+                {/* Fotos agrupadas por momento — mostra ao dono o que foi (ou não) registrado */}
+                {MOMENTOS_FESTA.map((m) => {
+                  const fotosM = f.fotos.filter((ft) => ft.momento === m.id);
+                  if (!fotosM.length) return null;
+                  return (
+                    <div key={m.id} className="mt-3">
+                      <p className="text-[11px] font-semibold text-muted">{m.emoji} {m.label} <span className="font-normal">· {fotosM.length}</span></p>
+                      <div className="mt-1 grid grid-cols-4 gap-2 sm:grid-cols-6">
+                        {fotosM.map((foto) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img key={foto.id} src={foto.url} alt={m.label} className="aspect-square w-full rounded-md border border-linha object-cover" />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ))}
           </div>

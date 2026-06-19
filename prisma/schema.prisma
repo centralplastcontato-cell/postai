@@ -97,6 +97,9 @@ model ImagemMarca {
   // SetNull: apagar a festa não apaga as fotos (elas seguem no banco da marca).
   festaId   String?
   festa     Festa?   @relation(fields: [festaId], references: [id], onDelete: SetNull)
+  // Momento guiado do Álbum da Festa (salao|brinquedos|aniversariante|parabens|momentos).
+  // "" = foto que não veio pelo álbum. Ver lib/momentos-festa.ts.
+  momento   String   @default("")
   criadoEm  DateTime @default(now())
 
   @@index([marcaId, categoria])

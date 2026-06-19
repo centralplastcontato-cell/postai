@@ -25,7 +25,7 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
   const festas = await prisma.festa.findMany({
     where: { marcaId: marca.id },
     orderBy: { data: "desc" },
-    include: { fotos: { select: { id: true, url: true }, orderBy: { criadoEm: "desc" } } },
+    include: { fotos: { select: { id: true, url: true, momento: true }, orderBy: { criadoEm: "desc" } } },
   });
 
   const festasView: FestaView[] = festas.map((f) => ({
@@ -33,7 +33,7 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
     dataISO: f.data.toISOString(),
     aniversariantes: parseAniversariantes(f.aniversariantes),
     tema: f.tema,
-    fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url })),
+    fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento })),
   }));
 
   return (
