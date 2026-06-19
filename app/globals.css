@@ -105,3 +105,21 @@ select.input-compact option:checked {
   background-color: #7c3aed;
   color: #ffffff;
 }
+
+/* <input type="date"> no padrão escuro e alinhado igual aos outros campos. Sem isto, no
+   mobile (iOS/Safari) o campo ganha altura/alinhamento NATIVOS que destoam e o ícone do
+   calendário some no fundo escuro. */
+input[type="date"].input-base {
+  color-scheme: dark; /* ícone do calendário branco + picker no tema escuro */
+  min-height: 38px; /* mesma altura visual dos demais inputs (py-2 + text-sm) */
+  -webkit-appearance: none;
+  appearance: none;
+}
+/* iOS centraliza o valor verticalmente e empurra pros lados — alinha à esquerda como os outros. */
+input[type="date"].input-base::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+input[type="date"].input-base::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
