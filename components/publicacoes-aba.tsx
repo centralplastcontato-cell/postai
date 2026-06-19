@@ -28,7 +28,6 @@ import { EtiquetaCategoria } from "./etiqueta-categoria";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
-import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
 import { type SugestaoBia } from "@/lib/inteligencia";
 
@@ -197,7 +196,16 @@ export function PublicacoesAba({
   sugestao?: SugestaoBia | null; // sugestão da Bia pro próximo post (banner no gerador)
 }) {
   const router = useRouter();
-  const gerador = usePainelColapsavel("feed");
+  // Gerador colapsável CONTEXTUAL: vem RECOLHIDO quando o dia (ou a lista) já tem publicação —
+  // foca no que existe; ABERTO quando está vazio — foca em criar a 1ª. Re-sincroniza ao trocar
+  // de dia. O usuário pode abrir/fechar na mão a qualquer momento (botão ▾/▸).
+  const temPubsNoContexto = (dataAlvo ? publicacoes.filter((p) => chaveDiaSP(p.data) === dataAlvo) : publicacoes).length > 0;
+  const [geradorAberto, setGeradorAberto] = useState(!temPubsNoContexto);
+  useEffect(() => {
+    setGeradorAberto(!(dataAlvo ? publicacoes.filter((p) => chaveDiaSP(p.data) === dataAlvo) : publicacoes).length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataAlvo]);
+  const gerador = { aberto: geradorAberto, alternar: () => setGeradorAberto((a) => !a) };
   const redesTexto = temFacebook ? "no Instagram e Facebook" : "no Instagram";
   const [isPending, startTransition] = useTransition();
   const [template, setTemplate] = useState<Template>("dica");

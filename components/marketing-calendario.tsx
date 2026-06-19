@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
@@ -22,7 +22,6 @@ import {
 import { excluirConteudo } from "@/app/actions/excluir";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
-import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
 import { CORES_EXTRAS } from "@/lib/cores-fundo";
 import { SeloEngajamento } from "./selo-engajamento";
@@ -143,7 +142,15 @@ export function MarketingCalendario({
   slotGerador?: ReactNode; // outro gerador (Aniversariantes) renderizado logo abaixo do principal
 }) {
   const router = useRouter();
-  const gerador = usePainelColapsavel("carrossel");
+  // Gerador colapsável CONTEXTUAL: recolhido quando o dia (ou a lista) já tem carrossel; aberto
+  // quando vazio. Re-sincroniza ao trocar de dia. Dá pra abrir/fechar na mão (▾/▸).
+  const temCarrosseisNoContexto = (dataAlvo ? posts.filter((p) => chaveDiaSP(p.data) === dataAlvo) : posts).length > 0;
+  const [geradorAberto, setGeradorAberto] = useState(!temCarrosseisNoContexto);
+  useEffect(() => {
+    setGeradorAberto(!(dataAlvo ? posts.filter((p) => chaveDiaSP(p.data) === dataAlvo) : posts).length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataAlvo]);
+  const gerador = { aberto: geradorAberto, alternar: () => setGeradorAberto((a) => !a) };
   const redesTexto = temFacebook ? "no Instagram e Facebook" : "no Instagram";
   const [isPending, startTransition] = useTransition();
   const [tema, setTema] = useState("");

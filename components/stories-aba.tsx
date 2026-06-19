@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   gerarPublicacao,
@@ -17,7 +17,6 @@ import { type Template } from "@/lib/feed-templates";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
-import { usePainelColapsavel } from "./use-painel-colapsavel";
 import { rotuloHora } from "@/lib/horarios";
 import { CORES_EXTRAS } from "@/lib/cores-fundo";
 import { SeloEngajamento } from "./selo-engajamento";
@@ -82,7 +81,15 @@ export function StoriesAba({
   onLimparDia?: () => void;
 }) {
   const router = useRouter();
-  const gerador = usePainelColapsavel("story");
+  // Gerador colapsável CONTEXTUAL: recolhido quando o dia (ou a lista) já tem story; aberto
+  // quando vazio. Re-sincroniza ao trocar de dia. Dá pra abrir/fechar na mão (▾/▸).
+  const temStoriesNoContexto = (dataAlvo ? stories.filter((s) => chaveDiaSP(s.data) === dataAlvo) : stories).length > 0;
+  const [geradorAberto, setGeradorAberto] = useState(!temStoriesNoContexto);
+  useEffect(() => {
+    setGeradorAberto(!(dataAlvo ? stories.filter((s) => chaveDiaSP(s.data) === dataAlvo) : stories).length);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataAlvo]);
+  const gerador = { aberto: geradorAberto, alternar: () => setGeradorAberto((a) => !a) };
   const [isPending, startTransition] = useTransition();
   const [tema, setTema] = useState("");
   const [template, setTemplate] = useState("promocao");
