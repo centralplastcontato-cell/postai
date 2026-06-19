@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { criarFestaPublica } from "@/app/actions/festas";
+import { criarFestaPublica, removerFotoPublica, moverFotoMomento } from "@/app/actions/festas";
 import { type Aniversariante, rotuloAniversariantes } from "@/lib/aniversariantes";
 import { MOMENTOS_FESTA, LIMITE_FOTOS_FESTA, LIMITE_FOTOS_MOMENTO } from "@/lib/momentos-festa";
 
@@ -35,6 +35,10 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
   const [festaAtiva, setFestaAtiva] = useState<string | null>(festas[0]?.id ?? null);
   const [subindo, setSubindo] = useState<string | null>(null); // "festaId:momento" que está recebendo fotos
   const [erroUp, setErroUp] = useState<string | null>(null);
+  const [fotoSel, setFotoSel] = useState<FotoView | null>(null); // foto aberta no modal de ações (mover/remover)
+  const [removendo, setRemovendo] = useState(false);
+  const [movendo, setMovendo] = useState(false);
+  const [erroModal, setErroModal] = useState<string | null>(null);
 
   function setPessoa(i: number, campo: "nome" | "idade", val: string) {
     setPessoas((ps) => ps.map((p, idx) => (idx === i ? { ...p, [campo]: val } : p)));
@@ -97,8 +101,81 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
     }
   }
 
+  function abrirFoto(foto: FotoView) {
+    setFotoSel(foto);
+    setErroModal(null);
+  }
+
+  async function moverPara(momentoId: string) {
+    if (!fotoSel) return;
+    setMovendo(true);
+    setErroModal(null);
+    try {
+      const r = await moverFotoMomento(token, fotoSel.id, momentoId);
+      if (!r.ok) { setErroModal(r.erro); return; }
+      setFotoSel(null);
+      router.refresh();
+    } catch {
+      setErroModal("Não consegui mover a foto. Tente de novo.");
+    } finally {
+      setMovendo(false);
+    }
+  }
+
+  async function confirmarRemover() {
+    if (!fotoSel) return;
+    setRemovendo(true);
+    setErroModal(null);
+    try {
+      const r = await removerFotoPublica(token, fotoSel.id);
+      if (!r.ok) { setErroModal(r.erro); return; }
+      setFotoSel(null);
+      router.refresh();
+    } catch {
+      setErroModal("Não consegui remover a foto. Tente de novo.");
+    } finally {
+      setRemovendo(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-preto px-4 py-6 sm:px-6 sm:py-10">
+      {/* Modal de ações da foto: mover pro momento certo ou remover (padrão escuro, sem confirm() nativo) */}
+      {fotoSel && (
+        <div onClick={() => !removendo && !movendo && setFotoSel(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-linha bg-preto-card p-5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={fotoSel.url} alt="foto da festa" className="h-40 w-full rounded-lg border border-linha object-cover" />
+
+            <p className="mt-4 text-xs font-medium text-muted">Está no momento certo? Toque pra mover:</p>
+            <div className="mt-2 space-y-1.5">
+              {MOMENTOS_FESTA.map((m) => {
+                const atual = fotoSel.momento === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    disabled={atual || movendo || removendo}
+                    onClick={() => moverPara(m.id)}
+                    className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition disabled:cursor-default ${atual ? "border-[#7c3aed]/50 bg-[#7c3aed]/10 text-white" : "border-linha text-muted hover:border-white/40 hover:text-white disabled:opacity-60"}`}
+                  >
+                    <span>{m.emoji} {m.label}</span>
+                    {atual && <span className="text-[11px] font-semibold text-[#c7b2ff]">✓ aqui</span>}
+                  </button>
+                );
+              })}
+            </div>
+
+            {erroModal && <p className="mt-3 text-sm text-vermelho">{erroModal}</p>}
+
+            <div className="mt-4 flex items-center justify-between gap-2 border-t border-linha pt-4">
+              <button type="button" onClick={confirmarRemover} disabled={removendo || movendo} className="text-sm font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-60">{removendo ? "Removendo…" : "🗑 Remover foto"}</button>
+              <button type="button" onClick={() => setFotoSel(null)} disabled={removendo || movendo} className="rounded-lg border border-linha px-4 py-2 text-sm text-muted transition hover:text-white disabled:opacity-60">Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto w-full max-w-md">
         {/* Cabeçalho da marca */}
         <div className="flex items-center gap-3">
@@ -224,8 +301,11 @@ export function AlbumFestaPublico({ token, marca, festas }: { token: string; mar
                           {fotosM.length > 0 && (
                             <div className="mt-3 grid grid-cols-3 gap-2">
                               {fotosM.map((foto) => (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img key={foto.id} src={foto.url} alt={m.label} className="aspect-square w-full rounded-lg border border-linha object-cover" />
+                                <button key={foto.id} type="button" onClick={() => abrirFoto(foto)} className="relative block" aria-label="Opções da foto">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={foto.url} alt={m.label} className="aspect-square w-full rounded-lg border border-linha object-cover" />
+                                  <span className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs text-white">⋯</span>
+                                </button>
                               ))}
                             </div>
                           )}

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { marcaPorTokenFotos } from "@/lib/festa";
 import { parseAniversariantes, nomesAniversariantes } from "@/lib/aniversariantes";
+import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO } from "@/lib/momentos-festa";
 
 // ===========================================================================
 // ÁLBUM DA FESTA — server actions
@@ -90,4 +91,34 @@ export async function criarFestaPublica(
   });
   revalidatePath(`/f/${token}`);
   return { ok: true as const, festaId: festa.id };
+}
+
+// O gerente remove uma foto que subiu errada — pelo link público (validado por TOKEN).
+// Só apaga foto DE FESTA desta marca (festaId preenchido): o link não mexe nas fotos do
+// banco geral que o dono subiu no painel, nem nas de outra marca.
+export async function removerFotoPublica(token: string, fotoId: string) {
+  const m = await marcaPorTokenFotos(token);
+  if (!m) return { ok: false as const, erro: "Link inválido ou desativado." };
+  const foto = await prisma.imagemMarca.findUnique({ where: { id: fotoId }, select: { marcaId: true, festaId: true } });
+  if (!foto || foto.marcaId !== m.id || !foto.festaId) return { ok: false as const, erro: "Foto não encontrada." };
+  await prisma.imagemMarca.delete({ where: { id: fotoId } });
+  revalidatePath(`/f/${token}`);
+  return { ok: true as const };
+}
+
+// O gerente MOVE uma foto pro momento certo (subiu no lugar errado). Pelo link público
+// (validado por TOKEN). Atualiza o momento E a categoria do banco correspondente — assim a
+// foto volta a casar com o tipo de post certo. Respeita o limite de 5 por momento no destino.
+export async function moverFotoMomento(token: string, fotoId: string, novoMomento: string) {
+  const m = await marcaPorTokenFotos(token);
+  if (!m) return { ok: false as const, erro: "Link inválido ou desativado." };
+  const mom = normalizarMomento(novoMomento);
+  const foto = await prisma.imagemMarca.findUnique({ where: { id: fotoId }, select: { marcaId: true, festaId: true, momento: true } });
+  if (!foto || foto.marcaId !== m.id || !foto.festaId) return { ok: false as const, erro: "Foto não encontrada." };
+  if (foto.momento === mom) return { ok: true as const }; // já está no momento pedido
+  const noDestino = await prisma.imagemMarca.count({ where: { festaId: foto.festaId, momento: mom } });
+  if (noDestino >= LIMITE_FOTOS_MOMENTO) return { ok: false as const, erro: `Esse momento já tem ${LIMITE_FOTOS_MOMENTO} fotos (o máximo).` };
+  await prisma.imagemMarca.update({ where: { id: fotoId }, data: { momento: mom, categoria: categoriaDoMomento(mom) } });
+  revalidatePath(`/f/${token}`);
+  return { ok: true as const };
 }
