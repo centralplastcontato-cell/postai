@@ -18,3 +18,15 @@ export const TEMPLATE_LABEL: Record<Template, string> = {
   enquete: "⚔️ Enquete / VS (engajamento)",
   vitrine: "🍱 Vitrine (6 fotos + título)",
 };
+
+// Templates de DESIGN FECHADO: a arte é só cor + texto (ou usa fotos próprias via rodízio,
+// como mosaico/vitrine). Eles NÃO usam a `imagemUrl` (foto de fundo única) — então os botões
+// "🎲 Banco / 🤖 IA / 📤 Foto" não têm efeito neles e devem ficar escondidos. Lista negativa
+// (mais segura p/ templates legados): todo o resto usa foto de fundo. Espelha o render em
+// app/api/feed/[id]/route.tsx (só esses não passam imagemUrl/fotoUrl pro layout).
+const TEMPLATES_SEM_FOTO_FUNDO: string[] = ["promocao", "divulgacao", "moldura", "preco", "mosaico", "vitrine"];
+
+// O template usa foto de fundo única (controlada pelos botões Banco/IA/Foto)?
+export function templateUsaFotoFundo(template: string): boolean {
+  return !TEMPLATES_SEM_FOTO_FUNDO.includes(template);
+}

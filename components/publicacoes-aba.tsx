@@ -20,7 +20,7 @@ import {
   definirEspelhar,
 } from "@/app/actions/feed";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
-import { TEMPLATES, TEMPLATE_LABEL, type Template } from "@/lib/feed-templates";
+import { TEMPLATES, TEMPLATE_LABEL, templateUsaFotoFundo, type Template } from "@/lib/feed-templates";
 import { CATEGORIAS, CATEGORIA_LABEL } from "@/lib/categorias-imagem";
 import { parsePaleta, paletaComExtras, CORES_EXTRAS } from "@/lib/cores-fundo";
 import { SeloEngajamento } from "./selo-engajamento";
@@ -1162,10 +1162,12 @@ export function PublicacoesAba({
                   <button onClick={() => copiar(p)} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">{copiadoId === p.id ? "✓ Copiado" : "Copiar texto"}</button>
                   {/* Edição de imagem some em posts já postados (não muda o que está no
                       Instagram). Pra uma versão nova, use Regerar → "criar nova ao lado". */}
-                  {!postado && (
+                  {/* Botões de FOTO DE FUNDO só nos templates que usam imagem. Em design fechado
+                      (Promoção, Preço, Divulgação…) eles não teriam efeito — escondidos pra não confundir. */}
+                  {!postado && templateUsaFotoFundo(p.template) && (
                     <>
                       <button onClick={() => handleBanco(p.id, p.categoria ?? undefined)} disabled={ocupado} title="Sortear foto real do seu banco de imagens" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲 Banco</button>
-                      <button onClick={() => handleGerarImagem(p.id)} disabled={ocupado} title="Fundo decorativo abstrato com IA (não mostra ambiente real)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🤖 IA</button>
+                      <button onClick={() => handleGerarImagem(p.id)} disabled={ocupado} title="Gera um FUNDO artístico com IA, no clima do post (fundo abstrato — não é foto do seu espaço)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🤖 Fundo IA</button>
                       <label className="cursor-pointer rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
                         📤 Foto
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUpload(p.id, e.target.files?.[0])} />

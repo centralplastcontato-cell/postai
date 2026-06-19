@@ -1034,9 +1034,13 @@ export async function gerarImagemPublicacao(input: { id: string; descricao?: str
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
-  // Fundo DECORATIVO ABSTRATO — nunca um ambiente/cena realista (pra não fingir
-  // ser o espaço real do negócio). O espaço de verdade vem do banco de fotos reais.
-  const prompt = `Fundo decorativo abstrato para um post de rede social da marca "${p.marca.nome}". Estilo: textura/padrão festivo e colorido — bokeh, confete, balões, formas geométricas suaves, gradiente alegre. NÃO é uma fotografia de ambiente, lugar, espaço, comida, objetos ou pessoas reais; é apenas um fundo artístico abstrato. Formato vertical. SEM texto, letras, números, logotipos, pessoas, rostos ou cenários reconhecíveis.`;
+  // Fundo DECORATIVO ABSTRATO conectado ao TEMA do post — nunca um ambiente/cena realista
+  // (pra não fingir ser o espaço real do negócio; o espaço de verdade vem do banco de fotos).
+  // O tema (título/tema do post) guia o CLIMA e as CORES, e harmoniza com a cor da marca —
+  // assim o fundo "conversa" com o conteúdo, mas segue abstrato.
+  const tema = (input.descricao || p.tema || p.titulo || "").toString().trim().slice(0, 200);
+  const contexto = tema ? ` O post é sobre: "${tema}". Deixe o CLIMA e as CORES do fundo combinarem com esse tema.` : "";
+  const prompt = `Fundo decorativo abstrato para um post de rede social do buffet infantil "${p.marca.nome}".${contexto} Harmonize a paleta com a cor ${p.marca.corPrimaria || "#7C3AED"}, de forma alegre e festiva. Estilo: textura/padrão abstrato — bokeh, confete, balões, formas geométricas suaves, gradiente. É APENAS um fundo artístico abstrato: NÃO é fotografia de ambiente, lugar, espaço, comida, objetos ou pessoas reais. Formato vertical. SEM texto, letras, números, logotipos, pessoas, rostos ou cenários reconhecíveis.`;
   let b64: string | undefined;
   try {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
