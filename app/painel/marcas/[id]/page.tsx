@@ -52,7 +52,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     prisma.imagemMarca.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
     prisma.metricaMarca.findMany({ where: { marcaId: id }, orderBy: { dia: "desc" }, take: 90, select: { dia: true, seguidores: true, posts: true } }),
     prisma.atividadeAgente.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" }, take: 25, select: { id: true, agente: true, texto: true, criadoEm: true } }),
-    prisma.festa.findMany({ where: { marcaId: id }, orderBy: { data: "desc" }, include: { fotos: { select: { id: true, url: true, momento: true }, orderBy: { criadoEm: "desc" } } } }),
+    prisma.festa.findMany({ where: { marcaId: id }, orderBy: { data: "desc" }, include: { fotos: { select: { id: true, url: true, momento: true, descricao: true }, orderBy: { criadoEm: "desc" } } } }),
   ]);
   // Backfill: festas criadas antes do "link por festa" não têm token — geramos um aqui
   // (uma vez) pra cada, pra que toda festa tenha seu link próprio no painel.
@@ -69,7 +69,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       aniversariantes: parseAniversariantes(f.aniversariantes),
       tema: f.tema,
       finalizadaEm: f.finalizadaEm ? f.finalizadaEm.toISOString() : null,
-      fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento })),
+      fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento, descricao: foto.descricao })),
     };
   }));
   const atividades = ativ.map((a) => ({ id: a.id, agente: a.agente, texto: a.texto, criadoEm: a.criadoEm.toISOString() }));

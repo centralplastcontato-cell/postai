@@ -18,7 +18,7 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
   if (festa) {
     const fotos = await prisma.imagemMarca.findMany({
       where: { festaId: festa.id },
-      select: { id: true, url: true, momento: true },
+      select: { id: true, url: true, momento: true, descricao: true },
       orderBy: { criadoEm: "desc" },
     });
     const festaView: FestaView = {
@@ -28,7 +28,7 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
       aniversariantes: parseAniversariantes(festa.aniversariantes),
       tema: festa.tema,
       finalizadaEm: festa.finalizadaEm ? festa.finalizadaEm.toISOString() : null,
-      fotos: fotos.map((f) => ({ id: f.id, url: f.url, momento: f.momento })),
+      fotos: fotos.map((f) => ({ id: f.id, url: f.url, momento: f.momento, descricao: f.descricao })),
     };
     return <FestaPublico token={token} marca={festa.marca} festa={festaView} />;
   }

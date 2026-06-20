@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { gerarLinkFotos, revogarLinkFotos, excluirFesta, editarFesta } from "@/app/actions/festas";
-import { type FestaView } from "@/lib/festa-tipos";
+import { gerarLinkFotos, revogarLinkFotos, excluirFesta, editarFesta, adicionarFotoFestaPainel } from "@/app/actions/festas";
+import { atualizarImagemMarca } from "@/app/actions/imagens";
+import { type FestaView, type FotoView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
-import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
+import { MOMENTOS_FESTA, LIMITE_FOTOS_MOMENTO } from "@/lib/momentos-festa";
 import { InputDataBR } from "@/components/input-data-br";
 
 function dataBR(iso: string): string {
@@ -31,18 +32,66 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
   const [erro, setErro] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<Confirmacao | null>(null);
   const [abertas, setAbertas] = useState<Set<string>>(new Set()); // festas expandidas (começam TODAS colapsadas)
-  const [imgExpandida, setImgExpandida] = useState<string | null>(null); // foto aberta no lightbox
+  const [fotoAberta, setFotoAberta] = useState<FotoView | null>(null); // foto aberta no modal (ampliar + descrição)
+  const [descEdit, setDescEdit] = useState("");
+  const [salvandoDesc, setSalvandoDesc] = useState(false);
+  const [erroDesc, setErroDesc] = useState<string | null>(null);
   const [editando, setEditando] = useState<FestaView | null>(null); // festa em edição
   const [edData, setEdData] = useState("");
   const [edPessoas, setEdPessoas] = useState<{ nome: string; idade: string }[]>([{ nome: "", idade: "" }]);
   const [edTema, setEdTema] = useState("");
   const [salvandoEd, setSalvandoEd] = useState(false);
   const [erroEd, setErroEd] = useState<string | null>(null);
+  const [subindoFesta, setSubindoFesta] = useState<string | null>(null); // "festaId:momento" recebendo fotos
+  const [erroUpload, setErroUpload] = useState<string | null>(null);
 
   const linkCriar = token ? `${linkBase}/f/${token}` : "";
 
+  async function subirFotosPainel(festaId: string, momento: string, files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setErroUpload(null);
+    setSubindoFesta(`${festaId}:${momento}`);
+    try {
+      for (const file of Array.from(files)) {
+        const form = new FormData();
+        form.append("file", file);
+        const resp = await fetch("/api/marketing/upload", { method: "POST", body: form });
+        const data = await resp.json();
+        if (!data.ok) { setErroUpload(data.erro || "Falha no upload de uma foto."); continue; }
+        const r = await adicionarFotoFestaPainel(festaId, data.url, momento);
+        if (!r.ok) setErroUpload(r.erro);
+      }
+      router.refresh();
+    } catch {
+      setErroUpload("Não consegui subir as fotos. Tente de novo.");
+    } finally {
+      setSubindoFesta(null);
+    }
+  }
+
   function toggleFesta(id: string) {
     setAbertas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
+  function abrirFoto(foto: FotoView) {
+    setFotoAberta(foto);
+    setDescEdit(foto.descricao || "");
+    setErroDesc(null);
+  }
+  async function salvarDescricao() {
+    if (!fotoAberta) return;
+    setSalvandoDesc(true);
+    setErroDesc(null);
+    try {
+      const r = await atualizarImagemMarca({ id: fotoAberta.id, descricao: descEdit });
+      if (!r.ok) { setErroDesc(r.erro); return; }
+      setFotoAberta(null);
+      router.refresh();
+    } catch {
+      setErroDesc("Não consegui salvar. Tente de novo.");
+    } finally {
+      setSalvandoDesc(false);
+    }
   }
 
   function abrirEdicao(f: FestaView) {
@@ -167,12 +216,23 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
         </div>
       )}
 
-      {/* Lightbox: clicar na foto amplia */}
-      {imgExpandida && (
-        <div onClick={() => setImgExpandida(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={imgExpandida} alt="foto da festa" className="max-h-[90vh] max-w-full rounded-lg object-contain" />
-          <button type="button" onClick={() => setImgExpandida(null)} aria-label="Fechar" className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-lg text-white">✕</button>
+      {/* Modal da foto: ampliar + ver/corrigir a descrição que a IA leu (a Bia usa pra casar com o post) */}
+      {fotoAberta && (
+        <div onClick={() => !salvandoDesc && setFotoAberta(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+          <div onClick={(e) => e.stopPropagation()} className="flex max-h-[90vh] w-full max-w-2xl flex-col gap-4 overflow-auto rounded-2xl border border-linha bg-preto-card p-4 sm:flex-row">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={fotoAberta.url} alt="foto da festa" className="max-h-[45vh] w-full rounded-lg object-contain sm:max-h-[70vh] sm:w-1/2" />
+            <div className="flex flex-1 flex-col">
+              <p className="text-sm font-semibold text-white">🔍 O que a IA leu nesta foto</p>
+              <p className="mt-1 text-[11px] text-muted">A Bia usa esta descrição pra escolher a foto quando combinar com o post. Corrija aqui se ela errou.</p>
+              <textarea value={descEdit} onChange={(e) => setDescEdit(e.target.value)} rows={3} placeholder="Ainda sem descrição — escreva uma (ex: Mesa de doces colorida)" className="input-base mt-3 resize-none" />
+              {erroDesc && <p className="mt-2 text-sm text-vermelho">{erroDesc}</p>}
+              <div className="mt-4 flex gap-2">
+                <button type="button" onClick={salvarDescricao} disabled={salvandoDesc} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">{salvandoDesc ? "Salvando…" : "Salvar"}</button>
+                <button type="button" onClick={() => setFotoAberta(null)} className="rounded-lg border border-linha px-4 py-2 text-sm text-muted transition hover:border-vermelho hover:text-white">Fechar</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -283,23 +343,38 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
                         <button type="button" onClick={() => abrirEdicao(f)} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-sky-300 transition hover:border-sky-500 hover:text-sky-200">✏️ Editar</button>
                       </div>
 
-                      {/* Fotos agrupadas por momento — mostra ao dono o que foi (ou não) registrado */}
-                      {f.fotos.length === 0 ? (
-                        <p className="mt-3 text-center text-xs text-muted">Ainda sem fotos nesta festa.</p>
-                      ) : MOMENTOS_FESTA.map((m) => {
+                      {erroUpload && <p className="mt-3 rounded-lg border border-vermelho/40 bg-vermelho/10 p-2 text-center text-sm text-vermelho">{erroUpload}</p>}
+
+                      {/* Fotos por momento — com botão de ADICIONAR (o dono/admin sobe direto pelo painel) */}
+                      {MOMENTOS_FESTA.map((m) => {
                         const fotosM = f.fotos.filter((ft) => ft.momento === m.id);
-                        if (!fotosM.length) return null;
+                        const cheio = fotosM.length >= LIMITE_FOTOS_MOMENTO;
+                        const subindoEste = subindoFesta === `${f.id}:${m.id}`;
                         return (
-                          <div key={m.id} className="mt-3">
-                            <p className="text-[11px] font-semibold text-muted">{m.emoji} {m.label} <span className="font-normal">· {fotosM.length}</span></p>
-                            <div className="mt-1 grid grid-cols-4 gap-2 sm:grid-cols-6">
-                              {fotosM.map((foto) => (
-                                <button key={foto.id} type="button" onClick={() => setImgExpandida(foto.url)} title="Ampliar" className="block overflow-hidden rounded-md border border-linha transition hover:border-vermelho">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={foto.url} alt={m.label} className="aspect-square w-full object-cover" />
-                                </button>
-                              ))}
+                          <div key={m.id} className="mt-3 rounded-lg border border-linha bg-preto p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[12px] font-semibold text-white">{m.emoji} {m.label}</span>
+                              <span className={`shrink-0 text-[11px] font-semibold ${cheio ? "text-green-400" : "text-muted"}`}>{cheio ? "✓ " : ""}{fotosM.length}/{LIMITE_FOTOS_MOMENTO}</span>
                             </div>
+                            {!cheio && (
+                              <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">
+                                {subindoEste ? "Subindo…" : "📷 Adicionar fotos"}
+                                <input type="file" accept="image/*" multiple className="hidden" disabled={subindoEste} onChange={(e) => subirFotosPainel(f.id, m.id, e.target.files)} />
+                              </label>
+                            )}
+                            {fotosM.length > 0 && (
+                              <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
+                                {fotosM.map((foto) => (
+                                  <button key={foto.id} type="button" onClick={() => abrirFoto(foto)} title="Ver / descrição da IA" className="relative block overflow-hidden rounded-md border border-linha transition hover:border-vermelho">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={foto.url} alt={m.label} className="aspect-square w-full object-cover" />
+                                    {foto.descricao ? (
+                                      <span title={foto.descricao} className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-1 py-0.5 text-left text-[9px] leading-tight text-white/90">🔍 {foto.descricao}</span>
+                                    ) : null}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         );
                       })}

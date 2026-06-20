@@ -6,7 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { marcaPorTokenFotos, festaPorToken, gerarTokenFesta } from "@/lib/festa";
 import { parseAniversariantes, nomesAniversariantes } from "@/lib/aniversariantes";
-import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO } from "@/lib/momentos-festa";
+import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO, LIMITE_FOTOS_FESTA } from "@/lib/momentos-festa";
+import { descreverImagem } from "@/lib/imagem-ia";
 
 // ===========================================================================
 // ÁLBUM DA FESTA — server actions
@@ -84,6 +85,30 @@ export async function editarFesta(
       tema: (input.tema || "").trim().slice(0, 80),
     },
   });
+  revalidatePath(`/painel/marcas/${f.marcaId}`);
+  return { ok: true as const };
+}
+
+// O ADMIN/dono adiciona uma foto a uma festa pelo PAINEL (com sessão). A foto já vem subida
+// no Blob (via /api/marketing/upload). Mapeia categoria do momento, respeita os limites e
+// descreve com IA — igual ao upload do gerente, mas autorizado por sessão (guardaMarca).
+export async function adicionarFotoFestaPainel(festaId: string, url: string, momento: string) {
+  const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
+  if (!f) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(f.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const u = (url || "").trim();
+  if (!u) return { ok: false as const, erro: "Foto sem URL." };
+  const mom = normalizarMomento(momento);
+  const totalFesta = await prisma.imagemMarca.count({ where: { festaId } });
+  if (totalFesta >= LIMITE_FOTOS_FESTA) return { ok: false as const, erro: `Esta festa já atingiu o limite de ${LIMITE_FOTOS_FESTA} fotos.` };
+  const noMomento = await prisma.imagemMarca.count({ where: { festaId, momento: mom } });
+  if (noMomento >= LIMITE_FOTOS_MOMENTO) return { ok: false as const, erro: `Este momento já tem ${LIMITE_FOTOS_MOMENTO} fotos (o máximo).` };
+  const img = await prisma.imagemMarca.create({
+    data: { marcaId: f.marcaId, url: u, categoria: categoriaDoMomento(mom), festaId, momento: mom },
+  });
+  const descricao = await descreverImagem(u);
+  if (descricao) await prisma.imagemMarca.update({ where: { id: img.id }, data: { descricao } }).catch(() => {});
   revalidatePath(`/painel/marcas/${f.marcaId}`);
   return { ok: true as const };
 }
