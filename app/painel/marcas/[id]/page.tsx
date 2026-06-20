@@ -8,8 +8,9 @@ import { type Post } from "@/components/marketing-calendario";
 import { type PublicacaoView } from "@/components/publicacoes-aba";
 import { type MarcaView } from "@/components/marca-form";
 import { type ImagemView } from "@/components/banco-imagens";
-import { type FestaView } from "@/components/album-festa-publico";
+import { type FestaView } from "@/lib/festa-tipos";
 import { parseAniversariantes } from "@/lib/aniversariantes";
+import { gerarTokenFesta } from "@/lib/festa";
 import { baseUrl } from "@/lib/config";
 import { AtividadesRecentes } from "@/components/atividades-recentes";
 import { OnboardingMarca } from "@/components/onboarding-marca";
@@ -54,12 +55,23 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     prisma.atividadeAgente.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" }, take: 25, select: { id: true, agente: true, texto: true, criadoEm: true } }),
     prisma.festa.findMany({ where: { marcaId: id }, orderBy: { data: "desc" }, include: { fotos: { select: { id: true, url: true, momento: true }, orderBy: { criadoEm: "desc" } } } }),
   ]);
-  const festas: FestaView[] = festasRaw.map((f) => ({
-    id: f.id,
-    dataISO: f.data.toISOString(),
-    aniversariantes: parseAniversariantes(f.aniversariantes),
-    tema: f.tema,
-    fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento })),
+  // Backfill: festas criadas antes do "link por festa" não têm token — geramos um aqui
+  // (uma vez) pra cada, pra que toda festa tenha seu link próprio no painel.
+  const festas: FestaView[] = await Promise.all(festasRaw.map(async (f) => {
+    let token = f.token;
+    if (!token) {
+      token = gerarTokenFesta();
+      await prisma.festa.update({ where: { id: f.id }, data: { token } }).catch(() => {});
+    }
+    return {
+      id: f.id,
+      token,
+      dataISO: f.data.toISOString(),
+      aniversariantes: parseAniversariantes(f.aniversariantes),
+      tema: f.tema,
+      finalizadaEm: f.finalizadaEm ? f.finalizadaEm.toISOString() : null,
+      fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento })),
+    };
   }));
   const atividades = ativ.map((a) => ({ id: a.id, agente: a.agente, texto: a.texto, criadoEm: a.criadoEm.toISOString() }));
 

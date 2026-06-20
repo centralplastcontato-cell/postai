@@ -14,8 +14,8 @@ export const MOMENTOS_FESTA = [
 export type MomentoId = (typeof MOMENTOS_FESTA)[number]["id"];
 
 // Limites por festa (curadoria + controla custo da visão da IA, que roda 1x por foto).
-export const LIMITE_FOTOS_FESTA = 25;
-export const LIMITE_FOTOS_MOMENTO = 5;
+export const LIMITE_FOTOS_FESTA = 50; // 5 momentos × 10
+export const LIMITE_FOTOS_MOMENTO = 10;
 
 export function momentoPorId(id: string) {
   return MOMENTOS_FESTA.find((m) => m.id === id) ?? null;

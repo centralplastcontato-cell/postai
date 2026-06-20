@@ -8,7 +8,7 @@ import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { FestasPainel } from "./festas-painel";
-import { type FestaView } from "./album-festa-publico";
+import { type FestaView } from "@/lib/festa-tipos";
 import { ConexaoCard } from "./conexao-card";
 import { EvolucaoCard } from "./evolucao-card";
 import { BackfillEngajamento } from "./backfill-engajamento";
@@ -103,6 +103,9 @@ export function MarcaHub({
         </p>
       )}
 
+      {/* Cartões de contexto (assinatura, conexão, Bia, evolução) são sobre POSTS/conta —
+          some na aba Festas, que é um contexto à parte (gerenciar fotos de evento). */}
+      {aba !== "festas" && (
       <div className="mt-5 space-y-4">
         {assinatura && stAssin && (
           <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
@@ -142,6 +145,7 @@ export function MarcaHub({
         <EvolucaoCard pontos={evolucao} />
         {ehAdmin && <BackfillEngajamento marcaId={marca.id} />}
       </div>
+      )}
 
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>

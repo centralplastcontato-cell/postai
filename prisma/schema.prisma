@@ -66,6 +66,9 @@ model Festa {
   id             String   @id @default(cuid())
   marcaId        String
   marca          Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  // Token do link PRÓPRIO e ISOLADO desta festa: quem tem ele só acessa ESTA festa (não as
+  // outras). Gerado na criação; backfill preenche as antigas. Vazio nunca casa (lib/festa.ts).
+  token          String   @default("")
   data           DateTime // dia da festa
   // Label de exibição (nomes juntados, ex: "Maria e João") — derivado de `aniversariantes`,
   // mantido pra exibição/busca rápida. A fonte da verdade é o JSON abaixo.
@@ -74,6 +77,9 @@ model Festa {
   // um aniversariante (gêmeos, irmãos), e cada um tem sua idade (opcional). Ver lib/aniversariantes.ts.
   aniversariantes String  @default("[]")
   tema           String   @default("") // tema da festa (ex: "Frozen", "Super-heróis")
+  // Quando o gerente marca "finalizei o envio". null = ainda subindo fotos. Sinaliza ao dono
+  // que a festa está COMPLETA (pronta pra usar/gerar post). Pode reabrir pra adicionar mais.
+  finalizadaEm   DateTime?
   criadoEm       DateTime @default(now())
 
   fotos          ImagemMarca[]
