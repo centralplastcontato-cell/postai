@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { exigirAdmin, guardaMarca } from "@/lib/acesso";
 import { estaLogado } from "@/lib/auth";
@@ -111,10 +112,25 @@ export async function salvarIdentidadeMarca(input: {
   return { ok: true as const };
 }
 
+// Exclui a marca e TUDO dela. O cascade do banco (onDelete: Cascade) já apaga os REGISTROS
+// de conteúdos, publicações, imagens, festas e métricas. Aqui, antes, apagamos também os
+// ARQUIVOS de foto no Vercel Blob (fotos do banco/festas + imagens de feed + slides), pra não
+// deixar storage órfão. Best-effort: se a limpeza do Blob falhar, a exclusão segue.
 export async function excluirMarca(id: string) {
   const g = await exigirAdmin(); // excluir marca é ação destrutiva — só admin
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  await prisma.marca.delete({ where: { id } });
+  try {
+    const [imgs, pubs, conts] = await Promise.all([
+      prisma.imagemMarca.findMany({ where: { marcaId: id }, select: { url: true } }),
+      prisma.publicacao.findMany({ where: { marcaId: id }, select: { imagemUrl: true } }),
+      prisma.conteudo.findMany({ where: { marcaId: id }, select: { slides: true } }),
+    ]);
+    const slideUrls = conts.flatMap((c) => { try { return JSON.parse(c.slides) as string[]; } catch { return []; } });
+    const urls = [...imgs.map((i) => i.url), ...pubs.map((p) => p.imagemUrl || ""), ...slideUrls]
+      .filter((u) => typeof u === "string" && u.startsWith("http")); // ignora data:base64 (logo) e vazios
+    if (urls.length) await del(urls).catch(() => {});
+  } catch {}
+  await prisma.marca.delete({ where: { id } }); // cascade: conteúdos, publicações, imagens, festas, métricas
   revalidatePath("/painel");
   return { ok: true as const };
 }

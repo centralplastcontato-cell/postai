@@ -8,6 +8,7 @@ import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { FestasPainel } from "./festas-painel";
+import { AtividadesRecentes, type Ativ } from "./atividades-recentes";
 import { type FestaView } from "@/lib/festa-tipos";
 import { ConexaoCard } from "./conexao-card";
 import { EvolucaoCard } from "./evolucao-card";
@@ -38,6 +39,7 @@ export function MarcaHub({
   stories,
   imagens,
   festas,
+  atividades,
   linkBase,
   tokenFotos,
   evolucao,
@@ -55,6 +57,7 @@ export function MarcaHub({
   stories: PublicacaoView[];
   imagens: ImagemView[];
   festas: FestaView[];
+  atividades: Ativ[];
   linkBase: string;
   tokenFotos: string;
   evolucao: { dia: string; seguidores: number; posts: number }[];
@@ -104,8 +107,9 @@ export function MarcaHub({
       )}
 
       {/* Cartões de contexto (assinatura, conexão, Bia, evolução) são sobre POSTS/conta —
-          some na aba Festas, que é um contexto à parte (gerenciar fotos de evento). */}
-      {aba !== "festas" && (
+          aparecem SÓ na aba Redes Sociais. Nas abas de gestão (Imagens, Festas, Config) ficam
+          escondidos, pra todas as abas serem consistentes e focadas. */}
+      {aba === "redes" && (
       <div className="mt-5 space-y-4">
         {assinatura && stAssin && (
           <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
@@ -161,6 +165,9 @@ export function MarcaHub({
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
         {aba === "config" && (ehAdmin ? <MarcaForm marca={marca} /> : <MarcaForm marca={marca} somenteIdentidade />)}
       </div>
+
+      {/* Atividades da Bia (sobre posts) — só na aba Redes Sociais, junto dos demais cartões. */}
+      {aba === "redes" && <AtividadesRecentes atividades={atividades} />}
     </div>
   );
 }

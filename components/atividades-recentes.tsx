@@ -7,7 +7,7 @@ import { usePainelColapsavel } from "./use-painel-colapsavel";
 // os erros. Antes isso era gravado no banco e nunca exibido: quando uma postagem falhava,
 // o dono ficava no escuro. Aqui o motivo aparece em vermelho, na hora.
 
-type Ativ = { id: string; agente: string; texto: string; criadoEm: string };
+export type Ativ = { id: string; agente: string; texto: string; criadoEm: string };
 
 const INICIAIS = 6; // quantas aparecem antes do "Ver todas"
 

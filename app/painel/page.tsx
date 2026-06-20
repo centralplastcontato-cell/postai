@@ -5,6 +5,7 @@ import { criarMarca } from "@/app/actions/marcas";
 import { marcaConectada } from "@/lib/instagram";
 import { sessaoAtual } from "@/lib/auth";
 import { filtroMarcaVisivel } from "@/lib/acesso";
+import { ExcluirMarcaBtn } from "@/components/excluir-marca-btn";
 
 export const dynamic = "force-dynamic";
 
@@ -102,8 +103,8 @@ export default async function PainelHome() {
               accessToken: m.accessToken,
             });
             return (
+              <div key={m.id} className="relative">
               <Link
-                key={m.id}
                 href={`/painel/marcas/${m.id}`}
                 className="flex flex-col rounded-xl border border-linha bg-preto-card p-4 transition hover:border-vermelho"
               >
@@ -153,6 +154,8 @@ export default async function PainelHome() {
                   )}
                 </div>
               </Link>
+              {s.admin && <ExcluirMarcaBtn id={m.id} nome={m.nome} />}
+              </div>
             );
           })}
         </div>

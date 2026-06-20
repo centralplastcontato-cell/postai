@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { criarFestaPublica } from "@/app/actions/festas";
 import { type MarcaPublica } from "@/lib/festa-tipos";
+import { InputDataBR } from "@/components/input-data-br";
 
 // Data de hoje (BRT) no formato yyyy-mm-dd pro <input type="date">.
 function hojeBR(): string {
@@ -79,7 +80,7 @@ export function CriarFestaPublico({ tokenMarca, marca }: { tokenMarca: string; m
           <p className="text-sm font-semibold text-white">✨ Nova festa</p>
 
           <label className="mt-4 block text-xs font-medium text-muted">Data da festa
-            <input type="date" value={data} onChange={(e) => setData(e.target.value)} className="input-base mt-1" />
+            <InputDataBR value={data} onChange={setData} className="mt-1" />
           </label>
 
           <div className="mt-4">

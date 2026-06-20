@@ -6,6 +6,7 @@ import { gerarLinkFotos, revogarLinkFotos, excluirFesta, editarFesta } from "@/a
 import { type FestaView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
 import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
+import { InputDataBR } from "@/components/input-data-br";
 
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" });
@@ -182,7 +183,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
             <p className="text-sm font-semibold text-white">✏️ Editar festa</p>
 
             <label className="mt-4 block text-xs font-medium text-muted">Data da festa
-              <input type="date" value={edData} onChange={(e) => setEdData(e.target.value)} className="input-base mt-1" />
+              <InputDataBR value={edData} onChange={setEdData} className="mt-1" />
             </label>
 
             <div className="mt-4">

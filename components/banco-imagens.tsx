@@ -21,6 +21,8 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
   const [descEdit, setDescEdit] = useState("");
   const [catEdit, setCatEdit] = useState("");
   const [salvandoImg, setSalvandoImg] = useState(false);
+  const [filtroCat, setFiltroCat] = useState<string>(""); // "" = todas as categorias
+  const [pagina, setPagina] = useState(1);
 
   async function upload(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -87,6 +89,18 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
 
   const descritas = imagens.filter((i) => i.descricao && i.descricao.trim()).length;
 
+  // Filtro por categoria + ORDENAÇÃO por categoria (mantém as fotos da mesma categoria
+  // sempre juntas, pra não ficar bagunçado) + paginação. O sort é estável: dentro da mesma
+  // categoria preserva a ordem original (mais recentes primeiro).
+  const POR_PAGINA = 24;
+  const ordemDe = (c: string) => { const i = (CATEGORIAS as readonly string[]).indexOf(c); return i === -1 ? 99 : i; };
+  const filtradas = (filtroCat ? imagens.filter((i) => i.categoria === filtroCat) : imagens)
+    .slice()
+    .sort((a, b) => ordemDe(a.categoria) - ordemDe(b.categoria));
+  const totalPag = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
+  const pagAtual = Math.min(pagina, totalPag);
+  const visiveis = filtradas.slice((pagAtual - 1) * POR_PAGINA, pagAtual * POR_PAGINA);
+
   return (
     <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
       {/* Modal: ver a foto grande + ler/editar a descrição e a categoria */}
@@ -114,7 +128,7 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
         </div>
       )}
       <h3 className="mb-1 text-sm font-semibold text-white">🏰 Banco de imagens reais</h3>
-      <p className="mb-3 text-xs text-muted">Suba fotos <strong className="text-white/80">de verdade</strong> do seu espaço, brinquedos, festas e comida. Os posts usam essas fotos no lugar de imagens de IA — pra nunca mostrar um lugar que não existe.</p>
+      <p className="mb-3 text-xs text-muted">Suba fotos <strong className="text-white/80">de verdade</strong> do seu espaço, brinquedos e comida. Os posts usam essas fotos no lugar de imagens de IA — pra nunca mostrar um lugar que não existe. <span className="text-white/60">As fotos das festas ficam na aba <strong className="text-white/80">📸 Festas</strong> (e também entram nos posts).</span></p>
 
       {/* Subir: escolhe a categoria e manda (aceita várias de uma vez) */}
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-linha bg-preto p-3">
@@ -148,26 +162,51 @@ export function BancoImagens({ marcaId, imagens }: { marcaId: string; imagens: I
       {imagens.length === 0 ? (
         <p className="rounded-lg border border-dashed border-linha bg-preto p-6 text-center text-sm text-muted">Nenhuma foto ainda. Suba fotos reais do seu buffet acima. 🎉</p>
       ) : (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-          {imagens.map((img) => (
-            <div key={img.id} onClick={() => abrirImagem(img)} title="Abrir pra ver/editar" className="group relative cursor-pointer overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={img.url} alt={img.categoria} className="aspect-square w-full object-cover" />
-              <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{ROTULO[img.categoria as keyof typeof ROTULO] ?? img.categoria}</span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); remover(img.id); }}
-                title="Remover"
-                className="absolute right-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-xs text-red-300 transition hover:bg-red-900/70"
-              >
-                ✕
-              </button>
-              {img.descricao ? (
-                <span title={img.descricao} className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-1.5 py-1 text-[9px] leading-tight text-white/90">🔍 {img.descricao}</span>
-              ) : null}
+        <>
+          {/* Filtro por categoria (o banco fica grande com as fotos das festas) */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-xs text-muted">Mostrar
+              <select value={filtroCat} onChange={(e) => { setFiltroCat(e.target.value); setPagina(1); }} className="input-base mt-0 w-auto">
+                <option value="">Todas ({imagens.length})</option>
+                {CATEGORIAS.map((c) => {
+                  const n = imagens.filter((i) => i.categoria === c).length;
+                  return <option key={c} value={c}>{ROTULO[c] ?? c} ({n})</option>;
+                })}
+              </select>
+            </label>
+            <span className="text-[11px] text-muted">{filtradas.length} {filtradas.length === 1 ? "foto" : "fotos"}</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {visiveis.map((img) => (
+              <div key={img.id} onClick={() => abrirImagem(img)} title="Abrir pra ver/editar" className="group relative cursor-pointer overflow-hidden rounded-lg border border-linha transition hover:border-vermelho">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={img.url} alt={img.categoria} className="aspect-square w-full object-cover" />
+                <span className="absolute left-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] text-white">{ROTULO[img.categoria as keyof typeof ROTULO] ?? img.categoria}</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); remover(img.id); }}
+                  title="Remover"
+                  className="absolute right-1 top-1 rounded bg-black/60 px-1.5 py-0.5 text-xs text-red-300 transition hover:bg-red-900/70"
+                >
+                  ✕
+                </button>
+                {img.descricao ? (
+                  <span title={img.descricao} className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-1.5 py-1 text-[9px] leading-tight text-white/90">🔍 {img.descricao}</span>
+                ) : null}
+              </div>
+            ))}
+          </div>
+
+          {/* Paginação */}
+          {totalPag > 1 && (
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagAtual <= 1} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">◀ Anterior</button>
+              <span className="text-xs text-muted">Página {pagAtual} de {totalPag}</span>
+              <button type="button" onClick={() => setPagina((p) => Math.min(totalPag, p + 1))} disabled={pagAtual >= totalPag} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">Próxima ▶</button>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </section>
   );

@@ -18,6 +18,14 @@ import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO } from "@/l
 //    TOKEN (marcaPorTokenFotos), não pela sessão — quem tem o link, mexe nas fotos.
 // ===========================================================================
 
+// Converte "aaaa-mm-dd" num Date ao MEIO-DIA de Brasília (-03:00). Usar meia-noite UTC faria
+// a data "voltar" um dia ao exibir em BRT (ex: 20/06 viraria 19/06). Retorna null se inválida.
+function dataDoDiaBRT(iso: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || "")) return null;
+  const d = new Date(`${iso}T12:00:00-03:00`);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 // --- PAINEL -----------------------------------------------------------------
 
 // Código curto e LEGÍVEL pro fim do link (sem caracteres ambíguos: nada de i/l/o/0/1).
@@ -65,8 +73,8 @@ export async function editarFesta(
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const lista = parseAniversariantes(JSON.stringify(input.aniversariantes || [])).slice(0, 10);
   if (!lista.length) return { ok: false as const, erro: "Informe o nome de pelo menos um aniversariante." };
-  const data = new Date(input.dataISO);
-  if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
+  const data = dataDoDiaBRT(input.dataISO);
+  if (!data) return { ok: false as const, erro: "Data inválida." };
   await prisma.festa.update({
     where: { id: festaId },
     data: {
@@ -105,8 +113,8 @@ export async function criarFestaPublica(
   // parseAniversariantes limpa/normaliza a lista (descarta sem nome, idade 0–130 ou null).
   const lista = parseAniversariantes(JSON.stringify(input.aniversariantes || [])).slice(0, 10);
   if (!lista.length) return { ok: false as const, erro: "Informe o nome de pelo menos um aniversariante." };
-  const data = new Date(input.dataISO);
-  if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
+  const data = dataDoDiaBRT(input.dataISO);
+  if (!data) return { ok: false as const, erro: "Data inválida." };
   const festaToken = gerarTokenFesta();
   const festa = await prisma.festa.create({
     data: {

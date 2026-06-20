@@ -12,7 +12,6 @@ import { type FestaView } from "@/lib/festa-tipos";
 import { parseAniversariantes } from "@/lib/aniversariantes";
 import { gerarTokenFesta } from "@/lib/festa";
 import { baseUrl } from "@/lib/config";
-import { AtividadesRecentes } from "@/components/atividades-recentes";
 import { OnboardingMarca } from "@/components/onboarding-marca";
 import { analisarEngajamento, sugerirProximoPost } from "@/lib/inteligencia";
 
@@ -150,7 +149,9 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const publicacoes: PublicacaoView[] = pubs.filter((p) => p.formato !== "story").map(mapPub);
   const stories: PublicacaoView[] = pubs.filter((p) => p.formato === "story").map(mapPub);
 
-  const imagens: ImagemView[] = imgs.map((i) => ({ id: i.id, url: i.url, categoria: i.categoria, descricao: i.descricao }));
+  // Banco da aba Imagens = só as fotos-BASE (que o dono sobe). As fotos de FESTA (festaId
+  // preenchido) ficam só na aba Festas, organizadas por evento — mas seguem no rodízio dos posts.
+  const imagens: ImagemView[] = imgs.filter((i) => !i.festaId).map((i) => ({ id: i.id, url: i.url, categoria: i.categoria, descricao: i.descricao }));
   const evolucao = metricas.reverse().map((m) => ({ dia: m.dia.toISOString(), seguidores: m.seguidores, posts: m.posts }));
 
   // Inteligência: cruza categoria × horário × intenção (carrossel + feed; Story fica fora,
@@ -209,6 +210,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         stories={stories}
         imagens={imagens}
         festas={festas}
+        atividades={atividades}
         linkBase={baseUrl()}
         tokenFotos={marca.tokenFotos}
         evolucao={evolucao}
@@ -220,7 +222,6 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         analise={analise}
         sugestao={sugestao}
       />
-      <AtividadesRecentes atividades={atividades} />
     </div>
   );
 }
