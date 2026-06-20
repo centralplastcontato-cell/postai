@@ -53,6 +53,33 @@ export async function revogarLinkFotos(marcaId: string) {
   return { ok: true as const };
 }
 
+// Edita as infos da festa pelo PAINEL (com sessão/dono): data, aniversariantes (nome+idade)
+// e tema. Atualiza o label derivado (`aniversariante`) junto.
+export async function editarFesta(
+  festaId: string,
+  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string },
+) {
+  const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
+  if (!f) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(f.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const lista = parseAniversariantes(JSON.stringify(input.aniversariantes || [])).slice(0, 10);
+  if (!lista.length) return { ok: false as const, erro: "Informe o nome de pelo menos um aniversariante." };
+  const data = new Date(input.dataISO);
+  if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
+  await prisma.festa.update({
+    where: { id: festaId },
+    data: {
+      data,
+      aniversariante: nomesAniversariantes(lista),
+      aniversariantes: JSON.stringify(lista),
+      tema: (input.tema || "").trim().slice(0, 80),
+    },
+  });
+  revalidatePath(`/painel/marcas/${f.marcaId}`);
+  return { ok: true as const };
+}
+
 // Exclui uma festa. As FOTOS não somem do banco — o festaId delas vira null (SetNull no
 // schema), então elas seguem alimentando as artes; só perdem o agrupamento por festa.
 export async function excluirFesta(festaId: string) {
