@@ -49,20 +49,21 @@ function CardPagina({ f, linkBase }: { f: FestaView; linkBase: string }) {
         <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${st.cls}`}>{st.txt}</span>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
         <input
           readOnly
           value={url}
           onFocus={(e) => e.currentTarget.select()}
-          className="input-base flex-1 text-xs"
-          style={{ minWidth: "12rem" }}
+          className="input-base w-full text-xs sm:flex-1 sm:min-w-0"
         />
-        <button onClick={copiar} className="rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-white transition hover:border-vermelho">
-          {copiado ? "✓ Copiado" : "📋 Copiar"}
-        </button>
-        <a href={url} target="_blank" rel="noreferrer" className="rounded-lg bg-vermelho px-3 py-2 text-xs font-semibold text-white transition hover:bg-vermelho-hover">
-          Abrir ↗
-        </a>
+        <div className="flex gap-2">
+          <button onClick={copiar} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-white transition hover:border-vermelho sm:flex-none">
+            {copiado ? "✓ Copiado" : "📋 Copiar"}
+          </button>
+          <a href={url} target="_blank" rel="noreferrer" className="flex-1 rounded-lg bg-vermelho px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-vermelho-hover sm:flex-none">
+            Abrir ↗
+          </a>
+        </div>
       </div>
     </div>
   );

@@ -223,7 +223,7 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
               <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg" style={{ background: `${acento}1f` }}>
                 {m.emoji}
               </span>
-              <h2 className="text-lg font-extrabold text-zinc-800 sm:text-xl">{m.titulo}</h2>
+              <h2 className="min-w-0 text-lg font-extrabold text-zinc-800 sm:text-xl">{m.titulo}</h2>
               <span className="ml-auto shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: `${acento}14`, color: acento }}>
                 {m.fotos.length} fotos
               </span>
@@ -388,11 +388,11 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
       {/* LIGHTBOX */}
       {aberta !== null && (
         <div className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-sm" onClick={fechar}>
-          <div className="flex items-center justify-between px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
-            <span className="text-sm font-medium">
+          <div className="flex items-center justify-between gap-2 px-4 py-3 text-white" onClick={(e) => e.stopPropagation()}>
+            <span className="min-w-0 truncate text-sm font-medium">
               {todas[aberta].momentoEmoji} {todas[aberta].momentoTitulo} · {aberta + 1}/{todas.length}
             </span>
-            <button onClick={fechar} aria-label="Fechar" className="rounded-full bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20">
+            <button onClick={fechar} aria-label="Fechar" className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20">
               ✕
             </button>
           </div>
