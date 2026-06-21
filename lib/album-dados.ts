@@ -9,8 +9,8 @@ import { temaVisual } from "@/lib/temas-festa";
 
 // Apresentação carinhosa de cada momento (os ids internos viram títulos pros pais).
 const APRES: Record<string, { emoji: string; titulo: string; sub: string }> = {
-  salao: { emoji: "🎀", titulo: "Chegada & decoração", sub: "O espaço montado com todo carinho" },
-  brinquedos: { emoji: "🎠", titulo: "Brinquedos & diversão", sub: "A criançada aproveitando cada cantinho" },
+  salao: { emoji: "🎀", titulo: "Chegada e decoração", sub: "O espaço montado com todo carinho" },
+  brinquedos: { emoji: "🎠", titulo: "Brinquedos e diversão", sub: "A criançada aproveitando cada cantinho" },
   aniversariante: { emoji: "👑", titulo: "O aniversariante", sub: "A estrela do dia" },
   parabens: { emoji: "🎂", titulo: "Hora dos parabéns", sub: "O momento mais esperado" },
   momentos: { emoji: "📸", titulo: "Momentos especiais", sub: "Aqueles cliques que ficam pra sempre" },
