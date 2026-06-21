@@ -18,11 +18,19 @@ function statusFesta(f: FestaView): { txt: string; cls: string } {
   return { txt: "Sem fotos ainda", cls: "border-linha bg-preto text-muted" };
 }
 
+// Selo de autorização de uso de imagem — só aparece quando NÃO autorizada (o caso que pede atenção).
+function statusAutoriz(f: FestaView): { txt: string; cls: string } | null {
+  if (f.autorizacao === "negada") return { txt: "✗ Sem autorização", cls: "border-vermelho/40 bg-vermelho/10 text-vermelho" };
+  if (f.autorizacao === "pendente") return { txt: "⏳ Autorização pendente", cls: "border-amber-500/30 bg-amber-500/15 text-amber-300" };
+  return null;
+}
+
 function CardPagina({ f, linkBase }: { f: FestaView; linkBase: string }) {
   const [copiado, setCopiado] = useState(false);
   const url = `${linkBase}/festa/${f.tokenAlbum}`;
   const nomes = rotuloAniversariantes(f.aniversariantes) || "Festa";
   const st = statusFesta(f);
+  const sa = statusAutoriz(f);
 
   async function copiar() {
     try {
@@ -46,8 +54,16 @@ function CardPagina({ f, linkBase }: { f: FestaView; linkBase: string }) {
             {` · ${f.fotos.length} ${f.fotos.length === 1 ? "foto" : "fotos"}`}
           </p>
         </div>
-        <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${st.cls}`}>{st.txt}</span>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${st.cls}`}>{st.txt}</span>
+          {sa && <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${sa.cls}`}>{sa.txt}</span>}
+        </div>
       </div>
+      {f.autorizacao === "negada" && (
+        <p className="mt-2 rounded-md border border-vermelho/30 bg-vermelho/5 px-2.5 py-1.5 text-[11px] text-muted">
+          🔒 Fotos NÃO divulgadas (álbum e posts bloqueados){f.motivoNaoAutoriza ? ` — motivo: ${f.motivoNaoAutoriza}` : ""}
+        </p>
+      )}
 
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
         <input

@@ -110,6 +110,12 @@ model Festa {
   // Quando o gerente marca "finalizei o envio". null = ainda subindo fotos. Sinaliza ao dono
   // que a festa está COMPLETA (pronta pra usar/gerar post). Pode reabrir pra adicionar mais.
   finalizadaEm   DateTime?
+  // Autorização de uso de imagem (direito de imagem / LGPD): o gerente registra se os PAIS
+  // autorizaram a divulgação pública das fotos. "pendente" | "autorizada" | "negada".
+  // SÓ "autorizada" libera divulgar (álbum pros pais + posts no Instagram + funções futuras);
+  // pendente/negada = fotos ficam guardadas pra uso interno, nunca viram divulgação pública.
+  autorizacao    String   @default("pendente")
+  motivoNaoAutoriza String @default("") // motivo quando os pais NÃO autorizam (o gerente escreve)
   criadoEm       DateTime @default(now())
 
   fotos          ImagemMarca[]

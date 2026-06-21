@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta } from "@/app/actions/festas";
+import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta, salvarAutorizacaoFesta } from "@/app/actions/festas";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
 import { MOMENTOS_FESTA, LIMITE_FOTOS_FESTA, LIMITE_FOTOS_MOMENTO } from "@/lib/momentos-festa";
 import { type FestaView, type FotoView, type MarcaPublica } from "@/lib/festa-tipos";
@@ -31,6 +31,13 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
   const [erroNome, setErroNome] = useState(false); // nome é obrigatório pra finalizar
   const nomeRef = useRef<HTMLInputElement>(null);
   const [albumCopiado, setAlbumCopiado] = useState(false); // linkAlbum (read-only pros pais) vem pronto do servidor
+  // Autorização de uso de imagem (LGPD): pendente | autorizada | negada
+  const [autoriz, setAutoriz] = useState(festa.autorizacao);
+  const [motivoNao, setMotivoNao] = useState(festa.motivoNaoAutoriza || "");
+  const [perguntandoMotivo, setPerguntandoMotivo] = useState(false);
+  const [salvandoAutoriz, setSalvandoAutoriz] = useState(false);
+  const [erroAutoriz, setErroAutoriz] = useState<string | null>(null);
+  const autorizRef = useRef<HTMLDivElement>(null);
 
   async function salvarGerente() {
     try {
@@ -100,12 +107,36 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
     }
   }
 
-  // Finalizar EXIGE o nome do gerente (o buffet precisa saber quem registrou a festa).
+  // O gerente registra a autorização de uso de imagem (os pais autorizam divulgar?).
+  async function autorizar(sim: boolean) {
+    if (!sim && !perguntandoMotivo) { setPerguntandoMotivo(true); return; } // 1º "Não" → abre o campo de motivo
+    if (!sim && !motivoNao.trim()) { setErroAutoriz("Escreva o motivo de não autorizar."); return; }
+    setSalvandoAutoriz(true);
+    setErroAutoriz(null);
+    try {
+      const r = await salvarAutorizacaoFesta(token, sim, sim ? "" : motivoNao);
+      if (!r.ok) { setErroAutoriz(r.erro); return; }
+      setAutoriz(sim ? "autorizada" : "negada");
+      setPerguntandoMotivo(false);
+      router.refresh();
+    } catch {
+      setErroAutoriz("Não consegui salvar agora. Tente de novo.");
+    } finally {
+      setSalvandoAutoriz(false);
+    }
+  }
+
+  // Finalizar EXIGE: (1) o nome do gerente; (2) a decisão de autorização de imagem.
   async function tentarFinalizar() {
     if (!gerente.trim()) {
       setErroNome(true);
       nomeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       nomeRef.current?.focus();
+      return;
+    }
+    if (autoriz === "pendente") {
+      setErroAutoriz("Registre a autorização de uso de imagem antes de finalizar.");
+      autorizRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     await salvarGerenteFesta(token, gerente).catch(() => {}); // garante o nome salvo antes
@@ -206,7 +237,7 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
         <div className="mt-4 rounded-xl border border-linha bg-preto-card p-4">
           <p className="text-sm font-semibold text-white">🎂 {rotuloAniversariantes(festa.aniversariantes)}{festa.tema ? <span className="font-normal text-muted"> · {festa.tema}</span> : null}</p>
           <p className="mt-0.5 text-xs text-muted">{dataBR(festa.dataISO)}{festa.horario ? ` às ${festa.horario}` : ""} · {festa.fotos.length}/{LIMITE_FOTOS_FESTA} fotos {festa.finalizadaEm && <span className="font-semibold text-green-400">· ✓ Finalizada</span>}</p>
-          <button type="button" onClick={copiarLink} className="mt-2 text-[11px] font-semibold text-muted underline transition hover:text-white">🔗 {linkCopiado ? "Link copiado!" : "Salvar o link desta festa (pra voltar depois)"}</button>
+          <button type="button" onClick={copiarLink} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-linha px-3 py-1.5 text-[11px] font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">🔗 {linkCopiado ? "✓ Link copiado!" : "Salvar o link desta festa (pra voltar depois)"}</button>
           <div className="mt-3 border-t border-linha pt-3">
             <label className="block text-xs font-medium text-muted">👤 Seu nome <span className="text-vermelho">*</span> <span className="font-normal text-muted/70">(quem está registrando as fotos)</span>
               <input
@@ -225,6 +256,40 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
             ) : salvouGerente ? (
               <p className="mt-1 text-[11px] font-semibold text-green-400">✓ Salvo, obrigado!</p>
             ) : null}
+          </div>
+
+          {/* Autorização de uso de imagem (LGPD) — obrigatória pra finalizar */}
+          <div ref={autorizRef} className="mt-3 border-t border-linha pt-3">
+            <p className="text-xs font-medium text-muted">📋 Autorização de uso de imagem <span className="text-vermelho">*</span></p>
+            <p className="mt-0.5 text-[11px] text-muted">Os pais autorizam o buffet a divulgar as fotos (Instagram, álbum)?</p>
+            {autoriz === "autorizada" ? (
+              <div className="mt-2 flex items-center justify-between rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2">
+                <span className="text-xs font-semibold text-green-400">✓ Sim, os pais autorizaram</span>
+                <button type="button" onClick={() => { setAutoriz("pendente"); setPerguntandoMotivo(false); setErroAutoriz(null); }} className="shrink-0 rounded-md border border-green-500/30 px-2.5 py-1 text-[11px] font-semibold text-green-400 transition hover:bg-green-500/15">alterar</button>
+              </div>
+            ) : autoriz === "negada" ? (
+              <div className="mt-2 rounded-lg border border-vermelho/40 bg-vermelho/10 px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-vermelho">✗ Não autorizaram a divulgação</span>
+                  <button type="button" onClick={() => { setAutoriz("pendente"); setPerguntandoMotivo(true); setErroAutoriz(null); }} className="shrink-0 rounded-md border border-vermelho/40 px-2.5 py-1 text-[11px] font-semibold text-vermelho transition hover:bg-vermelho/15">alterar</button>
+                </div>
+                {motivoNao && <p className="mt-1 text-[11px] text-muted">Motivo: {motivoNao}</p>}
+              </div>
+            ) : !perguntandoMotivo ? (
+              <div className="mt-2 flex gap-2">
+                <button type="button" onClick={() => autorizar(true)} disabled={salvandoAutoriz} className="flex-1 rounded-lg border border-green-500/40 bg-green-500/10 px-3 py-2 text-xs font-semibold text-green-400 transition hover:bg-green-500/20 disabled:opacity-60">✓ Sim, autorizam</button>
+                <button type="button" onClick={() => autorizar(false)} disabled={salvandoAutoriz} className="flex-1 rounded-lg border border-vermelho/40 bg-vermelho/10 px-3 py-2 text-xs font-semibold text-vermelho transition hover:bg-vermelho/20 disabled:opacity-60">✗ Não autorizam</button>
+              </div>
+            ) : (
+              <div className="mt-2">
+                <textarea value={motivoNao} onChange={(e) => { setMotivoNao(e.target.value); if (erroAutoriz) setErroAutoriz(null); }} rows={2} placeholder="Por que não autorizam? (ex: os pais preferem não divulgar a criança)" maxLength={300} className="input-base" />
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={() => autorizar(false)} disabled={salvandoAutoriz} className="flex-1 rounded-lg bg-vermelho px-3 py-2 text-xs font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-60">{salvandoAutoriz ? "Salvando…" : "Confirmar: não autorizam"}</button>
+                  <button type="button" onClick={() => { setPerguntandoMotivo(false); setErroAutoriz(null); }} className="rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-muted transition hover:text-white">Voltar</button>
+                </div>
+              </div>
+            )}
+            {erroAutoriz && <p className="mt-1 text-[11px] font-semibold text-vermelho">{erroAutoriz}</p>}
           </div>
         </div>
 
@@ -294,6 +359,7 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
                 <input readOnly value={linkAlbum} onClick={(e) => (e.target as HTMLInputElement).select()} className="input-base mt-0 w-full text-[11px] sm:flex-1" />
                 <div className="flex gap-2">
                   <button type="button" onClick={copiarAlbum} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-white transition hover:border-[#7c3aed] sm:flex-none">{albumCopiado ? "✓ Copiado" : "📋 Copiar"}</button>
+                  <a href={linkAlbum} target="_blank" rel="noreferrer" className="flex-1 rounded-lg border border-linha px-3 py-2 text-center text-xs font-semibold text-white transition hover:border-[#7c3aed] sm:flex-none">↗ Abrir</a>
                   <button type="button" onClick={compartilharAlbum} className="flex-1 rounded-lg bg-[#7c3aed] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#8b4ef5] sm:flex-none">💜 Compartilhar</button>
                 </div>
               </div>

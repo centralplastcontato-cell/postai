@@ -15,6 +15,8 @@ export type FestaView = {
   gerente: string;
   horario: string;
   finalizadaEm: string | null;
+  autorizacao: string; // "pendente" | "autorizada" | "negada" — uso de imagem (LGPD)
+  motivoNaoAutoriza: string; // motivo quando os pais não autorizam
   fotos: FotoView[];
 };
 

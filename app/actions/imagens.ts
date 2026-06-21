@@ -44,6 +44,10 @@ export async function removerImagemMarca(id: string) {
   return { ok: true as const };
 }
 
+// Filtro de DIVULGAÇÃO (LGPD): só entram nos posts as fotos LIBERADAS — as soltas (sem festa)
+// OU de festa com uso de imagem AUTORIZADO. Festa pendente/negada nunca vira post público.
+const PODE_DIVULGAR = { OR: [{ festaId: null }, { festa: { autorizacao: "autorizada" } }] };
+
 // Escolhe uma foto REAL do banco da marca em RODÍZIO: pega sempre a MENOS usada
 // (desempate pela mais antiga), e incrementa o contador. Assim percorre todas as
 // fotos uma vez antes de repetir qualquer uma — nada de cair sempre na mesma.
@@ -53,7 +57,7 @@ export async function sortearImagemBanco(marcaId: string, categoria?: string): P
   // server action). Os chamadores internos rodam em sessão já autorizada → passa.
   const g = await guardaMarca(marcaId);
   if (!g.ok) return null;
-  const where = categoria && categoria !== "geral" ? { marcaId, categoria } : { marcaId };
+  const where = categoria && categoria !== "geral" ? { marcaId, categoria, ...PODE_DIVULGAR } : { marcaId, ...PODE_DIVULGAR };
   let img = await prisma.imagemMarca.findFirst({
     where,
     orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
@@ -61,7 +65,7 @@ export async function sortearImagemBanco(marcaId: string, categoria?: string): P
   });
   if (!img && categoria) {
     img = await prisma.imagemMarca.findFirst({
-      where: { marcaId },
+      where: { marcaId, ...PODE_DIVULGAR },
       orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
       select: { id: true, url: true },
     });
@@ -78,7 +82,7 @@ export async function sortearImagemBanco(marcaId: string, categoria?: string): P
 export async function sortearImagensBanco(marcaId: string, n: number, categoria?: string): Promise<string[]> {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return [];
-  const where = categoria && categoria !== "geral" ? { marcaId, categoria } : { marcaId };
+  const where = categoria && categoria !== "geral" ? { marcaId, categoria, ...PODE_DIVULGAR } : { marcaId, ...PODE_DIVULGAR };
   let imgs = await prisma.imagemMarca.findMany({
     where,
     orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
@@ -87,7 +91,7 @@ export async function sortearImagensBanco(marcaId: string, n: number, categoria?
   });
   if (imgs.length < n) {
     imgs = await prisma.imagemMarca.findMany({
-      where: { marcaId },
+      where: { marcaId, ...PODE_DIVULGAR },
       orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
       take: n,
       select: { id: true, url: true },
@@ -106,7 +110,7 @@ export async function escolherImagemPorTexto(marcaId: string, categoria: string 
   const g = await guardaMarca(marcaId);
   if (!g.ok) return null;
   const t = (texto || "").trim();
-  const where = categoria && categoria !== "geral" ? { marcaId, categoria } : { marcaId };
+  const where = categoria && categoria !== "geral" ? { marcaId, categoria, ...PODE_DIVULGAR } : { marcaId, ...PODE_DIVULGAR };
   const cands = await prisma.imagemMarca.findMany({
     where,
     orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],

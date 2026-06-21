@@ -179,11 +179,33 @@ export async function salvarGerenteFesta(festaToken: string, nome: string) {
   return { ok: true as const };
 }
 
+// O gerente registra a AUTORIZAÇÃO de uso de imagem (os pais autorizam a divulgação?). Pelo
+// link da festa. autoriza=true → "autorizada" (libera álbum + posts + funções futuras);
+// false → "negada" (+ motivo obrigatório; as fotos nunca viram divulgação pública).
+export async function salvarAutorizacaoFesta(festaToken: string, autoriza: boolean, motivo: string) {
+  const f = await festaPorToken(festaToken);
+  if (!f) return { ok: false as const, erro: "Link inválido ou desativado." };
+  if (!autoriza && !(motivo || "").trim()) return { ok: false as const, erro: "Diga o motivo de não autorizar." };
+  await prisma.festa.update({
+    where: { id: f.id },
+    data: {
+      autorizacao: autoriza ? "autorizada" : "negada",
+      motivoNaoAutoriza: autoriza ? "" : (motivo || "").trim().slice(0, 300),
+    },
+  });
+  revalidatePath(`/f/${festaToken}`);
+  return { ok: true as const };
+}
+
 // O gerente marca a festa como FINALIZADA (terminou de subir) — ou REABRE pra adicionar mais.
-// Pelo LINK DA FESTA (validado por festaToken). Sinaliza ao dono que está completa.
+// Pelo LINK DA FESTA (validado por festaToken). Sinaliza ao dono que está completa. EXIGE que a
+// autorização de uso de imagem já tenha sido decidida (não pode finalizar com "pendente").
 export async function finalizarFestaPublica(festaToken: string, finalizar: boolean) {
   const f = await festaPorToken(festaToken);
   if (!f) return { ok: false as const, erro: "Link inválido ou desativado." };
+  if (finalizar && f.autorizacao === "pendente") {
+    return { ok: false as const, erro: "Antes de finalizar, registre a autorização de uso de imagem dos pais." };
+  }
   await prisma.festa.update({ where: { id: f.id }, data: { finalizadaEm: finalizar ? new Date() : null } });
   revalidatePath(`/f/${festaToken}`);
   return { ok: true as const };

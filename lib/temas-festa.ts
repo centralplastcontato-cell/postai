@@ -105,6 +105,10 @@ const TEMAS: Def[] = [
     chaves: ["barbie", "boneca"],
     cfg: { nome: "Barbie", cores: ["#D81B60", "#EC407A", "#F48FB1"], acento: "#D81B60", icone: "💖", emojis: ["💖", "👛", "✨", "🌸", "👠"], padrao: "dots" },
   },
+  {
+    chaves: ["rock", "roqueiro", "roqueira", "rockstar", "banda", "rock n roll", "rock and roll", "rock'n'roll"],
+    cfg: { nome: "Rock", cores: ["#1C1C1E", "#D32F2F", "#3F3F46"], acento: "#D32F2F", icone: "🎸", emojis: ["🎸", "🤘", "🥁", "🎵", "⚡"], padrao: "stripes" },
+  },
 ];
 
 // Resolve o visual pro tema digitado. `corMarca` é o fallback quando nada casa.

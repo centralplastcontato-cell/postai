@@ -32,6 +32,11 @@ export default async function FestaAlbumPage({ params }: { params: Promise<{ tok
   const festa = await festaPorTokenAlbum(token);
   if (!festa) return aviso("🔒", "Álbum não encontrado", "Esse link não está ativo. Peça um novo ao buffet.");
 
+  // Trava de uso de imagem (LGPD): só mostra o álbum se os pais autorizaram a divulgação.
+  if (festa.autorizacao !== "autorizada") {
+    return aviso("🔒", "Álbum indisponível", "As fotos desta festa não estão liberadas para divulgação.");
+  }
+
   const fotos = await prisma.imagemMarca.findMany({
     where: { festaId: festa.id },
     select: { url: true, momento: true, descricao: true },

@@ -83,6 +83,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       gerente: f.gerente,
       horario: f.horario,
       finalizadaEm: f.finalizadaEm ? f.finalizadaEm.toISOString() : null,
+      autorizacao: f.autorizacao,
+      motivoNaoAutoriza: f.motivoNaoAutoriza,
       fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento, descricao: foto.descricao })),
     };
   }));
