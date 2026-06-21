@@ -11,7 +11,7 @@ import { type ImagemView } from "@/components/banco-imagens";
 import { type CampanhaView } from "@/components/campanhas-painel";
 import { type FestaView } from "@/lib/festa-tipos";
 import { parseAniversariantes } from "@/lib/aniversariantes";
-import { gerarTokenFesta, gerarTokenAlbum, tokenAlbumBonito } from "@/lib/festa";
+import { gerarTokenFesta, gerarTokenAlbum } from "@/lib/festa";
 import { baseUrl } from "@/lib/config";
 import { OnboardingMarca } from "@/components/onboarding-marca";
 import { analisarEngajamento, sugerirProximoPost } from "@/lib/inteligencia";
@@ -60,8 +60,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     id: c.id, selo: c.selo, titulo: c.titulo, texto: c.texto, ctaTexto: c.ctaTexto, ctaTipo: c.ctaTipo, ctaValor: c.ctaValor, ativa: c.ativa,
   }));
   // Backfill: festas antigas podem não ter token (link de edição) nem tokenAlbum (álbum pros
-  // pais). Geramos os que faltarem. O tokenAlbum é BONITO ("<buffet>-<criança>-<código>") — se
-  // ainda estiver no formato antigo (aleatório), regeneramos UMA vez (depois fica estável).
+  // pais). Geramos APENAS os que estiverem VAZIOS — uma vez criado, o token NUNCA muda (senão um
+  // link já enviado pros pais quebraria). Festas novas já nascem com tokenAlbum bonito na criação.
   const slugBuffet = marca.slug;
   const festas: FestaView[] = await Promise.all(festasRaw.map(async (f) => {
     const anivs = parseAniversariantes(f.aniversariantes);
@@ -69,9 +69,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     let tokenAlbum = f.tokenAlbum;
     const patch: { token?: string; tokenAlbum?: string } = {};
     if (!token) patch.token = token = gerarTokenFesta();
-    if (!tokenAlbum || !tokenAlbumBonito(tokenAlbum, slugBuffet)) {
-      patch.tokenAlbum = tokenAlbum = gerarTokenAlbum(slugBuffet, anivs[0]?.nome || "");
-    }
+    if (!tokenAlbum) patch.tokenAlbum = tokenAlbum = gerarTokenAlbum(slugBuffet, anivs[0]?.nome || "");
     if (Object.keys(patch).length) {
       await prisma.festa.update({ where: { id: f.id }, data: patch }).catch(() => {});
     }
