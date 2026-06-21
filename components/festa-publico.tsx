@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica } from "@/app/actions/festas";
+import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta } from "@/app/actions/festas";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
 import { MOMENTOS_FESTA, LIMITE_FOTOS_FESTA, LIMITE_FOTOS_MOMENTO } from "@/lib/momentos-festa";
 import { type FestaView, type FotoView, type MarcaPublica } from "@/lib/festa-tipos";
+import { salvarFestaRecente } from "@/lib/festas-recentes";
 
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" });
@@ -25,6 +26,21 @@ export function FestaPublico({ token, marca, festa }: { token: string; marca: Ma
   const [erroModal, setErroModal] = useState<string | null>(null);
   const [finalizando, setFinalizando] = useState(false);
   const [linkCopiado, setLinkCopiado] = useState(false);
+  const [gerente, setGerente] = useState(festa.gerente || "");
+  const [salvouGerente, setSalvouGerente] = useState(false);
+
+  async function salvarGerente() {
+    try {
+      const r = await salvarGerenteFesta(token, gerente);
+      if (r.ok) { setSalvouGerente(true); setTimeout(() => setSalvouGerente(false), 2000); }
+    } catch {}
+  }
+
+  // O aparelho LEMBRA esta festa — pra o gerente voltar mesmo se fechou a aba e perdeu o link.
+  useEffect(() => {
+    salvarFestaRecente({ token, label: rotuloAniversariantes(festa.aniversariantes) || "Festa", dataISO: festa.dataISO });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   async function subirFotos(momento: string, files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -158,8 +174,14 @@ export function FestaPublico({ token, marca, festa }: { token: string; marca: Ma
         {/* Cabeçalho da festa */}
         <div className="mt-4 rounded-xl border border-linha bg-preto-card p-4">
           <p className="text-sm font-semibold text-white">🎂 {rotuloAniversariantes(festa.aniversariantes)}{festa.tema ? <span className="font-normal text-muted"> · {festa.tema}</span> : null}</p>
-          <p className="mt-0.5 text-xs text-muted">{dataBR(festa.dataISO)} · {festa.fotos.length}/{LIMITE_FOTOS_FESTA} fotos {festa.finalizadaEm && <span className="font-semibold text-green-400">· ✓ Finalizada</span>}</p>
+          <p className="mt-0.5 text-xs text-muted">{dataBR(festa.dataISO)}{festa.horario ? ` às ${festa.horario}` : ""} · {festa.fotos.length}/{LIMITE_FOTOS_FESTA} fotos {festa.finalizadaEm && <span className="font-semibold text-green-400">· ✓ Finalizada</span>}</p>
           <button type="button" onClick={copiarLink} className="mt-2 text-[11px] font-semibold text-muted underline transition hover:text-white">🔗 {linkCopiado ? "Link copiado!" : "Salvar o link desta festa (pra voltar depois)"}</button>
+          <div className="mt-3 border-t border-linha pt-3">
+            <label className="block text-xs font-medium text-muted">👤 Seu nome <span className="font-normal text-muted/70">(quem está registrando as fotos)</span>
+              <input type="text" value={gerente} onChange={(e) => setGerente(e.target.value)} onBlur={salvarGerente} placeholder="Ex: João (recepção)" maxLength={60} className="input-base mt-1" />
+            </label>
+            {salvouGerente && <p className="mt-1 text-[11px] font-semibold text-green-400">✓ Salvo, obrigado!</p>}
+          </div>
         </div>
 
         {erroUp && <p className="mt-3 rounded-lg border border-vermelho/40 bg-vermelho/10 p-2 text-center text-sm text-vermelho">{erroUp}</p>}

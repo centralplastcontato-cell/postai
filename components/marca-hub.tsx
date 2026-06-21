@@ -8,6 +8,8 @@ import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { FestasPainel } from "./festas-painel";
+import { PaginasPainel } from "./paginas-painel";
+import { CampanhasPainel, type CampanhaView } from "./campanhas-painel";
 import { AtividadesRecentes, type Ativ } from "./atividades-recentes";
 import { type FestaView } from "@/lib/festa-tipos";
 import { ConexaoCard } from "./conexao-card";
@@ -39,6 +41,7 @@ export function MarcaHub({
   stories,
   imagens,
   festas,
+  campanhas,
   atividades,
   linkBase,
   tokenFotos,
@@ -57,6 +60,7 @@ export function MarcaHub({
   stories: PublicacaoView[];
   imagens: ImagemView[];
   festas: FestaView[];
+  campanhas: CampanhaView[];
   atividades: Ativ[];
   linkBase: string;
   tokenFotos: string;
@@ -69,7 +73,7 @@ export function MarcaHub({
   analise: AnaliseInsights;
   sugestao: SugestaoBia | null;
 }) {
-  const [aba, setAba] = useState<"redes" | "imagens" | "festas" | "config">("redes");
+  const [aba, setAba] = useState<"redes" | "imagens" | "festas" | "paginas" | "campanhas" | "config">("redes");
   const cls = (a: boolean) =>
     `rounded-lg px-4 py-2 text-sm font-semibold transition ${a ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"}`;
   const stAssin = assinatura ? statusAssinatura(assinatura.acessoAte) : null;
@@ -155,6 +159,8 @@ export function MarcaHub({
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
         <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
         <button onClick={() => setAba("festas")} className={cls(aba === "festas")}>📸 Festas</button>
+        <button onClick={() => setAba("paginas")} className={cls(aba === "paginas")}>📄 Páginas</button>
+        <button onClick={() => setAba("campanhas")} className={cls(aba === "campanhas")}>🎈 Campanhas</button>
         <button onClick={() => setAba("config")} className={cls(aba === "config")}>{ehAdmin ? "⚙️ Configurações" : "✏️ Minha marca"}</button>
         {ehTrial && <div className="w-full sm:ml-auto sm:w-auto"><RegerarCalendario marcaId={marca.id} /></div>}
       </div>
@@ -163,6 +169,8 @@ export function MarcaHub({
         {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} sugestao={sugestao} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
+        {aba === "paginas" && <PaginasPainel festas={festas} linkBase={linkBase} />}
+        {aba === "campanhas" && <CampanhasPainel marcaId={marca.id} temTelefone={Boolean(marca.telefone)} campanhas={campanhas} />}
         {aba === "config" && (ehAdmin ? <MarcaForm marca={marca} /> : <MarcaForm marca={marca} somenteIdentidade />)}
       </div>
 

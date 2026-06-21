@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
-import { marcaPorTokenFotos, festaPorToken, gerarTokenFesta } from "@/lib/festa";
+import { marcaPorTokenFotos, festaPorToken, gerarTokenFesta, gerarTokenAlbum } from "@/lib/festa";
 import { parseAniversariantes, nomesAniversariantes } from "@/lib/aniversariantes";
 import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO, LIMITE_FOTOS_FESTA } from "@/lib/momentos-festa";
 import { descreverImagem } from "@/lib/imagem-ia";
@@ -66,7 +66,7 @@ export async function revogarLinkFotos(marcaId: string) {
 // e tema. Atualiza o label derivado (`aniversariante`) junto.
 export async function editarFesta(
   festaId: string,
-  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string },
+  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string; horario?: string },
 ) {
   const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
   if (!f) return { ok: false as const, erro: "Festa não encontrada." };
@@ -83,6 +83,7 @@ export async function editarFesta(
       aniversariante: nomesAniversariantes(lista),
       aniversariantes: JSON.stringify(lista),
       tema: (input.tema || "").trim().slice(0, 80),
+      horario: (input.horario || "").trim().slice(0, 5),
     },
   });
   revalidatePath(`/painel/marcas/${f.marcaId}`);
@@ -131,7 +132,7 @@ export async function excluirFesta(festaId: string) {
 // o devolve — a página redireciona pro link isolado dela. Aceita vários aniversariantes.
 export async function criarFestaPublica(
   tokenMarca: string,
-  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string },
+  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string; horario?: string },
 ) {
   const m = await marcaPorTokenFotos(tokenMarca);
   if (!m) return { ok: false as const, erro: "Link inválido ou desativado. Peça um novo ao buffet." };
@@ -145,10 +146,13 @@ export async function criarFestaPublica(
     data: {
       marcaId: m.id,
       token: festaToken,
+      // Link público SÓ-LEITURA do álbum pros pais — BONITO: "<buffet>-<criança>-<código>".
+      tokenAlbum: gerarTokenAlbum(m.slug, lista[0]?.nome || ""),
       data,
       aniversariante: nomesAniversariantes(lista), // label de exibição derivado
       aniversariantes: JSON.stringify(lista),
       tema: (input.tema || "").trim().slice(0, 80),
+      horario: (input.horario || "").trim().slice(0, 5),
     },
   });
   return { ok: true as const, festaId: festa.id, festaToken };
@@ -162,6 +166,15 @@ export async function removerFotoPublica(festaToken: string, fotoId: string) {
   const foto = await prisma.imagemMarca.findUnique({ where: { id: fotoId }, select: { festaId: true } });
   if (!foto || foto.festaId !== f.id) return { ok: false as const, erro: "Foto não encontrada." };
   await prisma.imagemMarca.delete({ where: { id: fotoId } });
+  revalidatePath(`/f/${festaToken}`);
+  return { ok: true as const };
+}
+
+// O gerente registra o NOME dele (quem está documentando a festa). Pelo link da festa.
+export async function salvarGerenteFesta(festaToken: string, nome: string) {
+  const f = await festaPorToken(festaToken);
+  if (!f) return { ok: false as const, erro: "Link inválido ou desativado." };
+  await prisma.festa.update({ where: { id: f.id }, data: { gerente: (nome || "").trim().slice(0, 60) } });
   revalidatePath(`/f/${festaToken}`);
   return { ok: true as const };
 }

@@ -40,6 +40,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
   const [edData, setEdData] = useState("");
   const [edPessoas, setEdPessoas] = useState<{ nome: string; idade: string }[]>([{ nome: "", idade: "" }]);
   const [edTema, setEdTema] = useState("");
+  const [edHorario, setEdHorario] = useState("");
   const [salvandoEd, setSalvandoEd] = useState(false);
   const [erroEd, setErroEd] = useState<string | null>(null);
   const [subindoFesta, setSubindoFesta] = useState<string | null>(null); // "festaId:momento" recebendo fotos
@@ -99,6 +100,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
     setEdData(new Date(f.dataISO).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }));
     setEdPessoas(f.aniversariantes.length ? f.aniversariantes.map((a) => ({ nome: a.nome, idade: a.idade != null ? String(a.idade) : "" })) : [{ nome: "", idade: "" }]);
     setEdTema(f.tema);
+    setEdHorario(f.horario || "");
     setErroEd(null);
   }
   function setPessoaEd(i: number, campo: "nome" | "idade", val: string) {
@@ -118,7 +120,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
     if (!lista.length) { setErroEd("Qual o nome do aniversariante?"); return; }
     setSalvandoEd(true);
     try {
-      const r = await editarFesta(editando.id, { dataISO: edData, aniversariantes: lista, tema: edTema });
+      const r = await editarFesta(editando.id, { dataISO: edData, aniversariantes: lista, tema: edTema, horario: edHorario });
       if (!r.ok) { setErroEd(r.erro); return; }
       setEditando(null);
       router.refresh();
@@ -242,9 +244,14 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
           <div onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl border border-linha bg-preto-card p-5">
             <p className="text-sm font-semibold text-white">✏️ Editar festa</p>
 
-            <label className="mt-4 block text-xs font-medium text-muted">Data da festa
-              <InputDataBR value={edData} onChange={setEdData} className="mt-1" />
-            </label>
+            <div className="mt-4 flex gap-3">
+              <label className="block flex-1 text-xs font-medium text-muted">Data da festa
+                <InputDataBR value={edData} onChange={setEdData} className="mt-1" />
+              </label>
+              <label className="block text-xs font-medium text-muted">Horário
+                <input type="time" value={edHorario} onChange={(e) => setEdHorario(e.target.value)} style={{ colorScheme: "dark" }} className="input-base mt-1" />
+              </label>
+            </div>
 
             <div className="mt-4">
               <p className="text-xs font-medium text-muted">Aniversariante(s) e idade</p>
@@ -279,10 +286,19 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
 
       {/* Cartão do LINK DE CRIAR */}
       <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <h3 className="text-sm font-semibold text-white">🔗 Link pra criar festa</h3>
-        <p className="mt-1 text-xs leading-relaxed text-muted">
-          Passe este link pro gerente do buffet. Ele abre no celular <strong className="text-white/80">sem login</strong>, cria a festa e ganha um <strong className="text-white/80">link só dela</strong> pra subir as fotos. Cada festa fica <strong className="text-white/80">isolada</strong> — um gerente não mexe na festa do outro. 🎉
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-sm font-semibold text-white">🔗 Link para criar festas</h3>
+          <span className="rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2 py-0.5 text-[10px] font-semibold text-[#c7b2ff]">1 link · pro buffet todo</span>
+        </div>
+        <p className="mt-1.5 text-xs leading-relaxed text-muted">
+          É <strong className="text-white/80">um link só</strong>, o mesmo pra sempre. Mande pro gerente: ele cria cada festa por aqui — e <strong className="text-white/80">cada festa ganha o próprio link</strong>, na lista abaixo.
         </p>
+
+        {/* Como funciona — 2 passos, pra não confundir os dois tipos de link */}
+        <div className="mt-3 space-y-1.5 rounded-lg border border-linha bg-preto p-3 text-[11px] text-muted">
+          <p><span className="mr-1 font-semibold text-[#c7b2ff]">1.</span> Você manda <strong className="text-white/80">este</strong> link pro gerente (sempre o mesmo).</p>
+          <p><span className="mr-1 font-semibold text-[#c7b2ff]">2.</span> Ele cria a festa → ganha um link <strong className="text-white/80">só dela</strong> (em “Festas registradas”, no botão <span className="text-white/80">Copiar link</span>).</p>
+        </div>
 
         {token ? (
           <>
@@ -292,15 +308,15 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
                 {copiadoId === "criar" ? "✓ Copiado" : "Copiar"}
               </button>
             </div>
-            <div className="mt-2 flex flex-wrap gap-3 text-xs">
-              <a href={linkCriar} target="_blank" rel="noopener noreferrer" className="text-muted underline transition hover:text-white">Abrir link</a>
-              <button type="button" onClick={gerarNovo} className="text-muted underline transition hover:text-white">Gerar link novo</button>
-              <button type="button" onClick={pedirRevogar} className="text-red-400 underline transition hover:text-red-300">Desativar link</button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <a href={linkCriar} target="_blank" rel="noopener noreferrer" className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">↗ Abrir</a>
+              <button type="button" onClick={gerarNovo} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">↻ Gerar novo</button>
+              <button type="button" onClick={pedirRevogar} className="rounded-md border border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500 hover:bg-red-900/20">🚫 Desativar</button>
             </div>
           </>
         ) : (
-          <button type="button" onClick={gerar} disabled={gerando} className="mt-3 rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-60">
-            {gerando ? "Gerando…" : "🔗 Gerar link pra criar festa"}
+          <button type="button" onClick={gerar} disabled={gerando} className="mt-3 rounded-lg bg-vermelho px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-60">
+            {gerando ? "Gerando…" : "🔗 Gerar o link de criar festas"}
           </button>
         )}
         {erro && <p className="mt-3 text-sm text-vermelho">{erro}</p>}
@@ -309,6 +325,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
       {/* Galeria por festa — cada uma com seu link próprio */}
       <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
         <h3 className="text-sm font-semibold text-white">🎂 Festas registradas <span className="font-normal text-muted">({festas.length})</span></h3>
+        <p className="mt-0.5 text-[11px] text-muted">Cada festa tem o <strong className="text-white/70">seu próprio link</strong> — abra a festa (▼) pra copiar e mandar pro gerente dela.</p>
         {festas.length === 0 ? (
           <p className="mt-3 rounded-lg border border-dashed border-linha bg-preto p-6 text-center text-sm text-muted">
             Nenhuma festa ainda. Gere o link de criar acima e mande pro gerente — as festas dele aparecem aqui. 🎉
@@ -326,7 +343,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
                       <span className="mt-0.5 shrink-0 text-xs text-muted">{aberta ? "▲" : "▼"}</span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold text-white">🎂 {rotuloAniversariantes(f.aniversariantes)}{f.tema ? <span className="font-normal text-muted"> · {f.tema}</span> : null}</span>
-                        <span className="block text-xs text-muted">{dataBR(f.dataISO)} · {f.fotos.length} {f.fotos.length === 1 ? "foto" : "fotos"} {f.finalizadaEm && <span className="font-semibold text-green-400">· ✓ Finalizada</span>}</span>
+                        <span className="block text-xs text-muted">{dataBR(f.dataISO)}{f.horario ? ` às ${f.horario}` : ""} · {f.fotos.length} {f.fotos.length === 1 ? "foto" : "fotos"}{f.gerente ? <span> · 📷 {f.gerente}</span> : null} {f.finalizadaEm && <span className="font-semibold text-green-400">· ✓ Finalizada</span>}</span>
                       </span>
                     </button>
                     <button type="button" onClick={() => pedirApagarFesta(f)} title="Excluir festa" className="shrink-0 rounded px-2 py-1 text-xs text-red-400 transition hover:bg-red-900/30">✕ Excluir</button>

@@ -24,9 +24,12 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
     const festaView: FestaView = {
       id: festa.id,
       token,
+      tokenAlbum: festa.tokenAlbum,
       dataISO: festa.data.toISOString(),
       aniversariantes: parseAniversariantes(festa.aniversariantes),
       tema: festa.tema,
+      gerente: festa.gerente,
+      horario: festa.horario,
       finalizadaEm: festa.finalizadaEm ? festa.finalizadaEm.toISOString() : null,
       fotos: fotos.map((f) => ({ id: f.id, url: f.url, momento: f.momento, descricao: f.descricao })),
     };

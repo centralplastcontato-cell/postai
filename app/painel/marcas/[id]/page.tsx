@@ -8,9 +8,10 @@ import { type Post } from "@/components/marketing-calendario";
 import { type PublicacaoView } from "@/components/publicacoes-aba";
 import { type MarcaView } from "@/components/marca-form";
 import { type ImagemView } from "@/components/banco-imagens";
+import { type CampanhaView } from "@/components/campanhas-painel";
 import { type FestaView } from "@/lib/festa-tipos";
 import { parseAniversariantes } from "@/lib/aniversariantes";
-import { gerarTokenFesta } from "@/lib/festa";
+import { gerarTokenFesta, gerarTokenAlbum, tokenAlbumBonito } from "@/lib/festa";
 import { baseUrl } from "@/lib/config";
 import { OnboardingMarca } from "@/components/onboarding-marca";
 import { analisarEngajamento, sugerirProximoPost } from "@/lib/inteligencia";
@@ -46,28 +47,43 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
 
   // Todas as queries da marca em PARALELO (Promise.all) — antes eram sequenciais e
   // somavam ~4-5s + pressionavam o pool de conexões. Em paralelo cai pra ~1 query.
-  const [conteudos, pubs, imgs, metricas, ativ, festasRaw] = await Promise.all([
+  const [conteudos, pubs, imgs, metricas, ativ, festasRaw, campanhasRaw] = await Promise.all([
     prisma.conteudo.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.publicacao.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.imagemMarca.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
     prisma.metricaMarca.findMany({ where: { marcaId: id }, orderBy: { dia: "desc" }, take: 90, select: { dia: true, seguidores: true, posts: true } }),
     prisma.atividadeAgente.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" }, take: 25, select: { id: true, agente: true, texto: true, criadoEm: true } }),
     prisma.festa.findMany({ where: { marcaId: id }, orderBy: { data: "desc" }, include: { fotos: { select: { id: true, url: true, momento: true, descricao: true }, orderBy: { criadoEm: "desc" } } } }),
+    prisma.campanha.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
   ]);
-  // Backfill: festas criadas antes do "link por festa" não têm token — geramos um aqui
-  // (uma vez) pra cada, pra que toda festa tenha seu link próprio no painel.
+  const campanhas: CampanhaView[] = campanhasRaw.map((c) => ({
+    id: c.id, selo: c.selo, titulo: c.titulo, texto: c.texto, ctaTexto: c.ctaTexto, ctaTipo: c.ctaTipo, ctaValor: c.ctaValor, ativa: c.ativa,
+  }));
+  // Backfill: festas antigas podem não ter token (link de edição) nem tokenAlbum (álbum pros
+  // pais). Geramos os que faltarem. O tokenAlbum é BONITO ("<buffet>-<criança>-<código>") — se
+  // ainda estiver no formato antigo (aleatório), regeneramos UMA vez (depois fica estável).
+  const slugBuffet = marca.slug;
   const festas: FestaView[] = await Promise.all(festasRaw.map(async (f) => {
+    const anivs = parseAniversariantes(f.aniversariantes);
     let token = f.token;
-    if (!token) {
-      token = gerarTokenFesta();
-      await prisma.festa.update({ where: { id: f.id }, data: { token } }).catch(() => {});
+    let tokenAlbum = f.tokenAlbum;
+    const patch: { token?: string; tokenAlbum?: string } = {};
+    if (!token) patch.token = token = gerarTokenFesta();
+    if (!tokenAlbum || !tokenAlbumBonito(tokenAlbum, slugBuffet)) {
+      patch.tokenAlbum = tokenAlbum = gerarTokenAlbum(slugBuffet, anivs[0]?.nome || "");
+    }
+    if (Object.keys(patch).length) {
+      await prisma.festa.update({ where: { id: f.id }, data: patch }).catch(() => {});
     }
     return {
       id: f.id,
       token,
+      tokenAlbum,
       dataISO: f.data.toISOString(),
-      aniversariantes: parseAniversariantes(f.aniversariantes),
+      aniversariantes: anivs,
       tema: f.tema,
+      gerente: f.gerente,
+      horario: f.horario,
       finalizadaEm: f.finalizadaEm ? f.finalizadaEm.toISOString() : null,
       fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento, descricao: foto.descricao })),
     };
@@ -210,6 +226,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         stories={stories}
         imagens={imagens}
         festas={festas}
+        campanhas={campanhas}
         atividades={atividades}
         linkBase={baseUrl()}
         tokenFotos={marca.tokenFotos}

@@ -43,6 +43,29 @@ body {
   .animate-postai-feed { animation: none; }
 }
 
+/* Banner de campanha do Álbum: o botão "pulsa" com um anel que expande pra chamar atenção
+   (a cor vem da var --cta-glow, setada inline com a cor do tema da festa). */
+@keyframes album-cta-pulse {
+  0% { box-shadow: 0 0 0 0 var(--cta-glow, rgba(255, 255, 255, 0.5)); }
+  70% { box-shadow: 0 0 0 14px rgba(0, 0, 0, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+}
+.album-cta { animation: album-cta-pulse 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .album-cta { animation: none; }
+}
+
+/* O CARD da campanha inteiro "pisca" com um brilho que aparece e some (cor do tema via
+   --campanha-glow) — chama o olho sem o pisca-pisca brega. */
+@keyframes album-banner-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); transform: scale(1); }
+  50% { box-shadow: 0 0 46px 9px var(--campanha-glow, rgba(255, 255, 255, 0.55)); transform: scale(1.015); }
+}
+.album-banner-pulse { animation: album-banner-glow 1.15s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .album-banner-pulse { animation: none; }
+}
+
 /* Títulos: Oswald, caixa alta, condensado */
 .display {
   font-family: var(--font-display);

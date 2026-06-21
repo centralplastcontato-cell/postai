@@ -7,10 +7,13 @@ export type FotoView = { id: string; url: string; momento: string; descricao: st
 
 export type FestaView = {
   id: string;
-  token: string; // link próprio e isolado da festa
+  token: string; // link próprio e isolado da festa (EDIÇÃO — o gerente sobe fotos)
+  tokenAlbum: string; // link público SÓ-LEITURA do álbum pros pais
   dataISO: string;
   aniversariantes: Aniversariante[];
   tema: string;
+  gerente: string;
+  horario: string;
   finalizadaEm: string | null;
   fotos: FotoView[];
 };

@@ -54,8 +54,29 @@ model Marca {
   imagens     ImagemMarca[]
   metricas    MetricaMarca[]
   festas      Festa[]
+  campanhas   Campanha[]
 
   @@index([usuarioId])
+}
+
+// Campanha = uma OFERTA (banner de recompra) que o buffet cria e que aparece no fim de cada
+// álbum pros pais (no pico do encantamento). Uma campanha vale pra marca toda: a ATIVA mais
+// recente é a que aparece nos álbuns. O número do WhatsApp vem da Marca (não se repete aqui).
+model Campanha {
+  id        String   @id @default(cuid())
+  marcaId   String
+  marca     Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  selo      String   @default("") // badge de urgência (ex: "Condição especial · 15 dias")
+  titulo    String                 // chamada principal (ex: "Já pensou na próxima festa?")
+  texto     String   @default("") // descrição da oferta
+  ctaTexto  String   @default("Quero saber mais") // texto do botão
+  // Pra onde o botão leva: "whatsapp" (usa o telefone da Marca + a mensagem abaixo) ou "link".
+  ctaTipo   String   @default("whatsapp")
+  ctaValor  String   @default("") // whatsapp: mensagem pré-escrita · link: a URL de destino
+  ativa     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  @@index([marcaId])
 }
 
 // Uma festa real do buffet (aniversário). O GERENTE cria pelo link público (Álbum da Festa),
@@ -69,6 +90,10 @@ model Festa {
   // Token do link PRÓPRIO e ISOLADO desta festa: quem tem ele só acessa ESTA festa (não as
   // outras). Gerado na criação; backfill preenche as antigas. Vazio nunca casa (lib/festa.ts).
   token          String   @default("")
+  // Token do link PÚBLICO e SÓ-LEITURA do Álbum pros pais (compartilhável). É SEPARADO de `token`
+  // (que dá acesso de EDIÇÃO ao gerente) — quem tem só o álbum nunca consegue editar a festa.
+  // Gerado na criação; backfill preenche as antigas. Vazio nunca casa (lib/festa.ts).
+  tokenAlbum     String   @default("")
   data           DateTime // dia da festa
   // Label de exibição (nomes juntados, ex: "Maria e João") — derivado de `aniversariantes`,
   // mantido pra exibição/busca rápida. A fonte da verdade é o JSON abaixo.
@@ -77,6 +102,11 @@ model Festa {
   // um aniversariante (gêmeos, irmãos), e cada um tem sua idade (opcional). Ver lib/aniversariantes.ts.
   aniversariantes String  @default("[]")
   tema           String   @default("") // tema da festa (ex: "Frozen", "Super-heróis")
+  // Nome de quem REGISTROU as fotos (o gerente preenche no link da festa) — pra o dono saber
+  // quem documentou cada evento. "" = não informado.
+  gerente        String   @default("")
+  // Horário da festa (HH:MM) — pra distinguir festas no mesmo dia. "" = não informado.
+  horario        String   @default("")
   // Quando o gerente marca "finalizei o envio". null = ainda subindo fotos. Sinaliza ao dono
   // que a festa está COMPLETA (pronta pra usar/gerar post). Pode reabrir pra adicionar mais.
   finalizadaEm   DateTime?

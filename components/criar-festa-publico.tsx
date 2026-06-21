@@ -5,10 +5,14 @@ import { useRouter } from "next/navigation";
 import { criarFestaPublica } from "@/app/actions/festas";
 import { type MarcaPublica } from "@/lib/festa-tipos";
 import { InputDataBR } from "@/components/input-data-br";
+import { lerFestasRecentes, type FestaRecente } from "@/lib/festas-recentes";
 
 // Data de hoje (BRT) no formato yyyy-mm-dd pro <input type="date">.
 function hojeBR(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+function dataBR(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "America/Sao_Paulo" });
 }
 
 // LINK DE CRIAR (do buffet): só o formulário "Nova festa". Não lista nem dá acesso às festas
@@ -18,12 +22,16 @@ export function CriarFestaPublico({ tokenMarca, marca }: { tokenMarca: string; m
   const cor = marca.corPrimaria || "#7C3AED";
 
   const [data, setData] = useState("");
+  const [horario, setHorario] = useState("");
   const [pessoas, setPessoas] = useState<{ nome: string; idade: string }[]>([{ nome: "", idade: "" }]);
   const [tema, setTema] = useState("");
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  const [recentes, setRecentes] = useState<FestaRecente[]>([]);
+
   useEffect(() => { setData(hojeBR()); }, []); // evita mismatch de hidratação no input date
+  useEffect(() => { setRecentes(lerFestasRecentes()); }, []); // festas que este aparelho já começou
 
   function setPessoa(i: number, campo: "nome" | "idade", val: string) {
     setPessoas((ps) => ps.map((p, idx) => (idx === i ? { ...p, [campo]: val } : p)));
@@ -44,7 +52,7 @@ export function CriarFestaPublico({ tokenMarca, marca }: { tokenMarca: string; m
     if (!lista.length) { setErro("Qual o nome do aniversariante?"); return; }
     setCriando(true);
     try {
-      const r = await criarFestaPublica(tokenMarca, { dataISO: data || hojeBR(), aniversariantes: lista, tema });
+      const r = await criarFestaPublica(tokenMarca, { dataISO: data || hojeBR(), aniversariantes: lista, tema, horario });
       if (!r.ok) { setErro(r.erro); setCriando(false); return; }
       router.push(`/f/${r.festaToken}`); // vai pro link isolado da festa criada
     } catch {
@@ -76,12 +84,32 @@ export function CriarFestaPublico({ tokenMarca, marca }: { tokenMarca: string; m
           Crie a festa abaixo. Depois, você vai pra um link <strong className="text-white/80">só dela</strong> pra subir as fotos durante o evento. 🎉
         </p>
 
+        {recentes.length > 0 && (
+          <div className="mt-4 rounded-xl border border-[#7c3aed]/40 bg-[#7c3aed]/10 p-3">
+            <p className="text-xs font-semibold text-[#c7b2ff]">📋 Festas que você começou neste aparelho</p>
+            <p className="mt-0.5 text-[11px] text-muted">Já começou uma festa? Toque pra voltar e continuar — não precisa criar de novo.</p>
+            <div className="mt-2 space-y-1.5">
+              {recentes.map((r) => (
+                <a key={r.token} href={`/f/${r.token}`} className="flex items-center justify-between gap-2 rounded-lg border border-linha bg-preto-card px-3 py-2 text-sm text-white transition hover:border-[#7c3aed]">
+                  <span className="truncate">🎂 {r.label}</span>
+                  <span className="shrink-0 text-xs text-muted">{dataBR(r.dataISO)} →</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <form onSubmit={criar} className="mt-4 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
           <p className="text-sm font-semibold text-white">✨ Nova festa</p>
 
-          <label className="mt-4 block text-xs font-medium text-muted">Data da festa
-            <InputDataBR value={data} onChange={setData} className="mt-1" />
-          </label>
+          <div className="mt-4 flex gap-3">
+            <label className="block flex-1 text-xs font-medium text-muted">Data da festa
+              <InputDataBR value={data} onChange={setData} className="mt-1" />
+            </label>
+            <label className="block text-xs font-medium text-muted">Horário
+              <input type="time" value={horario} onChange={(e) => setHorario(e.target.value)} style={{ colorScheme: "dark" }} className="input-base mt-1" />
+            </label>
+          </div>
 
           <div className="mt-4">
             <p className="text-xs font-medium text-muted">Aniversariante(s) e idade</p>
