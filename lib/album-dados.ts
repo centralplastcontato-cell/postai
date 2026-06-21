@@ -34,6 +34,7 @@ export function montarDadosAlbum(
     googleReviewUrl?: string | null;
     instagram?: string | null;
     campanha?: AlbumData["campanha"];
+    musicaUrl?: string | null;
   },
 ): AlbumData {
   // Agrupa as fotos por momento, na ordem natural da festa.
@@ -84,6 +85,7 @@ export function montarDadosAlbum(
     momentos,
     googleReviewUrl: extras.googleReviewUrl ?? null,
     campanha: extras.campanha ?? null,
+    musicaUrl: extras.musicaUrl ?? null,
     preview: extras.preview,
   };
 }

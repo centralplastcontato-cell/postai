@@ -65,6 +65,16 @@ function CardPagina({ f, linkBase }: { f: FestaView; linkBase: string }) {
           </a>
         </div>
       </div>
+
+      {/* Acesso do DONO à tela do gerente desta festa (subir/mover/remover/finalizar fotos) */}
+      <a
+        href={`${linkBase}/f/${f.token}`}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white"
+      >
+        🔧 Abrir como o gerente vê — subir / editar fotos ↗
+      </a>
     </div>
   );
 }
@@ -75,7 +85,7 @@ export function PaginasPainel({ festas, linkBase }: { festas: FestaView[]; linkB
       <div className="mb-4">
         <p className="text-sm font-semibold text-white">📄 Páginas das festas</p>
         <p className="mt-1 text-xs text-muted">
-          Cada festa vira um <strong className="text-white/80">álbum pros pais</strong>. Mande o link — eles veem as fotos, podem avaliar no Google e recebem a oferta da próxima festa. O link só deixa <strong className="text-white/80">ver</strong> (não dá pra editar).
+          Cada festa vira um <strong className="text-white/80">álbum pros pais</strong>. Mande o link — eles veem as fotos, podem avaliar no Google e recebem a oferta da próxima festa. O link só deixa <strong className="text-white/80">ver</strong>. Já o <strong className="text-white/80">🔧</strong> abre a <strong className="text-white/80">tela do gerente</strong> — onde você (ou ele) sobe e edita as fotos.
         </p>
       </div>
 

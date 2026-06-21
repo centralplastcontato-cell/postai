@@ -4,6 +4,7 @@ import { AlbumFesta } from "@/components/album-festa";
 import { montarDadosAlbum } from "@/lib/album-dados";
 import { bannerDaCampanha } from "@/lib/campanha";
 import { linkAvaliacaoGoogle } from "@/lib/google-review";
+import { musicaBuffet } from "@/lib/musica-buffet";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Álbum da Festa" };
@@ -50,6 +51,7 @@ export default async function FestaAlbumPage({ params }: { params: Promise<{ tok
     preview: false,
     campanha,
     googleReviewUrl: linkAvaliacaoGoogle(festa.marca.slug, festa.marca.nome),
+    musicaUrl: musicaBuffet(festa.marca.slug),
   });
   return <AlbumFesta dados={dados} />;
 }

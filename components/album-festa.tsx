@@ -7,6 +7,8 @@
 
 import { useState, useEffect, useCallback, type CSSProperties } from "react";
 import { type TemaVisual, padraoStyle } from "@/lib/temas-festa";
+import { IconeTema } from "@/components/icone-tema";
+import { PlayerMusica } from "@/components/player-musica";
 
 export type AlbumMarca = {
   nome: string;
@@ -29,6 +31,7 @@ export type AlbumData = {
   mensagem: string | null; // palavrinha do buffet pros pais (null = esconde o card)
   momentos: AlbumMomento[];
   googleReviewUrl: string | null; // link pra avaliar o buffet no Google (null = esconde o card)
+  musicaUrl: string | null; // música/jingle do buffet que toca no álbum (null = sem player)
   // Campanha (banner de oferta) que o buffet injeta na página pela aba Campanhas. null = sem banner.
   campanha: {
     selo: string; // badge de urgência ("Condição especial · 15 dias")
@@ -151,8 +154,8 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
           )}
           <p className="mt-3 text-sm font-semibold uppercase tracking-wide text-white/90">{marca.nome}</p>
 
-          <h1 className="mt-2 text-3xl font-extrabold leading-tight drop-shadow-sm sm:text-5xl">
-            {dados.titulo} {visual.icone}
+          <h1 className="font-titulo mt-2 text-3xl font-extrabold leading-tight drop-shadow-sm sm:text-5xl">
+            {dados.titulo} <IconeTema nome={visual.nome} emoji={visual.icone} className="ml-0.5 h-[0.78em] w-[0.78em] [vertical-align:-0.04em]" />
           </h1>
 
           <p className="mt-2 text-sm font-medium text-white/90 sm:text-base">📅 {dados.dataLabel}</p>
@@ -163,7 +166,7 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
             )}
             {dados.tema && (
               <span className="rounded-full bg-white/20 px-3 py-1 font-semibold backdrop-blur">
-                {visual.icone} Tema {visual.reconhecido ? visual.nome : dados.tema}
+                <IconeTema nome={visual.nome} emoji={visual.icone} className="mr-1 h-[1.05em] w-[1.05em] [vertical-align:-0.15em]" /> Tema {visual.reconhecido ? visual.nome : dados.tema}
               </span>
             )}
             {dados.horario && (
@@ -207,10 +210,6 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
           </section>
         )}
 
-        <p className="mb-8 text-center text-sm text-zinc-500">
-          {todas.length} fotos lindas · organizadas por momento da festa
-        </p>
-
         {momentos.map((m, i) => (
           <section key={m.titulo} className="mb-10">
             {i > 0 &&
@@ -223,7 +222,7 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
               <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg" style={{ background: `${acento}1f` }}>
                 {m.emoji}
               </span>
-              <h2 className="min-w-0 text-lg font-extrabold text-zinc-800 sm:text-xl">{m.titulo}</h2>
+              <h2 className="font-titulo min-w-0 text-xl font-extrabold text-zinc-800 sm:text-2xl">{m.titulo}</h2>
               <span className="ml-auto shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: `${acento}14`, color: acento }}>
                 {m.fotos.length} fotos
               </span>
@@ -281,7 +280,7 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
               <span className="inline-block rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide" style={{ background: acento }}>
                 {dados.campanha.selo}
               </span>
-              <h3 className="mx-auto mt-4 max-w-md text-2xl font-extrabold leading-tight">{dados.campanha.titulo}</h3>
+              <h3 className="font-titulo mx-auto mt-4 max-w-md text-2xl font-extrabold leading-tight">{dados.campanha.titulo}</h3>
               <p className="mx-auto mt-2 max-w-md text-sm text-white/80">{dados.campanha.texto}</p>
               {dados.campanha.ctaUrl && (
                 <a
@@ -307,7 +306,7 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
         {dados.googleReviewUrl && (
           <section className="mt-4 rounded-3xl border-2 bg-white px-6 py-8 text-center shadow-sm" style={{ borderColor: `${acento}55` }}>
             <div className="text-2xl tracking-[0.2em]">⭐️⭐️⭐️⭐️⭐️</div>
-            <h3 className="mt-3 text-xl font-extrabold text-zinc-800">Conta pra todo mundo como foi! 💛</h3>
+            <h3 className="font-titulo mt-3 text-2xl font-extrabold text-zinc-800">Conta pra todo mundo como foi! 💛</h3>
             <p className="mx-auto mt-2 max-w-sm text-sm text-zinc-500">
               Se você curtiu a festa, deixar uma avaliação no Google ajuda demais a{" "}
               <strong className="text-zinc-700">{marca.nome}</strong> — e leva só 1 minutinho. 🙏
@@ -330,7 +329,7 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
           style={{ background: `linear-gradient(135deg, ${cor} 0%, ${cor2} 100%)` }}
         >
           <p className="text-2xl">💜</p>
-          <h3 className="mt-1 text-xl font-extrabold">Gostou das fotos?</h3>
+          <h3 className="font-titulo mt-1 text-2xl font-extrabold">Gostou das fotos?</h3>
           <p className="mx-auto mt-2 max-w-sm text-sm text-white/90">
             Marque a <strong>{marca.nome}</strong> nas suas fotos! Foi uma alegria fazer parte desse dia. 🎉
           </p>
@@ -436,6 +435,8 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
           {toast}
         </div>
       )}
+
+      {dados.musicaUrl && <PlayerMusica url={dados.musicaUrl} cor={acento} />}
     </div>
   );
 }

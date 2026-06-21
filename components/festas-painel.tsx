@@ -357,6 +357,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
                         <button type="button" onClick={() => copiarLink(linkFesta, f.id)} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">
                           {copiadoId === f.id ? "✓ Copiado" : "Copiar link"}
                         </button>
+                        <a href={linkFesta} target="_blank" rel="noreferrer" className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">↗ Abrir</a>
                         <button type="button" onClick={() => abrirEdicao(f)} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-sky-300 transition hover:border-sky-500 hover:text-sky-200">✏️ Editar</button>
                       </div>
 

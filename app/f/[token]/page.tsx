@@ -4,6 +4,7 @@ import { parseAniversariantes } from "@/lib/aniversariantes";
 import { CriarFestaPublico } from "@/components/criar-festa-publico";
 import { FestaPublico } from "@/components/festa-publico";
 import { type FestaView } from "@/lib/festa-tipos";
+import { baseUrl } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
       finalizadaEm: festa.finalizadaEm ? festa.finalizadaEm.toISOString() : null,
       fotos: fotos.map((f) => ({ id: f.id, url: f.url, momento: f.momento, descricao: f.descricao })),
     };
-    return <FestaPublico token={token} marca={festa.marca} festa={festaView} />;
+    return <FestaPublico token={token} marca={festa.marca} festa={festaView} linkAlbum={`${baseUrl()}/festa/${festa.tokenAlbum}`} />;
   }
 
   // 2) É o link de CRIAR? (token da marca) → mostra o form de nova festa.

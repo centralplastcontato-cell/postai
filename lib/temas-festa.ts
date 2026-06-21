@@ -86,8 +86,8 @@ const TEMAS: Def[] = [
     cfg: { nome: "Patrulha Canina", cores: ["#1565C0", "#E53935", "#FDD835"], acento: "#1565C0", icone: "🐶", emojis: ["🐶", "🚒", "🦴", "🐾", "⭐"] },
   },
   {
-    chaves: ["mickey", "minnie", "mouse"],
-    cfg: { nome: "Mickey & Minnie", cores: ["#1A1A1A", "#E53935", "#FDD835"], acento: "#E53935", icone: "🐭", emojis: ["🐭", "🎀", "⭐", "❤️", "🎈"], padrao: "dots" },
+    chaves: ["mickey", "minnie", "mouse", "rato", "ratinho"],
+    cfg: { nome: "Mickey & Minnie", cores: ["#1A1A1A", "#E53935", "#FDD835"], acento: "#E53935", icone: "🎀", emojis: ["🎀", "⭐", "❤️", "🎈", "🎉"], padrao: "dots" },
   },
   {
     chaves: ["borboleta", "jardim", "flores", "floral", "primavera", "joaninha"],

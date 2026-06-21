@@ -11,6 +11,7 @@
 
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-display: var(--font-oswald), sans-serif;
+  --font-titulo: var(--font-baloo), var(--font-inter), system-ui, sans-serif;
 }
 
 html {

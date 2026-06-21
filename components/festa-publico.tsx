@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta } from "@/app/actions/festas";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
@@ -14,7 +14,7 @@ function dataBR(iso: string): string {
 
 // LINK DA FESTA (isolado): mostra SÓ esta festa — subir fotos por momento, mover/remover,
 // finalizar. Validado pelo token da festa nas actions; não dá acesso a outras festas.
-export function FestaPublico({ token, marca, festa }: { token: string; marca: MarcaPublica; festa: FestaView }) {
+export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string; marca: MarcaPublica; festa: FestaView; linkAlbum: string }) {
   const router = useRouter();
   const cor = marca.corPrimaria || "#7C3AED";
 
@@ -28,6 +28,9 @@ export function FestaPublico({ token, marca, festa }: { token: string; marca: Ma
   const [linkCopiado, setLinkCopiado] = useState(false);
   const [gerente, setGerente] = useState(festa.gerente || "");
   const [salvouGerente, setSalvouGerente] = useState(false);
+  const [erroNome, setErroNome] = useState(false); // nome é obrigatório pra finalizar
+  const nomeRef = useRef<HTMLInputElement>(null);
+  const [albumCopiado, setAlbumCopiado] = useState(false); // linkAlbum (read-only pros pais) vem pronto do servidor
 
   async function salvarGerente() {
     try {
@@ -97,6 +100,18 @@ export function FestaPublico({ token, marca, festa }: { token: string; marca: Ma
     }
   }
 
+  // Finalizar EXIGE o nome do gerente (o buffet precisa saber quem registrou a festa).
+  async function tentarFinalizar() {
+    if (!gerente.trim()) {
+      setErroNome(true);
+      nomeRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      nomeRef.current?.focus();
+      return;
+    }
+    await salvarGerenteFesta(token, gerente).catch(() => {}); // garante o nome salvo antes
+    await alternarFinalizada(true);
+  }
+
   async function alternarFinalizada(finalizar: boolean) {
     setFinalizando(true);
     setErroUp(null);
@@ -117,6 +132,22 @@ export function FestaPublico({ token, marca, festa }: { token: string; marca: Ma
       setLinkCopiado(true);
       setTimeout(() => setLinkCopiado(false), 1800);
     } catch {}
+  }
+
+  async function copiarAlbum() {
+    try {
+      await navigator.clipboard.writeText(linkAlbum);
+      setAlbumCopiado(true);
+      setTimeout(() => setAlbumCopiado(false), 1800);
+    } catch {}
+  }
+  async function compartilharAlbum() {
+    try {
+      if (navigator.share) await navigator.share({ title: "Álbum da Festa", text: "Olha as fotos da festa! 💜", url: linkAlbum });
+      else await copiarAlbum();
+    } catch {
+      /* cancelou — tudo bem */
+    }
   }
 
   return (
@@ -177,10 +208,23 @@ export function FestaPublico({ token, marca, festa }: { token: string; marca: Ma
           <p className="mt-0.5 text-xs text-muted">{dataBR(festa.dataISO)}{festa.horario ? ` às ${festa.horario}` : ""} · {festa.fotos.length}/{LIMITE_FOTOS_FESTA} fotos {festa.finalizadaEm && <span className="font-semibold text-green-400">· ✓ Finalizada</span>}</p>
           <button type="button" onClick={copiarLink} className="mt-2 text-[11px] font-semibold text-muted underline transition hover:text-white">🔗 {linkCopiado ? "Link copiado!" : "Salvar o link desta festa (pra voltar depois)"}</button>
           <div className="mt-3 border-t border-linha pt-3">
-            <label className="block text-xs font-medium text-muted">👤 Seu nome <span className="font-normal text-muted/70">(quem está registrando as fotos)</span>
-              <input type="text" value={gerente} onChange={(e) => setGerente(e.target.value)} onBlur={salvarGerente} placeholder="Ex: João (recepção)" maxLength={60} className="input-base mt-1" />
+            <label className="block text-xs font-medium text-muted">👤 Seu nome <span className="text-vermelho">*</span> <span className="font-normal text-muted/70">(quem está registrando as fotos)</span>
+              <input
+                ref={nomeRef}
+                type="text"
+                value={gerente}
+                onChange={(e) => { setGerente(e.target.value); if (erroNome) setErroNome(false); }}
+                onBlur={salvarGerente}
+                placeholder="Ex: João (recepção)"
+                maxLength={60}
+                className={`input-base mt-1 ${erroNome ? "border-vermelho" : ""}`}
+              />
             </label>
-            {salvouGerente && <p className="mt-1 text-[11px] font-semibold text-green-400">✓ Salvo, obrigado!</p>}
+            {erroNome ? (
+              <p className="mt-1 text-[11px] font-semibold text-vermelho">✋ Coloque seu nome antes de finalizar o envio.</p>
+            ) : salvouGerente ? (
+              <p className="mt-1 text-[11px] font-semibold text-green-400">✓ Salvo, obrigado!</p>
+            ) : null}
           </div>
         </div>
 
@@ -232,9 +276,28 @@ export function FestaPublico({ token, marca, festa }: { token: string; marca: Ma
               </button>
             </div>
           ) : (
-            <button type="button" onClick={() => alternarFinalizada(true)} disabled={finalizando || festa.fotos.length === 0} title={festa.fotos.length === 0 ? "Suba pelo menos uma foto antes de finalizar" : undefined} className="flex w-full items-center justify-center gap-2 rounded-lg border border-green-500/40 bg-green-500/10 py-3 text-sm font-semibold text-green-400 transition hover:bg-green-500/20 disabled:opacity-50">
+            <button type="button" onClick={tentarFinalizar} disabled={finalizando || festa.fotos.length === 0} title={festa.fotos.length === 0 ? "Suba pelo menos uma foto antes de finalizar" : undefined} className="flex w-full items-center justify-center gap-2 rounded-lg border border-green-500/40 bg-green-500/10 py-3 text-sm font-semibold text-green-400 transition hover:bg-green-500/20 disabled:opacity-50">
               {finalizando ? "Finalizando…" : "✓ Finalizei o envio das fotos"}
             </button>
+          )}
+
+          {/* Link do álbum pros pais — o gerente já manda na hora (com os pais por perto) */}
+          {festa.tokenAlbum && (
+            <div className="rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/10 p-3">
+              <p className="text-sm font-semibold text-white">📱 Álbum pros pais</p>
+              <p className="mt-0.5 text-[11px] text-muted">
+                {festa.finalizadaEm
+                  ? "Tudo pronto! Manda este link pra família ver as fotos. 🎉"
+                  : "Link pra família ver as fotos. (Pode mandar agora ou finalizar antes pra ficar completo.)"}
+              </p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input readOnly value={linkAlbum} onClick={(e) => (e.target as HTMLInputElement).select()} className="input-base mt-0 w-full text-[11px] sm:flex-1" />
+                <div className="flex gap-2">
+                  <button type="button" onClick={copiarAlbum} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-white transition hover:border-[#7c3aed] sm:flex-none">{albumCopiado ? "✓ Copiado" : "📋 Copiar"}</button>
+                  <button type="button" onClick={compartilharAlbum} className="flex-1 rounded-lg bg-[#7c3aed] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#8b4ef5] sm:flex-none">💜 Compartilhar</button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 

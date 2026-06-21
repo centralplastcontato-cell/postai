@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Oswald } from "next/font/google";
+import { Inter, Oswald, Baloo_2 } from "next/font/google";
 import "./globals.css";
 import { APP_NAME } from "@/lib/config";
 
@@ -8,6 +8,12 @@ const oswald = Oswald({
   variable: "--font-oswald",
   subsets: ["latin"],
   weight: ["500", "600", "700"],
+});
+// Fonte arredondada/festiva pros títulos do Álbum da Festa (charme de "memória especial").
+const baloo = Baloo_2({
+  variable: "--font-baloo",
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
 });
 
 const DESC =
@@ -41,7 +47,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className={`${inter.variable} ${oswald.variable} h-full`}>
+    <html lang="pt-BR" className={`${inter.variable} ${oswald.variable} ${baloo.variable} h-full`}>
       <body className="flex min-h-full flex-col">{children}</body>
     </html>
   );
