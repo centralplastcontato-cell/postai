@@ -3,6 +3,7 @@ import { festaPorTokenAlbum } from "@/lib/festa";
 import { AlbumFesta } from "@/components/album-festa";
 import { montarDadosAlbum } from "@/lib/album-dados";
 import { bannerDaCampanha } from "@/lib/campanha";
+import { linkAvaliacaoGoogle } from "@/lib/google-review";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Álbum da Festa" };
@@ -45,6 +46,10 @@ export default async function FestaAlbumPage({ params }: { params: Promise<{ tok
   });
   const campanha = campAtiva ? bannerDaCampanha(campAtiva, festa.marca.telefone) : null;
 
-  const dados = montarDadosAlbum(festa, fotos, { preview: false, campanha });
+  const dados = montarDadosAlbum(festa, fotos, {
+    preview: false,
+    campanha,
+    googleReviewUrl: linkAvaliacaoGoogle(festa.marca.slug, festa.marca.nome),
+  });
   return <AlbumFesta dados={dados} />;
 }
