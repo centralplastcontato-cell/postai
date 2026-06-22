@@ -74,7 +74,7 @@ export function MarcaHub({
   assinatura?: Assinatura | null;
   ehAdmin: boolean;
   ehTrial?: boolean;
-  entregue: { carrosseis: number; feed: number; stories: number; total: number };
+  entregue: { carrosseis: number; feed: number; stories: number; reels: number; total: number };
   analise: AnaliseInsights;
   sugestao: SugestaoBia | null;
 }) {
@@ -137,7 +137,7 @@ export function MarcaHub({
             <p className="mt-1 text-xs text-muted">
               A Bia já fez <strong className="text-white">{entregue.total}</strong> {entregue.total === 1 ? "publicação" : "publicações"} sozinha — sem você levantar um dedo. 🚀
             </p>
-            <div className="mt-3 grid grid-cols-3 gap-3">
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div className="rounded-lg border border-linha bg-preto px-4 py-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted">🎠 Carrosséis</p>
                 <p className="mt-0.5 text-2xl font-bold text-white">{entregue.carrosseis}</p>
@@ -149,6 +149,10 @@ export function MarcaHub({
               <div className="rounded-lg border border-linha bg-preto px-4 py-3">
                 <p className="text-[10px] uppercase tracking-wider text-muted">🟣 Stories</p>
                 <p className="mt-0.5 text-2xl font-bold text-white">{entregue.stories}</p>
+              </div>
+              <div className="rounded-lg border border-linha bg-preto px-4 py-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted">🎬 Reels</p>
+                <p className="mt-0.5 text-2xl font-bold text-white">{entregue.reels}</p>
               </div>
             </div>
             <p className="mt-2 text-[11px] text-muted">Carrosséis e Publicações ficam fixos no seu perfil · os Stories somem em 24h.</p>

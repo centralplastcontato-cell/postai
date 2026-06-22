@@ -5,14 +5,14 @@
 // pronto, marca a data e agenda — igual as outras abas geram o seu tipo. O piloto posta via
 // media_type=REELS quando chega a data (próximo passo).
 
-import { useState, useTransition } from "react";
+import { useState, useEffect, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { InputDataBR } from "./input-data-br";
 import { alternarAprovacao, excluirPublicacao } from "@/app/actions/feed";
 import { agendarReelsDaFesta, gerarLegendaReels } from "@/app/actions/festas";
 
-export type FestaComVideo = { id: string; nome: string; videoUrl: string };
+export type FestaComVideo = { id: string; nome: string; videoUrl: string; data: string; horario: string };
 
 function quando(iso: string): string {
   const d = new Date(iso);
@@ -21,14 +21,22 @@ function quando(iso: string): string {
   return `${dia} às ${hora}`;
 }
 
-export function ReelsAba({ reels, festasComVideo }: { reels: PublicacaoView[]; festasComVideo: FestaComVideo[] }) {
+// Rótulo da festa no seletor: "Samuel · 21/06 13:00" (nome + data e horário DA FESTA).
+function festaLabel(f: FestaComVideo): string {
+  const dia = new Date(f.data).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+  return `${f.nome} · ${dia}${f.horario ? ` ${f.horario}` : ""}`;
+}
+
+export function ReelsAba({ reels, festasComVideo, dataAlvo }: { reels: PublicacaoView[]; festasComVideo: FestaComVideo[]; dataAlvo: string | null }) {
   const router = useRouter();
   const [pend, startT] = useTransition();
   const [ocupadoId, setOcupadoId] = useState<string | null>(null);
 
   // agendador
   const [festaId, setFestaId] = useState("");
-  const [dataISO, setDataISO] = useState("");
+  const [dataISO, setDataISO] = useState(dataAlvo ?? "");
+  // se o dono está olhando um dia X na agenda, a data do Reels acompanha (e dá pra trocar).
+  useEffect(() => { if (dataAlvo) setDataISO(dataAlvo); }, [dataAlvo]);
   const [legenda, setLegenda] = useState("");
   const [agendando, setAgendando] = useState(false);
   const [gerandoLeg, setGerandoLeg] = useState(false);
@@ -80,7 +88,7 @@ export function ReelsAba({ reels, festasComVideo }: { reels: PublicacaoView[]; f
                 <label className="block text-xs font-semibold text-white">Festa</label>
                 <select value={festaId} onChange={(e) => { setFestaId(e.target.value); setMsg(null); }} className="input-base mt-1 w-full text-sm">
                   <option value="">Escolha a festa…</option>
-                  {festasComVideo.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                  {festasComVideo.map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}</option>)}
                 </select>
               </div>
               <div>
@@ -97,7 +105,7 @@ export function ReelsAba({ reels, festasComVideo }: { reels: PublicacaoView[]; f
             </div>
             <textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} rows={4} placeholder="Deixe em branco que eu escrevo uma — ou clique em ✨ Escrever com a Bia" className="input-base mt-1 w-full text-xs" />
             {msg && <p className={`mt-2 text-xs font-semibold ${msg.tipo === "ok" ? "text-green-400" : "text-vermelho"}`}>{msg.txt}</p>}
-            <button onClick={agendar} disabled={agendando} className="mt-3 rounded-lg bg-[#7c3aed] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-60">{agendando ? "Agendando…" : "📅 Agendar Reels"}</button>
+            <button onClick={agendar} disabled={agendando || !festaId || !dataISO} title={!festaId || !dataISO ? "Escolha a festa e a data" : ""} className="mt-3 rounded-lg bg-[#7c3aed] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{agendando ? "Salvando…" : "💾 Salvar e agendar Reels"}</button>
           </>
         )}
       </div>

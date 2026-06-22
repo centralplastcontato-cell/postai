@@ -96,13 +96,15 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   // Carrosséis, Publicações, Story). A soma fecha certinho (carrosseis + feed + stories
   // = total).
   const carrosseisPostados = conteudos.filter((c) => c.status === "postado" && c.postadoEm).length;
-  const feedPostados = pubs.filter((p) => p.formato !== "story" && p.status === "postado" && p.postadoEm).length;
+  const feedPostados = pubs.filter((p) => p.formato !== "story" && p.formato !== "reels" && p.status === "postado" && p.postadoEm).length;
   const storiesPostados = pubs.filter((p) => p.formato === "story" && p.status === "postado" && p.postadoEm).length;
+  const reelsPostados = pubs.filter((p) => p.formato === "reels" && p.status === "postado" && p.postadoEm).length;
   const entregue = {
     carrosseis: carrosseisPostados,
     feed: feedPostados,
     stories: storiesPostados,
-    total: carrosseisPostados + feedPostados + storiesPostados,
+    reels: reelsPostados,
+    total: carrosseisPostados + feedPostados + storiesPostados + reelsPostados,
   };
 
   const posts: Post[] = conteudos.map((c) => {
@@ -170,7 +172,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const stories: PublicacaoView[] = pubs.filter((p) => p.formato === "story").map(mapPub);
   const reels: PublicacaoView[] = pubs.filter((p) => p.formato === "reels").map(mapPub);
   // Festas com vídeo já montado → alimentam o agendador de Reels na aba Redes Sociais.
-  const festasComVideo = festasRaw.filter((f) => f.videoUrl).map((f) => ({ id: f.id, nome: f.aniversariante || "Festa", videoUrl: f.videoUrl }));
+  const festasComVideo = festasRaw.filter((f) => f.videoUrl).map((f) => ({ id: f.id, nome: f.aniversariante || "Festa", videoUrl: f.videoUrl, data: f.data.toISOString(), horario: f.horario }));
 
   // Banco da aba Imagens = só as fotos-BASE (que o dono sobe). As fotos de FESTA (festaId
   // preenchido) ficam só na aba Festas, organizadas por evento — mas seguem no rodízio dos posts.

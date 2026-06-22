@@ -162,7 +162,7 @@ export function RedesSociais({
         />
       )}
 
-      {subaba === "reels" && <ReelsAba reels={reels} festasComVideo={festasComVideo} />}
+      {subaba === "reels" && <ReelsAba reels={reels} festasComVideo={festasComVideo} dataAlvo={dataAlvo} />}
     </div>
   );
 }
