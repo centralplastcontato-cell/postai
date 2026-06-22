@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada } from "@/lib/instagram";
+import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada, criarContainerReels, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
 import { snapshotDeMarca, alertarTokenSeVencendo, coletarInsightsDaMarca } from "@/lib/metricas";
 import { acessoExpirado } from "@/lib/plano";
 import { registrarAtividade } from "@/lib/atividade";
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-type Tipo = "carrossel" | "feed" | "story";
+type Tipo = "carrossel" | "feed" | "story" | "reels";
 type Resultado = { marca: string; tipo: Tipo; titulo: string; ok: boolean; erro?: string };
 
 /**
@@ -72,6 +72,7 @@ export async function GET(req: Request) {
       await postarCarrossel(m, agora, base, resultados);
       await postarFeed(m, agora, base, resultados);
       await postarStory(m, agora, base, resultados);
+      await postarReels(m, agora, resultados);
 
       // Coleta o engajamento (curtidas/comentários/alcance) dos posts recentes — Story só
       // dentro de 24h. Best-effort: nunca derruba o piloto.
@@ -188,5 +189,86 @@ async function postarStory(m: { id: string; nome: string; igUserId: string | nul
     out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
   } catch (e) {
     out.push({ marca: m.nome, tipo: "story", titulo: "(erro)", ok: false, erro: msg(e) });
+  }
+}
+
+const dorme = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Publica um container de Reels JÁ pronto (FINISHED): claim atômico + media_publish + atividade.
+async function publicarReelsPronto(
+  m: { id: string; nome: string; igUserId: string | null; accessToken: string | null },
+  p: { id: string; titulo: string },
+  containerId: string,
+  out: Resultado[],
+): Promise<boolean> {
+  if (!(await claimPublicacao(p.id))) return true; // já pego por outra execução — não duplica
+  const conn = { igUserId: m.igUserId as string, accessToken: m.accessToken as string };
+  const r = await publicarContainerReels(conn, containerId);
+  if (r.ok) {
+    await registrarAtividade(AGENTE, `Postei o Reels "${p.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
+    await prisma.publicacao.update({ where: { id: p.id }, data: { mediaId: r.mediaId } }).catch(() => {});
+  } else {
+    // volta a "a_postar" e zera o container (recria do zero na próxima passada)
+    await prisma.publicacao.update({ where: { id: p.id }, data: { status: "a_postar", postadoEm: null, reelsContainerId: "" } }).catch(() => {});
+    await registrarAtividade(AGENTE, `Não consegui publicar o Reels "${p.titulo}" de ${m.nome}: ${r.erro}`, m.id).catch(() => {});
+  }
+  out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: r.ok, erro: r.ok ? undefined : r.erro });
+  return r.ok;
+}
+
+// PILOTO DO REELS (2 fases, pra caber na janela de 60s sem travar):
+//  • Fase 1 (sem container): cria o vídeo na Meta + poll CURTO (~20s) — se ficar pronto, publica já.
+//  • Fase 2 (já tem container): confere o processamento e publica quando FINISHED.
+// O container fica guardado em Publicacao.reelsContainerId entre as passadas; ERROR/EXPIRED zera pra recriar.
+async function postarReels(m: { id: string; nome: string; igUserId: string | null; accessToken: string | null }, agora: Date, out: Resultado[]) {
+  try {
+    const p = await prisma.publicacao.findFirst({ where: { marcaId: m.id, status: "a_postar", data: { lte: agora }, formato: "reels" }, orderBy: { data: "asc" } });
+    if (!p) return;
+    if (!p.videoUrl) {
+      await registrarAtividade(AGENTE, `O Reels "${p.titulo}" de ${m.nome} ainda não tem vídeo gerado — não postei.`, m.id).catch(() => {});
+      out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: false, erro: "sem vídeo" });
+      return;
+    }
+    const conn = { igUserId: m.igUserId as string, accessToken: m.accessToken as string };
+    const legenda = p.legenda.slice(0, 2200);
+
+    // FASE 2 — já criou o container numa passada anterior
+    if (p.reelsContainerId) {
+      const status = await statusContainerReels(conn, p.reelsContainerId);
+      if (status === "FINISHED") {
+        await publicarReelsPronto(m, p, p.reelsContainerId, out);
+      } else if (status === "ERROR" || status === "EXPIRED") {
+        await prisma.publicacao.update({ where: { id: p.id }, data: { reelsContainerId: "" } }).catch(() => {}); // recria na próxima
+        await registrarAtividade(AGENTE, `O vídeo do Reels "${p.titulo}" de ${m.nome} falhou no preparo (${status}) — vou tentar de novo.`, m.id).catch(() => {});
+        out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: false, erro: status });
+      }
+      // IN_PROGRESS/UNKNOWN: ainda processando → espera a próxima passada
+      return;
+    }
+
+    // FASE 1 — cria o container e guarda; poll curto pra publicar já se ficar pronto rápido
+    const c = await criarContainerReels(conn, p.videoUrl, legenda);
+    if (!c.ok) {
+      await registrarAtividade(AGENTE, `Não consegui preparar o Reels "${p.titulo}" de ${m.nome}: ${c.erro}`, m.id).catch(() => {});
+      out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: false, erro: c.erro });
+      return;
+    }
+    await prisma.publicacao.update({ where: { id: p.id }, data: { reelsContainerId: c.containerId } }).catch(() => {});
+
+    for (let i = 0; i < 5; i++) { // ~20s (5 × 4s)
+      await dorme(4000);
+      const s = await statusContainerReels(conn, c.containerId);
+      if (s === "FINISHED") { await publicarReelsPronto(m, p, c.containerId, out); return; }
+      if (s === "ERROR" || s === "EXPIRED") {
+        await prisma.publicacao.update({ where: { id: p.id }, data: { reelsContainerId: "" } }).catch(() => {});
+        out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: false, erro: s });
+        return;
+      }
+    }
+    // ainda processando → fica pra próxima passada (container já guardado)
+    await registrarAtividade(AGENTE, `Preparando o Reels "${p.titulo}" de ${m.nome} — publico assim que o vídeo ficar pronto.`, m.id).catch(() => {});
+    out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: false, erro: "processando" });
+  } catch (e) {
+    out.push({ marca: m.nome, tipo: "reels", titulo: "(erro)", ok: false, erro: msg(e) });
   }
 }

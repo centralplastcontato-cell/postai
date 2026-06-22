@@ -201,6 +201,8 @@ model Publicacao {
   hashtags  String   @default("")
   imagemUrl String?
   videoUrl  String? // URL do MP4 (Blob) quando formato="reels" — o piloto posta via media_type=REELS
+  // ID do container de vídeo na Meta enquanto ele PROCESSA (guardado entre as passadas do piloto). "" = ainda não criado.
+  reelsContainerId String @default("")
   extra     String? // JSON com dados específicos do template (oferta, validade, selo, linhas do título, cor de fundo...)
   tema      String?
   // Categoria de INTENÇÃO de marketing (ver Conteudo.categoria) — eixo da inteligência.
