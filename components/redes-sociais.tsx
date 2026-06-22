@@ -54,9 +54,10 @@ export function RedesSociais({
 
   // Abre um item da VISÃO DO DIA: leva pra aba do tipo certo pra editar/postar
   // (o item já aparece filtrado lá, porque o dia segue selecionado).
-  function abrirDoResumo(tipo: "carrossel" | "feed" | "story", id: string) {
+  function abrirDoResumo(tipo: "carrossel" | "feed" | "story" | "reels", id: string) {
     if (tipo === "carrossel") { setSelecao({ tipo: "carrossel", id }); setSubaba("carrosseis"); }
     else if (tipo === "feed") { setSelecao({ tipo: "feed", id }); setSubaba("publicacoes"); }
+    else if (tipo === "reels") { setSelecao(null); setSubaba("reels"); }
     else { setSelecao(null); setSubaba("story"); }
   }
 
@@ -81,6 +82,7 @@ export function RedesSociais({
           posts={posts}
           publicacoes={publicacoes}
           stories={stories}
+          reels={reels}
           dataAlvo={dataAlvo}
           onSelecionarDia={aoSelecionarDia}
           diasCarrossel={diasCarrossel}
@@ -109,6 +111,7 @@ export function RedesSociais({
           posts={posts}
           publicacoes={publicacoes}
           stories={stories}
+          reels={reels}
           onAbrir={abrirDoResumo}
         />
       )}
@@ -162,7 +165,7 @@ export function RedesSociais({
         />
       )}
 
-      {subaba === "reels" && <ReelsAba reels={reels} festasComVideo={festasComVideo} dataAlvo={dataAlvo} />}
+      {subaba === "reels" && <ReelsAba reels={reels} festasComVideo={festasComVideo} dataAlvo={dataAlvo} horaPadrao={horaPost} />}
     </div>
   );
 }

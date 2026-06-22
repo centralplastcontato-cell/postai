@@ -8,6 +8,7 @@ import { marcaPorTokenFotos, festaPorToken, gerarTokenFesta, gerarTokenAlbum } f
 import { parseAniversariantes, nomesAniversariantes } from "@/lib/aniversariantes";
 import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO, LIMITE_FOTOS_FESTA } from "@/lib/momentos-festa";
 import { descreverImagem } from "@/lib/imagem-ia";
+import { publicarReelsNasRedes } from "@/lib/instagram";
 
 // ===========================================================================
 // ÁLBUM DA FESTA — server actions
@@ -197,6 +198,15 @@ export async function salvarAutorizacaoFesta(festaToken: string, autoriza: boole
   return { ok: true as const };
 }
 
+// Liga/desliga o card "Avalie no Google" no álbum dos pais (gerente, pela tela pública por token).
+export async function salvarMostrarAvaliacao(festaToken: string, mostrar: boolean) {
+  const f = await festaPorToken(festaToken);
+  if (!f) return { ok: false as const, erro: "Link inválido ou desativado." };
+  await prisma.festa.update({ where: { id: f.id }, data: { mostrarAvaliacao: mostrar } });
+  revalidatePath(`/f/${festaToken}`);
+  return { ok: true as const };
+}
+
 // O gerente marca a festa como FINALIZADA (terminou de subir) — ou REABRE pra adicionar mais.
 // Pelo LINK DA FESTA (validado por festaToken). Sinaliza ao dono que está completa. EXIGE que a
 // autorização de uso de imagem já tenha sido decidida (não pode finalizar com "pendente").
@@ -246,7 +256,7 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[]) {
 // Cria um POST DE REELS agendado a partir do vídeo JÁ montado da festa. Entra na Agenda como
 // Publicacao formato="reels" (status a_postar), pronto pra revisar e ser postado pelo piloto.
 // TRAVA LGPD: festa sem autorização dos pais NUNCA vira divulgação pública.
-export async function agendarReelsDaFesta(festaId: string, dataYMD: string, legendaManual?: string) {
+export async function agendarReelsDaFesta(festaId: string, dataYMD: string, legendaManual?: string, horaSel?: number) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
     select: { marcaId: true, videoUrl: true, autorizacao: true, tema: true, aniversariante: true, aniversariantes: true, marca: { select: { nome: true, horaPost: true } } },
@@ -257,8 +267,9 @@ export async function agendarReelsDaFesta(festaId: string, dataYMD: string, lege
   if (festa.autorizacao !== "autorizada") return { ok: false as const, erro: "Esta festa não tem autorização de uso de imagem — não pode ser divulgada." };
   if (!festa.videoUrl) return { ok: false as const, erro: "Esta festa ainda não tem vídeo gerado." };
 
-  const hora = String(festa.marca.horaPost ?? 10).padStart(2, "0");
-  const data = new Date(`${dataYMD}T${hora}:00:00-03:00`); // BRT
+  const horaFinal = (typeof horaSel === "number" && horaSel >= 0 && horaSel <= 23) ? horaSel : (festa.marca.horaPost ?? 10);
+  const hh = String(horaFinal).padStart(2, "0");
+  const data = new Date(`${dataYMD}T${hh}:00:00-03:00`); // BRT
   if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
 
   const nome = festa.aniversariante || "a criança";
@@ -334,4 +345,49 @@ export async function gerarLegendaReels(festaId: string) {
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const legenda = await legendaReelsIA({ aniversariante: festa.aniversariante, aniversariantes: festa.aniversariantes, tema: festa.tema, buffet: festa.marca.nome });
   return { ok: true as const, legenda };
+}
+
+// Edita um Reels JÁ agendado (data, hora e legenda) — só enquanto NÃO foi postado.
+export async function atualizarReels(pubId: string, dataYMD: string, horaSel: number, legenda: string) {
+  const pub = await prisma.publicacao.findUnique({ where: { id: pubId }, select: { marcaId: true, formato: true, status: true } });
+  if (!pub) return { ok: false as const, erro: "Reels não encontrado." };
+  if (pub.formato !== "reels") return { ok: false as const, erro: "Não é um Reels." };
+  if (pub.status === "postado") return { ok: false as const, erro: "Esse Reels já foi postado." };
+  const g = await guardaMarca(pub.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const hh = String((horaSel >= 0 && horaSel <= 23) ? horaSel : 10).padStart(2, "0");
+  const data = new Date(`${dataYMD}T${hh}:00:00-03:00`); // BRT
+  if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
+  await prisma.publicacao.update({ where: { id: pubId }, data: { data, legenda: legenda.trim() ? legenda.trim() : undefined } });
+  revalidatePath(`/painel/marcas/${pub.marcaId}`);
+  return { ok: true as const };
+}
+
+// POSTA o Reels AGORA no Instagram (botão "Postar agora"). Claim atômico (não posta 2x) e
+// reverte se a Meta falhar. Usa a Meta API de Reels (processa o vídeo + publica) — pode levar
+// até ~1 min por causa do processamento do vídeo.
+export async function postarReelsAgora(pubId: string) {
+  const pub = await prisma.publicacao.findUnique({
+    where: { id: pubId },
+    select: { marcaId: true, formato: true, status: true, videoUrl: true, legenda: true, marca: { select: { igUserId: true, accessToken: true } } },
+  });
+  if (!pub) return { ok: false as const, erro: "Reels não encontrado." };
+  if (pub.formato !== "reels") return { ok: false as const, erro: "Não é um Reels." };
+  const g = await guardaMarca(pub.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (!pub.videoUrl) return { ok: false as const, erro: "Esse Reels não tem vídeo." };
+  if (!pub.marca.igUserId || !pub.marca.accessToken) return { ok: false as const, erro: "A marca não está conectada ao Instagram." };
+
+  // claim: marca como postado ANTES de postar (evita 2 cliques publicarem 2x). Reverte se falhar.
+  const claim = await prisma.publicacao.updateMany({ where: { id: pubId, status: "a_postar" }, data: { status: "postado", postadoEm: new Date() } });
+  if (claim.count === 0) return { ok: false as const, erro: "Esse Reels já foi postado." };
+
+  const r = await publicarReelsNasRedes({ igUserId: pub.marca.igUserId, accessToken: pub.marca.accessToken }, pub.videoUrl, pub.legenda);
+  if (!r.ig.ok) {
+    await prisma.publicacao.update({ where: { id: pubId }, data: { status: "a_postar", postadoEm: null } });
+    return { ok: false as const, erro: r.ig.erro };
+  }
+  await prisma.publicacao.update({ where: { id: pubId }, data: { mediaId: r.ig.mediaId } });
+  revalidatePath(`/painel/marcas/${pub.marcaId}`);
+  return { ok: true as const, permalink: r.ig.permalink };
 }

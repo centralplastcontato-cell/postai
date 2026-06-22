@@ -77,6 +77,7 @@ export async function festaPorTokenAlbum(token: string) {
         horario: true,
         finalizadaEm: true,
         autorizacao: true,
+        mostrarAvaliacao: true,
         marca: { select: { slug: true, nome: true, logoUrl: true, corPrimaria: true, telefone: true, site: true } },
       },
     });
@@ -105,6 +106,7 @@ export async function festaPorToken(token: string) {
         finalizadaEm: true,
         autorizacao: true,
         motivoNaoAutoriza: true,
+        mostrarAvaliacao: true,
         marca: { select: { nome: true, logoUrl: true, corPrimaria: true } },
       },
     });

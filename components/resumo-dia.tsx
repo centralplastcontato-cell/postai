@@ -25,7 +25,7 @@ function dataLongaBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "long" });
 }
 
-type Tipo = "carrossel" | "feed" | "story";
+type Tipo = "carrossel" | "feed" | "story" | "reels";
 
 type ItemDia = {
   tipo: Tipo;
@@ -34,6 +34,7 @@ type ItemDia = {
   status: string;
   aprovado: boolean;
   thumb?: string;
+  video?: string; // miniatura quando é vídeo (Reels)
   aspect: string;
   ordem: number; // pra ordenar por horário
 };
@@ -42,6 +43,7 @@ const CFG: Record<Tipo, { nome: string; icone: string; cls: string }> = {
   carrossel: { nome: "Carrossel", icone: "🖼️", cls: "bg-orange-500/15 text-orange-300 border-orange-500/30" },
   feed: { nome: "Feed", icone: "📱", cls: "bg-sky-500/15 text-sky-300 border-sky-500/30" },
   story: { nome: "Story", icone: "🟣", cls: "bg-[#7c3aed]/20 text-purple-300 border-[#7c3aed]/40" },
+  reels: { nome: "Reels", icone: "🎬", cls: "bg-fuchsia-500/15 text-fuchsia-300 border-fuchsia-500/30" },
 };
 
 export function ResumoDoDia({
@@ -49,12 +51,14 @@ export function ResumoDoDia({
   posts,
   publicacoes,
   stories,
+  reels,
   onAbrir,
 }: {
   dia: string; // chave do dia (YYYY-MM-DD em SP)
   posts: Post[];
   publicacoes: PublicacaoView[];
   stories: PublicacaoView[];
+  reels: PublicacaoView[];
   onAbrir: (tipo: Tipo, id: string) => void;
 }) {
   const v = (p: PublicacaoView) => hashCurto(`${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`);
@@ -69,6 +73,9 @@ export function ResumoDoDia({
     ...stories
       .filter((p) => chaveDiaSP(p.data) === dia)
       .map((p) => ({ tipo: "story" as const, id: p.id, titulo: p.titulo, status: p.status, aprovado: p.aprovado, thumb: `/api/story/${p.id}?v=${v(p)}`, aspect: "aspect-[9/16]", ordem: new Date(p.data).getTime() })),
+    ...reels
+      .filter((p) => chaveDiaSP(p.data) === dia)
+      .map((p) => ({ tipo: "reels" as const, id: p.id, titulo: p.titulo, status: p.status, aprovado: p.aprovado, video: p.videoUrl ?? undefined, aspect: "aspect-[9/16]", ordem: new Date(p.data).getTime() })),
   ].sort((a, b) => a.ordem - b.ordem);
 
   const dataItem = posts.find((p) => chaveDiaSP(p.data) === dia)?.data
@@ -96,7 +103,10 @@ export function ResumoDoDia({
                   <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "Postado" : "A postar"}</span>
                 </div>
                 <button type="button" onClick={() => onAbrir(it.tipo, it.id)} title="Abrir pra editar/postar" className="block w-full overflow-hidden rounded-md border border-linha transition hover:border-vermelho">
-                  {it.thumb ? (
+                  {it.video ? (
+                    // eslint-disable-next-line jsx-a11y/media-has-caption
+                    <video src={`${it.video}#t=0.5`} preload="metadata" muted playsInline className={`${it.aspect} w-full object-cover`} />
+                  ) : it.thumb ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={it.thumb} alt={it.titulo} className={`${it.aspect} w-full object-cover`} />
                   ) : (

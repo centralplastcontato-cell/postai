@@ -121,6 +121,8 @@ model Festa {
   videoFotos     String   @default("[]")
   // URL do VÍDEO/Reels já montado desta festa (no Blob). "" = ainda não gerado.
   videoUrl       String   @default("")
+  // O gerente liga/desliga o card "Avalie no Google" no álbum dos pais (por festa).
+  mostrarAvaliacao Boolean @default(true)
   criadoEm       DateTime @default(now())
 
   fotos          ImagemMarca[]

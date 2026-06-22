@@ -55,7 +55,7 @@ export default async function FestaAlbumPage({ params }: { params: Promise<{ tok
   const dados = montarDadosAlbum(festa, fotos, {
     preview: false,
     campanha,
-    googleReviewUrl: linkAvaliacaoGoogle(festa.marca.slug, festa.marca.nome),
+    googleReviewUrl: festa.mostrarAvaliacao ? linkAvaliacaoGoogle(festa.marca.slug, festa.marca.nome) : null,
     musicaUrl: musicaBuffet(festa.marca.slug),
   });
   return <AlbumFesta dados={dados} />;

@@ -24,19 +24,21 @@ function chaveData(iso: string): string {
 // Mantido (redes-sociais usa pra destacar/abrir o item nas abas de edição).
 export type SelecaoRede = { tipo: "carrossel" | "feed"; id: string };
 
-type Tipo = "carrossel" | "feed" | "story";
+type Tipo = "carrossel" | "feed" | "story" | "reels";
 type ResTipo = { total: number; postados: number; aprovados: number };
 type ResumoDia = Record<Tipo, ResTipo>;
 const zero = (): ResumoDia => ({
   carrossel: { total: 0, postados: 0, aprovados: 0 },
   feed: { total: 0, postados: 0, aprovados: 0 },
   story: { total: 0, postados: 0, aprovados: 0 },
+  reels: { total: 0, postados: 0, aprovados: 0 },
 });
 
 const CHIP: Record<Tipo, { icone: string; cor: string; nome: string }> = {
   carrossel: { icone: "🖼️", cor: "bg-orange-500", nome: "Carrossel" },
   feed: { icone: "📱", cor: "bg-sky-600", nome: "Feed" },
   story: { icone: "🟣", cor: "bg-[#7c3aed]", nome: "Story" },
+  reels: { icone: "🎬", cor: "bg-fuchsia-600", nome: "Reels" },
 };
 
 function parseDias(s: string): number[] {
@@ -67,6 +69,7 @@ export function CalendarioRedes({
   posts,
   publicacoes,
   stories,
+  reels,
   dataAlvo,
   onSelecionarDia,
   diasCarrossel,
@@ -75,6 +78,7 @@ export function CalendarioRedes({
   posts: Post[];
   publicacoes: PublicacaoView[];
   stories: PublicacaoView[];
+  reels: PublicacaoView[];
   dataAlvo: string | null;
   onSelecionarDia: (iso: string) => void;
   diasCarrossel: string;
@@ -101,6 +105,7 @@ export function CalendarioRedes({
   for (const p of posts) add(p.data, "carrossel", p.status === "postado", p.aprovado);
   for (const p of publicacoes) add(p.data, "feed", p.status === "postado", p.aprovado);
   for (const p of stories) add(p.data, "story", p.status === "postado", p.aprovado);
+  for (const p of reels) add(p.data, "reels", p.status === "postado", p.aprovado);
 
   function mudarMes(delta: number) {
     setView((v) => {
@@ -128,6 +133,7 @@ export function CalendarioRedes({
         <span>🖼️ <span className="text-orange-400">Carrossel</span></span>
         <span>📱 <span className="text-sky-400">Feed</span></span>
         <span>🟣 <span className="text-purple-300">Story</span></span>
+        <span>🎬 <span className="text-fuchsia-300">Reels</span></span>
         <span><span className="rounded bg-green-600 px-1 text-white">✓</span> = já postado</span>
         <span><span className="text-amber-300">Amarelo</span> = hoje</span>
         <span>🎉 <span className="text-yellow-300">data comemorativa</span></span>
@@ -207,6 +213,7 @@ export function CalendarioRedes({
                 {res.carrossel.total > 0 && <Chip tipo="carrossel" res={res.carrossel} />}
                 {res.feed.total > 0 && <Chip tipo="feed" res={res.feed} />}
                 {res.story.total > 0 && <Chip tipo="story" res={res.story} />}
+                {res.reels.total > 0 && <Chip tipo="reels" res={res.reels} />}
               </span>
               {comemorativa && <TooltipData emoji={comemorativa.emoji} nome={comemorativa.nome} rodape="clique pra ver o dia" />}
             </button>

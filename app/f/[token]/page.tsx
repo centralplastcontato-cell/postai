@@ -36,6 +36,7 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
       motivoNaoAutoriza: festa.motivoNaoAutoriza,
       videoFotos: [],
       videoUrl: "",
+      mostrarAvaliacao: festa.mostrarAvaliacao,
       fotos: fotos.map((f) => ({ id: f.id, url: f.url, momento: f.momento, descricao: f.descricao })),
     };
     return <FestaPublico token={token} marca={festa.marca} festa={festaView} linkAlbum={`${baseUrl()}/festa/${festa.tokenAlbum}`} />;

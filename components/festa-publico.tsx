@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta, salvarAutorizacaoFesta } from "@/app/actions/festas";
+import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta, salvarAutorizacaoFesta, salvarMostrarAvaliacao } from "@/app/actions/festas";
+import { QRCodeSVG } from "qrcode.react";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
 import { MOMENTOS_FESTA, LIMITE_FOTOS_FESTA, LIMITE_FOTOS_MOMENTO } from "@/lib/momentos-festa";
 import { type FestaView, type FotoView, type MarcaPublica } from "@/lib/festa-tipos";
@@ -38,6 +39,17 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
   const [salvandoAutoriz, setSalvandoAutoriz] = useState(false);
   const [erroAutoriz, setErroAutoriz] = useState<string | null>(null);
   const autorizRef = useRef<HTMLDivElement>(null);
+  // Card de avaliação no Google (liga/desliga no álbum) + QR code do álbum
+  const [mostrarAval, setMostrarAval] = useState(festa.mostrarAvaliacao);
+  const [salvandoAval, setSalvandoAval] = useState(false);
+  const [mostrarQR, setMostrarQR] = useState(false);
+
+  async function alternarAvaliacao() {
+    const novo = !mostrarAval;
+    setMostrarAval(novo);
+    setSalvandoAval(true);
+    try { await salvarMostrarAvaliacao(token, novo); router.refresh(); } catch { setMostrarAval(!novo); } finally { setSalvandoAval(false); }
+  }
 
   async function salvarGerente() {
     try {
@@ -291,6 +303,17 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
             )}
             {erroAutoriz && <p className="mt-1 text-[11px] font-semibold text-vermelho">{erroAutoriz}</p>}
           </div>
+
+          {/* Card de avaliação no Google — o gerente decide se aparece no álbum dos pais */}
+          <div className="mt-3 flex items-center justify-between gap-3 border-t border-linha pt-3">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-white">⭐ Pedir avaliação no Google</p>
+              <p className="mt-0.5 text-[11px] text-muted">Mostra um card no álbum dos pais convidando a avaliar o buffet.</p>
+            </div>
+            <button type="button" role="switch" aria-checked={mostrarAval} onClick={alternarAvaliacao} disabled={salvandoAval} aria-label="Pedir avaliação no Google" className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:opacity-60 ${mostrarAval ? "bg-green-500" : "bg-linha"}`}>
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${mostrarAval ? "left-[22px]" : "left-0.5"}`} />
+            </button>
+          </div>
         </div>
 
         {erroUp && <p className="mt-3 rounded-lg border border-vermelho/40 bg-vermelho/10 p-2 text-center text-sm text-vermelho">{erroUp}</p>}
@@ -363,6 +386,15 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
                   <button type="button" onClick={compartilharAlbum} className="flex-1 rounded-lg bg-[#7c3aed] px-3 py-2 text-xs font-semibold text-white transition hover:bg-[#8b4ef5] sm:flex-none">💜 Compartilhar</button>
                 </div>
               </div>
+              <button type="button" onClick={() => setMostrarQR((v) => !v)} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-[#7c3aed]">
+                📲 {mostrarQR ? "Esconder QR code" : "Mostrar QR code pros pais"}
+              </button>
+              {mostrarQR && (
+                <div className="mt-3 flex flex-col items-center rounded-lg border border-linha bg-white p-4">
+                  <QRCodeSVG value={linkAlbum} size={180} level="M" />
+                  <p className="mt-2 text-center text-[11px] font-semibold text-black">Os pais apontam a câmera do celular 📷</p>
+                </div>
+              )}
             </div>
           )}
         </div>

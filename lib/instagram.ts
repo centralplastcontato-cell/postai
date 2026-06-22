@@ -247,6 +247,77 @@ export async function publicarStoryNasRedes(
   return { ig };
 }
 
+/**
+ * Publica um REELS (vídeo 9:16) no Instagram da marca. O vídeo já está no Blob (video_url).
+ * Vídeo é diferente de imagem: a Meta cria o container, PROCESSA o vídeo (leva segundos) e só
+ * então deixa publicar — por isso a gente faz POLL do status_code até FINISHED antes do publish.
+ */
+export async function publicarReelsIG(conn: ConexaoIG, videoUrl: string, legenda: string): Promise<ResultadoPostagem> {
+  if (!marcaConectada(conn)) return { ok: false, erro: "Marca sem conexão com o Instagram." };
+  try {
+    // 1) cria o container do Reels (share_to_feed: também aparece no feed do perfil)
+    const c = await graphRetry(conn, `${conn.igUserId}/media`, {
+      media_type: "REELS",
+      video_url: videoUrl,
+      caption: legenda,
+      share_to_feed: "true",
+      thumb_offset: "1500", // capa do Reels = frame de 1,5s (logo + nome já nítidos, fora do fade)
+    });
+    const containerId = String(c.id);
+
+    // 2) espera a Meta PROCESSAR o vídeo (status_code: IN_PROGRESS → FINISHED). ~até 80s.
+    let pronto = false;
+    let ultimoStatus = "";
+    for (let i = 0; i < 20; i++) {
+      await espera(4000);
+      try {
+        const r = await fetch(`${GRAPH}/${containerId}?fields=status_code&access_token=${conn.accessToken}`, { cache: "no-store" });
+        const j = (await r.json()) as { status_code?: string };
+        ultimoStatus = j.status_code || "";
+        if (ultimoStatus === "FINISHED") { pronto = true; break; }
+        if (ultimoStatus === "ERROR" || ultimoStatus === "EXPIRED") return { ok: false, erro: `A Meta não conseguiu processar o vídeo (${ultimoStatus}).` };
+      } catch {}
+    }
+    if (!pronto) return { ok: false, erro: `O vídeo ainda está processando na Meta (${ultimoStatus || "sem status"}). Tente postar de novo em instantes.` };
+
+    // 3) publica
+    let mediaId: string | null = null;
+    let ultimoErro = "";
+    for (let i = 0; i < 5; i++) {
+      try {
+        const pub = await graph(conn, `${conn.igUserId}/media_publish`, { creation_id: containerId });
+        mediaId = String(pub.id);
+        break;
+      } catch (e) {
+        ultimoErro = e instanceof Error ? e.message : String(e);
+        await espera(3000);
+      }
+    }
+    if (!mediaId) return { ok: false, erro: `Não consegui publicar o Reels: ${ultimoErro}` };
+
+    let permalink: string | null = null;
+    try {
+      const r = await fetch(`${GRAPH}/${mediaId}?fields=permalink&access_token=${conn.accessToken}`, { cache: "no-store" });
+      const j = (await r.json()) as { permalink?: string };
+      permalink = j.permalink ?? null;
+    } catch {}
+
+    return { ok: true, mediaId, permalink };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "Erro na Meta API (Reels)." };
+  }
+}
+
+/** Posta o Reels (vídeo já no Blob, não precisa materializar) no Instagram da marca. */
+export async function publicarReelsNasRedes(
+  marca: { igUserId: string; accessToken: string },
+  videoUrl: string,
+  legenda: string
+): Promise<ResultadoRedes> {
+  const ig = await publicarReelsIG({ igUserId: marca.igUserId, accessToken: marca.accessToken }, videoUrl, legenda);
+  return { ig };
+}
+
 /** Monta URLs públicas absolutas a partir de caminhos relativos (/api/...). */
 export function urlsAbsolutas(base: string, caminhos: string[]): string[] {
   const b = base.replace(/\/$/, "");
