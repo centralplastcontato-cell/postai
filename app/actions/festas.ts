@@ -9,6 +9,9 @@ import { parseAniversariantes, nomesAniversariantes } from "@/lib/aniversariante
 import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO, LIMITE_FOTOS_FESTA } from "@/lib/momentos-festa";
 import { descreverImagem } from "@/lib/imagem-ia";
 import { publicarReelsNasRedes } from "@/lib/instagram";
+import { dispararMotorReels } from "@/lib/video-engine";
+import { musicaBuffet } from "@/lib/musica-buffet";
+import { baseUrl } from "@/lib/config";
 
 // ===========================================================================
 // ÁLBUM DA FESTA — server actions
@@ -390,4 +393,51 @@ export async function postarReelsAgora(pubId: string) {
   await prisma.publicacao.update({ where: { id: pubId }, data: { mediaId: r.ig.mediaId } });
   revalidatePath(`/painel/marcas/${pub.marcaId}`);
   return { ok: true as const, permalink: r.ig.permalink };
+}
+
+// Dispara o MOTOR DE VÍDEO pra gerar o Reels da festa (botão "⚡ Gerar vídeo"). Marca a festa
+// como "gerando"; o motor monta em segundo plano e o /api/video-pronto salva a URL no fim.
+// videoUrl = "" (sem vídeo) | "gerando" (em montagem) | URL http (pronto).
+export async function gerarVideoDaFesta(festaId: string) {
+  const festa = await prisma.festa.findUnique({
+    where: { id: festaId },
+    select: { marcaId: true, videoFotos: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true } }, fotos: { select: { id: true, url: true } } },
+  });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (festa.videoUrl === "gerando") return { ok: false as const, erro: "Já estou gerando esse vídeo — aguarde um pouquinho." };
+  if (!festa.marca.logoUrl) return { ok: false as const, erro: "A marca precisa de um logo pra montar o vídeo." };
+
+  // fotos na ORDEM escolhida (ou as primeiras, se não houve seleção manual)
+  let ids: string[] = [];
+  try { ids = JSON.parse(festa.videoFotos || "[]"); } catch {}
+  const mapa = new Map(festa.fotos.map((f) => [f.id, f.url]));
+  let fotos = ids.map((id) => mapa.get(id)).filter((u): u is string => !!u);
+  if (fotos.length === 0) fotos = festa.fotos.slice(0, 28).map((f) => f.url);
+  if (fotos.length === 0) return { ok: false as const, erro: "Suba fotos antes de gerar o vídeo." };
+
+  const anivs = parseAniversariantes(festa.aniversariantes);
+  const nome = anivs[0]?.nome || festa.aniversariante || "a criança";
+  const idade = anivs[0]?.idade;
+  const textoCapa = idade ? `${nome} fez ${idade} aninhos` : `Festa da ${nome}`;
+  const musicaUrl = musicaBuffet(festa.marca.slug) || undefined;
+
+  await prisma.festa.update({ where: { id: festaId }, data: { videoUrl: "gerando" } });
+  const r = await dispararMotorReels({
+    fotos,
+    logoUrl: festa.marca.logoUrl,
+    musicaUrl,
+    textoCapa,
+    nomeArquivo: festa.marca.slug || "reels",
+    festaId,
+    callbackUrl: `${baseUrl()}/api/video-pronto`,
+    callbackToken: process.env.VIDEO_CALLBACK_SECRET || "",
+  });
+  if (!r.ok) {
+    await prisma.festa.update({ where: { id: festaId }, data: { videoUrl: "" } });
+    return { ok: false as const, erro: r.erro };
+  }
+  revalidatePath(`/painel/marcas/${festa.marcaId}`);
+  return { ok: true as const };
 }

@@ -9,6 +9,7 @@ import { type FestaView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
 import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
 import { FestaVideoAgendar } from "@/components/festa-video-agendar";
+import { FestaGerarVideo } from "@/components/festa-gerar-video";
 
 function dataCurta(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -95,8 +96,20 @@ function CardPagina({ f, linkBase, onAbrirSeletor }: { f: FestaView; linkBase: s
         </a>
       </div>
 
-      {/* vídeo pronto → ver + agendar */}
-      {f.videoUrl && <FestaVideoAgendar videoUrl={f.videoUrl} />}
+      {/* vídeo: pronto (ver+agendar) · gerando · gerar */}
+      {f.videoUrl.startsWith("http") ? (
+        <FestaVideoAgendar videoUrl={f.videoUrl} />
+      ) : f.videoUrl === "gerando" ? (
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
+          <span className="text-lg">🎬</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-white">Gerando o vídeo…</p>
+            <p className="text-[11px] text-muted">Leva uns minutos. Atualize a página pra ver quando ficar pronto. ⏳</p>
+          </div>
+        </div>
+      ) : (
+        <FestaGerarVideo festaId={f.id} />
+      )}
 
       {/* ações secundárias */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-linha pt-3">

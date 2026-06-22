@@ -173,7 +173,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const stories: PublicacaoView[] = pubs.filter((p) => p.formato === "story").map(mapPub);
   const reels: PublicacaoView[] = pubs.filter((p) => p.formato === "reels").map(mapPub);
   // Festas com vídeo já montado → alimentam o agendador de Reels na aba Redes Sociais.
-  const festasComVideo = festasRaw.filter((f) => f.videoUrl).map((f) => ({ id: f.id, nome: f.aniversariante || "Festa", videoUrl: f.videoUrl, data: f.data.toISOString(), horario: f.horario }));
+  const festasComVideo = festasRaw.filter((f) => (f.videoUrl || "").startsWith("http")).map((f) => ({ id: f.id, nome: f.aniversariante || "Festa", videoUrl: f.videoUrl, data: f.data.toISOString(), horario: f.horario }));
 
   // Banco da aba Imagens = só as fotos-BASE (que o dono sobe). As fotos de FESTA (festaId
   // preenchido) ficam só na aba Festas, organizadas por evento — mas seguem no rodízio dos posts.
