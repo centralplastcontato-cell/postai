@@ -431,7 +431,7 @@ export async function gerarVideoDaFesta(festaId: string) {
     textoCapa,
     nomeArquivo: festa.marca.slug || "reels",
     festaId,
-    callbackUrl: `${baseUrl()}/api/video-pronto`,
+    callbackUrl: process.env.VIDEO_CALLBACK_URL || `${baseUrl()}/api/video-pronto`,
     callbackToken: process.env.VIDEO_CALLBACK_SECRET || "",
   });
   if (!r.ok) {
