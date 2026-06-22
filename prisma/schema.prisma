@@ -116,6 +116,11 @@ model Festa {
   // pendente/negada = fotos ficam guardadas pra uso interno, nunca viram divulgação pública.
   autorizacao    String   @default("pendente")
   motivoNaoAutoriza String @default("") // motivo quando os pais NÃO autorizam (o gerente escreve)
+  // Seleção de fotos pro VÍDEO/Reels da festa: JSON ["fotoId1","fotoId2",...] na ORDEM escolhida.
+  // "[]" = sem seleção (cai nas fotos automáticas). O dono monta na tela "escolher fotos do vídeo".
+  videoFotos     String   @default("[]")
+  // URL do VÍDEO/Reels já montado desta festa (no Blob). "" = ainda não gerado.
+  videoUrl       String   @default("")
   criadoEm       DateTime @default(now())
 
   fotos          ImagemMarca[]
@@ -193,6 +198,7 @@ model Publicacao {
   legenda   String
   hashtags  String   @default("")
   imagemUrl String?
+  videoUrl  String? // URL do MP4 (Blob) quando formato="reels" — o piloto posta via media_type=REELS
   extra     String? // JSON com dados específicos do template (oferta, validade, selo, linhas do título, cor de fundo...)
   tema      String?
   // Categoria de INTENÇÃO de marketing (ver Conteudo.categoria) — eixo da inteligência.
@@ -201,8 +207,8 @@ model Publicacao {
   status    String   @default("a_postar") // a_postar | postado
   aprovado  Boolean  @default(false) // revisão INTERNA do dono (não vai pra rede) — só marca "eu já revisei"
   postadoEm DateTime? // momento REAL em que foi publicado (null = ainda não postado)
-  // formato: "feed" (4:5, post normal) | "story" (9:16, vai pro Story). O Story usa a
-  // mesma máquina da publicação — só muda o render (vertical) e o jeito de postar.
+  // formato: "feed" (4:5) | "story" (9:16) | "reels" (vídeo 9:16). Feed/Story renderizam arte;
+  // Reels traz o vídeo pronto em videoUrl. O piloto escolhe o jeito de postar pelo formato.
   formato   String   @default("feed")
   // espelhar (só p/ formato feed): null = usa o padrão da marca; true/false = força.
   // Ligado: ao postar o feed, o piloto também sobe a versão Story automaticamente.

@@ -53,7 +53,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     prisma.imagemMarca.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
     prisma.metricaMarca.findMany({ where: { marcaId: id }, orderBy: { dia: "desc" }, take: 90, select: { dia: true, seguidores: true, posts: true } }),
     prisma.atividadeAgente.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" }, take: 25, select: { id: true, agente: true, texto: true, criadoEm: true } }),
-    prisma.festa.findMany({ where: { marcaId: id }, orderBy: { data: "desc" }, include: { fotos: { select: { id: true, url: true, momento: true, descricao: true }, orderBy: { criadoEm: "desc" } } } }),
+    prisma.festa.findMany({ where: { marcaId: id }, orderBy: [{ data: "desc" }, { criadoEm: "desc" }], include: { fotos: { select: { id: true, url: true, momento: true, descricao: true }, orderBy: { criadoEm: "desc" } } } }),
     prisma.campanha.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
   ]);
   const campanhas: CampanhaView[] = campanhasRaw.map((c) => ({
@@ -85,6 +85,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       finalizadaEm: f.finalizadaEm ? f.finalizadaEm.toISOString() : null,
       autorizacao: f.autorizacao,
       motivoNaoAutoriza: f.motivoNaoAutoriza,
+      videoFotos: (() => { try { const a = JSON.parse(f.videoFotos || "[]"); return Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string") : []; } catch { return []; } })(),
+      videoUrl: f.videoUrl || "",
       fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento, descricao: foto.descricao })),
     };
   }));
@@ -148,6 +150,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     legenda: p.legenda,
     hashtags: p.hashtags,
     imagemUrl: p.imagemUrl,
+    formato: p.formato,
+    videoUrl: p.videoUrl,
     status: p.status,
     tema: p.tema,
     aprovado: p.aprovado,
@@ -162,8 +166,11 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     salvamentos: p.salvamentos,
   });
   // Feed (4:5) vai pra aba Publicações; Story (9:16) vai pra aba Story.
-  const publicacoes: PublicacaoView[] = pubs.filter((p) => p.formato !== "story").map(mapPub);
+  const publicacoes: PublicacaoView[] = pubs.filter((p) => p.formato !== "story" && p.formato !== "reels").map(mapPub);
   const stories: PublicacaoView[] = pubs.filter((p) => p.formato === "story").map(mapPub);
+  const reels: PublicacaoView[] = pubs.filter((p) => p.formato === "reels").map(mapPub);
+  // Festas com vídeo já montado → alimentam o agendador de Reels na aba Redes Sociais.
+  const festasComVideo = festasRaw.filter((f) => f.videoUrl).map((f) => ({ id: f.id, nome: f.aniversariante || "Festa", videoUrl: f.videoUrl }));
 
   // Banco da aba Imagens = só as fotos-BASE (que o dono sobe). As fotos de FESTA (festaId
   // preenchido) ficam só na aba Festas, organizadas por evento — mas seguem no rodízio dos posts.
@@ -224,6 +231,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         posts={posts}
         publicacoes={publicacoes}
         stories={stories}
+        reels={reels}
+        festasComVideo={festasComVideo}
         imagens={imagens}
         festas={festas}
         campanhas={campanhas}

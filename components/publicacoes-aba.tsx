@@ -119,6 +119,8 @@ export type PublicacaoView = {
   legenda: string;
   hashtags: string;
   imagemUrl: string | null;
+  formato?: string; // "feed" | "story" | "reels"
+  videoUrl?: string | null; // URL do vídeo (quando formato="reels")
   status: string;
   tema: string | null;
   aprovado: boolean; // revisão interna do dono (não vai pra rede)

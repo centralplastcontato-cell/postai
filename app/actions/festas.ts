@@ -227,3 +227,111 @@ export async function moverFotoMomento(festaToken: string, fotoId: string, novoM
   revalidatePath(`/f/${festaToken}`);
   return { ok: true as const };
 }
+
+// Salva a SELEÇÃO ordenada de fotos pro VÍDEO/Reels da festa (do PAINEL — guardaMarca). Só aceita
+// fotos que SÃO desta festa; guarda os IDs na ordem escolhida (máx 30). Lista vazia volta pro automático.
+export async function salvarFotosVideo(festaId: string, fotoIds: string[]) {
+  const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const validas = await prisma.imagemMarca.findMany({ where: { festaId, id: { in: fotoIds } }, select: { id: true } });
+  const set = new Set(validas.map((v) => v.id));
+  const ordenadas = fotoIds.filter((id) => set.has(id)).slice(0, 30); // mantém a ordem escolhida
+  await prisma.festa.update({ where: { id: festaId }, data: { videoFotos: JSON.stringify(ordenadas) } });
+  revalidatePath(`/painel/marcas/${festa.marcaId}`);
+  return { ok: true as const, total: ordenadas.length };
+}
+
+// Cria um POST DE REELS agendado a partir do vídeo JÁ montado da festa. Entra na Agenda como
+// Publicacao formato="reels" (status a_postar), pronto pra revisar e ser postado pelo piloto.
+// TRAVA LGPD: festa sem autorização dos pais NUNCA vira divulgação pública.
+export async function agendarReelsDaFesta(festaId: string, dataYMD: string, legendaManual?: string) {
+  const festa = await prisma.festa.findUnique({
+    where: { id: festaId },
+    select: { marcaId: true, videoUrl: true, autorizacao: true, tema: true, aniversariante: true, aniversariantes: true, marca: { select: { nome: true, horaPost: true } } },
+  });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (festa.autorizacao !== "autorizada") return { ok: false as const, erro: "Esta festa não tem autorização de uso de imagem — não pode ser divulgada." };
+  if (!festa.videoUrl) return { ok: false as const, erro: "Esta festa ainda não tem vídeo gerado." };
+
+  const hora = String(festa.marca.horaPost ?? 10).padStart(2, "0");
+  const data = new Date(`${dataYMD}T${hora}:00:00-03:00`); // BRT
+  if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
+
+  const nome = festa.aniversariante || "a criança";
+  const legenda = (legendaManual && legendaManual.trim())
+    || (await legendaReelsIA({ aniversariante: festa.aniversariante, aniversariantes: festa.aniversariantes, tema: festa.tema, buffet: festa.marca.nome }));
+
+  const slug = `reels-${festaId.slice(-6)}-${randomBytes(3).toString("hex")}`;
+  const pub = await prisma.publicacao.create({
+    data: {
+      marcaId: festa.marcaId,
+      slug,
+      data,
+      template: "divulgacao",
+      titulo: `Reels — ${nome}`,
+      legenda,
+      formato: "reels",
+      videoUrl: festa.videoUrl,
+      categoria: "prova_social",
+      status: "a_postar",
+      aprovado: false,
+    },
+  });
+  revalidatePath(`/painel/marcas/${festa.marcaId}`);
+  return { ok: true as const, id: pub.id };
+}
+
+// Gera (via IA, com fallback) uma legenda CALOROSA pro Reels da festa, conectada ao aniversariante
+// (nome, idade, tema). Usada tanto no agendamento automático quanto no botão "Escrever com a Bia".
+async function legendaReelsIA(d: { aniversariante: string; aniversariantes: string; tema: string; buffet: string }): Promise<string> {
+  const anivs = parseAniversariantes(d.aniversariantes);
+  const nome = anivs[0]?.nome || d.aniversariante || "o aniversariante";
+  const idade = anivs[0]?.idade;
+  const tema = (d.tema || "").trim();
+  const temaSlug = tema.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+  const hashTema = temaSlug ? ` #${temaSlug}` : "";
+  const fallback = `✨ Que festa inesquecível! ${nome}${idade ? ` comemorou ${idade} aninhos` : " fez aniversário"}${tema ? ` com o tema ${tema}` : ""} aqui no ${d.buffet}. 🎉 Cada sorriso desse dia ficou guardado nesse vídeo 💛\n\nQuer uma festa assim pra quem você ama? Chama a gente! 🥳\n\n#festainfantil #buffetinfantil #aniversario${hashTema}`;
+
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return fallback;
+
+  const sistema = `Você é a social media de um buffet infantil chamado "${d.buffet}". Escreva a LEGENDA de um Reels (vídeo) que reúne as melhores fotos de uma festa real. Regras:
+- Tom caloroso, emocional e brasileiro; celebre a CRIANÇA pelo nome.
+- Frase de abertura com impacto.
+- Use de 3 a 5 emojis no total (sem exagero).
+- Termine com um convite SUTIL pra outras famílias marcarem a festa delas no buffet.
+- Inclua de 3 a 5 hashtags no final (festa infantil, o tema).
+- Máximo de 600 caracteres. Sem aspas. Não invente preço nem data.`;
+  const pedido = `Festa de ${nome}${idade ? `, ${idade} anos` : ""}${tema ? `, tema ${tema}` : ""}, no buffet ${d.buffet}.`;
+
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-4o-mini", temperature: 0.8, max_tokens: 350, messages: [{ role: "system", content: sistema }, { role: "user", content: pedido }] }),
+    });
+    if (!resp.ok) return fallback;
+    const data = await resp.json();
+    const content = data?.choices?.[0]?.message?.content;
+    return content ? String(content).trim() : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// Botão "✨ Escrever com a Bia": gera a legenda pro dono VER e editar antes de agendar.
+export async function gerarLegendaReels(festaId: string) {
+  const festa = await prisma.festa.findUnique({
+    where: { id: festaId },
+    select: { marcaId: true, tema: true, aniversariante: true, aniversariantes: true, marca: { select: { nome: true } } },
+  });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const legenda = await legendaReelsIA({ aniversariante: festa.aniversariante, aniversariantes: festa.aniversariantes, tema: festa.tema, buffet: festa.marca.nome });
+  return { ok: true as const, legenda };
+}

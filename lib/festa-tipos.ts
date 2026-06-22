@@ -17,6 +17,8 @@ export type FestaView = {
   finalizadaEm: string | null;
   autorizacao: string; // "pendente" | "autorizada" | "negada" — uso de imagem (LGPD)
   motivoNaoAutoriza: string; // motivo quando os pais não autorizam
+  videoFotos: string[]; // IDs das fotos escolhidas pro vídeo, na ordem ("[]" = automático)
+  videoUrl: string; // URL do vídeo/Reels já montado ("" = ainda não gerado)
   fotos: FotoView[];
 };
 

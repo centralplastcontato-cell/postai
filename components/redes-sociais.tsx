@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MarketingCalendario, type Post } from "./marketing-calendario";
 import { PublicacoesAba, type PublicacaoView } from "./publicacoes-aba";
 import { StoriesAba } from "./stories-aba";
+import { ReelsAba, type FestaComVideo } from "./reels-aba";
 import { type SugestaoBia } from "@/lib/inteligencia";
 import { CalendarioRedes, type SelecaoRede } from "./calendario-redes";
 import { ResumoDoDia } from "./resumo-dia";
@@ -18,6 +19,8 @@ export function RedesSociais({
   posts,
   publicacoes,
   stories,
+  reels,
+  festasComVideo,
   diasCarrossel,
   diasFeed,
   horaPost,
@@ -31,6 +34,8 @@ export function RedesSociais({
   posts: Post[];
   publicacoes: PublicacaoView[];
   stories: PublicacaoView[];
+  reels: PublicacaoView[];
+  festasComVideo: FestaComVideo[];
   diasCarrossel: string;
   diasFeed: string;
   horaPost: number; // hora padrão do feed (BRT)
@@ -40,7 +45,7 @@ export function RedesSociais({
   espelharStoryPadrao?: boolean; // padrão da marca pra espelhar o feed no Story
   sugestao?: SugestaoBia | null; // sugestão da Bia pro próximo post (gerador de feed)
 }) {
-  const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes" | "story">("carrosseis");
+  const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes" | "story" | "reels">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
   const [dataAlvo, setDataAlvo] = useState<string | null>(null);
 
@@ -112,6 +117,7 @@ export function RedesSociais({
         <button onClick={() => setSubaba("carrosseis")} className={cls(subaba === "carrosseis", "bg-orange-500")}>🖼️ Carrosséis</button>
         <button onClick={() => setSubaba("publicacoes")} className={cls(subaba === "publicacoes", "bg-sky-600")}>📱 Publicações</button>
         <button onClick={() => setSubaba("story")} className={cls(subaba === "story", "bg-[#7c3aed]")}>🟣 Story</button>
+        <button onClick={() => setSubaba("reels")} className={cls(subaba === "reels", "bg-[#7c3aed]")}>🎬 Reels{reels.length ? ` (${reels.length})` : ""}</button>
       </div>
 
       {subaba === "carrosseis" && (
@@ -155,6 +161,8 @@ export function RedesSociais({
           onLimparDia={() => { setDataAlvo(null); setSelecao(null); }}
         />
       )}
+
+      {subaba === "reels" && <ReelsAba reels={reels} festasComVideo={festasComVideo} />}
     </div>
   );
 }

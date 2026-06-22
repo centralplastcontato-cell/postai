@@ -7,6 +7,8 @@
 import { useState } from "react";
 import { type FestaView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
+import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
+import { FestaVideoAgendar } from "@/components/festa-video-agendar";
 
 function dataCurta(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -25,12 +27,13 @@ function statusAutoriz(f: FestaView): { txt: string; cls: string } | null {
   return null;
 }
 
-function CardPagina({ f, linkBase }: { f: FestaView; linkBase: string }) {
+function CardPagina({ f, linkBase, onAbrirSeletor }: { f: FestaView; linkBase: string; onAbrirSeletor: () => void }) {
   const [copiado, setCopiado] = useState(false);
   const url = `${linkBase}/festa/${f.tokenAlbum}`;
   const nomes = rotuloAniversariantes(f.aniversariantes) || "Festa";
   const st = statusFesta(f);
   const sa = statusAutoriz(f);
+  const capa = f.fotos[0]?.url; // miniatura: uma foto da festa (ou placeholder)
 
   async function copiar() {
     try {
@@ -43,59 +46,88 @@ function CardPagina({ f, linkBase }: { f: FestaView; linkBase: string }) {
   }
 
   return (
-    <div className="rounded-xl border border-linha bg-preto-card p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-semibold text-white">🎂 {nomes}</p>
-          <p className="mt-0.5 text-xs text-muted">
-            {dataCurta(f.dataISO)}
-            {f.horario ? ` · ${f.horario}` : ""}
-            {f.tema ? ` · ${f.tema}` : ""}
-            {` · ${f.fotos.length} ${f.fotos.length === 1 ? "foto" : "fotos"}`}
-          </p>
+    <div className="rounded-2xl border border-linha bg-preto-card p-3 transition hover:border-white/15 sm:p-4">
+      {/* topo: capa + info */}
+      <div className="flex gap-3">
+        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-linha bg-preto sm:h-24 sm:w-24">
+          {capa ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={capa} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-3xl opacity-60">🎂</div>
+          )}
+          <span className="absolute inset-x-0 bottom-0 bg-black/65 py-0.5 text-center text-[10px] font-semibold text-white">
+            {f.fotos.length} {f.fotos.length === 1 ? "foto" : "fotos"}
+          </span>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-          <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${st.cls}`}>{st.txt}</span>
-          {sa && <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${sa.cls}`}>{sa.txt}</span>}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <p className="truncate font-titulo text-lg leading-tight text-white">{nomes}</p>
+            <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.txt}</span>
+          </div>
+          <p className="mt-1 text-xs text-muted">
+            {dataCurta(f.dataISO)}{f.horario ? ` · ${f.horario}` : ""}{f.tema ? ` · ${f.tema}` : ""}
+          </p>
+          {sa && <span className={`mt-1.5 inline-block rounded-full border px-2 py-0.5 text-[11px] font-semibold ${sa.cls}`}>{sa.txt}</span>}
+          {f.autorizacao === "negada" && (
+            <p className="mt-1.5 rounded-md border border-vermelho/30 bg-vermelho/5 px-2 py-1 text-[11px] text-muted">
+              🔒 Fotos não divulgadas{f.motivoNaoAutoriza ? ` — ${f.motivoNaoAutoriza}` : ""}
+            </p>
+          )}
         </div>
       </div>
-      {f.autorizacao === "negada" && (
-        <p className="mt-2 rounded-md border border-vermelho/30 bg-vermelho/5 px-2.5 py-1.5 text-[11px] text-muted">
-          🔒 Fotos NÃO divulgadas (álbum e posts bloqueados){f.motivoNaoAutoriza ? ` — motivo: ${f.motivoNaoAutoriza}` : ""}
-        </p>
-      )}
 
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+      {/* link do álbum */}
+      <div className="mt-3 flex items-center gap-2 rounded-xl border border-linha bg-preto px-3 py-2">
+        <span className="shrink-0 text-sm opacity-70">🔗</span>
         <input
           readOnly
           value={url}
           onFocus={(e) => e.currentTarget.select()}
-          className="input-base w-full text-xs sm:flex-1 sm:min-w-0"
+          className="min-w-0 flex-1 bg-transparent text-xs text-muted outline-none"
         />
-        <div className="flex gap-2">
-          <button onClick={copiar} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-white transition hover:border-vermelho sm:flex-none">
-            {copiado ? "✓ Copiado" : "📋 Copiar"}
-          </button>
-          <a href={url} target="_blank" rel="noreferrer" className="flex-1 rounded-lg bg-vermelho px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-vermelho-hover sm:flex-none">
-            Abrir ↗
-          </a>
-        </div>
+        <button onClick={copiar} className="shrink-0 rounded-lg bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">
+          {copiado ? "✓ Copiado" : "📋 Copiar"}
+        </button>
+        <a href={url} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg bg-vermelho px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-vermelho-hover">
+          Abrir ↗
+        </a>
       </div>
 
-      {/* Acesso do DONO à tela do gerente desta festa (subir/mover/remover/finalizar fotos) */}
-      <a
-        href={`${linkBase}/f/${f.token}`}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white"
-      >
-        🔧 Abrir como o gerente vê — subir / editar fotos ↗
-      </a>
+      {/* vídeo pronto → ver + agendar */}
+      {f.videoUrl && <FestaVideoAgendar videoUrl={f.videoUrl} />}
+
+      {/* ações secundárias */}
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-linha pt-3">
+        <a
+          href={`${linkBase}/f/${f.token}`}
+          target="_blank"
+          rel="noreferrer"
+          className="group/g inline-flex items-center gap-2 rounded-xl border border-linha bg-white/[0.03] px-3.5 py-2 text-xs font-semibold text-white/90 transition hover:border-white/20 hover:bg-white/[0.07]"
+        >
+          <span className="text-sm">🔧</span>
+          Tela do gerente
+          <span className="text-muted transition group-hover/g:translate-x-0.5">↗</span>
+        </a>
+        <button
+          type="button"
+          onClick={onAbrirSeletor}
+          className="inline-flex items-center gap-2 rounded-xl border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-3.5 py-2 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25"
+        >
+          <span className="text-sm">🎬</span>
+          Fotos do vídeo
+          {f.videoFotos.length > 0 && (
+            <span className="rounded-full bg-[#7c3aed] px-1.5 py-0.5 text-[10px] font-bold text-white">{f.videoFotos.length}</span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
 
 export function PaginasPainel({ festas, linkBase }: { festas: FestaView[]; linkBase: string }) {
+  const [seletor, setSeletor] = useState<FestaView | null>(null);
   return (
     <div>
       <div className="mb-4">
@@ -112,9 +144,19 @@ export function PaginasPainel({ festas, linkBase }: { festas: FestaView[]; linkB
       ) : (
         <div className="space-y-3">
           {festas.map((f) => (
-            <CardPagina key={f.id} f={f} linkBase={linkBase} />
+            <CardPagina key={f.id} f={f} linkBase={linkBase} onAbrirSeletor={() => setSeletor(f)} />
           ))}
         </div>
+      )}
+
+      {seletor && (
+        <SeletorVideoFotos
+          festaId={seletor.id}
+          nome={rotuloAniversariantes(seletor.aniversariantes) || "Festa"}
+          fotos={seletor.fotos}
+          inicial={seletor.videoFotos}
+          onFechar={() => setSeletor(null)}
+        />
       )}
     </div>
   );

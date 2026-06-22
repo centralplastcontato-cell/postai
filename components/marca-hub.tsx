@@ -6,6 +6,7 @@ import { RedesSociais } from "./redes-sociais";
 import { MarcaForm, type MarcaView } from "./marca-form";
 import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
+import { type FestaComVideo } from "./reels-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { FestasPainel } from "./festas-painel";
 import { PaginasPainel } from "./paginas-painel";
@@ -39,6 +40,8 @@ export function MarcaHub({
   posts,
   publicacoes,
   stories,
+  reels,
+  festasComVideo,
   imagens,
   festas,
   campanhas,
@@ -58,6 +61,8 @@ export function MarcaHub({
   posts: Post[];
   publicacoes: PublicacaoView[];
   stories: PublicacaoView[];
+  reels: PublicacaoView[];
+  festasComVideo: FestaComVideo[];
   imagens: ImagemView[];
   festas: FestaView[];
   campanhas: CampanhaView[];
@@ -166,7 +171,7 @@ export function MarcaHub({
       </div>
 
       <div className="mt-6">
-        {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} sugestao={sugestao} />}
+        {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} reels={reels} festasComVideo={festasComVideo} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} sugestao={sugestao} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
         {aba === "paginas" && <PaginasPainel festas={festas} linkBase={linkBase} />}
