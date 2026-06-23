@@ -1,8 +1,9 @@
 "use client";
 
-// Modal pra ESCOLHER as fotos do vídeo da festa, NA ORDEM. O dono toca nas fotos (na sequência
-// que quer) → cada uma ganha um número. A "tira" no topo mostra a sequência montada e deixa
-// ARRASTAR pra reordenar (corrigir sem desmarcar tudo) ou × pra tirar uma. Vazio = automático.
+// Modal pra ESCOLHER as fotos do vídeo da festa, NA ORDEM, em DUAS grades de fotos GRANDES:
+//  1) "Sua sequência" — as escolhidas, numeradas, ARRASTÁVEIS pra reordenar (× pra tirar);
+//  2) "Adicionar" — as disponíveis, toque na ordem que quiser e elas sobem pra sequência.
+// Arrastar acontece nas próprias fotos grandes (não numa tira pequena). Vazio = automático.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -26,7 +27,7 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, onFechar }: {
   onFechar: () => void;
 }) {
   const router = useRouter();
-  // galeria ordenada por momento (narrativa)
+  // galeria ordenada por momento (narrativa) — base pra parte "disponíveis"
   const galeria = ORDEM.flatMap((m) => fotos.filter((f) => f.momento === m)).concat(fotos.filter((f) => !ORDEM.includes(f.momento)));
   const [sel, setSel] = useState<string[]>(inicial.filter((id) => fotos.some((f) => f.id === id)));
   const [salvando, setSalvando] = useState(false);
@@ -58,6 +59,8 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, onFechar }: {
   }
 
   const segs = sel.length ? Math.round(sel.length * 2.3 + 6) : 0;
+  const escolhidas = sel.map((id) => fotos.find((f) => f.id === id)).filter((f): f is FotoView => !!f);
+  const disponiveis = galeria.filter((f) => !sel.includes(f.id));
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/92 backdrop-blur-sm" onClick={onFechar}>
@@ -77,57 +80,52 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, onFechar }: {
           </div>
         </div>
 
-        {/* TIRA da sequência — arraste pra reordenar, × pra tirar */}
-        {sel.length > 0 && (
-          <div className="border-b border-linha bg-preto/50 px-4 py-2.5">
-            <p className="mb-1.5 text-[11px] text-muted">
-              🎞️ Sua sequência — <strong className="text-white/80">arraste</strong> pra mudar a ordem, <strong className="text-white/80">×</strong> pra tirar.
-            </p>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {sel.map((id, i) => {
-                const foto = fotos.find((x) => x.id === id);
-                if (!foto) return null;
-                return (
+        <div className="flex-1 overflow-y-auto px-4 pb-6">
+          {/* 1) SUA SEQUÊNCIA — fotos grandes, arraste pra reordenar, × pra tirar */}
+          {escolhidas.length > 0 && (
+            <div className="pt-3">
+              <p className="mb-2 text-[11px] text-muted">
+                🎞️ <strong className="text-white/80">Sua sequência</strong> — arraste as fotos pra mudar a ordem, <strong className="text-white/80">×</strong> pra tirar.
+              </p>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
+                {escolhidas.map((f, i) => (
                   <div
-                    key={id}
+                    key={f.id}
                     draggable
                     onDragStart={() => setDrag(i)}
                     onDragEnter={() => { if (drag !== null && drag !== i) { reordenar(drag, i); setDrag(i); } }}
                     onDragEnd={() => setDrag(null)}
                     onDragOver={(e) => e.preventDefault()}
-                    className={`relative h-14 w-14 shrink-0 cursor-grab overflow-hidden rounded-lg border-2 active:cursor-grabbing ${drag === i ? "border-[#c7b2ff] opacity-50" : "border-vermelho"}`}
+                    className={`relative cursor-grab overflow-hidden rounded-lg border-2 active:cursor-grabbing ${drag === i ? "border-[#c7b2ff] opacity-50" : "border-vermelho"}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={foto.url} alt="" draggable={false} className="h-full w-full select-none object-cover" />
-                    <span className="absolute left-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-vermelho text-[10px] font-bold text-white">{i + 1}</span>
-                    <button type="button" onClick={() => toggle(id)} aria-label="Tirar" className="absolute right-0 top-0 flex h-4 w-4 items-center justify-center rounded-bl bg-black/75 text-[11px] leading-none text-white hover:bg-vermelho">×</button>
+                    <img src={f.url} alt="" draggable={false} className="aspect-square w-full select-none object-cover" />
+                    <span className="absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-vermelho text-xs font-bold text-white shadow">{i + 1}</span>
+                    <button type="button" onClick={() => toggle(f.id)} aria-label="Tirar" className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl bg-black/75 text-sm leading-none text-white transition hover:bg-vermelho">×</button>
+                    <span className="absolute bottom-0 left-0 right-0 bg-black/65 px-1 py-0.5 text-[9px] font-semibold text-white/90">{LABEL[f.momento] || f.momento}</span>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <p className="px-4 py-2 text-[11px] text-muted">
-          Toque nas fotos na <strong className="text-white/80">ordem</strong> que você quer no vídeo — o número mostra a sequência. Pra ~65s, escolha umas <strong className="text-white/80">25-28</strong>.
-        </p>
-
-        {/* galeria */}
-        <div className="flex-1 overflow-y-auto px-4 pb-6">
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
-            {galeria.map((f) => {
-              const idx = sel.indexOf(f.id);
-              const on = idx >= 0;
-              return (
-                <button key={f.id} type="button" onClick={() => toggle(f.id)} className={`relative overflow-hidden rounded-lg border-2 transition ${on ? "border-vermelho" : "border-transparent hover:border-white/30"}`}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt="" className={`aspect-square w-full object-cover transition ${on ? "" : "opacity-75"}`} />
-                  {on && <span className="absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-vermelho text-xs font-bold text-white shadow">{idx + 1}</span>}
-                  <span className="absolute bottom-0 left-0 right-0 bg-black/65 px-1 py-0.5 text-[9px] font-semibold text-white/90">{LABEL[f.momento] || f.momento}</span>
-                </button>
-              );
-            })}
-          </div>
+          {/* 2) ADICIONAR — toque na ordem que quiser e a foto sobe pra sequência */}
+          {disponiveis.length > 0 && (
+            <div className="pt-4">
+              <p className="mb-2 text-[11px] text-muted">
+                {escolhidas.length > 0 ? "➕ Mais fotos" : "👆 Toque nas fotos na ordem que você quer"} — cada toque adiciona ao fim da sequência. Pra ~65s, escolha umas <strong className="text-white/80">25-28</strong>.
+              </p>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
+                {disponiveis.map((f) => (
+                  <button key={f.id} type="button" onClick={() => toggle(f.id)} className="relative overflow-hidden rounded-lg border-2 border-transparent transition hover:border-white/30">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.url} alt="" className="aspect-square w-full object-cover opacity-60 transition hover:opacity-100" />
+                    <span className="absolute bottom-0 left-0 right-0 bg-black/65 px-1 py-0.5 text-[9px] font-semibold text-white/90">{LABEL[f.momento] || f.momento}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

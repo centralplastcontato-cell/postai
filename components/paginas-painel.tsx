@@ -2,14 +2,12 @@
 
 // Aba PÁGINAS do painel — a "vitrine": cada festa vira um álbum pros pais (rota pública
 // /festa/[tokenAlbum], SÓ-LEITURA). Aqui o dono copia o link de cada álbum pra mandar pros
-// pais e abre a prévia. É diferente da aba Festas (operação: criar/subir foto no evento).
+// pais e abre a prévia. É diferente da aba Festas (operação: criar/subir foto no evento) e
+// da aba Vídeo (montar o Reels da festa) — cada aba tem um foco só.
 
 import { useState } from "react";
 import { type FestaView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
-import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
-import { FestaVideoAgendar } from "@/components/festa-video-agendar";
-import { FestaGerarVideo } from "@/components/festa-gerar-video";
 
 function dataCurta(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -28,7 +26,7 @@ function statusAutoriz(f: FestaView): { txt: string; cls: string } | null {
   return null;
 }
 
-function CardPagina({ f, linkBase, onAbrirSeletor }: { f: FestaView; linkBase: string; onAbrirSeletor: () => void }) {
+function CardPagina({ f, linkBase }: { f: FestaView; linkBase: string }) {
   const [copiado, setCopiado] = useState(false);
   const url = `${linkBase}/festa/${f.tokenAlbum}`;
   const nomes = rotuloAniversariantes(f.aniversariantes) || "Festa";
@@ -96,22 +94,7 @@ function CardPagina({ f, linkBase, onAbrirSeletor }: { f: FestaView; linkBase: s
         </a>
       </div>
 
-      {/* vídeo: pronto (ver+agendar) · gerando · gerar */}
-      {f.videoUrl.startsWith("http") ? (
-        <FestaVideoAgendar videoUrl={f.videoUrl} />
-      ) : f.videoUrl === "gerando" ? (
-        <div className="mt-3 flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3">
-          <span className="text-lg">🎬</span>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-white">Gerando o vídeo…</p>
-            <p className="text-[11px] text-muted">Leva uns minutos. Atualize a página pra ver quando ficar pronto. ⏳</p>
-          </div>
-        </div>
-      ) : (
-        <FestaGerarVideo festaId={f.id} />
-      )}
-
-      {/* ações secundárias */}
+      {/* ação: tela do gerente (sobe/edita as fotos) */}
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-linha pt-3">
         <a
           href={`${linkBase}/f/${f.token}`}
@@ -123,24 +106,12 @@ function CardPagina({ f, linkBase, onAbrirSeletor }: { f: FestaView; linkBase: s
           Tela do gerente
           <span className="text-muted transition group-hover/g:translate-x-0.5">↗</span>
         </a>
-        <button
-          type="button"
-          onClick={onAbrirSeletor}
-          className="inline-flex items-center gap-2 rounded-xl border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-3.5 py-2 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25"
-        >
-          <span className="text-sm">🎬</span>
-          Fotos do vídeo
-          {f.videoFotos.length > 0 && (
-            <span className="rounded-full bg-[#7c3aed] px-1.5 py-0.5 text-[10px] font-bold text-white">{f.videoFotos.length}</span>
-          )}
-        </button>
       </div>
     </div>
   );
 }
 
 export function PaginasPainel({ festas, linkBase }: { festas: FestaView[]; linkBase: string }) {
-  const [seletor, setSeletor] = useState<FestaView | null>(null);
   return (
     <div>
       <div className="mb-4">
@@ -157,19 +128,9 @@ export function PaginasPainel({ festas, linkBase }: { festas: FestaView[]; linkB
       ) : (
         <div className="space-y-3">
           {festas.map((f) => (
-            <CardPagina key={f.id} f={f} linkBase={linkBase} onAbrirSeletor={() => setSeletor(f)} />
+            <CardPagina key={f.id} f={f} linkBase={linkBase} />
           ))}
         </div>
-      )}
-
-      {seletor && (
-        <SeletorVideoFotos
-          festaId={seletor.id}
-          nome={rotuloAniversariantes(seletor.aniversariantes) || "Festa"}
-          fotos={seletor.fotos}
-          inicial={seletor.videoFotos}
-          onFechar={() => setSeletor(null)}
-        />
       )}
     </div>
   );
