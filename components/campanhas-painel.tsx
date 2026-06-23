@@ -21,6 +21,22 @@ export type CampanhaView = {
 
 const VAZIO = { selo: "", titulo: "", texto: "", ctaTexto: "Quero saber mais", ctaTipo: "whatsapp", ctaValor: "" };
 
+// Banner da oferta como o pai vê no fim do álbum (cor da marca + brilho, fiel ao album-festa.tsx)
+// — reusado no preview do form, nos cards da lista E na prévia em celular.
+function BannerOferta({ selo, titulo, texto, ctaTexto, acento = "#E11D2A" }: { selo: string; titulo: string; texto: string; ctaTexto: string; acento?: string }) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-950 px-5 py-6 text-center text-white">
+      <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(circle at 50% -10%, ${acento}55, transparent 62%)` }} />
+      <div className="relative">
+        {selo && <span className="inline-block rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white" style={{ background: acento }}>{selo}</span>}
+        <p className="mt-3 text-lg font-extrabold leading-tight text-white">{titulo || "Título da oferta"}</p>
+        {texto && <p className="mx-auto mt-1.5 max-w-sm text-xs text-white/70">{texto}</p>}
+        <span className="mt-4 inline-block rounded-full px-5 py-2 text-xs font-bold text-white" style={{ background: acento }}>{ctaTexto || "Quero saber mais"} →</span>
+      </div>
+    </div>
+  );
+}
+
 // Modelos prontos pra ajudar quem não sabe o que escrever — clica e o form já vem preenchido.
 type Template = { id: string; label: string; valores: typeof VAZIO };
 const TEMPLATES: Template[] = [
@@ -102,10 +118,12 @@ export function CampanhasPainel({
   marcaId,
   temTelefone,
   campanhas,
+  acento = "#E11D2A",
 }: {
   marcaId: string;
   temTelefone: boolean;
   campanhas: CampanhaView[];
+  acento?: string;
 }) {
   const router = useRouter();
   const [form, setForm] = useState(VAZIO);
@@ -113,6 +131,7 @@ export function CampanhasPainel({
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [confirmarExcluir, setConfirmarExcluir] = useState<string | null>(null);
+  const [prevendo, setPrevendo] = useState<CampanhaView | null>(null); // campanha aberta na prévia (celular)
 
   // A que está REALMENTE aparecendo nos álbuns = a ativa mais recente (lista vem por criadoEm desc).
   const idAparecendo = campanhas.find((c) => c.ativa)?.id ?? null;
@@ -237,11 +256,8 @@ export function CampanhasPainel({
 
         {/* PREVIEW ao vivo do banner */}
         <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-muted">Prévia no álbum</p>
-        <div className="mt-2 overflow-hidden rounded-2xl bg-gradient-to-br from-zinc-900 to-zinc-950 px-5 py-6 text-center">
-          {form.selo && <span className="inline-block rounded-full bg-vermelho px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-white">{form.selo}</span>}
-          <p className="mt-3 text-lg font-extrabold text-white">{form.titulo || "Título da oferta"}</p>
-          {form.texto && <p className="mx-auto mt-1.5 max-w-sm text-xs text-white/70">{form.texto}</p>}
-          <span className="mt-4 inline-block rounded-full bg-vermelho px-5 py-2 text-xs font-bold text-white">{form.ctaTexto || "Quero saber mais"} →</span>
+        <div className="mt-2">
+          <BannerOferta selo={form.selo} titulo={form.titulo} texto={form.texto} ctaTexto={form.ctaTexto} acento={acento} />
         </div>
 
         {erro && <p className="mt-3 text-sm text-vermelho">{erro}</p>}
@@ -258,7 +274,7 @@ export function CampanhasPainel({
         </div>
       </form>
 
-      {/* LISTA */}
+      {/* GALERIA — cada campanha aparece como o banner real que o pai vê */}
       <div className="mt-6">
         <p className="mb-3 text-sm font-semibold text-white">Suas campanhas</p>
         {campanhas.length === 0 ? (
@@ -266,50 +282,72 @@ export function CampanhasPainel({
             Nenhuma campanha ainda. Crie a primeira acima ✨
           </div>
         ) : (
-          <div className="space-y-3">
-            {campanhas.map((c) => (
-              <div key={c.id} className="rounded-xl border border-linha bg-preto-card p-4">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${c.ativa ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-linha bg-preto text-muted"}`}>
-                        {c.ativa ? "Ativa" : "Inativa"}
+          <div className="grid gap-4 sm:grid-cols-2">
+            {campanhas.map((c) => {
+              const aparecendo = c.id === idAparecendo;
+              return (
+                <div key={c.id} className={`flex flex-col rounded-2xl border bg-preto-card p-3 transition ${aparecendo ? "border-vermelho/50" : "border-linha hover:border-white/15"}`}>
+                  {/* badges de estado */}
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${c.ativa ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-linha bg-preto text-muted"}`}>
+                      {c.ativa ? "● Ativa" : "○ Inativa"}
+                    </span>
+                    {aparecendo && (
+                      <span className="rounded-full border border-vermelho/40 bg-vermelho/15 px-2.5 py-0.5 text-[11px] font-semibold text-white">📣 Aparecendo nos álbuns</span>
+                    )}
+                  </div>
+
+                  {/* o banner real (mockup do que o pai vê) — clicar abre a prévia em celular */}
+                  <button type="button" onClick={() => setPrevendo(c)} title="Ver como aparece no álbum" className="group relative block w-full text-left">
+                    <BannerOferta selo={c.selo} titulo={c.titulo} texto={c.texto} ctaTexto={c.ctaTexto} acento={acento} />
+                    <span className="pointer-events-none absolute right-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white opacity-0 backdrop-blur-sm transition group-hover:opacity-100">👁️ Ver no álbum</span>
+                  </button>
+
+                  {/* ações */}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button onClick={() => alternar(c)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition ${c.ativa ? "border border-linha hover:border-vermelho" : "bg-vermelho hover:bg-vermelho-hover"}`}>
+                      {c.ativa ? "Desativar" : "Ativar"}
+                    </button>
+                    <button onClick={() => editar(c)} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">
+                      ✏️ Editar
+                    </button>
+                    {confirmarExcluir === c.id ? (
+                      <span className="flex items-center gap-2">
+                        <button onClick={() => excluir(c.id)} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500">Excluir mesmo</button>
+                        <button onClick={() => setConfirmarExcluir(null)} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-white">Cancelar</button>
                       </span>
-                      {c.id === idAparecendo && (
-                        <span className="rounded-full border border-vermelho/40 bg-vermelho/15 px-2.5 py-0.5 text-xs font-semibold text-white">📣 Aparecendo nos álbuns</span>
-                      )}
-                    </div>
-                    <p className="mt-1.5 font-semibold text-white">{c.titulo}</p>
-                    {c.selo && <p className="text-xs text-muted">{c.selo}</p>}
+                    ) : (
+                      <button onClick={() => setConfirmarExcluir(c.id)} className="ml-auto rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500/50">
+                        🗑️
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button onClick={() => alternar(c)} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">
-                    {c.ativa ? "Desativar" : "Ativar"}
-                  </button>
-                  <button onClick={() => editar(c)} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">
-                    ✏️ Editar
-                  </button>
-                  {confirmarExcluir === c.id ? (
-                    <span className="flex items-center gap-2">
-                      <button onClick={() => excluir(c.id)} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-500">Excluir mesmo</button>
-                      <button onClick={() => setConfirmarExcluir(null)} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-white">Cancelar</button>
-                    </span>
-                  ) : (
-                    <button onClick={() => setConfirmarExcluir(c.id)} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500/50">
-                      🗑️ Excluir
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         {campanhas.filter((c) => c.ativa).length > 1 && (
           <p className="mt-3 text-xs text-muted">💡 Você tem mais de uma campanha ativa — nos álbuns aparece só a <strong className="text-white/80">mais recente</strong> (📣). As outras ficam guardadas.</p>
         )}
       </div>
+
+      {/* PRÉVIA em celular — como a oferta aparece pros pais no fim do álbum */}
+      {prevendo && (
+        <div onClick={() => setPrevendo(null)} className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/85 p-4">
+          <p className="text-center text-xs font-semibold text-white/80">👇 É assim que a oferta aparece pros pais, no fim do álbum</p>
+          <div onClick={(e) => e.stopPropagation()} className="relative w-full max-w-[330px] overflow-hidden rounded-[2.2rem] border-[6px] border-zinc-800 bg-zinc-950 shadow-2xl">
+            <div className="max-h-[68vh] overflow-y-auto px-3 pb-5 pt-4" style={{ background: `linear-gradient(${acento}14, ${acento}14), #FBF7F2` }}>
+              <p className="text-center text-[11px] font-semibold uppercase tracking-wide text-zinc-400">📸 Álbum da festa</p>
+              <p className="mx-auto mt-3 max-w-[16rem] text-center text-sm italic leading-relaxed text-zinc-600">“Que alegria celebrar com vocês! Obrigado por virem. 💜”</p>
+              <div className="mt-4">
+                <BannerOferta selo={prevendo.selo} titulo={prevendo.titulo} texto={prevendo.texto} ctaTexto={prevendo.ctaTexto} acento={acento} />
+              </div>
+            </div>
+          </div>
+          <button onClick={() => setPrevendo(null)} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">Fechar</button>
+        </div>
+      )}
     </div>
   );
 }

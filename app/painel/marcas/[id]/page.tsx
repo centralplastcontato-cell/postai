@@ -175,9 +175,11 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   // Festas com vídeo já montado → alimentam o agendador de Reels na aba Redes Sociais.
   const festasComVideo = festasRaw.filter((f) => (f.videoUrl || "").startsWith("http")).map((f) => ({ id: f.id, nome: f.aniversariante || "Festa", videoUrl: f.videoUrl, data: f.data.toISOString(), horario: f.horario }));
 
-  // Banco da aba Imagens = só as fotos-BASE (que o dono sobe). As fotos de FESTA (festaId
-  // preenchido) ficam só na aba Festas, organizadas por evento — mas seguem no rodízio dos posts.
-  const imagens: ImagemView[] = imgs.filter((i) => !i.festaId).map((i) => ({ id: i.id, url: i.url, categoria: i.categoria, descricao: i.descricao }));
+  // Banco da aba Imagens = só as fotos-BASE PURAS que o dono sobe (sem festa E sem `momento`).
+  // Foto vinda de festa tem `momento` preenchido (salão/brinquedos/…) — então, mesmo que perca o
+  // vínculo (festa excluída → festaId null), ela NÃO polui a aba Imagens. Continua no rodízio dos
+  // posts mesmo assim: a Bia (lib/imagens) busca por marcaId sem filtrar momento.
+  const imagens: ImagemView[] = imgs.filter((i) => !i.festaId && !i.momento).map((i) => ({ id: i.id, url: i.url, categoria: i.categoria, descricao: i.descricao }));
   const evolucao = metricas.reverse().map((m) => ({ dia: m.dia.toISOString(), seguidores: m.seguidores, posts: m.posts }));
 
   // Inteligência: cruza categoria × horário × intenção (carrossel + feed; Story fica fora,

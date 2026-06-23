@@ -5,8 +5,6 @@
 // Escolher/ordenar fotos abre o seletor. O AGENDAMENTO/postagem mora em Redes Sociais → 🎬 Reels.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { gerarVideoDaFesta } from "@/app/actions/festas";
 import { type FestaView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
 import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
@@ -29,9 +27,6 @@ function PlayerModal({ url, onFechar }: { url: string; onFechar: () => void }) {
 }
 
 function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => void }) {
-  const router = useRouter();
-  const [gerando, setGerando] = useState(false);
-  const [erro, setErro] = useState("");
   const [ver, setVer] = useState(false);
 
   const pronto = f.videoUrl.startsWith("http");
@@ -39,21 +34,20 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
   const nomes = rotuloAniversariantes(f.aniversariantes) || "Festa";
   const capa = f.fotos[0]?.url;
 
-  async function gerar() {
-    setGerando(true);
-    setErro("");
-    const r = await gerarVideoDaFesta(f.id).catch(() => ({ ok: false as const, erro: "Não consegui gerar agora." }));
-    if (!r.ok) { setErro(r.erro || "Não deu pra gerar."); setGerando(false); return; }
-    router.refresh(); // passa a mostrar "Gerando…"
-  }
-
   const badge = pronto
-    ? { txt: "✅ Pronto", cls: "bg-[#7c3aed] text-white" }
+    ? { txt: "✅ Pronto", cls: "bg-green-600 text-white" }
     : emGeracao
     ? { txt: "🎬 Gerando", cls: "bg-amber-500 text-black" }
     : f.fotos.length
     ? { txt: "Pra gerar", cls: "bg-black/70 text-white" }
     : { txt: "Sem fotos", cls: "bg-black/70 text-white/70" };
+
+  // Autorização (LGPD): festa SEM autorização não pode ter o Reels postado — mostra no card.
+  const autoriz = f.autorizacao === "negada"
+    ? { txt: "✗ Sem autorização", cls: "bg-vermelho text-white" }
+    : f.autorizacao === "pendente"
+    ? { txt: "⏳ Pendente", cls: "bg-amber-500 text-black" }
+    : { txt: "✓ Autorizado", cls: "bg-green-500 text-black" };
 
   return (
     <div className="overflow-hidden rounded-2xl border border-linha bg-preto-card transition hover:border-white/15">
@@ -89,6 +83,7 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
 
         {/* nome + data (rodapé do thumb, sobre gradiente) */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2.5 pt-8">
+          <span className={`mb-1 inline-block rounded-full px-2 py-0.5 text-[9px] font-bold ${autoriz.cls}`}>{autoriz.txt}</span>
           <p className="truncate font-titulo text-sm leading-tight text-white">{nomes}</p>
           <p className="truncate text-[10px] text-white/70">{dataCurta(f.dataISO)}{f.horario ? ` · ${f.horario}` : ""}{f.tema ? ` · ${f.tema}` : ""}</p>
         </div>
@@ -97,15 +92,16 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
       {/* ações */}
       <div className="flex items-stretch gap-1.5 p-2">
         {pronto ? (
-          <button onClick={() => setVer(true)} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">▶ Ver vídeo</button>
+          <>
+            <button onClick={() => setVer(true)} className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-green-500">▶ Ver vídeo</button>
+            <button onClick={onAbrirSeletor} title="Trocar as fotos e gerar de novo" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25">🎬 Fotos</button>
+          </>
         ) : emGeracao ? (
           <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
         ) : (
-          <button onClick={gerar} disabled={gerando} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-60">{gerando ? "Enviando…" : "⚡ Gerar vídeo"}</button>
+          <button onClick={onAbrirSeletor} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">⚡ Gerar vídeo</button>
         )}
-        <button onClick={onAbrirSeletor} title="Escolher e ordenar as fotos do vídeo" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25">🎬 Fotos</button>
       </div>
-      {erro && <p className="px-2 pb-2 text-[10px] text-vermelho">{erro}</p>}
 
       {ver && pronto && <PlayerModal url={f.videoUrl} onFechar={() => setVer(false)} />}
     </div>

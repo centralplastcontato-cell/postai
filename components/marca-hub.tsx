@@ -182,7 +182,7 @@ export function MarcaHub({
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
         {aba === "video" && <VideoPainel festas={festas} />}
         {aba === "paginas" && <PaginasPainel festas={festas} linkBase={linkBase} />}
-        {aba === "campanhas" && <CampanhasPainel marcaId={marca.id} temTelefone={Boolean(marca.telefone)} campanhas={campanhas} />}
+        {aba === "campanhas" && <CampanhasPainel marcaId={marca.id} temTelefone={Boolean(marca.telefone)} campanhas={campanhas} acento={marca.corPrimaria} />}
         {aba === "config" && (ehAdmin ? <MarcaForm marca={marca} /> : <MarcaForm marca={marca} somenteIdentidade />)}
       </div>
 

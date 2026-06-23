@@ -7,7 +7,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { salvarFotosVideo } from "@/app/actions/festas";
+import { salvarFotosVideo, gerarVideoDaFesta } from "@/app/actions/festas";
 import { type FotoView } from "@/lib/festa-tipos";
 
 const ORDEM = ["salao", "brinquedos", "aniversariante", "parabens", "momentos"];
@@ -32,6 +32,8 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, onFechar }: {
   const [sel, setSel] = useState<string[]>(inicial.filter((id) => fotos.some((f) => f.id === id)));
   const [salvando, setSalvando] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
+  const [ampliada, setAmpliada] = useState<FotoView | null>(null); // foto aberta em tela cheia
+  const [erroGerar, setErroGerar] = useState("");
 
   function toggle(id: string) {
     setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -57,6 +59,21 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, onFechar }: {
     router.refresh();
     onFechar();
   }
+  // Salva a seleção E dispara o motor de vídeo (o "Gerar" agora passa por aqui, depois de escolher).
+  async function salvarEGerar() {
+    setSalvando(true);
+    setErroGerar("");
+    try {
+      await salvarFotosVideo(festaId, sel);
+      const r = await gerarVideoDaFesta(festaId).catch(() => ({ ok: false as const, erro: "Não consegui gerar agora." }));
+      if (!r.ok) { setErroGerar(r.erro || "Não deu pra gerar."); setSalvando(false); return; }
+      router.refresh();
+      onFechar();
+    } catch {
+      setErroGerar("Não consegui gerar agora.");
+      setSalvando(false);
+    }
+  }
 
   const segs = sel.length ? Math.round(sel.length * 2.3 + 6) : 0;
   const escolhidas = sel.map((id) => fotos.find((f) => f.id === id)).filter((f): f is FotoView => !!f);
@@ -75,10 +92,13 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, onFechar }: {
           <div className="ml-auto flex items-center gap-2">
             <button onClick={sugerir} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">✨ Sugerir</button>
             {sel.length > 0 && <button onClick={() => setSel([])} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-white">Limpar</button>}
-            <button onClick={salvar} disabled={salvando} className="rounded-lg bg-vermelho px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-60">{salvando ? "Salvando…" : "Salvar"}</button>
+            <button onClick={salvar} disabled={salvando} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho disabled:opacity-60">{salvando ? "…" : "Salvar"}</button>
+            <button onClick={salvarEGerar} disabled={salvando || sel.length === 0} title={sel.length === 0 ? "Escolha as fotos primeiro" : "Salvar a seleção e gerar o vídeo"} className="rounded-lg bg-[#7c3aed] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">⚡ Gerar vídeo</button>
             <button onClick={onFechar} aria-label="Fechar" className="rounded-lg border border-linha px-3 py-1.5 text-xs text-muted transition hover:text-white">✕</button>
           </div>
         </div>
+
+        {erroGerar && <p className="border-b border-linha bg-vermelho/10 px-4 py-1.5 text-center text-xs text-vermelho">{erroGerar}</p>}
 
         <div className="flex-1 overflow-y-auto px-4 pb-6">
           {/* 1) SUA SEQUÊNCIA — fotos grandes, arraste pra reordenar, × pra tirar */}
@@ -102,7 +122,8 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, onFechar }: {
                     <img src={f.url} alt="" draggable={false} className="aspect-square w-full select-none object-cover" />
                     <span className="absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-vermelho text-xs font-bold text-white shadow">{i + 1}</span>
                     <button type="button" onClick={() => toggle(f.id)} aria-label="Tirar" className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl bg-black/75 text-sm leading-none text-white transition hover:bg-vermelho">×</button>
-                    <span className="absolute bottom-0 left-0 right-0 bg-black/65 px-1 py-0.5 text-[9px] font-semibold text-white/90">{LABEL[f.momento] || f.momento}</span>
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
+                    <span className="absolute bottom-0 left-0 right-0 bg-black/65 px-1 py-0.5 pr-7 text-[9px] font-semibold text-white/90">{LABEL[f.momento] || f.momento}</span>
                   </div>
                 ))}
               </div>
@@ -117,16 +138,29 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, onFechar }: {
               </p>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
                 {disponiveis.map((f) => (
-                  <button key={f.id} type="button" onClick={() => toggle(f.id)} className="relative overflow-hidden rounded-lg border-2 border-transparent transition hover:border-white/30">
+                  <div key={f.id} onClick={() => toggle(f.id)} title="Tocar pra adicionar" className="group relative cursor-pointer overflow-hidden rounded-lg border-2 border-transparent transition hover:border-white/30">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={f.url} alt="" className="aspect-square w-full object-cover opacity-60 transition hover:opacity-100" />
+                    <img src={f.url} alt="" className="aspect-square w-full object-cover opacity-60 transition group-hover:opacity-100" />
+                    <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
                     <span className="absolute bottom-0 left-0 right-0 bg-black/65 px-1 py-0.5 text-[9px] font-semibold text-white/90">{LABEL[f.momento] || f.momento}</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
           )}
         </div>
+
+        {/* foto ampliada em tela cheia */}
+        {ampliada && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4" onClick={() => setAmpliada(null)}>
+            <div onClick={(e) => e.stopPropagation()} className="relative">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ampliada.url} alt="" className="max-h-[88vh] max-w-[92vw] rounded-xl object-contain" />
+              <span className="absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-xs font-semibold text-white">{LABEL[ampliada.momento] || ampliada.momento}</span>
+              <button onClick={() => setAmpliada(null)} aria-label="Fechar" className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-black">✕</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

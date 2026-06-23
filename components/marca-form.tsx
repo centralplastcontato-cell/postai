@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { salvarMarca, salvarIdentidadeMarca, excluirMarca, testarConexao, extrairCoresLogo, buscarPaginasFacebook } from "@/app/actions/marcas";
 import { ConfirmDialog } from "./confirm-dialog";
@@ -41,6 +41,29 @@ const DIAS = [
 
 function parseDias(s: string): number[] {
   return s.split(",").map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
+}
+
+// Header padronizado de cada seção: ícone num quadradinho + título + descrição + status opcional.
+function SecaoHeader({ icone, titulo, sub, extra }: { icone: string; titulo: string; sub?: string; extra?: ReactNode }) {
+  return (
+    <div className="mb-4 flex items-start gap-3">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#7c3aed]/15 text-lg">{icone}</span>
+      <div className="min-w-0 flex-1">
+        <h3 className="text-sm font-semibold text-white">{titulo}</h3>
+        {sub && <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{sub}</p>}
+      </div>
+      {extra && <div className="shrink-0">{extra}</div>}
+    </div>
+  );
+}
+
+// Toggle (switch) estilizado — substitui o checkbox nativo, no tema escuro do app.
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${on ? "bg-vermelho" : "bg-zinc-700"}`}>
+      <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${on ? "translate-x-[22px]" : "translate-x-0.5"}`} />
+    </button>
+  );
 }
 
 // somenteIdentidade = formulário enxuto pro DONO (cliente/teste): só a seção de Identidade
@@ -262,7 +285,25 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
     <div className="max-w-2xl space-y-6">
       {/* Identidade */}
       <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <h3 className="mb-3 text-sm font-semibold text-white">Identidade</h3>
+        <SecaoHeader icone="🎨" titulo="Identidade da marca" sub="Logo, cores e textos que aparecem nas artes dos posts." />
+
+        {/* Preview ao vivo: como a marca aparece na faixa das artes (atualiza enquanto você edita) */}
+        <div className="mb-4 overflow-hidden rounded-xl border border-linha">
+          <div className="flex items-center gap-3 px-4 py-3" style={{ backgroundColor: f.corFundo || "#0E0E0E" }}>
+            {f.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={f.logoUrl} alt="" className="h-10 max-w-[120px] object-contain" />
+            ) : (
+              <span className="text-[10px] text-white/50">sem logo</span>
+            )}
+            <span className="font-titulo truncate text-lg font-extrabold tracking-wide" style={{ color: f.corPrimaria }}>{f.logoTexto || f.nome || "SUA MARCA"}</span>
+          </div>
+          {paleta.length > 0 && <div className="flex h-2">{paleta.map((c, i) => <div key={i} className="flex-1" style={{ backgroundColor: c }} />)}</div>}
+          <div className="flex items-center justify-between gap-2 bg-preto px-4 py-1.5 text-[10px] text-muted">
+            <span className="truncate">🌐 {f.site || "seu-site.com.br"}</span>
+            <span className="truncate">📱 {f.telefone || "seu telefone"}</span>
+          </div>
+        </div>
 
         {/* Logo: sobe a imagem, a IA lê as cores e o logo aparece na arte */}
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-linha bg-preto p-3">
@@ -295,8 +336,18 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-xs text-muted">Nome<input value={f.nome} onChange={(e) => set("nome", e.target.value)} className={inp} /></label>
           <label className="text-xs text-muted">Texto da faixa (na arte)<input value={f.logoTexto} onChange={(e) => set("logoTexto", e.target.value)} placeholder="CASTELO DA DIVERSÃO" className={inp} /></label>
-          <label className="text-xs text-muted">Cor principal<input type="color" value={f.corPrimaria} onChange={(e) => set("corPrimaria", e.target.value)} className="input-compact" /></label>
-          <label className="text-xs text-muted">Cor de fundo<input type="color" value={f.corFundo} onChange={(e) => set("corFundo", e.target.value)} className="input-compact" /></label>
+          <div className="text-xs text-muted">Cor principal
+            <div className="mt-1 flex items-center gap-2">
+              <input type="color" value={f.corPrimaria} onChange={(e) => set("corPrimaria", e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-linha bg-transparent p-0.5" />
+              <span className="rounded bg-preto px-2 py-1 text-[11px] uppercase text-white/70">{f.corPrimaria}</span>
+            </div>
+          </div>
+          <div className="text-xs text-muted">Cor de fundo
+            <div className="mt-1 flex items-center gap-2">
+              <input type="color" value={f.corFundo} onChange={(e) => set("corFundo", e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-linha bg-transparent p-0.5" />
+              <span className="rounded bg-preto px-2 py-1 text-[11px] uppercase text-white/70">{f.corFundo}</span>
+            </div>
+          </div>
           {paleta.length > 0 && (
             <div className="text-xs text-muted sm:col-span-2">
               Paleta da marca (régua multicolor das artes)
@@ -323,8 +374,16 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
         <>
       {/* Conexão Instagram */}
       <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <h3 className="mb-1 text-sm font-semibold text-white">Conexão com o Instagram</h3>
-        <p className="mb-3 text-xs text-muted">Cole o IG User ID e o token do Usuário do Sistema desta conta (com permissão de publicar). Ao testar com sucesso, a conexão é <strong className="text-white">salva na hora</strong> — não precisa clicar em Salvar embaixo.</p>
+        <SecaoHeader
+          icone="📸"
+          titulo="Conexão com o Instagram"
+          sub="Cole o IG User ID e o token (com permissão de publicar). Ao testar com sucesso, a conexão é salva na hora — não precisa o Salvar de baixo."
+          extra={
+            <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${f.temToken || f.igUserId ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>
+              {f.temToken || f.igUserId ? "✓ Conectado" : "Não conectado"}
+            </span>
+          }
+        />
         <div className="grid grid-cols-1 gap-3">
           <label className="text-xs text-muted">IG User ID<input value={f.igUserId} onChange={(e) => set("igUserId", e.target.value)} placeholder="17841400000000000" autoComplete="off" className={inp} /></label>
           <label className="text-xs text-muted">Access Token
@@ -340,8 +399,12 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
 
       {/* Conexão Facebook (opcional) — se conectar a Página, posta também no Facebook */}
       <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <h3 className="mb-1 text-sm font-semibold text-white">Conexão com o Facebook <span className="font-normal text-muted">(opcional)</span></h3>
-        <p className="mb-3 text-xs text-muted">Conecte a <strong className="text-white">Página do Facebook</strong> desta marca pra publicar nos dois ao mesmo tempo. Usa o mesmo token do Instagram (precisa da permissão <code className="text-amber-300">pages_manage_posts</code> no app Meta).</p>
+        <SecaoHeader
+          icone="📘"
+          titulo="Conexão com o Facebook (opcional)"
+          sub="Conecte a Página do Facebook pra publicar nos dois ao mesmo tempo. Usa o mesmo token do Instagram (permissão pages_manage_posts no app Meta)."
+          extra={f.fbPageId ? <span className="rounded-full border border-green-500/30 bg-green-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-green-400">✓ Conectado</span> : null}
+        />
 
         {f.fbPageId ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -367,7 +430,7 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
 
       {/* Agenda */}
       <section className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <h3 className="mb-3 text-sm font-semibold text-white">Agenda automática</h3>
+        <SecaoHeader icone="⏰" titulo="Agenda automática" sub="Em quais dias e horários o piloto posta sozinho." />
         <p className="mb-1 text-xs text-muted">🖼️ Dias de carrossel</p>
         <div className="mb-3 flex flex-wrap gap-1.5">
           {DIAS.map((d) => <button key={d.n} type="button" onClick={() => toggleDia("diasCarrossel", d.n)} className={diaBtn(diasCar.includes(d.n))}>{d.l}</button>)}
@@ -400,13 +463,16 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
         </div>
         <p className="mt-1.5 text-[11px] text-muted">⭐ = melhores horários pro público de buffet (manhã, almoço e noite). Muda só os <strong className="text-white/70">próximos</strong> posts — o que já está agendado fica como está.</p>
         <p className="mt-1.5 text-[11px] text-muted">⏰ O piloto automático posta cada um na sua hora (de hora em hora). Ative o despertador no Supabase pra valer.</p>
-        <label className="mt-3 flex items-center gap-2 text-sm text-white">
-          <input type="checkbox" checked={f.ativa} onChange={(e) => set("ativa", e.target.checked)} /> Piloto automático ativo
-        </label>
-        <label className="mt-2 flex flex-wrap items-center gap-2 text-sm text-white">
-          <input type="checkbox" checked={f.espelharStory} onChange={(e) => set("espelharStory", e.target.checked)} /> 🟣 Espelhar todo post no Story
-          <span className="text-xs text-muted">— cada post do feed também sobe como Story (dá pra ajustar post a post)</span>
-        </label>
+        <div className="mt-4 space-y-3 border-t border-linha pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-white">🚀 Piloto automático ativo</span>
+            <Toggle on={f.ativa} onChange={(v) => set("ativa", v)} />
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm font-medium text-white">🟣 Espelhar todo post no Story <span className="block text-xs font-normal text-muted">cada post do feed também sobe como Story (dá pra ajustar post a post)</span></span>
+            <Toggle on={f.espelharStory} onChange={(v) => set("espelharStory", v)} />
+          </div>
+        </div>
       </section>
         </>
       )}

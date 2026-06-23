@@ -18,7 +18,9 @@ type Confirmacao = { titulo: string; texto: string; rotulo: string; perigo?: boo
 // Aba 📸 Festas do painel da marca. Dois tipos de link:
 //  • LINK DE CRIAR (da marca): o gerente cria festas por ele (não vê as existentes).
 //  • LINK DE CADA FESTA: isolado — quem tem ele só mexe naquela festa.
-// As fotos também aparecem no Banco de imagens (categoria 🎉 Festa); aqui ficam por evento.
+// As festas viram uma GALERIA de cards (igual a aba Vídeo); clicar num card abre o DETALHE
+// num modal (link da festa + editar + fotos por momento + excluir). As fotos também aparecem
+// no Banco de imagens (categoria 🎉 Festa); aqui ficam por evento.
 export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }: {
   marcaId: string;
   linkBase: string;
@@ -31,7 +33,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<Confirmacao | null>(null);
-  const [abertas, setAbertas] = useState<Set<string>>(new Set()); // festas expandidas (começam TODAS colapsadas)
+  const [detalheId, setDetalheId] = useState<string | null>(null); // festa aberta no modal de detalhe
   const [fotoAberta, setFotoAberta] = useState<FotoView | null>(null); // foto aberta no modal (ampliar + descrição)
   const [descEdit, setDescEdit] = useState("");
   const [salvandoDesc, setSalvandoDesc] = useState(false);
@@ -47,6 +49,8 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
   const [erroUpload, setErroUpload] = useState<string | null>(null);
 
   const linkCriar = token ? `${linkBase}/f/${token}` : "";
+  // Derivado do `festas` (não de um snapshot): após router.refresh() o modal reflete os dados novos.
+  const detalhe = detalheId ? festas.find((f) => f.id === detalheId) ?? null : null;
 
   async function subirFotosPainel(festaId: string, momento: string, files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -68,10 +72,6 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
     } finally {
       setSubindoFesta(null);
     }
-  }
-
-  function toggleFesta(id: string) {
-    setAbertas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }
 
   function abrirFoto(foto: FotoView) {
@@ -190,17 +190,31 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
       rotulo: "Excluir festa",
       perigo: true,
       acao: async () => {
+        setDetalheId(null);
         await excluirFesta(f.id);
         router.refresh();
       },
     });
   }
 
+  // Status (badge) de uma festa pro card da galeria.
+  function statusFesta(f: FestaView): { txt: string; cls: string } {
+    if (f.finalizadaEm) return { txt: "✓ Finalizada", cls: "bg-green-500 text-black" };
+    if (f.fotos.length) return { txt: "Em andamento", cls: "bg-amber-500 text-black" };
+    return { txt: "Sem fotos", cls: "bg-black/70 text-white/70" };
+  }
+  // Selo de autorização (LGPD) — mostra sempre, igual na aba Páginas.
+  function statusAutoriz(f: FestaView): { txt: string; cls: string } {
+    if (f.autorizacao === "negada") return { txt: "✗ Sem autorização", cls: "bg-vermelho text-white" };
+    if (f.autorizacao === "pendente") return { txt: "⏳ Pendente", cls: "bg-amber-500 text-black" };
+    return { txt: "✓ Autorizado", cls: "bg-green-500 text-black" };
+  }
+
   return (
     <section className="space-y-5">
       {/* Modal de confirmação no padrão da plataforma (substitui o confirm() nativo) */}
       {confirmar && (
-        <div onClick={() => setConfirmar(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+        <div onClick={() => setConfirmar(null)} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4">
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-linha bg-preto-card p-5">
             <p className="text-sm font-semibold text-white">{confirmar.titulo}</p>
             <p className="mt-2 text-sm leading-relaxed text-muted">{confirmar.texto}</p>
@@ -220,7 +234,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
 
       {/* Modal da foto: ampliar + ver/corrigir a descrição que a IA leu (a Bia usa pra casar com o post) */}
       {fotoAberta && (
-        <div onClick={() => !salvandoDesc && setFotoAberta(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+        <div onClick={() => !salvandoDesc && setFotoAberta(null)} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4">
           <div onClick={(e) => e.stopPropagation()} className="flex max-h-[90vh] w-full max-w-2xl flex-col gap-4 overflow-auto rounded-2xl border border-linha bg-preto-card p-4 sm:flex-row">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={fotoAberta.url} alt="foto da festa" className="max-h-[45vh] w-full rounded-lg object-contain sm:max-h-[70vh] sm:w-1/2" />
@@ -240,7 +254,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
 
       {/* Modal de editar as infos da festa */}
       {editando && (
-        <div onClick={() => !salvandoEd && setEditando(null)} className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+        <div onClick={() => !salvandoEd && setEditando(null)} className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4">
           <div onClick={(e) => e.stopPropagation()} className="max-h-[90vh] w-full max-w-md overflow-auto rounded-2xl border border-linha bg-preto-card p-5">
             <p className="text-sm font-semibold text-white">✏️ Editar festa</p>
 
@@ -284,6 +298,71 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
         </div>
       )}
 
+      {/* Modal de DETALHE da festa — link próprio + editar + fotos por momento + excluir */}
+      {detalhe && (
+        <div onClick={() => setDetalheId(null)} className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/85 p-4">
+          <div onClick={(e) => e.stopPropagation()} className="my-4 w-full max-w-2xl rounded-2xl border border-linha bg-preto-card p-5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-base font-bold text-white">🎂 {rotuloAniversariantes(detalhe.aniversariantes)}{detalhe.tema ? <span className="font-normal text-muted"> · {detalhe.tema}</span> : null}</p>
+                <p className="text-xs text-muted">{dataBR(detalhe.dataISO)}{detalhe.horario ? ` às ${detalhe.horario}` : ""} · {detalhe.fotos.length} {detalhe.fotos.length === 1 ? "foto" : "fotos"}{detalhe.gerente ? <span> · 📷 {detalhe.gerente}</span> : null} {detalhe.finalizadaEm && <span className="font-semibold text-green-400">· ✓ Finalizada</span>}</p>
+              </div>
+              <button type="button" onClick={() => setDetalheId(null)} aria-label="Fechar" className="shrink-0 rounded-lg border border-linha px-3 py-1.5 text-xs text-muted transition hover:text-white">✕</button>
+            </div>
+
+            {/* Link próprio desta festa (pra mandar pro gerente responsável por ela) */}
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <input readOnly value={`${linkBase}/f/${detalhe.token}`} onClick={(e) => (e.target as HTMLInputElement).select()} className="input-base mt-0 min-w-[160px] flex-1 text-[11px]" />
+              <button type="button" onClick={() => copiarLink(`${linkBase}/f/${detalhe.token}`, detalhe.id)} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">
+                {copiadoId === detalhe.id ? "✓ Copiado" : "Copiar link"}
+              </button>
+              <a href={`${linkBase}/f/${detalhe.token}`} target="_blank" rel="noreferrer" className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">↗ Abrir</a>
+              <button type="button" onClick={() => abrirEdicao(detalhe)} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-sky-300 transition hover:border-sky-500 hover:text-sky-200">✏️ Editar</button>
+            </div>
+
+            {erroUpload && <p className="mt-3 rounded-lg border border-vermelho/40 bg-vermelho/10 p-2 text-center text-sm text-vermelho">{erroUpload}</p>}
+
+            {/* Fotos por momento — com botão de ADICIONAR (o dono/admin sobe direto pelo painel) */}
+            {MOMENTOS_FESTA.map((m) => {
+              const fotosM = detalhe.fotos.filter((ft) => ft.momento === m.id);
+              const cheio = fotosM.length >= LIMITE_FOTOS_MOMENTO;
+              const subindoEste = subindoFesta === `${detalhe.id}:${m.id}`;
+              return (
+                <div key={m.id} className="mt-3 rounded-lg border border-linha bg-preto p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[12px] font-semibold text-white">{m.emoji} {m.label}</span>
+                    <span className={`shrink-0 text-[11px] font-semibold ${cheio ? "text-green-400" : "text-muted"}`}>{cheio ? "✓ " : ""}{fotosM.length}/{LIMITE_FOTOS_MOMENTO}</span>
+                  </div>
+                  {!cheio && (
+                    <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">
+                      {subindoEste ? "Subindo…" : "📷 Adicionar fotos"}
+                      <input type="file" accept="image/*" multiple className="hidden" disabled={subindoEste} onChange={(e) => subirFotosPainel(detalhe.id, m.id, e.target.files)} />
+                    </label>
+                  )}
+                  {fotosM.length > 0 && (
+                    <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
+                      {fotosM.map((foto) => (
+                        <button key={foto.id} type="button" onClick={() => abrirFoto(foto)} title="Ver / descrição da IA" className="relative block overflow-hidden rounded-md border border-linha transition hover:border-vermelho">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={foto.url} alt={m.label} className="aspect-square w-full object-cover" />
+                          {foto.descricao ? (
+                            <span title={foto.descricao} className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-1 py-0.5 text-left text-[9px] leading-tight text-white/90">🔍 {foto.descricao}</span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <div className="mt-4 border-t border-linha pt-3 text-right">
+              <button type="button" onClick={() => pedirApagarFesta(detalhe)} className="rounded-md border border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500 hover:bg-red-900/20">✕ Excluir festa</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cartão do LINK DE CRIAR */}
       <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-2">
@@ -297,7 +376,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
         {/* Como funciona — 2 passos, pra não confundir os dois tipos de link */}
         <div className="mt-3 space-y-1.5 rounded-lg border border-linha bg-preto p-3 text-[11px] text-muted">
           <p><span className="mr-1 font-semibold text-[#c7b2ff]">1.</span> Você manda <strong className="text-white/80">este</strong> link pro gerente (sempre o mesmo).</p>
-          <p><span className="mr-1 font-semibold text-[#c7b2ff]">2.</span> Ele cria a festa → ganha um link <strong className="text-white/80">só dela</strong> (em “Festas registradas”, no botão <span className="text-white/80">Copiar link</span>).</p>
+          <p><span className="mr-1 font-semibold text-[#c7b2ff]">2.</span> Ele cria a festa → ganha um link <strong className="text-white/80">só dela</strong> (clicando na festa abaixo → <span className="text-white/80">Copiar link</span>).</p>
         </div>
 
         {token ? (
@@ -322,82 +401,44 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
         {erro && <p className="mt-3 text-sm text-vermelho">{erro}</p>}
       </div>
 
-      {/* Galeria por festa — cada uma com seu link próprio */}
-      <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
+      {/* GALERIA por festa — cada uma é um card; clicar abre o detalhe no modal */}
+      <div>
         <h3 className="text-sm font-semibold text-white">🎂 Festas registradas <span className="font-normal text-muted">({festas.length})</span></h3>
-        <p className="mt-0.5 text-[11px] text-muted">Cada festa tem o <strong className="text-white/70">seu próprio link</strong> — abra a festa (▼) pra copiar e mandar pro gerente dela.</p>
+        <p className="mt-0.5 text-[11px] text-muted">Cada festa tem o <strong className="text-white/70">seu próprio link</strong> — toque na festa pra abrir, copiar o link e gerenciar as fotos.</p>
         {festas.length === 0 ? (
           <p className="mt-3 rounded-lg border border-dashed border-linha bg-preto p-6 text-center text-sm text-muted">
             Nenhuma festa ainda. Gere o link de criar acima e mande pro gerente — as festas dele aparecem aqui. 🎉
           </p>
         ) : (
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
             {festas.map((f) => {
-              const linkFesta = `${linkBase}/f/${f.token}`;
-              const aberta = abertas.has(f.id);
+              const capa = f.fotos[0]?.url;
+              const st = statusFesta(f);
+              const sa = statusAutoriz(f);
               return (
-                <div key={f.id} className="rounded-lg border border-linha bg-preto p-3">
-                  {/* Cabeçalho clicável: começa COLAPSADO; toca pra expandir/recolher */}
-                  <div className="flex items-start justify-between gap-2">
-                    <button type="button" onClick={() => toggleFesta(f.id)} className="flex min-w-0 flex-1 items-start gap-2 text-left">
-                      <span className="mt-0.5 shrink-0 text-xs text-muted">{aberta ? "▲" : "▼"}</span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-white">🎂 {rotuloAniversariantes(f.aniversariantes)}{f.tema ? <span className="font-normal text-muted"> · {f.tema}</span> : null}</span>
-                        <span className="block text-xs text-muted">{dataBR(f.dataISO)}{f.horario ? ` às ${f.horario}` : ""} · {f.fotos.length} {f.fotos.length === 1 ? "foto" : "fotos"}{f.gerente ? <span> · 📷 {f.gerente}</span> : null} {f.finalizadaEm && <span className="font-semibold text-green-400">· ✓ Finalizada</span>}</span>
-                      </span>
-                    </button>
-                    <button type="button" onClick={() => pedirApagarFesta(f)} title="Excluir festa" className="shrink-0 rounded px-2 py-1 text-xs text-red-400 transition hover:bg-red-900/30">✕ Excluir</button>
-                  </div>
-
-                  {aberta && (
-                    <>
-                      {/* Link próprio desta festa (pra mandar pro gerente responsável por ela) */}
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <input readOnly value={linkFesta} onClick={(e) => (e.target as HTMLInputElement).select()} className="input-base mt-0 min-w-[160px] flex-1 text-[11px]" />
-                        <button type="button" onClick={() => copiarLink(linkFesta, f.id)} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white">
-                          {copiadoId === f.id ? "✓ Copiado" : "Copiar link"}
-                        </button>
-                        <a href={linkFesta} target="_blank" rel="noreferrer" className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">↗ Abrir</a>
-                        <button type="button" onClick={() => abrirEdicao(f)} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-sky-300 transition hover:border-sky-500 hover:text-sky-200">✏️ Editar</button>
+                <div key={f.id} className="overflow-hidden rounded-2xl border border-linha bg-preto-card transition hover:border-white/15">
+                  <button type="button" onClick={() => setDetalheId(f.id)} className="relative block aspect-[4/5] w-full bg-preto text-left">
+                    {capa ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={capa} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-4xl opacity-50">🎂</div>
+                    )}
+                    <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>{st.txt}</span>
+                    <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">📷 {f.fotos.length}</span>
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2.5 pt-8">
+                      <div className="mb-1 flex flex-wrap items-center gap-1">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold ${sa.cls}`}>{sa.txt}</span>
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[9px] font-bold ${f.mostrarAvaliacao ? "bg-green-500 text-black" : "bg-black/55 text-white/60"}`}>⭐ Google {f.mostrarAvaliacao ? "on" : "off"}</span>
                       </div>
-
-                      {erroUpload && <p className="mt-3 rounded-lg border border-vermelho/40 bg-vermelho/10 p-2 text-center text-sm text-vermelho">{erroUpload}</p>}
-
-                      {/* Fotos por momento — com botão de ADICIONAR (o dono/admin sobe direto pelo painel) */}
-                      {MOMENTOS_FESTA.map((m) => {
-                        const fotosM = f.fotos.filter((ft) => ft.momento === m.id);
-                        const cheio = fotosM.length >= LIMITE_FOTOS_MOMENTO;
-                        const subindoEste = subindoFesta === `${f.id}:${m.id}`;
-                        return (
-                          <div key={m.id} className="mt-3 rounded-lg border border-linha bg-preto p-3">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-[12px] font-semibold text-white">{m.emoji} {m.label}</span>
-                              <span className={`shrink-0 text-[11px] font-semibold ${cheio ? "text-green-400" : "text-muted"}`}>{cheio ? "✓ " : ""}{fotosM.length}/{LIMITE_FOTOS_MOMENTO}</span>
-                            </div>
-                            {!cheio && (
-                              <label className="mt-2 inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">
-                                {subindoEste ? "Subindo…" : "📷 Adicionar fotos"}
-                                <input type="file" accept="image/*" multiple className="hidden" disabled={subindoEste} onChange={(e) => subirFotosPainel(f.id, m.id, e.target.files)} />
-                              </label>
-                            )}
-                            {fotosM.length > 0 && (
-                              <div className="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-6">
-                                {fotosM.map((foto) => (
-                                  <button key={foto.id} type="button" onClick={() => abrirFoto(foto)} title="Ver / descrição da IA" className="relative block overflow-hidden rounded-md border border-linha transition hover:border-vermelho">
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={foto.url} alt={m.label} className="aspect-square w-full object-cover" />
-                                    {foto.descricao ? (
-                                      <span title={foto.descricao} className="absolute inset-x-0 bottom-0 truncate bg-black/65 px-1 py-0.5 text-left text-[9px] leading-tight text-white/90">🔍 {foto.descricao}</span>
-                                    ) : null}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </>
-                  )}
+                      <p className="truncate font-titulo text-sm leading-tight text-white">{rotuloAniversariantes(f.aniversariantes)}</p>
+                      <p className="truncate text-[10px] text-white/70">{dataBR(f.dataISO)}{f.horario ? ` · ${f.horario}` : ""}{f.tema ? ` · ${f.tema}` : ""}</p>
+                    </div>
+                  </button>
+                  <div className="flex items-stretch gap-1.5 p-2">
+                    <button type="button" onClick={() => setDetalheId(f.id)} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">Abrir festa</button>
+                    <button type="button" onClick={() => pedirApagarFesta(f)} title="Excluir festa" className="shrink-0 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500 hover:bg-red-900/20">✕</button>
+                  </div>
                 </div>
               );
             })}
