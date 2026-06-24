@@ -243,7 +243,8 @@ export async function moverFotoMomento(festaToken: string, fotoId: string, novoM
 
 // Salva a SELEÇÃO ordenada de fotos pro VÍDEO/Reels da festa (do PAINEL — guardaMarca). Só aceita
 // fotos que SÃO desta festa; guarda os IDs na ordem escolhida (máx 30). Lista vazia volta pro automático.
-export async function salvarFotosVideo(festaId: string, fotoIds: string[]) {
+const MOLDURAS = ["nenhuma", "branca", "grossa", "marca"];
+export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?: string, moldura?: string) {
   const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -251,7 +252,14 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[]) {
   const validas = await prisma.imagemMarca.findMany({ where: { festaId, id: { in: fotoIds } }, select: { id: true } });
   const set = new Set(validas.map((v) => v.id));
   const ordenadas = fotoIds.filter((id) => set.has(id)).slice(0, 30); // mantém a ordem escolhida
-  await prisma.festa.update({ where: { id: festaId }, data: { videoFotos: JSON.stringify(ordenadas) } });
+  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string } = { videoFotos: JSON.stringify(ordenadas) };
+  // capa: só aceita "" (automático) ou um fotoId que SEJA desta festa
+  if (capa !== undefined) {
+    const capaOk = capa === "" ? true : (await prisma.imagemMarca.count({ where: { festaId, id: capa } })) > 0;
+    data.videoCapa = capaOk ? capa : "";
+  }
+  if (moldura !== undefined) data.videoMoldura = MOLDURAS.includes(moldura) ? moldura : "branca";
+  await prisma.festa.update({ where: { id: festaId }, data });
   revalidatePath(`/painel/marcas/${festa.marcaId}`);
   return { ok: true as const, total: ordenadas.length };
 }
@@ -401,7 +409,7 @@ export async function postarReelsAgora(pubId: string) {
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoFotos: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true } }, fotos: { select: { id: true, url: true } } },
+    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true } }, fotos: { select: { id: true, url: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -417,6 +425,12 @@ export async function gerarVideoDaFesta(festaId: string) {
   if (fotos.length === 0) fotos = festa.fotos.slice(0, 28).map((f) => f.url);
   if (fotos.length === 0) return { ok: false as const, erro: "Suba fotos antes de gerar o vídeo." };
 
+  // capa: a foto escolhida (videoCapa) — ou, sem escolha, a 1ª da sequência.
+  const capaUrl = (festa.videoCapa && mapa.get(festa.videoCapa)) || fotos[0];
+  // a foto da capa NÃO se repete no slideshow (ela já abre o vídeo como capa).
+  const semCapa = fotos.filter((u) => u !== capaUrl);
+  if (semCapa.length > 0) fotos = semCapa;
+
   const anivs = parseAniversariantes(festa.aniversariantes);
   const nome = anivs[0]?.nome || festa.aniversariante || "a criança";
   const idade = anivs[0]?.idade;
@@ -426,6 +440,9 @@ export async function gerarVideoDaFesta(festaId: string) {
   await prisma.festa.update({ where: { id: festaId }, data: { videoUrl: "gerando" } });
   const r = await dispararMotorReels({
     fotos,
+    capaUrl,
+    moldura: festa.videoMoldura || "branca",
+    corMoldura: festa.marca.corPrimaria || "#FFFFFF",
     logoUrl: festa.marca.logoUrl,
     musicaUrl,
     textoCapa,

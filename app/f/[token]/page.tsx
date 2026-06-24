@@ -35,6 +35,8 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
       autorizacao: festa.autorizacao,
       motivoNaoAutoriza: festa.motivoNaoAutoriza,
       videoFotos: [],
+      videoCapa: "",
+      videoMoldura: "branca",
       videoUrl: "",
       mostrarAvaliacao: festa.mostrarAvaliacao,
       fotos: fotos.map((f) => ({ id: f.id, url: f.url, momento: f.momento, descricao: f.descricao })),

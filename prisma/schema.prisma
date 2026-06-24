@@ -119,6 +119,11 @@ model Festa {
   // Seleção de fotos pro VÍDEO/Reels da festa: JSON ["fotoId1","fotoId2",...] na ORDEM escolhida.
   // "[]" = sem seleção (cai nas fotos automáticas). O dono monta na tela "escolher fotos do vídeo".
   videoFotos     String   @default("[]")
+  // Foto escolhida pra CAPA do vídeo (fotoId). "" = sem escolha → o motor usa a 1ª foto.
+  // A capa entra NÍTIDA com o título por cima (gradiente pra legibilidade), não mais fundo preto.
+  videoCapa      String   @default("")
+  // Moldura das fotos no vídeo: "nenhuma" | "branca" | "grossa" (polaroid) | "marca" (cor da marca).
+  videoMoldura   String   @default("branca")
   // URL do VÍDEO/Reels já montado desta festa (no Blob). "" = ainda não gerado.
   videoUrl       String   @default("")
   // O gerente liga/desliga o card "Avalie no Google" no álbum dos pais (por festa).

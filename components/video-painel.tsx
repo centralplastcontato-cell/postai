@@ -94,7 +94,7 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
         {pronto ? (
           <>
             <button onClick={() => setVer(true)} className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-green-500">▶ Ver vídeo</button>
-            <button onClick={onAbrirSeletor} title="Trocar as fotos e gerar de novo" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25">🎬 Fotos</button>
+            <button onClick={onAbrirSeletor} title="Escolher as fotos e gerar o vídeo de novo (substitui o atual)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25">🔄 Refazer</button>
           </>
         ) : emGeracao ? (
           <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
@@ -108,7 +108,7 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
   );
 }
 
-export function VideoPainel({ festas }: { festas: FestaView[] }) {
+export function VideoPainel({ festas, corMarca }: { festas: FestaView[]; corMarca: string }) {
   const [seletor, setSeletor] = useState<FestaView | null>(null);
   return (
     <div>
@@ -137,6 +137,10 @@ export function VideoPainel({ festas }: { festas: FestaView[] }) {
           nome={rotuloAniversariantes(seletor.aniversariantes) || "Festa"}
           fotos={seletor.fotos}
           inicial={seletor.videoFotos}
+          capaInicial={seletor.videoCapa}
+          molduraInicial={seletor.videoMoldura}
+          corMarca={corMarca}
+          jaTemVideo={seletor.videoUrl.startsWith("http")}
           onFechar={() => setSeletor(null)}
         />
       )}
