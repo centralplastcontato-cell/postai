@@ -30,6 +30,7 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
       aniversariantes: parseAniversariantes(festa.aniversariantes),
       tema: festa.tema,
       gerente: festa.gerente,
+      instagramAnfitriao: festa.instagramAnfitriao,
       horario: festa.horario,
       finalizadaEm: festa.finalizadaEm ? festa.finalizadaEm.toISOString() : null,
       autorizacao: festa.autorizacao,

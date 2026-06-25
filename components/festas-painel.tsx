@@ -43,6 +43,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
   const [edPessoas, setEdPessoas] = useState<{ nome: string; idade: string }[]>([{ nome: "", idade: "" }]);
   const [edTema, setEdTema] = useState("");
   const [edHorario, setEdHorario] = useState("");
+  const [edInsta, setEdInsta] = useState("");
   const [salvandoEd, setSalvandoEd] = useState(false);
   const [erroEd, setErroEd] = useState<string | null>(null);
   const [subindoFesta, setSubindoFesta] = useState<string | null>(null); // "festaId:momento" recebendo fotos
@@ -101,6 +102,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
     setEdPessoas(f.aniversariantes.length ? f.aniversariantes.map((a) => ({ nome: a.nome, idade: a.idade != null ? String(a.idade) : "" })) : [{ nome: "", idade: "" }]);
     setEdTema(f.tema);
     setEdHorario(f.horario || "");
+    setEdInsta(f.instagramAnfitriao || "");
     setErroEd(null);
   }
   function setPessoaEd(i: number, campo: "nome" | "idade", val: string) {
@@ -120,7 +122,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
     if (!lista.length) { setErroEd("Qual o nome do aniversariante?"); return; }
     setSalvandoEd(true);
     try {
-      const r = await editarFesta(editando.id, { dataISO: edData, aniversariantes: lista, tema: edTema, horario: edHorario });
+      const r = await editarFesta(editando.id, { dataISO: edData, aniversariantes: lista, tema: edTema, horario: edHorario, instagramAnfitriao: edInsta });
       if (!r.ok) { setErroEd(r.erro); return; }
       setEditando(null);
       router.refresh();
@@ -287,6 +289,10 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
 
             <label className="mt-4 block text-xs font-medium text-muted">Tema da festa <span className="font-normal text-muted/70">(opcional)</span>
               <input type="text" value={edTema} onChange={(e) => setEdTema(e.target.value)} placeholder="Ex: Frozen, Super-heróis…" className="input-base mt-1" />
+            </label>
+
+            <label className="mt-4 block text-xs font-medium text-muted">📸 Instagram da família <span className="font-normal text-muted/70">(marca no post do Reels)</span>
+              <input type="text" value={edInsta} onChange={(e) => setEdInsta(e.target.value)} placeholder="@usuario_da_familia" autoCapitalize="none" autoCorrect="off" className="input-base mt-1" />
             </label>
 
             {erroEd && <p className="mt-3 text-sm text-vermelho">{erroEd}</p>}

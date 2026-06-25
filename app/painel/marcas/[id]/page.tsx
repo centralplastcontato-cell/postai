@@ -81,6 +81,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       aniversariantes: anivs,
       tema: f.tema,
       gerente: f.gerente,
+      instagramAnfitriao: f.instagramAnfitriao,
       horario: f.horario,
       finalizadaEm: f.finalizadaEm ? f.finalizadaEm.toISOString() : null,
       autorizacao: f.autorizacao,

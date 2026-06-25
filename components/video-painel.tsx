@@ -4,7 +4,8 @@
 // aba de Reels do Instagram. Play no centro quando o vídeo está pronto; ⚡ Gerar quando não tem.
 // Escolher/ordenar fotos abre o seletor. O AGENDAMENTO/postagem mora em Redes Sociais → 🎬 Reels.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { type FestaView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
 import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
@@ -109,7 +110,17 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
 }
 
 export function VideoPainel({ festas, corMarca }: { festas: FestaView[]; corMarca: string }) {
+  const router = useRouter();
   const [seletor, setSeletor] = useState<FestaView | null>(null);
+
+  // Auto-refresh enquanto algum vídeo está "Gerando": o motor monta na nuvem e avisa por callback
+  // (salva no banco). Aqui o painel se atualiza sozinho a cada 12s pra o card virar "pronto" sem F5.
+  const algumGerando = festas.some((f) => f.videoUrl === "gerando");
+  useEffect(() => {
+    if (!algumGerando) return;
+    const t = setInterval(() => router.refresh(), 12000);
+    return () => clearInterval(t);
+  }, [algumGerando, router]);
   return (
     <div>
       <div className="mb-4">

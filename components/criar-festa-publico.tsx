@@ -25,6 +25,7 @@ export function CriarFestaPublico({ tokenMarca, marca }: { tokenMarca: string; m
   const [horario, setHorario] = useState("");
   const [pessoas, setPessoas] = useState<{ nome: string; idade: string }[]>([{ nome: "", idade: "" }]);
   const [tema, setTema] = useState("");
+  const [instaAnfitriao, setInstaAnfitriao] = useState("");
   const [criando, setCriando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -52,7 +53,7 @@ export function CriarFestaPublico({ tokenMarca, marca }: { tokenMarca: string; m
     if (!lista.length) { setErro("Qual o nome do aniversariante?"); return; }
     setCriando(true);
     try {
-      const r = await criarFestaPublica(tokenMarca, { dataISO: data || hojeBR(), aniversariantes: lista, tema, horario });
+      const r = await criarFestaPublica(tokenMarca, { dataISO: data || hojeBR(), aniversariantes: lista, tema, horario, instagramAnfitriao: instaAnfitriao });
       if (!r.ok) { setErro(r.erro); setCriando(false); return; }
       router.push(`/f/${r.festaToken}`); // vai pro link isolado da festa criada
     } catch {
@@ -147,6 +148,10 @@ export function CriarFestaPublico({ tokenMarca, marca }: { tokenMarca: string; m
 
           <label className="mt-4 block text-xs font-medium text-muted">Tema da festa <span className="font-normal text-muted/70">(opcional)</span>
             <input type="text" value={tema} onChange={(e) => setTema(e.target.value)} placeholder="Ex: Frozen, Super-heróis…" className="input-base mt-1" />
+          </label>
+
+          <label className="mt-4 block text-xs font-medium text-muted">📸 Instagram da família <span className="font-normal text-muted/70">(opcional — pra marcar no post)</span>
+            <input type="text" value={instaAnfitriao} onChange={(e) => setInstaAnfitriao(e.target.value)} placeholder="@usuario_da_familia" autoCapitalize="none" autoCorrect="off" className="input-base mt-1" />
           </label>
 
           {erro && <p className="mt-3 text-sm text-vermelho">{erro}</p>}

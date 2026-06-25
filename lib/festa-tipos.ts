@@ -13,6 +13,7 @@ export type FestaView = {
   aniversariantes: Aniversariante[];
   tema: string;
   gerente: string;
+  instagramAnfitriao: string; // @ do Instagram da família (pra marcar no post)
   horario: string;
   finalizadaEm: string | null;
   autorizacao: string; // "pendente" | "autorizada" | "negada" — uso de imagem (LGPD)

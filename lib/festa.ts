@@ -102,6 +102,7 @@ export async function festaPorToken(token: string) {
         aniversariantes: true,
         tema: true,
         gerente: true,
+        instagramAnfitriao: true,
         horario: true,
         finalizadaEm: true,
         autorizacao: true,

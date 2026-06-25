@@ -68,9 +68,15 @@ export async function revogarLinkFotos(marcaId: string) {
 
 // Edita as infos da festa pelo PAINEL (com sessão/dono): data, aniversariantes (nome+idade)
 // e tema. Atualiza o label derivado (`aniversariante`) junto.
+// Normaliza o @ do Instagram do anfitrião: tira "@", espaços e a URL se colarem o link inteiro.
+// Guardamos só o username (sem @) — o "@" é colado na hora de usar (legenda do Reels). "" = sem.
+function limparInsta(s?: string): string {
+  return (s || "").trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/[@\s/?]/g, "").slice(0, 60);
+}
+
 export async function editarFesta(
   festaId: string,
-  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string; horario?: string },
+  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string; horario?: string; instagramAnfitriao?: string },
 ) {
   const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
   if (!f) return { ok: false as const, erro: "Festa não encontrada." };
@@ -88,6 +94,7 @@ export async function editarFesta(
       aniversariantes: JSON.stringify(lista),
       tema: (input.tema || "").trim().slice(0, 80),
       horario: (input.horario || "").trim().slice(0, 5),
+      ...(input.instagramAnfitriao !== undefined && { instagramAnfitriao: limparInsta(input.instagramAnfitriao) }),
     },
   });
   revalidatePath(`/painel/marcas/${f.marcaId}`);
@@ -136,7 +143,7 @@ export async function excluirFesta(festaId: string) {
 // o devolve — a página redireciona pro link isolado dela. Aceita vários aniversariantes.
 export async function criarFestaPublica(
   tokenMarca: string,
-  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string; horario?: string },
+  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string; horario?: string; instagramAnfitriao?: string },
 ) {
   const m = await marcaPorTokenFotos(tokenMarca);
   if (!m) return { ok: false as const, erro: "Link inválido ou desativado. Peça um novo ao buffet." };
@@ -157,6 +164,7 @@ export async function criarFestaPublica(
       aniversariantes: JSON.stringify(lista),
       tema: (input.tema || "").trim().slice(0, 80),
       horario: (input.horario || "").trim().slice(0, 5),
+      instagramAnfitriao: limparInsta(input.instagramAnfitriao),
     },
   });
   return { ok: true as const, festaId: festa.id, festaToken };
@@ -270,7 +278,7 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?
 export async function agendarReelsDaFesta(festaId: string, dataYMD: string, legendaManual?: string, horaSel?: number) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoUrl: true, autorizacao: true, tema: true, aniversariante: true, aniversariantes: true, marca: { select: { nome: true, horaPost: true } } },
+    select: { marcaId: true, videoUrl: true, autorizacao: true, tema: true, aniversariante: true, aniversariantes: true, instagramAnfitriao: true, marca: { select: { nome: true, horaPost: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -284,8 +292,10 @@ export async function agendarReelsDaFesta(festaId: string, dataYMD: string, lege
   if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
 
   const nome = festa.aniversariante || "a criança";
-  const legenda = (legendaManual && legendaManual.trim())
+  const legendaBase = (legendaManual && legendaManual.trim())
     || (await legendaReelsIA({ aniversariante: festa.aniversariante, aniversariantes: festa.aniversariantes, tema: festa.tema, buffet: festa.marca.nome }));
+  // MARCA a família: o @ entra na legenda → eles são notificados e o post alcança os seguidores deles.
+  const legenda = festa.instagramAnfitriao ? `${legendaBase}\n\n📸 @${festa.instagramAnfitriao}` : legendaBase;
 
   const slug = `reels-${festaId.slice(-6)}-${randomBytes(3).toString("hex")}`;
   const pub = await prisma.publicacao.create({

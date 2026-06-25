@@ -102,6 +102,9 @@ model Festa {
   // um aniversariante (gêmeos, irmãos), e cada um tem sua idade (opcional). Ver lib/aniversariantes.ts.
   aniversariantes String  @default("[]")
   tema           String   @default("") // tema da festa (ex: "Frozen", "Super-heróis")
+  // @ do Instagram do ANFITRIÃO (família da festa). O gerente anota; ao postar o Reels da festa,
+  // o @ entra na legenda pra MARCAR a família (notifica + alcança os seguidores dela). "" = sem.
+  instagramAnfitriao String @default("")
   // Nome de quem REGISTROU as fotos (o gerente preenche no link da festa) — pra o dono saber
   // quem documentou cada evento. "" = não informado.
   gerente        String   @default("")
