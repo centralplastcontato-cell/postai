@@ -127,6 +127,8 @@ model Festa {
   videoCapa      String   @default("")
   // Moldura das fotos no vídeo: "nenhuma" | "branca" | "grossa" (polaroid) | "marca" (cor da marca).
   videoMoldura   String   @default("branca")
+  // Mensagem do SLIDE FINAL do vídeo (o dono escreve ou a Bia gera). "" = usa o padrão do motor.
+  videoTextoFinal String  @default("")
   // URL do VÍDEO/Reels já montado desta festa (no Blob). "" = ainda não gerado.
   videoUrl       String   @default("")
   // O gerente liga/desliga o card "Avalie no Google" no álbum dos pais (por festa).

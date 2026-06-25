@@ -7,7 +7,7 @@
 
 import { useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { salvarFotosVideo, gerarVideoDaFesta } from "@/app/actions/festas";
+import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo } from "@/app/actions/festas";
 import { type FotoView } from "@/lib/festa-tipos";
 
 const ORDEM = ["salao", "brinquedos", "aniversariante", "parabens", "momentos"];
@@ -35,13 +35,14 @@ function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   return {};
 }
 
-export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   nome: string;
   fotos: FotoView[];
   inicial: string[];
   capaInicial?: string;
   molduraInicial?: string;
+  textoFinalInicial?: string;
   corMarca?: string;
   jaTemVideo?: boolean;
   onFechar: () => void;
@@ -57,6 +58,8 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
   // foto escolhida pra CAPA (fotoId). "" = a 1ª foto vira capa automaticamente.
   const [capa, setCapa] = useState<string>(fotos.some((f) => f.id === capaInicial) ? capaInicial : "");
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
+  const [textoFinal, setTextoFinal] = useState<string>(textoFinalInicial || ""); // mensagem do slide final
+  const [gerandoTexto, setGerandoTexto] = useState(false); // a Bia escrevendo o texto final
 
   function toggle(id: string) {
     setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -78,9 +81,18 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
     for (const m of ORDEM) sug.push(...fotos.filter((f) => f.momento === m).slice(0, 5).map((f) => f.id));
     setSel(sug.slice(0, 24));
   }
+  // A Bia gera uma frase carinhosa de encerramento (usa nome/idade/tema da festa).
+  async function biaEscreve() {
+    setGerandoTexto(true);
+    try {
+      const r = await gerarTextoFinalVideo(festaId);
+      if (r.ok && r.texto) setTextoFinal(r.texto);
+    } catch {}
+    setGerandoTexto(false);
+  }
   async function salvar() {
     setSalvando(true);
-    try { await salvarFotosVideo(festaId, sel, capa, moldura); } catch {}
+    try { await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal); } catch {}
     setSalvando(false);
     router.refresh();
     onFechar();
@@ -90,7 +102,7 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
     setSalvando(true);
     setErroGerar("");
     try {
-      await salvarFotosVideo(festaId, sel, capa, moldura);
+      await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal);
       const r = await gerarVideoDaFesta(festaId).catch(() => ({ ok: false as const, erro: "Não consegui gerar agora." }));
       if (!r.ok) { setErroGerar(r.erro || "Não deu pra gerar."); setSalvando(false); return; }
       router.refresh();
@@ -152,6 +164,15 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
               </button>
             )}
           </div>
+
+          {/* mensagem do SLIDE FINAL (último quadro do vídeo) — o dono escreve ou a Bia gera */}
+          <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg border border-linha bg-preto/40 px-2.5 py-2">
+            <span className="text-[11px] font-semibold text-muted">✍️ Texto final:</span>
+            <input type="text" value={textoFinal} onChange={(e) => setTextoFinal(e.target.value)} maxLength={48} placeholder='Em branco = "Muito obrigado!"' className="min-w-[150px] flex-1 rounded-lg border border-linha bg-preto px-2.5 py-1.5 text-xs text-white placeholder:text-muted/50 focus:border-vermelho focus:outline-none" />
+            <button type="button" onClick={biaEscreve} disabled={gerandoTexto} title="A Bia cria uma frase carinhosa de encerramento (usa o nome, a idade e o tema)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-60">{gerandoTexto ? "✍️ escrevendo…" : "✨ Bia escreve"}</button>
+            <span className="w-full text-[10px] leading-snug text-muted/70">Aparece no <strong className="text-white/70">último quadro</strong> do vídeo, com o logo. Curtinho (até ~48 letras).</span>
+          </div>
+
           {/* 1) SUA SEQUÊNCIA — fotos grandes, arraste pra reordenar, × pra tirar */}
           {escolhidas.length > 0 && (
             <div className="pt-3">

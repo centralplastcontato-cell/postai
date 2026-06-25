@@ -252,7 +252,7 @@ export async function moverFotoMomento(festaToken: string, fotoId: string, novoM
 // Salva a SELEÇÃO ordenada de fotos pro VÍDEO/Reels da festa (do PAINEL — guardaMarca). Só aceita
 // fotos que SÃO desta festa; guarda os IDs na ordem escolhida (máx 30). Lista vazia volta pro automático.
 const MOLDURAS = ["nenhuma", "branca", "grossa", "marca"];
-export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?: string, moldura?: string) {
+export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string) {
   const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -260,13 +260,14 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?
   const validas = await prisma.imagemMarca.findMany({ where: { festaId, id: { in: fotoIds } }, select: { id: true } });
   const set = new Set(validas.map((v) => v.id));
   const ordenadas = fotoIds.filter((id) => set.has(id)).slice(0, 30); // mantém a ordem escolhida
-  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string } = { videoFotos: JSON.stringify(ordenadas) };
+  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string; videoTextoFinal?: string } = { videoFotos: JSON.stringify(ordenadas) };
   // capa: só aceita "" (automático) ou um fotoId que SEJA desta festa
   if (capa !== undefined) {
     const capaOk = capa === "" ? true : (await prisma.imagemMarca.count({ where: { festaId, id: capa } })) > 0;
     data.videoCapa = capaOk ? capa : "";
   }
   if (moldura !== undefined) data.videoMoldura = MOLDURAS.includes(moldura) ? moldura : "branca";
+  if (textoFinal !== undefined) data.videoTextoFinal = textoFinal.trim().slice(0, 60); // limpa e limita
   await prisma.festa.update({ where: { id: festaId }, data });
   revalidatePath(`/painel/marcas/${festa.marcaId}`);
   return { ok: true as const, total: ordenadas.length };
@@ -368,6 +369,48 @@ export async function gerarLegendaReels(festaId: string) {
   return { ok: true as const, legenda };
 }
 
+// Botão "✨ Bia escreve" do SLIDE FINAL do vídeo: gera uma FRASE CURTA de encerramento (cabe em 1 linha).
+export async function gerarTextoFinalVideo(festaId: string) {
+  const festa = await prisma.festa.findUnique({
+    where: { id: festaId },
+    select: { marcaId: true, tema: true, aniversariante: true, aniversariantes: true, marca: { select: { nome: true } } },
+  });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+
+  const anivs = parseAniversariantes(festa.aniversariantes);
+  const nome = anivs[0]?.nome || festa.aniversariante || "";
+  const idade = anivs[0]?.idade;
+  const tema = (festa.tema || "").trim();
+  const fallback = nome ? `Obrigado por esse dia, ${nome}! 💛` : "Que dia inesquecível! 💛";
+
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: true as const, texto: fallback.slice(0, 48) };
+
+  const sistema = `Você escreve a FRASE FINAL (encerramento) de um vídeo de festa infantil do buffet "${festa.marca.nome}". Regras ESTRITAS:
+- UMA frase curta, no MÁXIMO 42 caracteres (cabe em 1 linha grande na tela).
+- Tom carinhoso e brasileiro; pode citar o nome da criança.
+- Apenas 1 emoji, no fim.
+- Sem aspas, sem hashtag.`;
+  const pedido = `Festa de ${nome || "uma criança"}${idade ? `, ${idade} anos` : ""}${tema ? `, tema ${tema}` : ""}.`;
+
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-4o-mini", temperature: 0.9, max_tokens: 40, messages: [{ role: "system", content: sistema }, { role: "user", content: pedido }] }),
+    });
+    if (!resp.ok) return { ok: true as const, texto: fallback.slice(0, 48) };
+    const data = await resp.json();
+    const raw = data?.choices?.[0]?.message?.content;
+    const texto = raw ? String(raw).trim().replace(/^["']|["']$/g, "").slice(0, 48) : fallback;
+    return { ok: true as const, texto: texto || fallback.slice(0, 48) };
+  } catch {
+    return { ok: true as const, texto: fallback.slice(0, 48) };
+  }
+}
+
 // Edita um Reels JÁ agendado (data, hora e legenda) — só enquanto NÃO foi postado.
 export async function atualizarReels(pubId: string, dataYMD: string, horaSel: number, legenda: string) {
   const pub = await prisma.publicacao.findUnique({ where: { id: pubId }, select: { marcaId: true, formato: true, status: true } });
@@ -419,7 +462,7 @@ export async function postarReelsAgora(pubId: string) {
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true } }, fotos: { select: { id: true, url: true } } },
+    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true } }, fotos: { select: { id: true, url: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);

@@ -17,6 +17,8 @@ export type PedidoReels = {
   capaUrl?: string; // foto da CAPA (nítida + texto por cima). Sem isso, o motor usa a 1ª foto.
   moldura?: string; // moldura das fotos: "nenhuma" | "branca" | "grossa" | "marca"
   corMoldura?: string; // cor (hex) usada quando moldura="marca"
+  tituloFinal?: string; // mensagem do SLIDE FINAL (linha 1). Vazio = padrão do motor.
+  subFinal?: string; // slide final (linha 2). Vazio = sem 2ª linha.
   logoUrl: string;
   musicaUrl?: string;
   textoCapa: string;

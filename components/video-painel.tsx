@@ -150,6 +150,7 @@ export function VideoPainel({ festas, corMarca }: { festas: FestaView[]; corMarc
           inicial={seletor.videoFotos}
           capaInicial={seletor.videoCapa}
           molduraInicial={seletor.videoMoldura}
+          textoFinalInicial={seletor.videoTextoFinal}
           corMarca={corMarca}
           jaTemVideo={seletor.videoUrl.startsWith("http")}
           onFechar={() => setSeletor(null)}

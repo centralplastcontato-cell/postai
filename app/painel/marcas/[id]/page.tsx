@@ -89,6 +89,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoFotos: (() => { try { const a = JSON.parse(f.videoFotos || "[]"); return Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string") : []; } catch { return []; } })(),
       videoCapa: f.videoCapa || "",
       videoMoldura: f.videoMoldura || "branca",
+      videoTextoFinal: f.videoTextoFinal || "",
       videoUrl: f.videoUrl || "",
       mostrarAvaliacao: f.mostrarAvaliacao,
       fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento, descricao: foto.descricao })),

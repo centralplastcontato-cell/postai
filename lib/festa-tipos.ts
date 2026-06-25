@@ -21,6 +21,7 @@ export type FestaView = {
   videoFotos: string[]; // IDs das fotos escolhidas pro vídeo, na ordem ("[]" = automático)
   videoCapa: string; // fotoId escolhido pra CAPA do vídeo ("" = usa a 1ª foto)
   videoMoldura: string; // moldura das fotos: "nenhuma" | "branca" | "grossa" | "marca"
+  videoTextoFinal: string; // mensagem do slide final do vídeo ("" = padrão "Muito obrigado!")
   videoUrl: string; // URL do vídeo/Reels já montado ("" = ainda não gerado)
   mostrarAvaliacao: boolean; // o gerente liga/desliga o card "Avalie no Google" no álbum
   fotos: FotoView[];
