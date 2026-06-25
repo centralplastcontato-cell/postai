@@ -291,10 +291,16 @@ export function StoriesAba({
 
       {/* Gerar Story */}
       <div className="mb-8 rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-        <button type="button" onClick={gerador.alternar} className="flex w-full items-center justify-between gap-3 text-left">
-          <span className="text-sm font-semibold text-white">🟣 Gerar Story com IA <span className="font-normal text-muted">— formato vertical (9:16), tela cheia</span></span>
-          <span className="shrink-0 rounded-md border border-linha px-2 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white">{gerador.aberto ? "▾ recolher" : "▸ expandir"}</span>
-        </button>
+        {!gerador.aberto ? (
+          <button type="button" onClick={gerador.alternar} className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#7c3aed]/20 py-2.5 text-sm font-bold text-[#d6c6ff] transition hover:bg-[#7c3aed]/30">
+            <span className="text-lg">✨</span> Criar novo Story
+          </button>
+        ) : (
+          <button type="button" onClick={gerador.alternar} className="flex w-full items-center justify-between gap-3 text-left">
+            <span className="text-sm font-semibold text-white">🟣 Gerar Story com IA <span className="font-normal text-muted">— formato vertical (9:16), tela cheia</span></span>
+            <span className="shrink-0 rounded-md border border-linha px-2 py-1 text-[11px] font-semibold text-muted transition hover:border-vermelho hover:text-white">▾ recolher</span>
+          </button>
+        )}
         {gerador.aberto && (<>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {TEMPLATES_STORY.map((t) => (

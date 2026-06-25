@@ -51,10 +51,15 @@ export function LayoutPromocao(d: DadosArte) {
         const itens = (d.inclui || []).filter((s) => s && s.trim()).slice(0, 5);
         const temLista = itens.length > 0;
         const rodape = [rotularValidade(d.validade), d.regras].filter((s) => s && s.trim()).join("  ·  ");
-        // Título longo (3-4 linhas) + lista ocupam muito: encolhe a fonte e sobe a
-        // margem do topo pra TUDO (inclusive o telefone) caber ACIMA da onda (top 1110).
-        const nLinhas = d.titulo.length;
-        const fonteTitulo = nLinhas >= 4 ? 82 : nLinhas === 3 ? 94 : 112;
+        // Fonte do título: começa grande e REDUZ até a linha mais LONGA caber numa linha só.
+        // Antes olhava só a CONTAGEM de linhas (d.titulo.length) — um título de 2 linhas mas
+        // LONGAS (ex: "FESTA INESQUECÍVEL / COM DESCONTO!") ficava com fonte 112, quebrava em
+        // 4 linhas VISUAIS e o CTA estourava a onda (top 1110). Agora conta o COMPRIMENTO real.
+        const cabe = (f: number) => Math.floor(920 / (f * 0.58)); // chars/linha nessa fonte (920 = 1080 - padding)
+        const maxLen = Math.max(1, ...d.titulo.map((l) => (l.t || "").length));
+        const fonteTitulo = [112, 100, 90, 82, 74].find((f) => maxLen <= cabe(f)) ?? 74;
+        const chMax = cabe(fonteTitulo);
+        const nLinhas = d.titulo.reduce((acc, l) => acc + Math.max(1, Math.ceil((l.t || "").length / chMax)), 0);
         const margemTopo = Math.max(120, (nLinhas >= 4 ? 200 : nLinhas === 3 ? 270 : 350) - (temLista ? 50 : 0) - itens.length * 12);
         return (
           <div style={{ display: "flex", flexDirection: "column", padding: "0 80px", marginTop: margemTopo, flexGrow: 1 }}>

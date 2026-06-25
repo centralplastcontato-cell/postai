@@ -20,6 +20,8 @@ export function SeletorImagemBanco({ marcaId, texto, atual, onEscolher, onFechar
   const [carregando, setCarregando] = useState(true);
   const [cat, setCat] = useState("");
   const [busca, setBusca] = useState("");
+  const [pagina, setPagina] = useState(1);
+  const POR_PAGINA = 30;
 
   useEffect(() => {
     let vivo = true;
@@ -36,6 +38,9 @@ export function SeletorImagemBanco({ marcaId, texto, atual, onEscolher, onFechar
   const cats = Array.from(new Set(imagens.map((i) => i.categoria)));
   const b = busca.trim().toLowerCase();
   const filtradas = imagens.filter((i) => (!cat || i.categoria === cat) && (!b || i.descricao.toLowerCase().includes(b)));
+  const totalPag = Math.max(1, Math.ceil(filtradas.length / POR_PAGINA));
+  const pagAtual = Math.min(pagina, totalPag);
+  const visiveis = filtradas.slice((pagAtual - 1) * POR_PAGINA, pagAtual * POR_PAGINA);
   const chip = (on: boolean) =>
     `rounded-full border px-3 py-1 text-xs font-semibold transition ${on ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`;
 
@@ -46,16 +51,16 @@ export function SeletorImagemBanco({ marcaId, texto, atual, onEscolher, onFechar
         <div className="flex flex-wrap items-center gap-2 border-b border-linha px-4 py-3">
           <p className="text-sm font-bold text-white">🖼️ Escolher imagem do banco</p>
           {texto?.trim() && <span className="hidden text-[11px] text-amber-300/90 sm:inline">✨ as que mais combinam com o post aparecem primeiro</span>}
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="🔍 buscar na descrição…" className="input-base ml-auto mt-0 w-44" />
+          <input value={busca} onChange={(e) => { setBusca(e.target.value); setPagina(1); }} placeholder="🔍 buscar na descrição…" className="input-base ml-auto mt-0 w-44" />
           <button onClick={onFechar} aria-label="Fechar" className="rounded-lg border border-linha px-3 py-1.5 text-xs text-muted transition hover:text-white">✕</button>
         </div>
 
         {/* chips de categoria */}
         {imagens.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 border-b border-linha px-4 py-2">
-            <button type="button" onClick={() => setCat("")} className={chip(cat === "")}>Todas ({imagens.length})</button>
+            <button type="button" onClick={() => { setCat(""); setPagina(1); }} className={chip(cat === "")}>Todas ({imagens.length})</button>
             {cats.map((c) => (
-              <button key={c} type="button" onClick={() => setCat(c)} className={chip(cat === c)}>{ROTULO[c as keyof typeof ROTULO] ?? c} ({imagens.filter((i) => i.categoria === c).length})</button>
+              <button key={c} type="button" onClick={() => { setCat(c); setPagina(1); }} className={chip(cat === c)}>{ROTULO[c as keyof typeof ROTULO] ?? c} ({imagens.filter((i) => i.categoria === c).length})</button>
             ))}
           </div>
         )}
@@ -68,7 +73,7 @@ export function SeletorImagemBanco({ marcaId, texto, atual, onEscolher, onFechar
             <p className="py-10 text-center text-sm text-muted">{imagens.length === 0 ? "Nenhuma foto no banco. Suba fotos reais na aba 🖼️ Imagens." : "Nada com esse filtro."}</p>
           ) : (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
-              {filtradas.map((img) => (
+              {visiveis.map((img) => (
                 <button
                   key={img.id}
                   type="button"
@@ -77,12 +82,21 @@ export function SeletorImagemBanco({ marcaId, texto, atual, onEscolher, onFechar
                   className={`group relative overflow-hidden rounded-lg border-2 transition ${atual === img.url ? "border-vermelho" : "border-transparent hover:border-white/40"}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={img.url} alt="" className="aspect-square w-full object-cover" />
+                  <img src={img.url} alt="" loading="lazy" decoding="async" className="aspect-square w-full object-cover" />
                   {atual === img.url && <span className="absolute left-1 top-1 rounded-full bg-vermelho px-1.5 py-0.5 text-[9px] font-bold text-white">✓ atual</span>}
                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">usar esta</span>
                   {img.descricao && <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/70 px-1.5 py-1 text-[9px] text-white/90">🔍 {img.descricao}</span>}
                 </button>
               ))}
+            </div>
+          )}
+
+          {/* paginação — 30 por página, pra não carregar centenas de fotos de uma vez */}
+          {!carregando && totalPag > 1 && (
+            <div className="mt-4 flex items-center justify-center gap-3">
+              <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagAtual <= 1} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">◀ Anterior</button>
+              <span className="text-xs text-muted">Página {pagAtual} de {totalPag} · {filtradas.length} fotos</span>
+              <button type="button" onClick={() => setPagina((p) => Math.min(totalPag, p + 1))} disabled={pagAtual >= totalPag} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">Próxima ▶</button>
             </div>
           )}
         </div>

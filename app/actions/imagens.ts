@@ -186,13 +186,22 @@ export async function imagensDoBanco(
 ): Promise<{ ok: false; erro: string } | { ok: true; imagens: ImagemBanco[] }> {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const imgs = await prisma.imagemMarca.findMany({
-    where: { marcaId, ...PODE_DIVULGAR },
-    orderBy: [{ usos: "asc" }, { criadoEm: "desc" }],
-    select: { id: true, url: true, categoria: true, descricao: true },
-    take: 300,
-  });
-  const imagens: ImagemBanco[] = imgs.map((i) => ({ id: i.id, url: i.url, categoria: i.categoria, descricao: i.descricao || "" }));
+  // NÃO usar o join PODE_DIVULGAR aqui: com muitas fotos ele ficava LENTÍSSIMO (10-55s no
+  // Supabase). Busca as imagens e as festas autorizadas em PARALELO (queries simples, rápidas)
+  // e filtra a divulgação no código (foto solta OU de festa autorizada).
+  const [imgs, festasOk] = await Promise.all([
+    prisma.imagemMarca.findMany({
+      where: { marcaId },
+      orderBy: [{ usos: "asc" }, { criadoEm: "desc" }],
+      select: { id: true, url: true, categoria: true, descricao: true, festaId: true },
+      take: 400,
+    }),
+    prisma.festa.findMany({ where: { marcaId, autorizacao: "autorizada" }, select: { id: true } }),
+  ]);
+  const okFesta = new Set(festasOk.map((f) => f.id));
+  const imagens: ImagemBanco[] = imgs
+    .filter((i) => !i.festaId || okFesta.has(i.festaId))
+    .map((i) => ({ id: i.id, url: i.url, categoria: i.categoria, descricao: i.descricao || "" }));
   const t = (texto || "").toLowerCase();
   if (t.trim()) {
     const palavras = Array.from(new Set(t.split(/[^a-zà-ú0-9]+/i).filter((w) => w.length >= 4)));
