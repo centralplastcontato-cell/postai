@@ -172,3 +172,32 @@ export async function sortearImagemBancoAction(marcaId: string, categoria?: stri
   if (!url) return { ok: false as const, erro: "Banco de imagens vazio. Suba fotos reais na aba Configurações." };
   return { ok: true as const, url };
 }
+
+export type ImagemBanco = { id: string; url: string; categoria: string; descricao: string };
+
+// Lista as fotos LIBERADAS (LGPD) do banco da marca pro SELETOR VISUAL — o dono vê TODAS e
+// escolhe na mão (não fica girando até achar). Se vier `texto` (o conteúdo do post/slide),
+// as fotos que MAIS COMBINAM com ele aparecem primeiro: pontua por palavras em comum entre o
+// texto e a descrição da foto (a descrição é gerada pela IA no upload). Sem custo de IA aqui —
+// a ordenação é instantânea; o usuário decide.
+export async function imagensDoBanco(
+  marcaId: string,
+  texto?: string,
+): Promise<{ ok: false; erro: string } | { ok: true; imagens: ImagemBanco[] }> {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const imgs = await prisma.imagemMarca.findMany({
+    where: { marcaId, ...PODE_DIVULGAR },
+    orderBy: [{ usos: "asc" }, { criadoEm: "desc" }],
+    select: { id: true, url: true, categoria: true, descricao: true },
+    take: 300,
+  });
+  const imagens: ImagemBanco[] = imgs.map((i) => ({ id: i.id, url: i.url, categoria: i.categoria, descricao: i.descricao || "" }));
+  const t = (texto || "").toLowerCase();
+  if (t.trim()) {
+    const palavras = Array.from(new Set(t.split(/[^a-zà-ú0-9]+/i).filter((w) => w.length >= 4)));
+    const score = (desc: string) => { const d = desc.toLowerCase(); return palavras.reduce((s, w) => (d.includes(w) ? s + 1 : s), 0); };
+    imagens.sort((a, b) => score(b.descricao) - score(a.descricao)); // estável: empate mantém ordem (menos usadas/recentes)
+  }
+  return { ok: true as const, imagens };
+}

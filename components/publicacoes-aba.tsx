@@ -20,6 +20,7 @@ import {
   definirEspelhar,
 } from "@/app/actions/feed";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
+import { SeletorImagemBanco } from "./seletor-imagem-banco";
 import { TEMPLATES, TEMPLATE_LABEL, templateUsaFotoFundo, type Template } from "@/lib/feed-templates";
 import { CATEGORIAS, CATEGORIA_LABEL } from "@/lib/categorias-imagem";
 import { parsePaleta, paletaComExtras, CORES_EXTRAS } from "@/lib/cores-fundo";
@@ -518,6 +519,17 @@ export function PublicacoesAba({
           setPostandoId(null);
         }
       },
+    });
+  }
+  const [seletorImg, setSeletorImg] = useState<PublicacaoView | null>(null);
+  function handleEscolherImagem(id: string, url: string) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await definirImagemPublicacao({ id, url });
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
     });
   }
   function handleGerarImagem(id: string) {
@@ -1176,7 +1188,8 @@ export function PublicacoesAba({
                       (Promoção, Preço, Divulgação…) eles não teriam efeito — escondidos pra não confundir. */}
                   {!postado && templateUsaFotoFundo(p.template) && (
                     <>
-                      <button onClick={() => handleBanco(p.id, p.categoria ?? undefined)} disabled={ocupado} title="Sortear foto real do seu banco de imagens" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲 Banco</button>
+                      <button onClick={() => setSeletorImg(p)} disabled={ocupado} title="Ver o banco e ESCOLHER a foto (as que mais combinam com o post aparecem primeiro)" className="rounded-md border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-2 py-1 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed] disabled:opacity-40">🖼️ Escolher</button>
+                      <button onClick={() => handleBanco(p.id, p.categoria ?? undefined)} disabled={ocupado} title="Sortear uma foto aleatória do banco (rodízio)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲 Sortear</button>
                       <button onClick={() => handleGerarImagem(p.id)} disabled={ocupado} title="Gera um FUNDO artístico com IA, no clima do post (fundo abstrato — não é foto do seu espaço)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🤖 Fundo IA</button>
                       <label className="cursor-pointer rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
                         📤 Foto
@@ -1225,6 +1238,16 @@ export function PublicacoesAba({
         }}
         onCancelar={() => setConfirmacao(null)}
       />
+
+      {seletorImg && (
+        <SeletorImagemBanco
+          marcaId={marcaId}
+          texto={[seletorImg.titulo, seletorImg.texto, seletorImg.tema].filter(Boolean).join(" ")}
+          atual={seletorImg.imagemUrl}
+          onEscolher={(url) => handleEscolherImagem(seletorImg.id, url)}
+          onFechar={() => setSeletorImg(null)}
+        />
+      )}
     </div>
   );
 }

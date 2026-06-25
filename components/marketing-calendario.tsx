@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
+import { SeletorImagemBanco } from "./seletor-imagem-banco";
 import {
   gerarCarrossel,
   trocarCapaCarrossel,
@@ -298,6 +299,17 @@ export function MarketingCalendario({
       if (!r.ok) setErro(r.erro);
       else router.refresh();
       setTrocandoCapa(false);
+    });
+  }
+  const [seletorSlide, setSeletorSlide] = useState<{ id: string; indice: number; texto: string; atual: string | null } | null>(null);
+  function handleEscolherSlide(id: string, indice: number, url: string) {
+    setErro(null);
+    setSlideProcessando(indice);
+    startTransition(async () => {
+      const r = await definirImagemSlide({ id, indice, url });
+      if (!r.ok) setErro(r.erro);
+      else router.refresh();
+      setSlideProcessando(null);
     });
   }
   function handleGerarImagem(id: string, indice: number) {
@@ -668,8 +680,12 @@ export function MarketingCalendario({
                       {!ehCapaEstilo(selecionado.tiposSlides?.[i]) && (
                         <>
                           <div className="group relative">
+                            <button type="button" onClick={() => setSeletorSlide({ id: selecionado.id, indice: i, texto: [selecionado.titulo, selecionado.tema].filter(Boolean).join(" "), atual: selecionado.imagensSlides?.[i] ?? null })} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-[#7c3aed]/50 bg-[#7c3aed]/15 text-sm transition hover:border-[#7c3aed] disabled:opacity-40">🖼️</button>
+                            <DicaSlide>Escolher foto do banco</DicaSlide>
+                          </div>
+                          <div className="group relative">
                             <button type="button" onClick={() => handleBancoSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🎲</button>
-                            <DicaSlide>Foto do banco</DicaSlide>
+                            <DicaSlide>Sortear (rodízio)</DicaSlide>
                           </div>
                           <div className="group relative">
                             <button type="button" onClick={() => handleGerarImagem(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">🤖</button>
@@ -757,6 +773,16 @@ export function MarketingCalendario({
         }}
         onCancelar={() => setExcluirAlvo(null)}
       />
+
+      {seletorSlide && (
+        <SeletorImagemBanco
+          marcaId={marcaId}
+          texto={seletorSlide.texto}
+          atual={seletorSlide.atual}
+          onEscolher={(url) => handleEscolherSlide(seletorSlide.id, seletorSlide.indice, url)}
+          onFechar={() => setSeletorSlide(null)}
+        />
+      )}
     </div>
   );
 }

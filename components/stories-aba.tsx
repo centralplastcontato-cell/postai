@@ -11,10 +11,12 @@ import {
   excluirPublicacao,
   sugerirPromocao,
   editarPublicacao,
+  definirImagemPublicacao,
 } from "@/app/actions/feed";
 import { sugerirTemas } from "@/app/actions/marketing";
 import { type Template } from "@/lib/feed-templates";
 import { type PublicacaoView } from "./publicacoes-aba";
+import { SeletorImagemBanco } from "./seletor-imagem-banco";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
 import { rotuloHora } from "@/lib/horarios";
@@ -105,6 +107,7 @@ export function StoriesAba({
   const [excluirAlvo, setExcluirAlvo] = useState<PublicacaoView | null>(null);
   const [copiadoId, setCopiadoId] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
+  const [seletorImg, setSeletorImg] = useState<PublicacaoView | null>(null);
   const [temasIA, setTemasIA] = useState<string[]>([]);
   const [sugerindo, setSugerindo] = useState(false);
   const [sugerindoOferta, setSugerindoOferta] = useState(false);
@@ -181,6 +184,16 @@ export function StoriesAba({
     setProc(id);
     startTransition(async () => {
       const r = await reagendarPublicacao(id, h);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  function handleEscolherImagem(id: string, url: string) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await definirImagemPublicacao({ id, url });
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
@@ -413,6 +426,7 @@ export function StoriesAba({
                   <button onClick={() => handleAprovar(s)} disabled={ocupado} title="Revisão interna" className={`rounded px-1.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${s.aprovado ? "bg-green-600 text-white" : "border border-linha text-muted hover:text-white"}`}>{s.aprovado ? "✓" : "Aprovar"}</button>
                   {!postado && <button onClick={() => handleEditar(s)} disabled={ocupado} title="Editar texto (sem IA)" className="rounded border border-linha px-1.5 py-1 text-[11px] text-muted transition hover:border-sky-500 hover:text-white disabled:opacity-40">✏️</button>}
                   {s.tema && <button onClick={() => handleRegerar(s)} disabled={ocupado} title="Regerar texto (com IA)" className="rounded border border-linha px-1.5 py-1 text-[11px] text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">↻</button>}
+                  {!postado && s.imagemUrl && <button onClick={() => setSeletorImg(s)} disabled={ocupado} title="Escolher a foto de fundo do banco" className="rounded border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-1.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed] disabled:opacity-40">🖼️</button>}
                   <button onClick={() => copiar(s)} className="rounded border border-linha px-1.5 py-1 text-[11px] text-muted transition hover:border-vermelho hover:text-white">{copiadoId === s.id ? "✓" : "Copiar"}</button>
                   {!postado && <button onClick={() => setPostarAlvo(s)} disabled={postando} className="rounded bg-[#C13584] px-1.5 py-1 text-[11px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50">📲 Story</button>}
                   <button onClick={() => setExcluirAlvo(s)} disabled={ocupado} title="Excluir" className="rounded border border-red-900 px-1.5 py-1 text-[11px] text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">🗑</button>
@@ -462,6 +476,16 @@ export function StoriesAba({
         }}
         onCancelar={() => setExcluirAlvo(null)}
       />
+
+      {seletorImg && (
+        <SeletorImagemBanco
+          marcaId={marcaId}
+          texto={[seletorImg.titulo, seletorImg.texto, seletorImg.tema].filter(Boolean).join(" ")}
+          atual={seletorImg.imagemUrl}
+          onEscolher={(url) => handleEscolherImagem(seletorImg.id, url)}
+          onFechar={() => setSeletorImg(null)}
+        />
+      )}
     </div>
   );
 }
