@@ -500,6 +500,8 @@ export async function gerarVideoDaFesta(festaId: string) {
     musicaUrl,
     textoCapa,
     nomeArquivo: festa.marca.slug || "reels",
+    // texto FINAL escolhido pelo dono (ou pela Bia). Vazio = motor usa o padrão "Muito obrigado!".
+    ...(festa.videoTextoFinal?.trim() ? { tituloFinal: festa.videoTextoFinal.trim(), subFinal: "" } : {}),
     festaId,
     callbackUrl: process.env.VIDEO_CALLBACK_URL || `${baseUrl()}/api/video-pronto`,
     callbackToken: process.env.VIDEO_CALLBACK_SECRET || "",
