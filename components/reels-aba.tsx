@@ -110,6 +110,12 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
     router.refresh();
   }
 
+  // festas cujo Reels JÁ foi postado — pra marcar no seletor e não reagendar por engano.
+  // cruza pelo nome no título do Reels ("Reels — Samuel" → "Samuel").
+  const nomesPostados = new Set(
+    reels.filter((r) => r.status === "postado").map((r) => (r.titulo || "").replace(/^Reels\s*[—–-]\s*/i, "").trim())
+  );
+
   return (
     <div className="space-y-4">
       {/* AGENDADOR */}
@@ -127,7 +133,7 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
                 <label className="block text-xs font-semibold text-white">Festa</label>
                 <select value={festaId} onChange={(e) => { setFestaId(e.target.value); setMsg(null); }} className="input-base mt-1 w-full text-sm">
                   <option value="">Escolha a festa…</option>
-                  {festasComVideo.map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}</option>)}
+                  {festasComVideo.map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{nomesPostados.has(f.nome) ? "  ✓ já postado" : ""}</option>)}
                 </select>
               </div>
               <div>
@@ -142,6 +148,9 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
             </div>
             {festaId && (
               <button type="button" onClick={() => { const f = festasComVideo.find((x) => x.id === festaId); if (f) setVerUrl(f.videoUrl); }} className="mt-2 text-xs font-semibold text-[#c7b2ff] transition hover:underline">▶ Ver o vídeo dessa festa</button>
+            )}
+            {festaId && nomesPostados.has(festasComVideo.find((f) => f.id === festaId)?.nome ?? "") && (
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300">✓ Essa festa já teve um Reels postado — só agende de novo se quiser repostar.</p>
             )}
             <div className="mt-3 flex items-center justify-between gap-2">
               <label className="block text-xs font-semibold text-white">Legenda <span className="font-normal text-muted">(opcional)</span></label>
