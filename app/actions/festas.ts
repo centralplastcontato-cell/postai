@@ -232,6 +232,21 @@ export async function finalizarFestaPublica(festaToken: string, finalizar: boole
   return { ok: true as const };
 }
 
+// Pelo PAINEL do dono (guardaMarca): finaliza/reabre uma festa que o gerente esqueceu de fechar.
+// Mesma trava da pública: não finaliza com autorização "pendente" (LGPD).
+export async function finalizarFestaPainel(festaId: string, finalizar: boolean) {
+  const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true, autorizacao: true } });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (finalizar && festa.autorizacao === "pendente") {
+    return { ok: false as const, erro: "Antes de finalizar, registre a autorização de uso de imagem dos pais (abra a festa)." };
+  }
+  await prisma.festa.update({ where: { id: festaId }, data: { finalizadaEm: finalizar ? new Date() : null } });
+  revalidatePath(`/painel/marcas/${festa.marcaId}`);
+  return { ok: true as const };
+}
+
 // O gerente MOVE uma foto pro momento certo (subiu no lugar errado). Pelo LINK DA FESTA.
 // Atualiza o momento E a categoria do banco — a foto volta a casar com o post certo.
 // Respeita o limite por momento no destino.

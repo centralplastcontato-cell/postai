@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { gerarLinkFotos, revogarLinkFotos, excluirFesta, editarFesta, adicionarFotoFestaPainel } from "@/app/actions/festas";
+import { gerarLinkFotos, revogarLinkFotos, excluirFesta, editarFesta, adicionarFotoFestaPainel, finalizarFestaPainel } from "@/app/actions/festas";
 import { atualizarImagemMarca } from "@/app/actions/imagens";
 import { type FestaView, type FotoView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
@@ -194,6 +194,34 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
       acao: async () => {
         setDetalheId(null);
         await excluirFesta(f.id);
+        router.refresh();
+      },
+    });
+  }
+
+  // Dono finaliza no lugar do gerente que esqueceu de fechar (ou reabre, se precisar).
+  function pedirFinalizarFesta(f: FestaView) {
+    setConfirmar({
+      titulo: `Finalizar a festa de ${rotuloAniversariantes(f.aniversariantes)}?`,
+      texto: "Marca a festa como concluída (caso o gerente tenha esquecido de fechar). Dá pra reabrir depois.",
+      rotulo: "✓ Finalizar festa",
+      perigo: false,
+      acao: async () => {
+        const r = await finalizarFestaPainel(f.id, true);
+        if (!r.ok) setErro(r.erro);
+        router.refresh();
+      },
+    });
+  }
+  function pedirReabrirFesta(f: FestaView) {
+    setConfirmar({
+      titulo: `Reabrir a festa de ${rotuloAniversariantes(f.aniversariantes)}?`,
+      texto: "Volta pra 'Em andamento' — permite subir mais fotos e ajustar.",
+      rotulo: "Reabrir festa",
+      perigo: false,
+      acao: async () => {
+        const r = await finalizarFestaPainel(f.id, false);
+        if (!r.ok) setErro(r.erro);
         router.refresh();
       },
     });
@@ -442,6 +470,12 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
                     </div>
                   </button>
                   <div className="flex items-stretch gap-1.5 p-2">
+                    {!f.finalizadaEm && f.fotos.length > 0 && (
+                      <button type="button" onClick={() => pedirFinalizarFesta(f)} title="Finalizar a festa (caso o gerente tenha esquecido)" className="shrink-0 rounded-lg border border-green-500/40 bg-green-500/10 px-2.5 py-1.5 text-xs font-semibold text-green-400 transition hover:border-green-500 hover:bg-green-500/20">✓ Finalizar</button>
+                    )}
+                    {f.finalizadaEm && (
+                      <button type="button" onClick={() => pedirReabrirFesta(f)} title="Reabrir a festa (volta pra Em andamento)" className="shrink-0 rounded-lg border border-linha px-2.5 py-1.5 text-xs font-semibold text-muted transition hover:border-white/40 hover:text-white">↩</button>
+                    )}
                     <button type="button" onClick={() => setDetalheId(f.id)} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">Abrir festa</button>
                     <button type="button" onClick={() => pedirApagarFesta(f)} title="Excluir festa" className="shrink-0 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500 hover:bg-red-900/20">✕</button>
                   </div>
