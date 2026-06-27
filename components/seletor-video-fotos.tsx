@@ -5,7 +5,7 @@
 //  2) "Adicionar" — as disponíveis, toque na ordem que quiser e elas sobem pra sequência.
 // Arrastar acontece nas próprias fotos grandes (não numa tira pequena). Vazio = automático.
 
-import { useState, useEffect, useRef, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo } from "@/app/actions/festas";
 import { type FotoView } from "@/lib/festa-tipos";
@@ -52,7 +52,7 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
   const galeria = ORDEM.flatMap((m) => fotos.filter((f) => f.momento === m)).concat(fotos.filter((f) => !ORDEM.includes(f.momento)));
   const [sel, setSel] = useState<string[]>(inicial.filter((id) => fotos.some((f) => f.id === id)));
   const [salvando, setSalvando] = useState(false);
-  const [drag, setDrag] = useState<number | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null); // foto sendo arrastada (PC ou alça)
   const [ampliada, setAmpliada] = useState<FotoView | null>(null); // foto aberta em tela cheia
   const [erroGerar, setErroGerar] = useState("");
   // foto escolhida pra CAPA (fotoId). "" = a 1ª foto vira capa automaticamente.
@@ -67,68 +67,29 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
   function definirCapa(id: string) {
     setCapa((c) => (c === id ? "" : id)); // clicar de novo na capa atual tira (volta pra automático)
   }
-  function reordenar(from: number, to: number) {
-    if (from === to) return;
+  // ---- REORDENAR por ID (estável mesmo enquanto a ordem muda) ----
+  // PC: arraste o card com o MOUSE (HTML5 drag). CELULAR: a ALÇA (grip) de cada foto tem
+  // touch-action:none → segurar+arrastar a alça reposiciona SEM rolar a tela (o resto da
+  // lista rola normal, porque só a alça bloqueia o scroll). Sem long-press, sem lib.
+  function moverFoto(deId: string, paraId: string) {
+    if (deId === paraId) return;
     setSel((s) => {
-      const arr = [...s];
-      const [item] = arr.splice(from, 1);
-      arr.splice(to, 0, item);
-      return arr;
+      const from = s.indexOf(deId), to = s.indexOf(paraId);
+      if (from < 0 || to < 0 || from === to) return s;
+      const a = [...s];
+      const [it] = a.splice(from, 1);
+      a.splice(to, 0, it);
+      return a;
     });
   }
-
-  // ---- ARRASTAR NO TOQUE (celular): segura ~0,2s e arrasta a foto pra reposicionar ----
-  // (No PC, o arraste do mouse usa o HTML5 drag lá embaixo.) O listener de toque precisa ser
-  // NÃO-passivo pra travar o scroll durante o arraste — por isso registramos na mão no useEffect.
-  const gridRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<number | null>(null); // índice arrastado — espelho pro listener nativo
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startXY = useRef<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    const grid = gridRef.current;
-    if (!grid) return;
-    const onMove = (e: TouchEvent) => {
-      if (dragRef.current === null) return;
-      e.preventDefault(); // trava o scroll da página enquanto arrasta a foto
-      const t = e.touches[0];
-      if (!t) return;
-      const alvo = (document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null)?.closest("[data-idx]");
-      if (!alvo) return;
-      const j = Number(alvo.getAttribute("data-idx"));
-      const from = dragRef.current;
-      if (Number.isNaN(j) || j === from) return;
-      setSel((s) => { const a = [...s]; const [it] = a.splice(from, 1); a.splice(j, 0, it); return a; });
-      dragRef.current = j;
-      setDrag(j);
-    };
-    grid.addEventListener("touchmove", onMove, { passive: false });
-    return () => grid.removeEventListener("touchmove", onMove);
-  }, []);
-
-  function tocarInicio(e: React.TouchEvent, i: number) {
+  // toque arrastando a alça → acha a foto sob o dedo e reordena ao vivo
+  function alcaMove(e: React.TouchEvent) {
+    if (!dragId) return;
     const t = e.touches[0];
-    startXY.current = { x: t.clientX, y: t.clientY };
-    pressTimer.current = setTimeout(() => { // long-press → "pega" a foto pra arrastar
-      dragRef.current = i;
-      setDrag(i);
-      if (typeof navigator !== "undefined" && navigator.vibrate) { try { navigator.vibrate(20); } catch {} }
-    }, 200);
-  }
-  function tocarMove(e: React.TouchEvent) {
-    // antes de "pegar" a foto: se o dedo desliza, é SCROLL → cancela o long-press
-    if (dragRef.current === null && startXY.current && pressTimer.current) {
-      const t = e.touches[0];
-      if (Math.abs(t.clientX - startXY.current.x) > 10 || Math.abs(t.clientY - startXY.current.y) > 10) {
-        clearTimeout(pressTimer.current); pressTimer.current = null;
-      }
-    }
-  }
-  function tocarFim() {
-    if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; }
-    dragRef.current = null;
-    setDrag(null);
-    startXY.current = null;
+    if (!t) return;
+    const alvo = (document.elementFromPoint(t.clientX, t.clientY) as HTMLElement | null)?.closest("[data-id]");
+    const alvoId = alvo?.getAttribute("data-id");
+    if (alvoId) moverFoto(dragId, alvoId);
   }
   function sugerir() {
     const sug: string[] = [];
@@ -231,30 +192,39 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
           {escolhidas.length > 0 && (
             <div className="pt-3">
               <p className="mb-2 text-[11px] text-muted">
-                🎞️ <strong className="text-white/80">Sua sequência</strong> — <strong className="text-white/80">segure e arraste</strong> a foto pra mudar a ordem (funciona no celular também!), <strong className="text-white/80">×</strong> pra tirar.
+                🎞️ <strong className="text-white/80">Sua sequência</strong> — segure a <strong className="text-white/80">alcinha ⠿</strong> da foto e arraste pra mudar a ordem (no celular também!), <strong className="text-white/80">×</strong> pra tirar.
               </p>
-              <div ref={gridRef} style={{ touchAction: drag !== null ? "none" : undefined }} className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
                 {escolhidas.map((f, i) => {
                   const ehCapa = capa === f.id;
                   return (
                   <div
                     key={f.id}
-                    data-idx={i}
+                    data-id={f.id}
                     draggable
-                    onDragStart={() => setDrag(i)}
-                    onDragEnter={() => { if (drag !== null && drag !== i) { reordenar(drag, i); setDrag(i); } }}
-                    onDragEnd={() => setDrag(null)}
+                    onDragStart={() => setDragId(f.id)}
+                    onDragEnter={() => { if (dragId && dragId !== f.id) moverFoto(dragId, f.id); }}
+                    onDragEnd={() => setDragId(null)}
                     onDragOver={(e) => e.preventDefault()}
-                    onTouchStart={(e) => tocarInicio(e, i)}
-                    onTouchMove={tocarMove}
-                    onTouchEnd={tocarFim}
-                    onTouchCancel={tocarFim}
-                    onContextMenu={(e) => e.preventDefault()}
-                    style={{ touchAction: "pan-y" }}
-                    className={`relative cursor-grab select-none overflow-hidden rounded-lg border-2 transition-transform active:cursor-grabbing ${drag === i ? "z-30 scale-105 border-[#c7b2ff] opacity-90 shadow-xl" : ehCapa ? "border-amber-400" : "border-vermelho"}`}
+                    className={`relative select-none overflow-hidden rounded-lg border-2 transition-transform ${dragId === f.id ? "z-30 scale-105 border-[#c7b2ff] opacity-90 shadow-xl" : ehCapa ? "border-amber-400" : "border-vermelho"}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={f.url} alt="" draggable={false} className="aspect-square w-full select-none object-cover" />
+                    {/* ALÇA de arrastar — segure aqui pra reordenar (no celular, sem rolar a tela) */}
+                    <div
+                      onTouchStart={(e) => { e.stopPropagation(); setDragId(f.id); if (typeof navigator !== "undefined" && navigator.vibrate) { try { navigator.vibrate(15); } catch {} } }}
+                      onTouchMove={alcaMove}
+                      onTouchEnd={() => setDragId(null)}
+                      onTouchCancel={() => setDragId(null)}
+                      onContextMenu={(e) => e.preventDefault()}
+                      style={{ touchAction: "none" }}
+                      aria-label="Segure e arraste pra mudar a ordem"
+                      className="absolute left-1/2 top-1/2 z-20 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full bg-black/55 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-vermelho"
+                    >
+                      <span className="grid grid-cols-2 gap-[3px]">
+                        {Array.from({ length: 6 }).map((_, k) => <span key={k} className="h-1.5 w-1.5 rounded-full bg-white/95" />)}
+                      </span>
+                    </div>
                     <span className="absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-vermelho text-xs font-bold text-white shadow">{i + 1}</span>
                     <button type="button" onClick={() => toggle(f.id)} aria-label="Tirar" className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl bg-black/75 text-sm leading-none text-white transition hover:bg-vermelho">×</button>
                     <button type="button" onClick={(e) => { e.stopPropagation(); definirCapa(f.id); }} aria-label={ehCapa ? "Tirar capa" : "Definir como capa"} title={ehCapa ? "Tirar como capa (clique pra remover)" : "Usar esta foto como capa do vídeo"} className={`absolute bottom-1 left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition ${ehCapa ? "bg-black/80 text-amber-300 ring-2 ring-amber-300 hover:bg-vermelho hover:text-white hover:ring-vermelho" : "bg-black/70 text-white hover:bg-black"}`}>⭐</button>
