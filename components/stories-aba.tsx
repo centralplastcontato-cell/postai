@@ -18,7 +18,6 @@ import { sugerirTemas } from "@/app/actions/marketing";
 import { type Template } from "@/lib/feed-templates";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { SeletorImagemBanco } from "./seletor-imagem-banco";
-import { InputDataBR } from "./input-data-br";
 import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
 import { rotuloHora } from "@/lib/horarios";
@@ -429,7 +428,7 @@ export function StoriesAba({
                 </div>
                 {!postado ? (
                   <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                    <InputDataBR value={ymd(s.data)} onChange={(d) => handleRemarcar(s.id, d)} className="w-[124px]" />
+                    <input type="date" value={ymd(s.data)} onChange={(e) => handleRemarcar(s.id, e.target.value)} disabled={ocupado} title="Mudar o dia da postagem" style={{ colorScheme: "dark" }} className="rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40" />
                     <select value={horaSP(s.data)} onChange={(e) => handleReagendar(s.id, Number(e.target.value))} disabled={ocupado} title="Hora da postagem" className="w-fit shrink-0 rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
                       {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
                     </select>

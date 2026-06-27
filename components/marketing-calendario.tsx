@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { SeletorImagemBanco } from "./seletor-imagem-banco";
-import { InputDataBR } from "./input-data-br";
 import {
   gerarCarrossel,
   trocarCapaCarrossel,
@@ -599,7 +598,7 @@ export function MarketingCalendario({
                 </div>
                 {!postado ? (
                   <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                    <InputDataBR value={ymd(p.data)} onChange={(d) => handleRemarcar(p.id, d)} className="w-[124px]" />
+                    <input type="date" value={ymd(p.data)} onChange={(e) => handleRemarcar(p.id, e.target.value)} disabled={isPending} title="Mudar o dia da postagem" style={{ colorScheme: "dark" }} className="rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40" />
                     <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={isPending} title="Hora da postagem (o piloto posta nesse horário) — permite vários posts no mesmo dia" className="w-fit shrink-0 rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
                     {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
                     </select>
