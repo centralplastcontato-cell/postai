@@ -219,10 +219,10 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
                       onContextMenu={(e) => e.preventDefault()}
                       style={{ touchAction: "none" }}
                       aria-label="Segure e arraste pra mudar a ordem"
-                      className="absolute left-1/2 top-1/2 z-20 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full bg-black/55 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-vermelho"
+                      className="absolute left-1/2 top-1/2 z-20 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full bg-black/55 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-vermelho"
                     >
-                      <span className="grid grid-cols-2 gap-[3px]">
-                        {Array.from({ length: 6 }).map((_, k) => <span key={k} className="h-1.5 w-1.5 rounded-full bg-white/95" />)}
+                      <span className="grid grid-cols-2 gap-[2.5px]">
+                        {Array.from({ length: 6 }).map((_, k) => <span key={k} className="h-1 w-1 rounded-full bg-white/95" />)}
                       </span>
                     </div>
                     <span className="absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-vermelho text-xs font-bold text-white shadow">{i + 1}</span>
