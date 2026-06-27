@@ -181,11 +181,13 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
           </div>
 
           {/* mensagem do SLIDE FINAL (último quadro do vídeo) — o dono escreve ou a Bia gera */}
-          <div className="mt-2.5 flex flex-wrap items-center gap-2 rounded-lg border border-linha bg-preto/40 px-2.5 py-2">
-            <span className="text-[11px] font-semibold text-muted">✍️ Texto final:</span>
-            <input type="text" value={textoFinal} onChange={(e) => setTextoFinal(e.target.value)} maxLength={48} placeholder='Em branco = "Muito obrigado!"' className="min-w-[150px] flex-1 rounded-lg border border-linha bg-preto px-2.5 py-1.5 text-xs text-white placeholder:text-muted/50 focus:border-vermelho focus:outline-none" />
-            <button type="button" onClick={biaEscreve} disabled={gerandoTexto} title="A Bia cria uma frase carinhosa de encerramento (usa o nome, a idade e o tema)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-60">{gerandoTexto ? "✍️ escrevendo…" : "✨ Bia escreve"}</button>
-            <span className="w-full text-[10px] leading-snug text-muted/70">Aparece no <strong className="text-white/70">último quadro</strong> do vídeo, com o logo. Curtinho (até ~48 letras).</span>
+          <div className="mt-2.5 rounded-lg border border-linha bg-preto/40 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-white">✍️ Texto do final do vídeo</span>
+              <button type="button" onClick={biaEscreve} disabled={gerandoTexto} title="A Bia cria uma frase carinhosa de encerramento (usa o nome, a idade e o tema)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-60">{gerandoTexto ? "✍️ escrevendo…" : "✨ Bia escreve"}</button>
+            </div>
+            <input type="text" value={textoFinal} onChange={(e) => setTextoFinal(e.target.value)} maxLength={48} placeholder='Em branco = "Muito obrigado!"' className="mt-2 w-full rounded-lg border border-linha bg-preto px-3 py-2.5 text-sm text-white placeholder:text-muted/50 focus:border-vermelho focus:outline-none" />
+            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Essa frase aparece no <strong className="text-white/70">último quadro</strong> do vídeo, com o logo. Curtinha (até ~48 letras).</p>
           </div>
 
           {/* 1) SUA SEQUÊNCIA — fotos grandes, arraste pra reordenar, × pra tirar */}
