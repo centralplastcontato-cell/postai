@@ -757,6 +757,23 @@ export async function reagendarPublicacao(id: string, hora: number) {
   return { ok: true as const };
 }
 
+// Remarca o DIA de um post (mantém a hora atual) — pra MOVER de um dia pro outro na agenda.
+export async function remarcarPublicacao(id: string, dataYMD: string) {
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const p = await prisma.publicacao.findUnique({ where: { id }, select: { data: true, marcaId: true, status: true } });
+  if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  if (p.status === "postado") return { ok: false as const, erro: "Esse post já foi publicado." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataYMD)) return { ok: false as const, erro: "Data inválida." };
+  // mantém a HORA atual (em BRT) e troca só o dia
+  const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(p.data)) % 24;
+  const novaData = new Date(`${dataYMD}T${String(h).padStart(2, "0")}:00:00-03:00`);
+  if (isNaN(novaData.getTime())) return { ok: false as const, erro: "Data inválida." };
+  await prisma.publicacao.update({ where: { id }, data: { data: novaData } });
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function regerarPublicacao(id: string) {
   const g = await guardaPublicacao(id);
   if (!g.ok) return { ok: false as const, erro: g.erro };

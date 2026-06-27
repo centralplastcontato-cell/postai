@@ -322,6 +322,22 @@ export async function reagendarCarrossel(id: string, hora: number) {
   return { ok: true as const };
 }
 
+// Remarca o DIA de um carrossel (mantém a hora atual) — pra MOVER de um dia pro outro na agenda.
+export async function remarcarCarrossel(id: string, dataYMD: string) {
+  const g = await guardaConteudo(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const c = await prisma.conteudo.findUnique({ where: { id }, select: { data: true, marcaId: true, status: true } });
+  if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
+  if (c.status === "postado") return { ok: false as const, erro: "Esse carrossel já foi publicado." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dataYMD)) return { ok: false as const, erro: "Data inválida." };
+  const h = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(c.data)) % 24;
+  const novaData = new Date(`${dataYMD}T${String(h).padStart(2, "0")}:00:00-03:00`);
+  if (isNaN(novaData.getTime())) return { ok: false as const, erro: "Data inválida." };
+  await prisma.conteudo.update({ where: { id }, data: { data: novaData } });
+  revalidatePath(`/painel/marcas/${c.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function regerarCarrossel(id: string) {
   const g = await guardaConteudo(id);
   if (!g.ok) return { ok: false as const, erro: g.erro };

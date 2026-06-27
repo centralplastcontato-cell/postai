@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { dataComemorativaDe } from "@/lib/datas-comemorativas";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { SeletorImagemBanco } from "./seletor-imagem-banco";
+import { InputDataBR } from "./input-data-br";
 import {
   gerarCarrossel,
   trocarCapaCarrossel,
   reagendarCarrossel,
+  remarcarCarrossel,
   regerarCarrossel,
   regerarCarrosselComoNova,
   alternarAprovacaoCarrossel,
@@ -92,6 +94,9 @@ const ehCapaEstilo = (tipo?: string) => tipo === "mosaico" || (tipo?.startsWith(
 function horaSP(iso: string): number {
   const h = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(new Date(iso));
   return parseInt(h, 10) || 0;
+}
+function ymd(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 }
 
 function dataBR(iso: string): string {
@@ -241,6 +246,16 @@ export function MarketingCalendario({
     setErro(null);
     startTransition(async () => {
       const r = await reagendarCarrossel(id, hora);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+    });
+  }
+  // Muda o DIA de um carrossel já programado (mantém a hora).
+  function handleRemarcar(id: string, dataYMD: string) {
+    if (!dataYMD) return;
+    setErro(null);
+    startTransition(async () => {
+      const r = await remarcarCarrossel(id, dataYMD);
       if (!r.ok) setErro(r.erro);
       router.refresh();
     });
@@ -583,9 +598,12 @@ export function MarketingCalendario({
                   <span title={postado && p.postadoEm ? `Publicado em ${dataHoraBR(p.postadoEm)}` : undefined} className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "✓ Postado" : "● A postar"}</span>
                 </div>
                 {!postado ? (
-                  <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={isPending} title="Hora da postagem (o piloto posta nesse horário) — permite vários posts no mesmo dia" className="mb-2 w-fit rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    <InputDataBR value={ymd(p.data)} onChange={(d) => handleRemarcar(p.id, d)} className="w-[124px]" />
+                    <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={isPending} title="Hora da postagem (o piloto posta nesse horário) — permite vários posts no mesmo dia" className="w-fit shrink-0 rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
                     {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
-                  </select>
+                    </select>
+                  </div>
                 ) : (
                   p.postadoEm && <p className="mb-2 text-[11px] text-green-400/80">📢 Publicado {dataHoraBR(p.postadoEm)}</p>
                 )}

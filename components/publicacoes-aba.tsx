@@ -17,10 +17,12 @@ import {
   sugerirDepoimento,
   editarPublicacao,
   reagendarPublicacao,
+  remarcarPublicacao,
   definirEspelhar,
 } from "@/app/actions/feed";
 import { sortearImagemBancoAction } from "@/app/actions/imagens";
 import { SeletorImagemBanco } from "./seletor-imagem-banco";
+import { InputDataBR } from "./input-data-br";
 import { TEMPLATES, TEMPLATE_LABEL, templateUsaFotoFundo, type Template } from "@/lib/feed-templates";
 import { CATEGORIAS, CATEGORIA_LABEL } from "@/lib/categorias-imagem";
 import { parsePaleta, paletaComExtras, CORES_EXTRAS } from "@/lib/cores-fundo";
@@ -149,6 +151,10 @@ function dataHoraBR(iso: string): string {
 function horaSP(iso: string): number {
   const h = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(new Date(iso));
   return parseInt(h, 10) || 0;
+}
+// Date ISO → "aaaa-mm-dd" (fuso SP) pro seletor de data (InputDataBR).
+function ymd(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 }
 
 function hashCurto(s: string): string {
@@ -303,6 +309,18 @@ export function PublicacoesAba({
     setProc(id);
     startTransition(async () => {
       const r = await reagendarPublicacao(id, hora);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  // Muda o DIA de um post já programado (mantém a hora) — mover de um dia pro outro.
+  function handleRemarcar(id: string, dataYMD: string) {
+    if (!dataYMD) return;
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await remarcarPublicacao(id, dataYMD);
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
@@ -1152,9 +1170,12 @@ export function PublicacoesAba({
                   <span title={postado && p.postadoEm ? `Publicado em ${dataHoraBR(p.postadoEm)}` : undefined} className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${postado ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-amber-500/30 bg-amber-500/15 text-amber-400"}`}>{postado ? "✓ Postado" : "● A postar"}</span>
                 </div>
                 {!postado ? (
-                  <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={ocupado} title="Hora da postagem (muda quando o piloto posta)" className="mb-2 w-fit rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
-                    {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
-                  </select>
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    <InputDataBR value={ymd(p.data)} onChange={(d) => handleRemarcar(p.id, d)} className="w-[124px]" />
+                    <select value={horaSP(p.data)} onChange={(e) => handleReagendar(p.id, Number(e.target.value))} disabled={ocupado} title="Hora da postagem (muda quando o piloto posta)" className="w-fit shrink-0 rounded-md border border-linha bg-preto px-2 py-1 text-[11px] text-white transition hover:border-vermelho disabled:opacity-40">
+                      {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>🕐 {rotuloHora(h)}</option>)}
+                    </select>
+                  </div>
                 ) : (
                   p.postadoEm && <p className="mb-2 text-[11px] text-green-400/80">📢 Publicado {dataHoraBR(p.postadoEm)}</p>
                 )}
