@@ -177,7 +177,7 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
           {escolhidas.length > 0 && (
             <div className="pt-3">
               <p className="mb-2 text-[11px] text-muted">
-                🎞️ <strong className="text-white/80">Sua sequência</strong> — arraste as fotos pra mudar a ordem, <strong className="text-white/80">×</strong> pra tirar.
+                🎞️ <strong className="text-white/80">Sua sequência</strong> — use as setas <strong className="text-white/80">◀ ▶</strong> pra mudar a ordem (ou arraste, no PC), <strong className="text-white/80">×</strong> pra tirar.
               </p>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
                 {escolhidas.map((f, i) => {
@@ -196,6 +196,13 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
                     <img src={f.url} alt="" draggable={false} className="aspect-square w-full select-none object-cover" />
                     <span className="absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-vermelho text-xs font-bold text-white shadow">{i + 1}</span>
                     <button type="button" onClick={() => toggle(f.id)} aria-label="Tirar" className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl bg-black/75 text-sm leading-none text-white transition hover:bg-vermelho">×</button>
+                    {/* setas pra reordenar — funcionam no TOQUE (celular) e no PC; o arraste continua só no PC */}
+                    {i > 0 && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); reordenar(i, i - 1); }} aria-label="Mover pra trás" className="absolute left-0.5 top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/65 text-sm font-bold text-white shadow-md backdrop-blur-sm transition hover:bg-vermelho active:scale-90">◀</button>
+                    )}
+                    {i < escolhidas.length - 1 && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); reordenar(i, i + 1); }} aria-label="Mover pra frente" className="absolute right-0.5 top-1/2 z-20 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/65 text-sm font-bold text-white shadow-md backdrop-blur-sm transition hover:bg-vermelho active:scale-90">▶</button>
+                    )}
                     <button type="button" onClick={(e) => { e.stopPropagation(); definirCapa(f.id); }} aria-label={ehCapa ? "Tirar capa" : "Definir como capa"} title={ehCapa ? "Tirar como capa (clique pra remover)" : "Usar esta foto como capa do vídeo"} className={`absolute bottom-1 left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition ${ehCapa ? "bg-black/80 text-amber-300 ring-2 ring-amber-300 hover:bg-vermelho hover:text-white hover:ring-vermelho" : "bg-black/70 text-white hover:bg-black"}`}>⭐</button>
                     <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
                     <span className={`absolute bottom-0 left-0 right-0 px-8 py-0.5 text-center text-[9px] font-bold ${ehCapa ? "bg-amber-400/90 text-black" : "bg-black/65 font-semibold text-white/90"}`}>{ehCapa ? "⭐ CAPA" : (LABEL[f.momento] || f.momento)}</span>
