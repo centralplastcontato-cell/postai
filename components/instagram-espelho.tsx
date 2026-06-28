@@ -62,11 +62,12 @@ export function InstagramEspelho({ marcaId }: { marcaId: string }) {
       {feed.length === 0 ? (
         <div className="rounded-xl border border-linha bg-preto-card p-8 text-center text-sm text-muted">Nenhum post publicado ainda nessa conta do Instagram.</div>
       ) : (
-        <div className="grid grid-cols-3 gap-1 sm:gap-2">
+        // Mosaico (CSS columns): cada foto na proporção ORIGINAL, sem cortar em cima/embaixo.
+        <div className="columns-2 gap-1 sm:columns-3 sm:gap-2">
           {feed.map((p) => (
-            <a key={p.id} href={p.permalink || undefined} target="_blank" rel="noreferrer" title={p.legenda?.slice(0, 120)} className="group relative aspect-square overflow-hidden rounded-md bg-preto sm:rounded-lg">
+            <a key={p.id} href={p.permalink || undefined} target="_blank" rel="noreferrer" title={p.legenda?.slice(0, 120)} className="group relative mb-1 block break-inside-avoid overflow-hidden rounded-md bg-preto sm:mb-2 sm:rounded-lg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={p.imagem} alt="" loading="lazy" className="h-full w-full object-cover transition group-hover:scale-105" />
+              <img src={p.imagem} alt="" loading="lazy" className="w-full" />
               {p.tipo === "VIDEO" && <span className="absolute right-1.5 top-1.5 text-sm drop-shadow-lg">🎬</span>}
               {p.tipo === "CAROUSEL_ALBUM" && <span className="absolute right-1.5 top-1.5 text-sm drop-shadow-lg">🗂️</span>}
               {/* engajamento no rodapé (sempre visível) */}
