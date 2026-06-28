@@ -525,6 +525,12 @@ export async function gerarVideoDaFesta(festaId: string) {
     await prisma.festa.update({ where: { id: festaId }, data: { videoUrl: "" } });
     return { ok: false as const, erro: r.erro };
   }
+  // Motor aceitou e vai montar um vídeo NOVO → apaga o ANTIGO do Blob (não acumula lixo a cada
+  // "refazer"; o storage tem limite). Best-effort, em segundo plano: nunca derruba o "gerar".
+  if (festa.videoUrl?.startsWith("http")) {
+    const antigo = festa.videoUrl;
+    import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
+  }
   revalidatePath(`/painel/marcas/${festa.marcaId}`);
   return { ok: true as const };
 }
