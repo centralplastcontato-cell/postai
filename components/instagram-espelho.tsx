@@ -45,7 +45,7 @@ export function InstagramEspelho({ marcaId }: { marcaId: string }) {
       {stories.length > 0 && (
         <div className="mb-5">
           <p className="mb-2 text-xs font-semibold text-muted">🟣 Stories no ar agora</p>
-          <div className="flex gap-3 overflow-x-auto pb-1">
+          <div className="flex gap-3 overflow-x-auto px-0.5 py-1.5">
             {stories.map((s) => (
               <a key={s.id} href={s.permalink || undefined} target="_blank" rel="noreferrer" className="shrink-0">
                 <span className="block rounded-full bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 p-[2px]">
