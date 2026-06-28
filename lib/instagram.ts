@@ -341,3 +341,43 @@ export function urlsAbsolutas(base: string, caminhos: string[]): string[] {
   const b = base.replace(/\/$/, "");
   return caminhos.map((p) => (p.startsWith("http") ? p : `${b}${p.startsWith("/") ? "" : "/"}${p}`));
 }
+
+// === ESPELHO DO INSTAGRAM: ler o feed/stories DA marca pra mostrar no painel (só leitura) ===
+export type PostIG = {
+  id: string;
+  tipo: string; // IMAGE | VIDEO | CAROUSEL_ALBUM
+  imagem: string; // foto (ou thumbnail do vídeo)
+  permalink: string;
+  legenda: string;
+  data: string; // ISO
+  curtidas: number;
+  comentarios: number;
+};
+export type StoryIG = { id: string; tipo: string; imagem: string; permalink: string; data: string };
+
+type ItemMedia = { id?: string; media_type?: string; media_url?: string; thumbnail_url?: string; permalink?: string; caption?: string; timestamp?: string; like_count?: number; comments_count?: number };
+const imagemDe = (m: ItemMedia): string => (m.media_type === "VIDEO" ? m.thumbnail_url : m.media_url) || m.media_url || "";
+
+// FEED da marca (posts publicados). `instagram_basic` já dá conta. Best-effort: erro → lista vazia.
+export async function buscarFeedIG(conn: ConexaoIG, limit = 24): Promise<PostIG[]> {
+  try {
+    const fields = "id,media_type,media_url,thumbnail_url,permalink,caption,timestamp,like_count,comments_count";
+    const r = await fetch(`${GRAPH}/${conn.igUserId}/media?fields=${fields}&limit=${limit}&access_token=${conn.accessToken}`, { cache: "no-store" });
+    const j = (await r.json()) as { data?: ItemMedia[] };
+    if (!Array.isArray(j.data)) return [];
+    return j.data.map((p) => ({
+      id: p.id || "", tipo: p.media_type || "IMAGE", imagem: imagemDe(p), permalink: p.permalink || "",
+      legenda: p.caption || "", data: p.timestamp || "", curtidas: p.like_count ?? 0, comentarios: p.comments_count ?? 0,
+    }));
+  } catch { return []; }
+}
+
+// STORIES ativos (só os das últimas 24h — a API não devolve os que já sumiram). Precisa `instagram_manage_insights`.
+export async function buscarStoriesIG(conn: ConexaoIG): Promise<StoryIG[]> {
+  try {
+    const r = await fetch(`${GRAPH}/${conn.igUserId}/stories?fields=id,media_type,media_url,thumbnail_url,permalink,timestamp&access_token=${conn.accessToken}`, { cache: "no-store" });
+    const j = (await r.json()) as { data?: ItemMedia[] };
+    if (!Array.isArray(j.data)) return [];
+    return j.data.map((s) => ({ id: s.id || "", tipo: s.media_type || "IMAGE", imagem: imagemDe(s), permalink: s.permalink || "", data: s.timestamp || "" }));
+  } catch { return []; }
+}

@@ -10,6 +10,7 @@ import { type FestaComVideo } from "./reels-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { FestasPainel } from "./festas-painel";
 import { VideoPainel } from "./video-painel";
+import { InstagramEspelho } from "./instagram-espelho";
 import { PaginasPainel } from "./paginas-painel";
 import { CampanhasPainel, type CampanhaView } from "./campanhas-painel";
 import { AtividadesRecentes, type Ativ } from "./atividades-recentes";
@@ -79,7 +80,7 @@ export function MarcaHub({
   analise: AnaliseInsights;
   sugestao: SugestaoBia | null;
 }) {
-  const [aba, setAba] = useState<"redes" | "imagens" | "festas" | "video" | "paginas" | "campanhas" | "config">("redes");
+  const [aba, setAba] = useState<"redes" | "imagens" | "festas" | "video" | "instagram" | "paginas" | "campanhas" | "config">("redes");
   const cls = (a: boolean) =>
     `rounded-lg px-4 py-2 text-sm font-semibold transition ${a ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"}`;
   const stAssin = assinatura ? statusAssinatura(assinatura.acessoAte) : null;
@@ -170,6 +171,7 @@ export function MarcaHub({
         <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
         <button onClick={() => setAba("festas")} className={cls(aba === "festas")}>📸 Festas</button>
         <button onClick={() => setAba("video")} className={cls(aba === "video")}>🎬 Vídeo</button>
+        <button onClick={() => setAba("instagram")} className={cls(aba === "instagram")}>📷 Instagram</button>
         <button onClick={() => setAba("paginas")} className={cls(aba === "paginas")}>📄 Páginas</button>
         <button onClick={() => setAba("campanhas")} className={cls(aba === "campanhas")}>🎈 Campanhas</button>
         <button onClick={() => setAba("config")} className={cls(aba === "config")}>{ehAdmin ? "⚙️ Configurações" : "✏️ Minha marca"}</button>
@@ -181,6 +183,7 @@ export function MarcaHub({
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
         {aba === "video" && <VideoPainel festas={festas} corMarca={marca.corPrimaria} />}
+        {aba === "instagram" && <InstagramEspelho marcaId={marca.id} />}
         {aba === "paginas" && <PaginasPainel festas={festas} linkBase={linkBase} />}
         {aba === "campanhas" && <CampanhasPainel marcaId={marca.id} temTelefone={Boolean(marca.telefone)} campanhas={campanhas} acento={marca.corPrimaria} />}
         {aba === "config" && (ehAdmin ? <MarcaForm marca={marca} /> : <MarcaForm marca={marca} somenteIdentidade />)}
