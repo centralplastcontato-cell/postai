@@ -73,6 +73,7 @@ export async function GET(req: Request) {
       await postarFeed(m, agora, base, resultados);
       await postarStory(m, agora, base, resultados);
       await postarReels(m, agora, resultados);
+      await arquivarReelsPostados(m, agora, resultados); // libera storage: apaga MP4 já postado há +24h
 
       // Coleta o engajamento (curtidas/comentários/alcance) dos posts recentes — Story só
       // dentro de 24h. Best-effort: nunca derruba o piloto.
@@ -270,5 +271,35 @@ async function postarReels(m: { id: string; nome: string; igUserId: string | nul
     out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: false, erro: "processando" });
   } catch (e) {
     out.push({ marca: m.nome, tipo: "reels", titulo: "(erro)", ok: false, erro: msg(e) });
+  }
+}
+
+// ARQUIVAMENTO DE STORAGE: o MP4 do Blob (1GB free) só cresce. Depois que um Reels é POSTADO,
+// o vídeo já vive no Instagram pra sempre — não precisa guardar a cópia pesada aqui. Então,
+// passadas +24h da postagem (janela de segurança: dá tempo de conferir que postou MESMO), apaga
+// o MP4. As FOTOS ficam, então o vídeo é REGERÁVEL idêntico (a festa volta pra "⚡ Gerar"). Marca
+// pelo próprio videoUrl="" (já arquivado não tem mais http → não reprocessa). Best-effort.
+const UM_DIA_MS = 24 * 60 * 60 * 1000;
+async function arquivarReelsPostados(m: { id: string; nome: string }, agora: Date, out: Resultado[]) {
+  try {
+    const limite = new Date(agora.getTime() - UM_DIA_MS);
+    const antigos = await prisma.publicacao.findMany({
+      where: { marcaId: m.id, formato: "reels", status: "postado", postadoEm: { lt: limite }, videoUrl: { startsWith: "http" } },
+      select: { id: true, videoUrl: true, titulo: true },
+      take: 5, // no máx. 5 por passada — não estoura a janela de 60s do cron
+    });
+    if (!antigos.length) return;
+    const { del } = await import("@vercel/blob");
+    for (const p of antigos) {
+      if (!p.videoUrl) continue;
+      try { await del(p.videoUrl); } catch {} // se já não existe, segue
+      // limpa a referência: festas que ainda apontam pro mesmo MP4 voltam pra "⚡ Gerar" (regenerável)
+      await prisma.festa.updateMany({ where: { videoUrl: p.videoUrl }, data: { videoUrl: "" } }).catch(() => {});
+      await prisma.publicacao.update({ where: { id: p.id }, data: { videoUrl: "" } }).catch(() => {});
+      await registrarAtividade(AGENTE, `Arquivei o vídeo do Reels "${p.titulo}" de ${m.nome} (já está no Instagram há +24h; liberei espaço — dá pra refazer das fotos).`, m.id).catch(() => {});
+      out.push({ marca: m.nome, tipo: "reels", titulo: `${p.titulo} (arquivado)`, ok: true });
+    }
+  } catch (e) {
+    out.push({ marca: m.nome, tipo: "reels", titulo: "(arquivar)", ok: false, erro: msg(e) });
   }
 }
