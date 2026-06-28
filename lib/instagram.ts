@@ -352,11 +352,25 @@ export type PostIG = {
   data: string; // ISO
   curtidas: number;
   comentarios: number;
+  views: number | null; // só VÍDEO/Reels tem; foto = null (o Instagram não conta visualização de foto)
 };
 export type StoryIG = { id: string; tipo: string; imagem: string; permalink: string; data: string };
 
 type ItemMedia = { id?: string; media_type?: string; media_url?: string; thumbnail_url?: string; permalink?: string; caption?: string; timestamp?: string; like_count?: number; comments_count?: number };
 const imagemDe = (m: ItemMedia): string => (m.media_type === "VIDEO" ? m.thumbnail_url : m.media_url) || m.media_url || "";
+
+// Visualizações de um Reels/vídeo. A Meta renomeou a métrica entre versões — tenta as conhecidas, na ordem.
+async function viewsDoVideo(conn: ConexaoIG, mediaId: string): Promise<number | null> {
+  for (const metric of ["plays", "views", "ig_reels_video_view_total_count"]) {
+    try {
+      const r = await fetch(`${GRAPH}/${mediaId}/insights?metric=${metric}&access_token=${conn.accessToken}`, { cache: "no-store" });
+      const j = (await r.json()) as { data?: { values?: { value?: number }[] }[] };
+      const v = j.data?.[0]?.values?.[0]?.value;
+      if (typeof v === "number") return v;
+    } catch { /* métrica não existe nessa versão → tenta a próxima */ }
+  }
+  return null;
+}
 
 // FEED da marca (posts publicados). `instagram_basic` já dá conta. Best-effort: erro → lista vazia.
 export async function buscarFeedIG(conn: ConexaoIG, limit = 24): Promise<PostIG[]> {
@@ -365,10 +379,13 @@ export async function buscarFeedIG(conn: ConexaoIG, limit = 24): Promise<PostIG[
     const r = await fetch(`${GRAPH}/${conn.igUserId}/media?fields=${fields}&limit=${limit}&access_token=${conn.accessToken}`, { cache: "no-store" });
     const j = (await r.json()) as { data?: ItemMedia[] };
     if (!Array.isArray(j.data)) return [];
-    return j.data.map((p) => ({
+    const posts: PostIG[] = j.data.map((p) => ({
       id: p.id || "", tipo: p.media_type || "IMAGE", imagem: imagemDe(p), permalink: p.permalink || "",
-      legenda: p.caption || "", data: p.timestamp || "", curtidas: p.like_count ?? 0, comentarios: p.comments_count ?? 0,
+      legenda: p.caption || "", data: p.timestamp || "", curtidas: p.like_count ?? 0, comentarios: p.comments_count ?? 0, views: null,
     }));
+    // visualizações só existem em VÍDEO/Reels — busca em paralelo (1 consulta de insights por vídeo)
+    await Promise.all(posts.map(async (p) => { if (p.tipo === "VIDEO" && p.id) p.views = await viewsDoVideo(conn, p.id); }));
+    return posts;
   } catch { return []; }
 }
 

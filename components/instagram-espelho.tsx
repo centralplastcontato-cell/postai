@@ -7,6 +7,9 @@ import { useState, useEffect } from "react";
 import { buscarInstagramDaMarca } from "@/app/actions/instagram";
 import type { PostIG, StoryIG } from "@/lib/instagram";
 
+// número grande fica curtinho: 1500 → "1,5k"
+const fmt = (n: number) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(".0", "").replace(".", ",") + "k" : String(n));
+
 export function InstagramEspelho({ marcaId }: { marcaId: string }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -72,8 +75,9 @@ export function InstagramEspelho({ marcaId }: { marcaId: string }) {
               {p.tipo === "CAROUSEL_ALBUM" && <span className="absolute right-1.5 top-1.5 text-sm drop-shadow-lg">🗂️</span>}
               {/* engajamento no rodapé (sempre visível) */}
               <div className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-2 bg-gradient-to-t from-black/80 to-transparent px-1.5 pb-1 pt-5 text-[10px] font-bold text-white">
-                <span>❤️ {p.curtidas}</span>
-                <span>💬 {p.comentarios}</span>
+                {p.views !== null && <span>👁️ {fmt(p.views)}</span>}
+                <span>❤️ {fmt(p.curtidas)}</span>
+                <span>💬 {fmt(p.comentarios)}</span>
               </div>
             </a>
           ))}
