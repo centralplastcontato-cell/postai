@@ -175,7 +175,17 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   // Feed (4:5) vai pra aba Publicações; Story (9:16) vai pra aba Story.
   const publicacoes: PublicacaoView[] = pubs.filter((p) => p.formato !== "story" && p.formato !== "reels").map(mapPub);
   const stories: PublicacaoView[] = pubs.filter((p) => p.formato === "story").map(mapPub);
-  const reels: PublicacaoView[] = pubs.filter((p) => p.formato === "reels").map(mapPub);
+  // capa pro card de Reels quando o vídeo já foi ARQUIVADO: foto da festa (a escolhida pra capa, ou a 1ª), por nome
+  const capaPorNome = new Map<string, string>();
+  for (const f of festasRaw) {
+    const nome = (f.aniversariante || "").trim();
+    const cap = (f.videoCapa && f.fotos.find((x) => x.id === f.videoCapa)?.url) || f.fotos[0]?.url;
+    if (nome && cap && !capaPorNome.has(nome)) capaPorNome.set(nome, cap);
+  }
+  const reels: PublicacaoView[] = pubs.filter((p) => p.formato === "reels").map((p) => ({
+    ...mapPub(p),
+    capaReel: capaPorNome.get((p.titulo || "").replace(/^Reels\s*[—–-]\s*/i, "").trim()) ?? null,
+  }));
   // Festas com vídeo já montado → alimentam o agendador de Reels na aba Redes Sociais.
   const festasComVideo = festasRaw.filter((f) => (f.videoUrl || "").startsWith("http")).map((f) => ({ id: f.id, nome: f.aniversariante || "Festa", videoUrl: f.videoUrl, data: f.data.toISOString(), horario: f.horario }));
 

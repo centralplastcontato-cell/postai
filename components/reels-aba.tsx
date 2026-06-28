@@ -178,6 +178,13 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
                 {r.videoUrl ? (
                   // eslint-disable-next-line jsx-a11y/media-has-caption
                   <video src={`${r.videoUrl}#t=0.5`} preload="metadata" controls playsInline className="h-40 w-24 shrink-0 rounded-lg bg-black object-cover" />
+                ) : r.capaReel ? (
+                  // vídeo já arquivado (postado há +24h): mostra uma foto da festa em vez do quadrado preto
+                  <div className="relative h-40 w-24 shrink-0 overflow-hidden rounded-lg bg-black">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={r.capaReel} alt="" className="h-full w-full object-cover opacity-90" />
+                    <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent px-1 pb-1 pt-5 text-center text-[9px] font-semibold leading-none text-white">📮 postado</span>
+                  </div>
                 ) : (
                   <div className="flex h-40 w-24 shrink-0 items-center justify-center rounded-lg bg-black text-2xl">🎬</div>
                 )}

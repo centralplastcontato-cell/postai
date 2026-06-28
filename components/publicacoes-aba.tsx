@@ -123,6 +123,7 @@ export type PublicacaoView = {
   imagemUrl: string | null;
   formato?: string; // "feed" | "story" | "reels"
   videoUrl?: string | null; // URL do vídeo (quando formato="reels")
+  capaReel?: string | null; // foto da festa pra mostrar no card de Reels quando o vídeo foi arquivado
   status: string;
   tema: string | null;
   aprovado: boolean; // revisão interna do dono (não vai pra rede)
