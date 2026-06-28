@@ -32,6 +32,7 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
 
   const pronto = f.videoUrl.startsWith("http");
   const emGeracao = f.videoUrl === "gerando";
+  const arquivado = f.videoUrl === "arquivado"; // já foi POSTADO e o MP4 foi apagado (+24h) — regerável das fotos
   const nomes = rotuloAniversariantes(f.aniversariantes) || "Festa";
   const capa = f.fotos[0]?.url;
 
@@ -39,6 +40,8 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
     ? { txt: "✅ Pronto", cls: "bg-green-600 text-white" }
     : emGeracao
     ? { txt: "🎬 Gerando", cls: "bg-amber-500 text-black" }
+    : arquivado
+    ? { txt: "📮 Postado", cls: "bg-sky-600 text-white" }
     : f.fotos.length
     ? { txt: "Pra gerar", cls: "bg-black/70 text-white" }
     : { txt: "Sem fotos", cls: "bg-black/70 text-white/70" };
@@ -81,6 +84,13 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
             <span className="animate-pulse text-[11px] font-semibold text-white">Montando…</span>
           </div>
         )}
+        {arquivado && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/55 px-3 text-center">
+            <span className="text-3xl">📮</span>
+            <span className="text-[11px] font-semibold text-white">Vídeo postado no Instagram</span>
+            <span className="text-[10px] leading-snug text-white/70">arquivado após 24h pra poupar espaço · gere de novo se precisar</span>
+          </div>
+        )}
 
         {/* nome + data (rodapé do thumb, sobre gradiente) */}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2.5 pt-8">
@@ -99,6 +109,8 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
           </>
         ) : emGeracao ? (
           <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
+        ) : arquivado ? (
+          <button onClick={onAbrirSeletor} title="Esse vídeo já foi postado e arquivado. Gere um novo com as fotos (continuam guardadas)." className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">🔄 Gerar de novo</button>
         ) : (
           <button onClick={onAbrirSeletor} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">⚡ Gerar vídeo</button>
         )}

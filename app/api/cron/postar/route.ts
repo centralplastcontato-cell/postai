@@ -293,8 +293,9 @@ async function arquivarReelsPostados(m: { id: string; nome: string }, agora: Dat
     for (const p of antigos) {
       if (!p.videoUrl) continue;
       try { await del(p.videoUrl); } catch {} // se já não existe, segue
-      // limpa a referência: festas que ainda apontam pro mesmo MP4 voltam pra "⚡ Gerar" (regenerável)
-      await prisma.festa.updateMany({ where: { videoUrl: p.videoUrl }, data: { videoUrl: "" } }).catch(() => {});
+      // marca a festa como "arquivado" (sentinela) — o card mostra "📮 Postado · arquivado" + "Gerar de novo",
+      // pra NÃO confundir com uma festa que nunca teve vídeo. (gerarVideoDaFesta trata "arquivado" como gerável.)
+      await prisma.festa.updateMany({ where: { videoUrl: p.videoUrl }, data: { videoUrl: "arquivado" } }).catch(() => {});
       await prisma.publicacao.update({ where: { id: p.id }, data: { videoUrl: "" } }).catch(() => {});
       await registrarAtividade(AGENTE, `Arquivei o vídeo do Reels "${p.titulo}" de ${m.nome} (já está no Instagram há +24h; liberei espaço — dá pra refazer das fotos).`, m.id).catch(() => {});
       out.push({ marca: m.nome, tipo: "reels", titulo: `${p.titulo} (arquivado)`, ok: true });
