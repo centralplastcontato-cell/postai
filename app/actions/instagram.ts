@@ -3,6 +3,7 @@
 // Espelho do Instagram: lê (SÓ leitura) o feed e os stories da marca pra mostrar no painel.
 // Sob demanda (chamado quando o dono abre a aba 📷 Instagram), pra não pesar o carregamento.
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { marcaConectada, buscarFeedIG, buscarStoriesIG, type PostIG, type StoryIG } from "@/lib/instagram";
@@ -64,5 +65,11 @@ export async function analisarHistoricoInstagram(
     quando: m.timestamp ? new Date(m.timestamp) : new Date(),
     titulo: (m.caption || "").replace(/\s+/g, " ").trim().slice(0, 60) || "post sem legenda",
   }));
-  return { ok: true, analise: analisarEngajamento(posts) };
+  const analise = analisarEngajamento(posts);
+  // GALHO 2 — cacheia a análise pra o cérebro oficial da Bia (cartão da aba Redes + sugestão de
+  // próximo post) usar sem repuxar o Instagram a cada carregamento do painel.
+  await prisma.marca
+    .update({ where: { id: marcaId }, data: { intelHistorico: analise as unknown as Prisma.InputJsonValue, intelHistoricoEm: new Date() } })
+    .catch(() => {});
+  return { ok: true, analise };
 }

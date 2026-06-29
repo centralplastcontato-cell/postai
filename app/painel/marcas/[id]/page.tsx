@@ -14,7 +14,7 @@ import { parseAniversariantes } from "@/lib/aniversariantes";
 import { gerarTokenFesta, gerarTokenAlbum } from "@/lib/festa";
 import { baseUrl } from "@/lib/config";
 import { OnboardingMarca } from "@/components/onboarding-marca";
-import { analisarEngajamento, sugerirProximoPost } from "@/lib/inteligencia";
+import { analisarEngajamento, sugerirProximoPost, type AnaliseInsights } from "@/lib/inteligencia";
 
 export const dynamic = "force-dynamic";
 
@@ -199,10 +199,15 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   // Inteligência: cruza categoria × horário × intenção (carrossel + feed; Story fica fora,
   // suas métricas não se comparam). Calculado aqui (servidor) com os posts já carregados —
   // sem query extra — e passado pronto pro cartão da Bia.
-  const analise = analisarEngajamento([
+  const analiseLocal = analisarEngajamento([
     ...conteudos.map((c) => ({ categoria: c.categoria, curtidas: c.curtidas, comentarios: c.comentarios, alcance: c.alcance, salvamentos: c.salvamentos, quando: c.postadoEm ?? c.data, titulo: c.titulo })),
     ...pubs.filter((p) => p.formato !== "story").map((p) => ({ categoria: p.categoria, curtidas: p.curtidas, comentarios: p.comentarios, alcance: p.alcance, salvamentos: p.salvamentos, quando: p.postadoEm ?? p.data, titulo: p.titulo })),
   ]);
+  // GALHO 2 — quando a Bia já ESTUDOU O FEED (aba Instagram), a análise do histórico fica
+  // cacheada na marca. O histórico inclui TUDO (até posts feitos fora do Postaí), então se ele
+  // mede mais posts que a análise local, o cérebro oficial da Bia passa a usar ELE.
+  const intel = marca.intelHistorico as unknown as AnaliseInsights | null;
+  const analise = intel && intel.total >= analiseLocal.total ? intel : analiseLocal;
 
   // Sugestão da Bia pro próximo post de feed: o que vende × o que faz tempo que não sai.
   // Recência só conta os que JÁ foram postados (postadoEm preenchido).

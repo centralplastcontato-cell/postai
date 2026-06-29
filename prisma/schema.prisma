@@ -44,6 +44,12 @@ model Marca {
   tokenFotos  String   @default("")
   criadoEm    DateTime @default(now())
 
+  // Inteligência: a análise do HISTÓRICO do Instagram ("A Bia estudou seu feed") cacheada,
+  // pra o cérebro oficial da Bia (cartão da aba Redes + sugestão de próximo post) usar sem
+  // repuxar o Instagram a cada carregamento do painel.
+  intelHistorico   Json?     // AnaliseInsights serializada (saída de analisarEngajamento)
+  intelHistoricoEm DateTime? // quando o dono mandou a Bia estudar o feed pela última vez
+
   // Dono (cliente) da marca — null = sem dono, só o admin vê. Multi-tenant: cada
   // cliente entra e vê SÓ as marcas dele; o admin (você) vê todas.
   usuarioId   String?
