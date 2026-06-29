@@ -23,6 +23,7 @@ export type FestaView = {
   videoMoldura: string; // moldura das fotos: "nenhuma" | "branca" | "grossa" | "marca"
   videoTextoFinal: string; // mensagem do slide final do vídeo ("" = padrão "Muito obrigado!")
   videoUrl: string; // URL do vídeo/Reels já montado ("" = ainda não gerado)
+  videoPostado?: boolean; // o Reels desta festa JÁ foi postado pelo Postaí (antes mesmo de arquivar em 24h)
   mostrarAvaliacao: boolean; // o gerente liga/desliga o card "Avalie no Google" no álbum
   fotos: FotoView[];
 };

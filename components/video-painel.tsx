@@ -33,15 +33,17 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
   const pronto = f.videoUrl.startsWith("http");
   const emGeracao = f.videoUrl === "gerando";
   const arquivado = f.videoUrl === "arquivado"; // já foi POSTADO e o MP4 foi apagado (+24h) — regerável das fotos
+  const postado = f.videoPostado === true; // já postado pelo Postaí, mas o vídeo ainda está disponível (antes das 24h)
   const nomes = rotuloAniversariantes(f.aniversariantes) || "Festa";
   const capa = f.fotos[0]?.url;
 
-  const badge = pronto
+  // Postado vem ANTES de "Pronto": se o Reels já foi ao ar (na hora ou arquivado em 24h), mostra "Postado".
+  const badge = arquivado || (pronto && postado)
+    ? { txt: "📮 Postado", cls: "bg-sky-600 text-white" }
+    : pronto
     ? { txt: "✅ Pronto", cls: "bg-green-600 text-white" }
     : emGeracao
     ? { txt: "🎬 Gerando", cls: "bg-amber-500 text-black" }
-    : arquivado
-    ? { txt: "📮 Postado", cls: "bg-sky-600 text-white" }
     : f.fotos.length
     ? { txt: "Pra gerar", cls: "bg-black/70 text-white" }
     : { txt: "Sem fotos", cls: "bg-black/70 text-white/70" };

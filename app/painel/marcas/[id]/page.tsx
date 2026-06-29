@@ -63,6 +63,11 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   // pais). Geramos APENAS os que estiverem VAZIOS — uma vez criado, o token NUNCA muda (senão um
   // link já enviado pros pais quebraria). Festas novas já nascem com tokenAlbum bonito na criação.
   const slugBuffet = marca.slug;
+  // Reels JÁ postados pelo Postaí (pra o card de Vídeo marcar "Postado" NA HORA, sem esperar o
+  // arquivamento de 24h). Casa pelo videoUrl — a publicação reels carrega o mesmo do vídeo da festa.
+  const urlsReelsPostados = new Set(
+    pubs.filter((p) => p.formato === "reels" && p.status === "postado" && (p.videoUrl || "").startsWith("http")).map((p) => p.videoUrl),
+  );
   const festas: FestaView[] = await Promise.all(festasRaw.map(async (f) => {
     const anivs = parseAniversariantes(f.aniversariantes);
     let token = f.token;
@@ -91,6 +96,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoMoldura: f.videoMoldura || "branca",
       videoTextoFinal: f.videoTextoFinal || "",
       videoUrl: f.videoUrl || "",
+      videoPostado: !!f.videoUrl && urlsReelsPostados.has(f.videoUrl),
       mostrarAvaliacao: f.mostrarAvaliacao,
       fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento, descricao: foto.descricao })),
     };
