@@ -4,8 +4,10 @@
 // Busca SOB DEMANDA (ao abrir a aba) pra não pesar o painel. Stories só os ativos (24h).
 
 import { useState, useEffect } from "react";
-import { buscarInstagramDaMarca } from "@/app/actions/instagram";
+import { buscarInstagramDaMarca, analisarHistoricoInstagram } from "@/app/actions/instagram";
 import type { PostIG, StoryIG } from "@/lib/instagram";
+import type { AnaliseInsights } from "@/lib/inteligencia";
+import { BiaDescobriu } from "./bia-descobriu";
 
 // número grande fica curtinho: 1500 → "1,5k"
 const fmt = (n: number) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(".0", "").replace(".", ",") + "k" : String(n));
@@ -15,6 +17,23 @@ export function InstagramEspelho({ marcaId }: { marcaId: string }) {
   const [erro, setErro] = useState<string | null>(null);
   const [feed, setFeed] = useState<PostIG[]>([]);
   const [stories, setStories] = useState<StoryIG[]>([]);
+  const [analise, setAnalise] = useState<AnaliseInsights | null>(null);
+  const [estudando, setEstudando] = useState(false);
+  const [erroEstudo, setErroEstudo] = useState<string | null>(null);
+
+  async function estudarFeed() {
+    setEstudando(true);
+    setErroEstudo(null);
+    try {
+      const r = await analisarHistoricoInstagram(marcaId);
+      if (r.ok) setAnalise(r.analise);
+      else setErroEstudo(r.erro);
+    } catch {
+      setErroEstudo("Não consegui estudar agora. Tenta de novo daqui a pouco.");
+    } finally {
+      setEstudando(false);
+    }
+  }
 
   useEffect(() => {
     let vivo = true;
@@ -42,6 +61,18 @@ export function InstagramEspelho({ marcaId }: { marcaId: string }) {
       <div className="mb-4">
         <p className="text-sm font-semibold text-white">📷 Meu Instagram</p>
         <p className="mt-1 text-xs text-muted">Um espelho do feed da sua conta. Toque num post pra abrir no Instagram. 💜</p>
+      </div>
+
+      {/* A Bia estuda o histórico do feed (sob demanda — é uma análise pesada, não roda sozinha) */}
+      <div className="mb-5">
+        {analise ? (
+          <BiaDescobriu analise={analise} variante="instagram" />
+        ) : (
+          <button onClick={estudarFeed} disabled={estudando} className="flex w-full items-center justify-center gap-2 rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-950/30 to-preto-card px-4 py-3 text-sm font-semibold text-white transition hover:border-purple-500/60 disabled:opacity-60">
+            {estudando ? <span className="animate-pulse">🧠 A Bia está estudando seu feed… leva alguns segundos</span> : <span>🧠 Pedir pra Bia estudar meu feed</span>}
+          </button>
+        )}
+        {erroEstudo && <p className="mt-2 text-center text-xs text-muted">{erroEstudo}</p>}
       </div>
 
       {/* Stories ativos (somem em 24h) */}

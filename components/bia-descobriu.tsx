@@ -17,9 +17,10 @@ function horaBR(h: number): string {
   return `${h}h`;
 }
 
-export function BiaDescobriu({ analise }: { analise: AnaliseInsights }) {
+export function BiaDescobriu({ analise, variante }: { analise: AnaliseInsights; variante?: "instagram" }) {
   const { confianca, total, categorias, melhorHora, melhorPost, prioridade, nicho } = analise;
   const aprendendo = confianca === "aprendendo";
+  const ig = variante === "instagram"; // texto adaptado pro contexto "estudei seu Instagram"
 
   // Topo das categorias reais (até 3) com barrinha proporcional — só faz sentido no modo "boa".
   const top = categorias.slice(0, 3);
@@ -30,21 +31,31 @@ export function BiaDescobriu({ analise }: { analise: AnaliseInsights }) {
       <div className="flex items-center gap-2">
         <AvatarBia />
         <p className="text-sm font-semibold text-white">
-          {aprendendo ? "A Bia está te conhecendo" : "A Bia descobriu pra você"}
+          {ig
+            ? aprendendo ? "A Bia começou a estudar seu feed" : "A Bia estudou seu feed"
+            : aprendendo ? "A Bia está te conhecendo" : "A Bia descobriu pra você"}
         </p>
       </div>
 
       {aprendendo ? (
         <div className="mt-3 space-y-2 text-sm text-white/85">
           {total === 0 ? (
-            <p>
-              Assim que seus posts começarem a engajar, eu te conto qual <strong>tipo</strong> mais desperta
-              vontade de fechar festa. Por enquanto, tô de olho. 👀
-            </p>
+            ig ? (
+              <p>
+                Consegui ver seus posts, mas o Instagram não me liberou os números de <strong className="text-white">alcance e salvamento</strong> —
+                que é o que mostra quem quer mesmo fechar festa. Pra eu aprender de verdade, falta liberar a permissão de
+                insights na conexão. 🔑
+              </p>
+            ) : (
+              <p>
+                Assim que seus posts começarem a engajar, eu te conto qual <strong>tipo</strong> mais desperta
+                vontade de fechar festa. Por enquanto, tô de olho. 👀
+              </p>
+            )
           ) : (
             <p>
-              Já medi <strong className="text-white">{total}</strong> {total === 1 ? "post" : "posts"} seus — ainda é
-              pouco pra cravar, mas quanto mais você postar, mais afiada eu fico. 💜
+              {ig ? "Analisei" : "Já medi"} <strong className="text-white">{total}</strong> {total === 1 ? "post" : "posts"}{" "}
+              {ig ? "do seu Instagram" : "seus"} — ainda é pouco pra cravar, mas quanto mais você postar, mais afiada eu fico. 💜
             </p>
           )}
 

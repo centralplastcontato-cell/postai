@@ -77,7 +77,7 @@ type Insights = { curtidas?: number; comentarios?: number; alcance?: number; sal
 // Busca o engajamento de UM post no Instagram. Curtidas/comentários vêm dos campos da
 // mídia (permissão básica); alcance/salvamentos exigem instagram_manage_insights. Story
 // só tem alcance (= visualizações) e some em 24h. Devolve só o que a Meta retornou.
-async function buscarInsights(token: string, mediaId: string, ehStory: boolean): Promise<Insights | null> {
+export async function buscarInsights(token: string, mediaId: string, ehStory: boolean): Promise<Insights | null> {
   const out: Insights = {};
   try {
     if (!ehStory) {
@@ -142,7 +142,7 @@ export async function coletarInsightsDaMarca(marca: { id: string; igUserId: stri
 
 // === Backfill: vincular posts ANTIGOS (publicados antes de termos o mediaId) ============
 
-type MidiaIG = { id: string; caption?: string; timestamp?: string };
+export type MidiaIG = { id: string; caption?: string; timestamp?: string };
 
 function normCaption(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 80);
@@ -150,10 +150,10 @@ function normCaption(s: string): string {
 
 // Lista as mídias (posts/carrosséis) da conta no Instagram — pagina até ~5x100. Stories
 // NÃO entram aqui (a API /media só traz o feed permanente).
-async function buscarMidiasDaConta(igUserId: string, token: string): Promise<MidiaIG[]> {
+export async function buscarMidiasDaConta(igUserId: string, token: string, maxPaginas = 5): Promise<MidiaIG[]> {
   const out: MidiaIG[] = [];
   let url = `${GRAPH}/${igUserId}/media?fields=id,caption,timestamp&limit=100&access_token=${token}`;
-  for (let pagina = 0; pagina < 5 && url; pagina++) {
+  for (let pagina = 0; pagina < maxPaginas && url; pagina++) {
     try {
       const r = await fetch(url, { cache: "no-store" });
       const j = (await r.json()) as { data?: MidiaIG[]; paging?: { next?: string } };
