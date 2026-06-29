@@ -253,6 +253,7 @@ model Usuario {
   admin     Boolean   @default(false)
   plano     String? // pacote do cliente: essencial | profissional | turbo (null = não definido)
   acessoAte DateTime? // validade do acesso do cliente (null = sem restrição; admin ignora)
+  valorMensal Int? // valor REAL que ESTE cliente paga por mês (R$) — null = usa o preço do pacote. Reflete o que de fato se cobra (ex: fundador 397, normal 599), independente do pacote.
   criadoEm  DateTime  @default(now())
 
   marcas    Marca[] // marcas que este usuário (cliente) administra

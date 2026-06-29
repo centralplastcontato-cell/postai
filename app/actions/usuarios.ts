@@ -17,7 +17,7 @@ function addMeses(base: Date, meses: number): Date {
 }
 
 // Cria um login de cliente (admin=false) — opcionalmente já com pacote + validade.
-export async function criarCliente(nome: string, senha: string, plano?: string, meses?: number) {
+export async function criarCliente(nome: string, senha: string, plano?: string, meses?: number, valorMensal?: number) {
   const g = await exigirAdmin();
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const n = (nome || "").trim().toLowerCase();
@@ -33,8 +33,19 @@ export async function criarCliente(nome: string, senha: string, plano?: string, 
       admin: false,
       plano: ehPlano(plano) ? plano : null,
       acessoAte: typeof meses === "number" && meses > 0 ? addMeses(new Date(), meses) : null,
+      valorMensal: typeof valorMensal === "number" && valorMensal > 0 ? Math.round(valorMensal) : null,
     },
   });
+  revalidatePath("/painel/usuarios");
+  return { ok: true as const };
+}
+
+// Define o VALOR mensal real que o cliente paga (R$). 0/vazio = volta a usar o preço do pacote.
+export async function definirValorMensal(id: string, valor: number) {
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const v = typeof valor === "number" && valor > 0 ? Math.round(valor) : null;
+  await prisma.usuario.update({ where: { id }, data: { valorMensal: v } });
   revalidatePath("/painel/usuarios");
   return { ok: true as const };
 }

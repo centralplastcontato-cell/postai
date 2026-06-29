@@ -2,11 +2,11 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { criarCliente, excluirCliente, redefinirSenhaCliente, atribuirMarca, definirPacote, renovarAcesso, removerValidade } from "@/app/actions/usuarios";
+import { criarCliente, excluirCliente, redefinirSenhaCliente, atribuirMarca, definirPacote, definirValorMensal, renovarAcesso, removerValidade } from "@/app/actions/usuarios";
 import { PLANOS, rotuloPlano, diasDeAcesso } from "@/lib/plano";
 import { ConfirmDialog } from "./confirm-dialog";
 
-type Cliente = { id: string; nome: string; plano: string | null; acessoAte: string | null; marcas: { id: string; nome: string }[] };
+type Cliente = { id: string; nome: string; plano: string | null; acessoAte: string | null; valorMensal: number | null; marcas: { id: string; nome: string }[] };
 type MarcaItem = { id: string; nome: string; usuarioId: string | null };
 type Resumo = { total: number; ativos: number; mrr: number; porPacote: { essencial: number; profissional: number; turbo: number } };
 
@@ -39,6 +39,7 @@ export function ClientesAdmin({ usuarios, marcas, resumo }: { usuarios: Cliente[
   const [senha, setSenha] = useState("");
   const [novoPlano, setNovoPlano] = useState("profissional");
   const [novoMeses, setNovoMeses] = useState(1);
+  const [novoValor, setNovoValor] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [excluirAlvo, setExcluirAlvo] = useState<Cliente | null>(null);
@@ -53,11 +54,12 @@ export function ClientesAdmin({ usuarios, marcas, resumo }: { usuarios: Cliente[
   function handleCriar() {
     setErro(null);
     startTransition(async () => {
-      const r = await criarCliente(nome, senha, novoPlano, novoMeses);
+      const r = await criarCliente(nome, senha, novoPlano, novoMeses, Number(novoValor) || 0);
       if (!r.ok) setErro(r.erro);
       else {
         setNome("");
         setSenha("");
+        setNovoValor("");
         aviso("Cliente criado!");
         router.refresh();
       }
@@ -70,6 +72,14 @@ export function ClientesAdmin({ usuarios, marcas, resumo }: { usuarios: Cliente[
       const r = await definirPacote(id, plano);
       if (!r.ok) setErro(r.erro);
       else { aviso("Pacote atualizado!"); router.refresh(); }
+    });
+  }
+  function handleDefinirValor(id: string, valor: string) {
+    setErro(null);
+    startTransition(async () => {
+      const r = await definirValorMensal(id, Number(valor) || 0);
+      if (!r.ok) setErro(r.erro);
+      else { aviso("Valor atualizado!"); router.refresh(); }
     });
   }
   function handleRenovar(id: string, meses: number) {
@@ -191,6 +201,10 @@ export function ClientesAdmin({ usuarios, marcas, resumo }: { usuarios: Cliente[
               <option value={0}>sem validade</option>
             </select>
           </label>
+          <label className="text-xs text-muted">
+            Valor/mês
+            <input value={novoValor} onChange={(e) => setNovoValor(e.target.value.replace(/\D/g, ""))} inputMode="numeric" placeholder="R$ 397" className="input-base w-24" />
+          </label>
           <button onClick={handleCriar} disabled={pending || !nome.trim() || senha.length < 4} className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50">
             Criar cliente
           </button>
@@ -258,6 +272,18 @@ export function ClientesAdmin({ usuarios, marcas, resumo }: { usuarios: Cliente[
                       <option value="">— nenhum —</option>
                       {PLANOS.map((p) => <option key={p} value={p}>{rotuloPlano(p)}</option>)}
                     </select>
+                  </label>
+                  <label className="text-xs text-muted">
+                    💰 R$/mês:{" "}
+                    <input
+                      key={`v-${u.id}-${u.valorMensal ?? ""}`}
+                      defaultValue={u.valorMensal ?? ""}
+                      onBlur={(e) => { const v = e.target.value.replace(/\D/g, ""); if ((Number(v) || 0) !== (u.valorMensal ?? 0)) handleDefinirValor(u.id, v); }}
+                      inputMode="numeric"
+                      placeholder="pacote"
+                      disabled={pending}
+                      className="input-compact ml-1 w-20"
+                    />
                   </label>
                   <span className={`text-xs font-semibold ${statusAcesso(u.acessoAte).cls}`}>{statusAcesso(u.acessoAte).txt}</span>
                   <div className="ml-auto flex flex-wrap items-center gap-1.5">
