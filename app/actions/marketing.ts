@@ -662,6 +662,20 @@ export async function adicionarSlide(input: { id: string }) {
   return { ok: true as const };
 }
 
+// Edita à MÃO o título + texto de um slide (sem IA). A imagem re-renderiza sozinha (?v=hash do slide).
+export async function editarTextoSlide(input: { id: string; indice: number; titulo: string; texto: string }) {
+  const g = await guardaConteudo(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const c = await prisma.conteudo.findUnique({ where: { id: input.id } });
+  if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
+  const slides = lerSlides(c.slidesTexto);
+  if (!slides?.[input.indice]) return { ok: false as const, erro: "Slide não encontrado." };
+  slides[input.indice] = { ...slides[input.indice], titulo: input.titulo.trim(), texto: input.texto.trim() };
+  await prisma.conteudo.update({ where: { id: input.id }, data: { slidesTexto: JSON.stringify(slides) } });
+  revalidatePath(`/painel/marcas/${c.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function marcarConteudo(formData: FormData) {
   const id = String(formData.get("id") || "");
   const g = await guardaConteudo(id);

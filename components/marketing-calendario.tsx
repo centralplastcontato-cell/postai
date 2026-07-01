@@ -20,6 +20,7 @@ import {
   editarLegendaCarrossel,
   alternarTextoSlide,
   adicionarSlide,
+  editarTextoSlide,
   postarInstagram,
   sugerirTemas,
   marcarConteudo,
@@ -73,6 +74,7 @@ export type Post = {
   imagensSlides?: (string | null)[];
   tiposSlides?: (string | undefined)[]; // tipo de cada slide (capa/conteudo/mosaico/capa-*)
   semTextoSlides?: boolean[]; // por slide: mostrar a foto PURA (sem os textos por cima)
+  textosSlides?: { titulo: string; texto: string }[]; // título + texto de cada slide (pra editar na mão)
   categoria?: string | null; // categoria de intenção (pra etiqueta + inteligência)
   // Engajamento no Instagram (coletado pelo piloto após postar)
   curtidas?: number | null;
@@ -180,6 +182,8 @@ export function MarketingCalendario({
   const [legendaEdit, setLegendaEdit] = useState("");
   const [hashtagsEdit, setHashtagsEdit] = useState("");
   const [salvandoLegenda, setSalvandoLegenda] = useState(false);
+  const [editandoSlide, setEditandoSlide] = useState<{ indice: number; titulo: string; texto: string } | null>(null);
+  const [salvandoSlide, setSalvandoSlide] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [slideProcessando, setSlideProcessando] = useState<number | null>(null);
@@ -452,6 +456,42 @@ export function MarketingCalendario({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={imgExpandida} alt="Slide" className="h-auto max-h-[90vh] w-auto max-w-[90vw] rounded-lg border border-linha" />
           <button onClick={() => setImgExpandida(null)} aria-label="Fechar" className="absolute right-4 top-4 rounded-full bg-preto-card px-3 py-1 text-lg text-white transition hover:bg-vermelho">✕</button>
+        </div>
+      )}
+
+      {/* Editor do texto de UM slide (na mão) — o ✏️ de cada slide abre aqui. */}
+      {editandoSlide !== null && selecionado && (
+        <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/85 p-4" onClick={() => setEditandoSlide(null)}>
+          <div className="w-full max-w-md rounded-xl border border-linha bg-preto-card p-4" onClick={(e) => e.stopPropagation()}>
+            <p className="mb-3 text-sm font-bold text-white">✏️ Editar texto do slide {editandoSlide.indice + 1}</p>
+            <label className="block text-xs text-muted">Título
+              <input value={editandoSlide.titulo} onChange={(e) => setEditandoSlide((s) => (s ? { ...s, titulo: e.target.value } : s))} className="input-base" />
+            </label>
+            <label className="mt-2 block text-xs text-muted">Texto
+              <textarea value={editandoSlide.texto} onChange={(e) => setEditandoSlide((s) => (s ? { ...s, texto: e.target.value } : s))} rows={4} className="input-base" />
+            </label>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={salvandoSlide}
+                onClick={async () => {
+                  const ed = editandoSlide;
+                  setSalvandoSlide(true);
+                  const r = await editarTextoSlide({ id: selecionado.id, indice: ed.indice, titulo: ed.titulo, texto: ed.texto });
+                  setSalvandoSlide(false);
+                  if (r.ok) { setEditandoSlide(null); router.refresh(); } else setErro(r.erro);
+                }}
+                className="rounded-lg bg-vermelho px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50"
+              >{salvandoSlide ? "Salvando…" : "Salvar"}</button>
+              <button
+                type="button"
+                disabled={salvandoSlide || slideProcessando !== null}
+                onClick={() => { const idx = editandoSlide.indice; setEditandoSlide(null); handleRegerarSlide(selecionado.id, idx); }}
+                className="rounded-lg border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-4 py-1.5 text-sm font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed] disabled:opacity-50"
+              >✨ Regerar com IA</button>
+              <button type="button" onClick={() => setEditandoSlide(null)} className="ml-auto rounded-lg border border-linha px-4 py-1.5 text-sm font-semibold text-muted transition hover:text-white">Cancelar</button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -728,8 +768,8 @@ export function MarketingCalendario({
                     // último (✕) alinhado com a BASE da imagem, sem vazar pra fora.
                     <div className="flex flex-col justify-between gap-1.5">
                       <div className="group relative">
-                        <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">✍️</button>
-                        <DicaSlide>Regerar texto do slide</DicaSlide>
+                        <button type="button" onClick={() => setEditandoSlide({ indice: i, titulo: selecionado.textosSlides?.[i]?.titulo ?? "", texto: selecionado.textosSlides?.[i]?.texto ?? "" })} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-[#7c3aed] hover:bg-preto-card disabled:opacity-40">✏️</button>
+                        <DicaSlide>Editar o texto (na mão ou com IA)</DicaSlide>
                       </div>
                       {/* COM texto / SEM texto: some quando o slide não tem foto (o modo "sem texto"
                           mostra a imagem pura, então só faz sentido com uma foto/arte no slide). */}
