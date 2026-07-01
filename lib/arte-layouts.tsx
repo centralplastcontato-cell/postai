@@ -27,8 +27,33 @@ export function rotularValidade(v?: string): string {
   return /^\d{1,2}[/.\-]\d{1,2}([/.\-]\d{2,4})?$/.test(s) ? `Válido até ${s}` : s;
 }
 
-// 🎉 Promoção / Oferta — fundo colorido festa + selo + CTA WhatsApp.
-export function LayoutPromocao(d: DadosArte) {
+// Converte cor hex (#RGB ou #RRGGBB) pra rgba com alpha — pro véu de cor sobre a foto de fundo.
+function hexParaRgba(hex: string, a: number): string {
+  const h = (hex || "").replace("#", "");
+  const n = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const r = parseInt(n.slice(0, 2), 16) || 0;
+  const g = parseInt(n.slice(2, 4), 16) || 0;
+  const b = parseInt(n.slice(4, 6), 16) || 0;
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+// Foto de fundo OPCIONAL pros templates de texto (Promoção, Preço, Divulgação): a foto entra
+// COVER + um véu da cor da marca por cima — mantém a identidade E a legibilidade do texto branco.
+// Renderizada ANTES do conteúdo no DOM (fica atrás dele).
+function FundoFoto({ src, cor, w = 1080, h = 1350 }: { src: string; cor: string; w?: number; h?: number }) {
+  const cobre = { position: "absolute" as const, top: 0, left: 0, width: `${w}px`, height: `${h}px` };
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} width={w} height={h} style={{ ...cobre, objectFit: "cover" }} />
+      <div style={{ ...cobre, display: "flex", backgroundColor: hexParaRgba(cor, 0.64) }} />
+      <div style={{ ...cobre, display: "flex", backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.30), rgba(0,0,0,0) 26%, rgba(0,0,0,0) 66%, rgba(0,0,0,0.55))" }} />
+    </>
+  );
+}
+
+// 🎉 Promoção / Oferta — fundo colorido festa + selo + CTA WhatsApp (foto de fundo opcional).
+export function LayoutPromocao(d: DadosArte & { imagemUrl?: string }) {
   const [c1, c2, c3, c4, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[3] || d.paleta[0], d.paleta[4] || d.paleta[0]];
   const fundo = d.corFundo || c4;
   return (
@@ -44,6 +69,7 @@ export function LayoutPromocao(d: DadosArte) {
         fontFamily: "Baloo",
       }}
     >
+      {d.imagemUrl ? <FundoFoto src={d.imagemUrl} cor={fundo} /> : null}
       <Confete cores={[c2, c3, c5, c1]} />
       {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
 
@@ -323,7 +349,7 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
 
 // ⭐ Divulgação / Institucional — fundo colorido festa + "por que escolher" com
 // os diferenciais em destaque (lista com checks) + CTA WhatsApp.
-export function LayoutDivulgacao(d: DadosArte & { parcelamento?: string }) {
+export function LayoutDivulgacao(d: DadosArte & { parcelamento?: string; imagemUrl?: string }) {
   const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
   const fundo = d.corFundo || escolherFundoFesta(d.paleta);
   const itens = (d.diferenciais || []).filter((s) => s && s.trim()).slice(0, 4);
@@ -340,6 +366,7 @@ export function LayoutDivulgacao(d: DadosArte & { parcelamento?: string }) {
         fontFamily: "Baloo",
       }}
     >
+      {d.imagemUrl ? <FundoFoto src={d.imagemUrl} cor={fundo} /> : null}
       <Confete cores={[c2, c3, c5, c1]} />
       {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
 
@@ -962,7 +989,7 @@ export function LayoutEnquete(d: DadosArte & { imagemUrl?: string; ladoA?: strin
 // 💰 Preço / Pacote — oferta com VALORES em destaque: de/por, forma de pagamento,
 // parcelas e economia. Os números são SEMPRE do dono (a IA não inventa preço).
 export function LayoutPreco(
-  d: DadosArte & { precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; validade?: string; modoPreco?: string }
+  d: DadosArte & { precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; validade?: string; modoPreco?: string; imagemUrl?: string }
 ) {
   const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
   const fundo = d.corFundo || escolherFundoFesta(d.paleta);
@@ -993,6 +1020,7 @@ export function LayoutPreco(
         fontFamily: "Baloo",
       }}
     >
+      {d.imagemUrl ? <FundoFoto src={d.imagemUrl} cor={fundo} /> : null}
       <Confete cores={[c2, c3, c5, c1]} />
       {d.logoSrc ? <LogoSolto src={d.logoSrc} /> : null}
 

@@ -45,6 +45,7 @@ export async function GET(req: Request) {
       ...base,
       titulo: montarTituloColorido(tituloParam || "A festa dos sonhos começa aqui", paleta),
       diferenciais: ["Monitores treinados", "Buffet completo", "Decoração temática", "Espaço seguro"],
+      imagemUrl,
     });
   } else if (template === "aniv-capa") {
     elemento = LayoutAnivCapa({
@@ -107,6 +108,7 @@ export async function GET(req: Request) {
       condicoes: ["Seg a Sex", "50 a 70 convidados"],
       validade: "30/06",
       corFundo: url.searchParams.get("cor") || undefined,
+      imagemUrl,
     });
   } else if (template === "feedback") {
     const banco = marca ? await prisma.imagemMarca.findFirst({ where: { marcaId: marca.id }, orderBy: { criadoEm: "asc" }, select: { url: true } }) : null;
@@ -147,6 +149,7 @@ export async function GET(req: Request) {
       validade: url.searchParams.get("validade") || "30/06/2026",
       regras: "Seg a qui · mediante reserva · não cumulativo",
       corFundo: url.searchParams.get("cor") || undefined,
+      imagemUrl,
     });
   }
 

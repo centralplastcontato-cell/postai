@@ -24,7 +24,9 @@ export const TEMPLATE_LABEL: Record<Template, string> = {
 // "🎲 Banco / 🤖 IA / 📤 Foto" não têm efeito neles e devem ficar escondidos. Lista negativa
 // (mais segura p/ templates legados): todo o resto usa foto de fundo. Espelha o render em
 // app/api/feed/[id]/route.tsx (só esses não passam imagemUrl/fotoUrl pro layout).
-const TEMPLATES_SEM_FOTO_FUNDO: string[] = ["promocao", "divulgacao", "moldura", "preco", "mosaico", "vitrine"];
+// promocao/divulgacao/preco AGORA aceitam foto de fundo opcional (véu da cor por cima p/ ler);
+// moldura é design fechado; mosaico/vitrine usam fotos PRÓPRIAS (várias) — esses seguem sem foto única.
+const TEMPLATES_SEM_FOTO_FUNDO: string[] = ["moldura", "mosaico", "vitrine"];
 
 // O template usa foto de fundo única (controlada pelos botões Banco/IA/Foto)?
 export function templateUsaFotoFundo(template: string): boolean {

@@ -50,7 +50,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   if (p.template === "promocao") {
     return new ImageResponse(
-      LayoutPromocao({ ...base, oferta: extra.oferta, validade: extra.validade, inclui: extra.inclui, regras: extra.regras, corFundo: extra.corFundo }),
+      LayoutPromocao({ ...base, oferta: extra.oferta, validade: extra.validade, inclui: extra.inclui, regras: extra.regras, corFundo: extra.corFundo, imagemUrl: fotoUrl }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
@@ -64,7 +64,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   if (p.template === "divulgacao") {
     return new ImageResponse(
-      LayoutDivulgacao({ ...base, diferenciais: extra.diferenciais, corFundo: extra.corFundo, parcelamento: extra.parcelamento }),
+      LayoutDivulgacao({ ...base, diferenciais: extra.diferenciais, corFundo: extra.corFundo, parcelamento: extra.parcelamento, imagemUrl: fotoUrl }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
@@ -100,7 +100,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   if (p.template === "preco") {
     return new ImageResponse(
-      LayoutPreco({ ...base, modoPreco: extra.modoPreco, precoDe: extra.precoDe, precoPor: extra.precoPor, labelPor: extra.labelPor, parcelas: extra.parcelas, economia: extra.economia, condicoes: extra.condicoes, validade: extra.validade, corFundo: extra.corFundo }),
+      LayoutPreco({ ...base, modoPreco: extra.modoPreco, precoDe: extra.precoDe, precoPor: extra.precoPor, labelPor: extra.labelPor, parcelas: extra.parcelas, economia: extra.economia, condicoes: extra.condicoes, validade: extra.validade, corFundo: extra.corFundo, imagemUrl: fotoUrl }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }
