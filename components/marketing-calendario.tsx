@@ -17,6 +17,7 @@ import {
   gerarImagemSlide,
   definirImagemSlide,
   removerImagemSlide,
+  editarLegendaCarrossel,
   postarInstagram,
   sugerirTemas,
   marcarConteudo,
@@ -172,6 +173,10 @@ export function MarketingCalendario({
   const [erro, setErro] = useState<string | null>(null);
   const [imgExpandida, setImgExpandida] = useState<string | null>(null);
   const [legendaAberta, setLegendaAberta] = useState(true);
+  const [editandoLegenda, setEditandoLegenda] = useState(false);
+  const [legendaEdit, setLegendaEdit] = useState("");
+  const [hashtagsEdit, setHashtagsEdit] = useState("");
+  const [salvandoLegenda, setSalvandoLegenda] = useState(false);
   const [copiado, setCopiado] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [slideProcessando, setSlideProcessando] = useState<number | null>(null);
@@ -742,10 +747,34 @@ export function MarketingCalendario({
           </div>
 
           <div className="mt-4">
-            <button type="button" onClick={() => setLegendaAberta((v) => !v)} className="mb-1 flex items-center gap-1 text-xs uppercase tracking-wider text-muted transition hover:text-white"><span>{legendaAberta ? "▾" : "▸"}</span> Legenda + hashtags</button>
-            {legendaAberta && (
+            <div className="mb-1 flex items-center gap-3">
+              <button type="button" onClick={() => setLegendaAberta((v) => !v)} className="flex items-center gap-1 text-xs uppercase tracking-wider text-muted transition hover:text-white"><span>{legendaAberta ? "▾" : "▸"}</span> Legenda + hashtags</button>
+              {legendaAberta && !editandoLegenda && (
+                <button type="button" onClick={() => { setLegendaEdit(selecionado.legenda); setHashtagsEdit(selecionado.hashtags); setEditandoLegenda(true); }} className="text-[11px] font-semibold text-[#d6c6ff] transition hover:text-white">✏️ Editar</button>
+              )}
+            </div>
+            {legendaAberta && (editandoLegenda ? (
+              <div className="space-y-2">
+                <textarea value={legendaEdit} onChange={(e) => setLegendaEdit(e.target.value)} rows={5} placeholder="Texto da legenda" className="scroll-bonito w-full rounded-md border border-linha bg-preto p-3 text-sm text-white" />
+                <textarea value={hashtagsEdit} onChange={(e) => setHashtagsEdit(e.target.value)} rows={2} placeholder="#hashtags" className="scroll-bonito w-full rounded-md border border-linha bg-preto p-3 text-xs text-white" />
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={salvandoLegenda}
+                    onClick={async () => {
+                      setSalvandoLegenda(true);
+                      const r = await editarLegendaCarrossel({ id: selecionado.id, legenda: legendaEdit, hashtags: hashtagsEdit });
+                      setSalvandoLegenda(false);
+                      if (r.ok) { setEditandoLegenda(false); router.refresh(); } else setErro(r.erro);
+                    }}
+                    className="rounded-lg bg-vermelho px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-vermelho-hover disabled:opacity-50"
+                  >{salvandoLegenda ? "Salvando…" : "Salvar"}</button>
+                  <button type="button" onClick={() => setEditandoLegenda(false)} className="rounded-lg border border-linha px-4 py-1.5 text-sm font-semibold text-muted transition hover:text-white">Cancelar</button>
+                </div>
+              </div>
+            ) : (
               <pre className="scroll-bonito max-h-48 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-linha bg-preto p-3 text-sm text-white">{selecionado.legenda}{"\n\n"}{selecionado.hashtags}</pre>
-            )}
+            ))}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">

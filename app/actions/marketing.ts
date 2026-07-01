@@ -523,6 +523,17 @@ export async function definirImagemSlide(input: { id: string; indice: number; ur
   return { ok: true as const };
 }
 
+// Edita a legenda + hashtags do carrossel na mão (sem IA) — o dono ajusta o texto antes de postar.
+export async function editarLegendaCarrossel(input: { id: string; legenda: string; hashtags: string }) {
+  const g = await guardaConteudo(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const c = await prisma.conteudo.findUnique({ where: { id: input.id }, select: { marcaId: true } });
+  if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
+  await prisma.conteudo.update({ where: { id: input.id }, data: { legenda: input.legenda.trim(), hashtags: input.hashtags.trim() } });
+  revalidatePath(`/painel/marcas/${c.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function removerImagemSlide(input: { id: string; indice: number }) {
   const g = await guardaConteudo(input.id);
   if (!g.ok) return { ok: false as const, erro: g.erro };
