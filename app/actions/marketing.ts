@@ -609,6 +609,59 @@ export async function regerarSlide(input: { id: string; indice: number }) {
   }
 }
 
+// Adiciona MAIS UM slide a um carrossel já pronto — sem regerar tudo (não perde os ajustes
+// dos outros slides). A IA escreve um slide de conteúdo com um ângulo novo; se a IA falhar,
+// entra um slide em branco pro dono escrever. O novo slide entra ANTES do último (CTA), pra
+// a "chamada final" continuar por último. Reescreve as URLs (posicionais) pro tamanho novo.
+export async function adicionarSlide(input: { id: string }) {
+  const g = await guardaConteudo(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const c = await prisma.conteudo.findUnique({ where: { id: input.id }, include: { marca: true } });
+  if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
+  if (c.status === "postado") return { ok: false as const, erro: "Esse carrossel já foi postado — regere pra criar um novo." };
+  const slides = lerSlides(c.slidesTexto) ?? [];
+  if (slides.length >= 20) return { ok: false as const, erro: "O carrossel já tem 20 slides (o máximo do Instagram)." };
+
+  // Slide novo de conteúdo — a IA escreve um ângulo diferente dos que já existem.
+  let novo: SlideTexto = { tipo: "conteudo", titulo: "Novo slide", texto: "" };
+  const key = process.env.OPENAI_API_KEY;
+  const tema = c.tema || c.titulo || c.marca.nome;
+  if (key) {
+    try {
+      const jaTem = slides.map((s) => s.titulo).filter(Boolean).join("; ");
+      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          temperature: 0.9,
+          messages: [
+            { role: "system", content: sistemaDaMarca(c.marca) },
+            { role: "user", content: `Tema do carrossel: "${tema}". Escreva UM slide NOVO do tipo "conteudo", com um ângulo diferente destes que já existem: ${jaTem || "(nenhum)"}. Responda só com JSON: {"titulo":"...","texto":"..."}.` },
+          ],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { titulo?: string; texto?: string };
+        if (j.titulo) novo = { tipo: "conteudo", titulo: j.titulo, texto: j.texto };
+      }
+    } catch (e) {
+      console.error("Erro ao criar slide novo:", e);
+    }
+  }
+
+  const ultimo = slides[slides.length - 1];
+  const pos = ultimo?.tipo === "cta" ? slides.length - 1 : slides.length;
+  slides.splice(pos, 0, novo);
+
+  const urls = JSON.stringify(slides.map((_, i) => `/api/slide/${c.id}/${i + 1}`));
+  await prisma.conteudo.update({ where: { id: c.id }, data: { slides: urls, slidesTexto: JSON.stringify(slides) } });
+  revalidatePath(`/painel/marcas/${c.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function marcarConteudo(formData: FormData) {
   const id = String(formData.get("id") || "");
   const g = await guardaConteudo(id);

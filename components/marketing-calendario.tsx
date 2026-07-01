@@ -19,6 +19,7 @@ import {
   removerImagemSlide,
   editarLegendaCarrossel,
   alternarTextoSlide,
+  adicionarSlide,
   postarInstagram,
   sugerirTemas,
   marcarConteudo,
@@ -406,6 +407,15 @@ export function MarketingCalendario({
       setSlideProcessando(null);
     });
   }
+  function handleAdicionarSlide(id: string) {
+    setSlideProcessando(-1); // -1 = "adicionando" (não bate com nenhum índice de slide real)
+    startTransition(async () => {
+      const r = await adicionarSlide({ id });
+      if (!r.ok) setErro(r.erro);
+      else router.refresh();
+      setSlideProcessando(null);
+    });
+  }
   async function baixarTodas(p: Post) {
     setBaixando(true);
     try {
@@ -764,6 +774,14 @@ export function MarketingCalendario({
               </div>
             ))}
           </div>
+
+          {/* Adicionar MAIS um slide ao carrossel já pronto (sem regerar tudo). A IA escreve
+              o texto no tema; o dono ajusta depois com ✍️/🖼️. Entra antes da chamada final. */}
+          {selecionado.status !== "postado" && (
+            <button type="button" onClick={() => handleAdicionarSlide(selecionado.id)} disabled={slideProcessando !== null} className="mt-1 flex items-center gap-2 rounded-lg border border-dashed border-[#7c3aed]/50 bg-[#7c3aed]/10 px-4 py-2 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed] hover:bg-[#7c3aed]/20 disabled:opacity-40">
+              {slideProcessando === -1 ? "➕ Adicionando slide…" : "➕ Adicionar slide"}
+            </button>
+          )}
 
           <div className="mt-4">
             <div className="mb-1 flex items-center gap-3">
