@@ -406,7 +406,7 @@ export function PublicacoesAba({
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
       const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback" || template === "enquete" || template === "vitrine";
       const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, parcelamento, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, parcelamento, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora, imagemUrl: imagemFundo || undefined });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -433,6 +433,7 @@ export function PublicacoesAba({
         setLadoB("");
         setFotoAutor("");
         setGoogleFb(false);
+        setImagemFundo("");
         onGerado?.(r.dia); // filtra a lista no dia da nova publicação (não abre todas)
         router.refresh();
       } else setErro(r.erro);
@@ -540,6 +541,27 @@ export function PublicacoesAba({
     });
   }
   const [seletorImg, setSeletorImg] = useState<PublicacaoView | null>(null);
+  // Foto de fundo escolhida JÁ no formulário (antes de gerar) — pros templates que usam foto.
+  const [imagemFundo, setImagemFundo] = useState("");
+  const [seletorFundo, setSeletorFundo] = useState(false);
+  const [subindoFundo, setSubindoFundo] = useState(false);
+  async function handleUploadFundo(file: File | undefined) {
+    if (!file) return;
+    setErro(null);
+    setSubindoFundo(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const resp = await fetch("/api/marketing/upload", { method: "POST", body: form });
+      const data = await resp.json();
+      if (data.ok) setImagemFundo(data.url);
+      else setErro(data.erro || "Falha ao subir a foto.");
+    } catch {
+      setErro("Falha ao subir a foto. Tente de novo.");
+    } finally {
+      setSubindoFundo(false);
+    }
+  }
   function handleEscolherImagem(id: string, url: string) {
     setErro(null);
     setProc(id);
@@ -1075,6 +1097,34 @@ export function PublicacoesAba({
           </div>
         )}
 
+        {/* Foto de fundo (opcional) — pros templates que usam foto de fundo única */}
+        {templateUsaFotoFundo(template) && (
+          <div className="mb-3">
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">🖼️ Foto de fundo <span className="normal-case text-muted/70">(opcional — sem foto, fica só a cor)</span></p>
+            {imagemFundo ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imagemFundo} alt="" className="h-16 w-16 rounded-lg border border-linha object-cover" />
+                <button type="button" onClick={() => setSeletorFundo(true)} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-[#7c3aed] hover:text-white">🖼️ Trocar</button>
+                <label className="cursor-pointer rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-[#7c3aed] hover:text-white">
+                  {subindoFundo ? "Enviando…" : "📤 Enviar"}
+                  <input type="file" accept="image/*" className="hidden" disabled={subindoFundo} onChange={(e) => handleUploadFundo(e.target.files?.[0])} />
+                </label>
+                <button type="button" onClick={() => setImagemFundo("")} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-vermelho hover:text-white">✕ Remover</button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setSeletorFundo(true)} className="rounded-md border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-3 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]">🖼️ Escolher do banco</button>
+                <label className="cursor-pointer rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-[#7c3aed] hover:text-white">
+                  {subindoFundo ? "Enviando…" : "📤 Enviar foto"}
+                  <input type="file" accept="image/*" className="hidden" disabled={subindoFundo} onChange={(e) => handleUploadFundo(e.target.files?.[0])} />
+                </label>
+                <span className="text-[11px] text-muted/70">entra atrás do texto, com um véu da cor pra ler bem</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Seletor de cor de fundo — só pros templates de fundo colorido e se a marca tem paleta */}
         {TEMPLATES_COR.includes(template) && coresFundo.length > 0 && (
           <div className="mb-3">
@@ -1271,6 +1321,16 @@ export function PublicacoesAba({
           atual={seletorImg.imagemUrl}
           onEscolher={(url) => handleEscolherImagem(seletorImg.id, url)}
           onFechar={() => setSeletorImg(null)}
+        />
+      )}
+      {/* Seletor do banco pra a foto de fundo escolhida NO FORMULÁRIO (antes de gerar) */}
+      {seletorFundo && (
+        <SeletorImagemBanco
+          marcaId={marcaId}
+          texto={[tema, oferta, precoPor].filter(Boolean).join(" ")}
+          atual={imagemFundo || null}
+          onEscolher={(url) => setImagemFundo(url)}
+          onFechar={() => setSeletorFundo(false)}
         />
       )}
     </div>

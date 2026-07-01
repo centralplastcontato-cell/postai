@@ -557,6 +557,7 @@ export async function gerarPublicacao(input: {
   estiloStory?: string; // colorida | foto | faixa — guardado no extra pro render do Story
   ladoA?: string; // enquete: lado A (ex: Salgados)
   ladoB?: string; // enquete: lado B (ex: Docinhos)
+  imagemUrl?: string; // foto de fundo ESCOLHIDA no formulário (banco/upload) — prioridade sobre a automática
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -623,7 +624,10 @@ export async function gerarPublicacao(input: {
   // gera um fundo decorativo abstrato. (Promoção/Divulgação usam fundo colorido.)
   const querFoto = input.comFoto === undefined ? USA_FOTO[template] : input.comFoto;
   let avisoFoto = false; // usuário PEDIU foto (Story Foto/Faixa) mas o banco estava vazio
-  if (template === "mosaico") {
+  if (input.imagemUrl) {
+    // Foto ESCOLHIDA pelo dono no formulário (banco/upload) — tem prioridade sobre a automática.
+    await definirImagemPublicacao({ id: criado.id, url: input.imagemUrl }).catch(() => {});
+  } else if (template === "mosaico") {
     // Puxa as 4 fotos reais do banco (rodízio) e grava no extra.
     await aplicarFotosMosaico(criado.id, marca.id, input.categoria).catch(() => {});
   } else if (template === "vitrine") {
