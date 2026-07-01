@@ -85,9 +85,10 @@ function dataHoraBR(iso: string): string {
   return `${dm} às ${hm}`;
 }
 
-// Capas de estilo (Mosaico/Colorida/Foto/Moldura/Faixa): têm visual próprio e NÃO
-// usam foto de fundo — então os botões de foto (banco/IA/upload) não têm efeito ali.
-const ehCapaEstilo = (tipo?: string) => tipo === "mosaico" || (tipo?.startsWith("capa-") ?? false);
+// Slides que NÃO usam foto de fundo ÚNICA → os botões de foto (banco/IA/upload) não têm efeito:
+// mosaico (usa 4 fotos próprias), capa-festiva (só cor) e capa-moldura (só cor + texto).
+// capa-foto e capa-faixa USAM 1 foto de fundo (slide.imagemUrl) — então os botões funcionam nelas.
+const ehCapaEstilo = (tipo?: string) => tipo === "mosaico" || tipo === "capa-festiva" || tipo === "capa-moldura";
 
 // Hora (0-23) de uma data ISO no fuso de São Paulo — pro seletor de hora do card.
 function horaSP(iso: string): number {
