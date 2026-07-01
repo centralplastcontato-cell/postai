@@ -13,7 +13,7 @@ export const maxDuration = 60;
 // ?v= troca sozinho quando o conteúdo muda.
 const CACHE = { "cache-control": "public, max-age=31536000, immutable" };
 
-type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string; fotos?: string[]; corFundo?: string; recado?: string };
+type Slide = { tipo?: string; titulo?: string; texto?: string; imagemUrl?: string; fotos?: string[]; corFundo?: string; recado?: string; semTexto?: boolean };
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: string }> }) {
   const { id, n } = await ctx.params;
@@ -45,6 +45,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
 
   // Normaliza a foto do slide pra PNG/JPEG (o next/og não aceita webp/avif do banco).
   const fotoSlide = await fotoSegura(slide.imagemUrl);
+
+  // "Sem texto": o dono subiu uma arte JÁ pronta (com os dizeres dele) e quer usá-la PURA
+  // como capa/slide — sem a plataforma escrever nada por cima. Só a imagem, ocupando tudo.
+  if (slide.semTexto && fotoSlide) {
+    return new ImageResponse(
+      (
+        <div style={{ width: "1080px", height: "1350px", display: "flex" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={fotoSlide} width={1080} height={1350} style={{ width: "1080px", height: "1350px", objectFit: "cover" }} />
+        </div>
+      ),
+      { width: 1080, height: 1350, headers: CACHE }
+    );
+  }
 
   // Capa em Mosaico: 4 fotos reais do banco em círculos, com a cara da marca.
   if (slide.tipo === "mosaico") {

@@ -21,6 +21,7 @@ type SlideTexto = {
   fotos?: string[]; // tipo "mosaico": as 4 fotos reais do banco que vão nos círculos
   corFundo?: string; // cor de fundo escolhida pra capa (templates de capa)
   recado?: string; // Aniversariantes: recado opcional por criança (aparece no slide dela)
+  semTexto?: boolean; // slide COM foto: mostrar a imagem PURA (arte que o dono já subiu pronta), sem os textos por cima
 };
 
 // Estilos de CAPA de carrossel que o usuário pode escolher (ou "aleatorio" sorteia).
@@ -547,6 +548,22 @@ export async function removerImagemSlide(input: { id: string; indice: number }) 
   await prisma.conteudo.update({ where: { id: input.id }, data: { slidesTexto: JSON.stringify(slides) } });
   revalidatePath(`/painel/marcas/${c.marcaId}`);
   return { ok: true as const };
+}
+
+// Liga/desliga o "sem texto" de um slide: mostra a imagem PURA (a arte que o dono subiu
+// pronta, com os dizeres dele) OU os textos da marca por cima. Só faz sentido com foto.
+export async function alternarTextoSlide(input: { id: string; indice: number }) {
+  const g = await guardaConteudo(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const c = await prisma.conteudo.findUnique({ where: { id: input.id } });
+  if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
+  const slides = lerSlides(c.slidesTexto);
+  const slide = slides?.[input.indice];
+  if (!slide) return { ok: false as const, erro: "Slide não encontrado." };
+  slides![input.indice] = { ...slide, semTexto: !slide.semTexto };
+  await prisma.conteudo.update({ where: { id: input.id }, data: { slidesTexto: JSON.stringify(slides) } });
+  revalidatePath(`/painel/marcas/${c.marcaId}`);
+  return { ok: true as const, semTexto: !slide.semTexto };
 }
 
 export async function regerarSlide(input: { id: string; indice: number }) {

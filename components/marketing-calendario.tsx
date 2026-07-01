@@ -18,6 +18,7 @@ import {
   definirImagemSlide,
   removerImagemSlide,
   editarLegendaCarrossel,
+  alternarTextoSlide,
   postarInstagram,
   sugerirTemas,
   marcarConteudo,
@@ -70,6 +71,7 @@ export type Post = {
   postadoEm?: string | null; // ISO do momento real da publicação (null = não postado)
   imagensSlides?: (string | null)[];
   tiposSlides?: (string | undefined)[]; // tipo de cada slide (capa/conteudo/mosaico/capa-*)
+  semTextoSlides?: boolean[]; // por slide: mostrar a foto PURA (sem os textos por cima)
   categoria?: string | null; // categoria de intenção (pra etiqueta + inteligência)
   // Engajamento no Instagram (coletado pelo piloto após postar)
   curtidas?: number | null;
@@ -395,6 +397,15 @@ export function MarketingCalendario({
       setSlideProcessando(null);
     });
   }
+  function handleAlternarTexto(id: string, indice: number) {
+    setSlideProcessando(indice);
+    startTransition(async () => {
+      const r = await alternarTextoSlide({ id, indice });
+      if (!r.ok) setErro(r.erro);
+      else router.refresh();
+      setSlideProcessando(null);
+    });
+  }
   async function baixarTodas(p: Post) {
     setBaixando(true);
     try {
@@ -710,6 +721,14 @@ export function MarketingCalendario({
                         <button type="button" onClick={() => handleRegerarSlide(selecionado.id, i)} disabled={slideProcessando !== null} className="flex h-8 w-8 items-center justify-center rounded-md border border-linha bg-preto text-sm transition hover:border-vermelho hover:bg-preto-card disabled:opacity-40">✍️</button>
                         <DicaSlide>Regerar texto do slide</DicaSlide>
                       </div>
+                      {/* COM texto / SEM texto: some quando o slide não tem foto (o modo "sem texto"
+                          mostra a imagem pura, então só faz sentido com uma foto/arte no slide). */}
+                      {selecionado.imagensSlides?.[i] && (
+                        <div className="group relative">
+                          <button type="button" onClick={() => handleAlternarTexto(selecionado.id, i)} disabled={slideProcessando !== null} className={`flex h-8 w-8 items-center justify-center rounded-md border text-sm font-bold transition disabled:opacity-40 ${selecionado.semTextoSlides?.[i] ? "border-amber-400 bg-amber-400/20 text-amber-300" : "border-linha bg-preto text-muted hover:border-vermelho hover:bg-preto-card"}`}>Aa</button>
+                          <DicaSlide>{selecionado.semTextoSlides?.[i] ? "SEM texto (imagem pura) — tocar pra voltar COM os textos" : "Tirar os textos — usar a imagem PURA (a arte que você subiu)"}</DicaSlide>
+                        </div>
+                      )}
                       {/* Botões de FOTO: só nos slides que usam foto de fundo. A capa de
                           estilo (mosaico/capa-*) tem visual próprio — foto ali não tem efeito. */}
                       {!ehCapaEstilo(selecionado.tiposSlides?.[i]) && (
