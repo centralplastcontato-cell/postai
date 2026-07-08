@@ -75,7 +75,9 @@ export function ResumoDoDia({
       .map((p) => ({ tipo: "story" as const, id: p.id, titulo: p.titulo, status: p.status, aprovado: p.aprovado, thumb: `/api/story/${p.id}?v=${v(p)}`, aspect: "aspect-[9/16]", ordem: new Date(p.data).getTime() })),
     ...reels
       .filter((p) => chaveDiaSP(p.data) === dia)
-      .map((p) => ({ tipo: "reels" as const, id: p.id, titulo: p.titulo, status: p.status, aprovado: p.aprovado, video: p.videoUrl ?? undefined, aspect: "aspect-[9/16]", ordem: new Date(p.data).getTime() })),
+      // Vídeo arquivado (postado há +24h → MP4 apagado): usa a foto da festa (capaReel)
+      // como miniatura — igual à aba Reels — em vez do quadrado "sem capa".
+      .map((p) => ({ tipo: "reels" as const, id: p.id, titulo: p.titulo, status: p.status, aprovado: p.aprovado, video: p.videoUrl || undefined, thumb: p.capaReel ?? undefined, aspect: "aspect-[9/16]", ordem: new Date(p.data).getTime() })),
   ].sort((a, b) => a.ordem - b.ordem);
 
   const dataItem = posts.find((p) => chaveDiaSP(p.data) === dia)?.data
