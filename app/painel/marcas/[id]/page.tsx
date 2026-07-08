@@ -189,8 +189,20 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   // pra capa, ou a 1ª). O vínculo principal é o ID embutido no slug do Reels
   // ("reels-<6 últimos do festaId>-…") — exato, não confunde festas de aniversariantes com o
   // mesmo nome (ex: dois "Pedro"). O nome fica só de RESERVA pra reels antigos sem esse slug.
-  const capaDaFesta = (f: (typeof festasRaw)[number]) =>
-    (f.videoCapa && f.fotos.find((x) => x.id === f.videoCapa)?.url) || f.fotos[0]?.url;
+  // Replica a regra do MOTOR do vídeo (gerarVideoDaFesta): capa = a foto ESCOLHIDA
+  // (videoCapa) → senão a 1ª da SEQUÊNCIA do vídeo (videoFotos) → senão a foto mais
+  // antiga da festa. Assim o card mostra a MESMA imagem que abre o Reels no Instagram.
+  const capaDaFesta = (f: (typeof festasRaw)[number]): string | undefined => {
+    const porId = new Map(f.fotos.map((x) => [x.id, x.url]));
+    if (f.videoCapa && porId.has(f.videoCapa)) return porId.get(f.videoCapa);
+    try {
+      for (const id of JSON.parse(f.videoFotos || "[]") as string[]) {
+        if (porId.has(id)) return porId.get(id);
+      }
+    } catch {}
+    // fotos vêm ordenadas da mais NOVA pra mais antiga → a última é a 1ª subida.
+    return f.fotos[f.fotos.length - 1]?.url;
+  };
   const capaPorNome = new Map<string, string>();
   for (const f of festasRaw) {
     const nome = (f.aniversariante || "").trim();
