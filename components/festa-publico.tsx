@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta, salvarAutorizacaoFesta, salvarMostrarAvaliacao } from "@/app/actions/festas";
+import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta, salvarAutorizacaoFesta, salvarMostrarAvaliacao, editarFestaPublica } from "@/app/actions/festas";
 import { QRCodeSVG } from "qrcode.react";
+import { InputDataBR } from "@/components/input-data-br";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
 import { MOMENTOS_FESTA, LIMITE_FOTOS_FESTA, LIMITE_FOTOS_MOMENTO } from "@/lib/momentos-festa";
 import { type FestaView, type FotoView, type MarcaPublica } from "@/lib/festa-tipos";
@@ -43,6 +44,53 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
   const [mostrarAval, setMostrarAval] = useState(festa.mostrarAvaliacao);
   const [salvandoAval, setSalvandoAval] = useState(false);
   const [mostrarQR, setMostrarQR] = useState(false);
+  // CORRIGIR DADOS da festa (erro de digitação na criação): mesmo formulário da criação,
+  // salvo pela action pública validada pelo token — só mexe NESTA festa.
+  const [editando, setEditando] = useState(false);
+  const [edData, setEdData] = useState("");
+  const [edHorario, setEdHorario] = useState("");
+  const [edPessoas, setEdPessoas] = useState<{ nome: string; idade: string }[]>([]);
+  const [edTema, setEdTema] = useState("");
+  const [edInsta, setEdInsta] = useState("");
+  const [salvandoEd, setSalvandoEd] = useState(false);
+  const [erroEd, setErroEd] = useState<string | null>(null);
+
+  function abrirEdicao() {
+    setEdData(new Date(festa.dataISO).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }));
+    setEdHorario(festa.horario || "");
+    setEdPessoas(
+      festa.aniversariantes.length
+        ? festa.aniversariantes.map((a) => ({ nome: a.nome, idade: a.idade != null ? String(a.idade) : "" }))
+        : [{ nome: "", idade: "" }],
+    );
+    setEdTema(festa.tema || "");
+    setEdInsta(festa.instagramAnfitriao || "");
+    setErroEd(null);
+    setEditando(true);
+  }
+
+  function setEdPessoa(i: number, campo: "nome" | "idade", val: string) {
+    setEdPessoas((ps) => ps.map((p, idx) => (idx === i ? { ...p, [campo]: val } : p)));
+  }
+
+  async function salvarEdicao() {
+    setErroEd(null);
+    const lista = edPessoas
+      .map((p) => ({ nome: p.nome.trim(), idade: p.idade.trim() ? parseInt(p.idade, 10) : null }))
+      .filter((p) => p.nome);
+    if (!lista.length) { setErroEd("Qual o nome do aniversariante?"); return; }
+    setSalvandoEd(true);
+    try {
+      const r = await editarFestaPublica(token, { dataISO: edData, aniversariantes: lista, tema: edTema, horario: edHorario, instagramAnfitriao: edInsta });
+      if (!r.ok) { setErroEd(r.erro); return; }
+      setEditando(false);
+      router.refresh();
+    } catch {
+      setErroEd("Não consegui salvar agora. Tente de novo.");
+    } finally {
+      setSalvandoEd(false);
+    }
+  }
 
   async function alternarAvaliacao() {
     const novo = !mostrarAval;
@@ -249,7 +297,55 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
         <div className="mt-4 rounded-xl border border-linha bg-preto-card p-4">
           <p className="text-sm font-semibold text-white">🎂 {rotuloAniversariantes(festa.aniversariantes)}{festa.tema ? <span className="font-normal text-muted"> · {festa.tema}</span> : null}</p>
           <p className="mt-0.5 text-xs text-muted">{dataBR(festa.dataISO)}{festa.horario ? ` às ${festa.horario}` : ""} · {festa.fotos.length}/{LIMITE_FOTOS_FESTA} fotos {festa.finalizadaEm && <span className="font-semibold text-green-400">· ✓ Finalizada</span>}</p>
-          <button type="button" onClick={copiarLink} className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-linha px-3 py-1.5 text-[11px] font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">🔗 {linkCopiado ? "✓ Link copiado!" : "Salvar o link desta festa (pra voltar depois)"}</button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" onClick={copiarLink} className="inline-flex items-center gap-1.5 rounded-lg border border-linha px-3 py-1.5 text-[11px] font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">🔗 {linkCopiado ? "✓ Link copiado!" : "Salvar o link desta festa (pra voltar depois)"}</button>
+            {!editando && (
+              <button type="button" onClick={abrirEdicao} className="inline-flex items-center gap-1.5 rounded-lg border border-linha px-3 py-1.5 text-[11px] font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">✏️ Corrigir dados</button>
+            )}
+          </div>
+
+          {/* Formulário de correção (mesmos campos da criação) */}
+          {editando && (
+            <div className="mt-3 border-t border-linha pt-3">
+              <p className="text-xs font-semibold text-white">✏️ Corrigir dados da festa</p>
+              <div className="mt-2 flex gap-3">
+                <label className="block flex-1 text-xs font-medium text-muted">Data da festa
+                  <InputDataBR value={edData} onChange={setEdData} className="mt-1" />
+                </label>
+                <label className="block text-xs font-medium text-muted">Horário
+                  <input type="time" value={edHorario} onChange={(e) => setEdHorario(e.target.value)} style={{ colorScheme: "dark" }} className="input-base mt-1" />
+                </label>
+              </div>
+              <div className="mt-3">
+                <p className="text-xs font-medium text-muted">Aniversariante(s) e idade</p>
+                <div className="mt-1 space-y-2">
+                  {edPessoas.map((p, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input type="text" value={p.nome} onChange={(e) => setEdPessoa(i, "nome", e.target.value)} placeholder={i === 0 ? "Nome (ex: Maria)" : "Outro aniversariante"} className="input-base mt-0 flex-1" />
+                      <input type="number" inputMode="numeric" min={0} max={130} value={p.idade} onChange={(e) => setEdPessoa(i, "idade", e.target.value)} placeholder="Idade" className="input-base mt-0 w-20 shrink-0" />
+                      {edPessoas.length > 1 && (
+                        <button type="button" onClick={() => setEdPessoas((ps) => ps.filter((_, idx) => idx !== i))} aria-label="Remover aniversariante" className="shrink-0 rounded-lg border border-linha px-2.5 py-2 text-sm text-muted transition hover:border-red-500/50 hover:text-red-400">✕</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {edPessoas.length < 10 && (
+                  <button type="button" onClick={() => setEdPessoas((ps) => [...ps, { nome: "", idade: "" }])} className="mt-2 text-xs font-semibold text-muted transition hover:text-white">+ Adicionar outro aniversariante</button>
+                )}
+              </div>
+              <label className="mt-3 block text-xs font-medium text-muted">Tema da festa <span className="font-normal text-muted/70">(opcional)</span>
+                <input type="text" value={edTema} onChange={(e) => setEdTema(e.target.value)} placeholder="Ex: Frozen, Super-heróis…" className="input-base mt-1" />
+              </label>
+              <label className="mt-3 block text-xs font-medium text-muted">📸 Instagram da família <span className="font-normal text-muted/70">(opcional — pra marcar no post)</span>
+                <input type="text" value={edInsta} onChange={(e) => setEdInsta(e.target.value)} placeholder="@usuario_da_familia" autoCapitalize="none" autoCorrect="off" className="input-base mt-1" />
+              </label>
+              {erroEd && <p className="mt-2 text-sm text-vermelho">{erroEd}</p>}
+              <div className="mt-3 flex gap-2">
+                <button type="button" onClick={salvarEdicao} disabled={salvandoEd} className="flex-1 rounded-lg px-3 py-2 text-xs font-semibold text-white transition disabled:opacity-60" style={{ backgroundColor: cor }}>{salvandoEd ? "Salvando…" : "✓ Salvar correções"}</button>
+                <button type="button" onClick={() => setEditando(false)} disabled={salvandoEd} className="rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-muted transition hover:text-white disabled:opacity-60">Cancelar</button>
+              </div>
+            </div>
+          )}
           <div className="mt-3 border-t border-linha pt-3">
             <label className="block text-xs font-medium text-muted">👤 Seu nome <span className="text-vermelho">*</span> <span className="font-normal text-muted/70">(quem está registrando as fotos)</span>
               <input

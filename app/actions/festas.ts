@@ -170,6 +170,35 @@ export async function criarFestaPublica(
   return { ok: true as const, festaId: festa.id, festaToken };
 }
 
+// O gerente CORRIGE os dados da festa (data, horário, aniversariantes, tema, @ da família) —
+// pelo LINK DA FESTA (validado por festaToken). Mesmos campos e validações do editarFesta do
+// painel; o link só mexe NESTA festa. Existe porque quem cria no balcão erra digitação, e é
+// o gerente que percebe na hora ("é com Y", "a festa mudou pras 15h").
+export async function editarFestaPublica(
+  festaToken: string,
+  input: { dataISO: string; aniversariantes: { nome: string; idade: number | null }[]; tema?: string; horario?: string; instagramAnfitriao?: string },
+) {
+  const f = await festaPorToken(festaToken);
+  if (!f) return { ok: false as const, erro: "Link inválido ou desativado." };
+  const lista = parseAniversariantes(JSON.stringify(input.aniversariantes || [])).slice(0, 10);
+  if (!lista.length) return { ok: false as const, erro: "Informe o nome de pelo menos um aniversariante." };
+  const data = dataDoDiaBRT(input.dataISO);
+  if (!data) return { ok: false as const, erro: "Data inválida." };
+  await prisma.festa.update({
+    where: { id: f.id },
+    data: {
+      data,
+      aniversariante: nomesAniversariantes(lista),
+      aniversariantes: JSON.stringify(lista),
+      tema: (input.tema || "").trim().slice(0, 80),
+      horario: (input.horario || "").trim().slice(0, 5),
+      instagramAnfitriao: limparInsta(input.instagramAnfitriao),
+    },
+  });
+  revalidatePath(`/f/${festaToken}`);
+  return { ok: true as const };
+}
+
 // O gerente remove uma foto que subiu errada — pelo LINK DA FESTA (validado por festaToken).
 // Só apaga foto DESTA festa: o link não mexe em outras festas nem nas fotos do banco geral.
 export async function removerFotoPublica(festaToken: string, fotoId: string) {
