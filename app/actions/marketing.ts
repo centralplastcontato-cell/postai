@@ -66,9 +66,14 @@ function slugify(s: string): string {
     .slice(0, 40);
 }
 
-async function gerarConteudo(marca: Marca, tema: string, nSlides: number): Promise<Gerado> {
+async function gerarConteudo(marca: Marca, tema: string, nSlides: number, fotosDesc?: string[]): Promise<Gerado> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error("OPENAI_API_KEY não configurada.");
+  // FOTO-PRIMEIRO: quando os slides já têm fotos reais definidas, o texto de cada slide é
+  // escrito SOBRE a foto dele — é isso que faz título/texto/imagem casarem no carrossel.
+  const guiaFotos = fotosDesc?.length
+    ? `\nOs slides de conteúdo serão ilustrados por FOTOS REAIS do negócio, nesta ordem:\n${fotosDesc.map((d, i) => `- Slide ${i + 2}: a foto mostra "${d}"`).join("\n")}\nREGRA: o título e o texto de cada slide de conteúdo falam EXATAMENTE do que a foto daquele slide mostra (conectando com o tema). Nunca escreva algo que a foto do slide não mostra.`
+    : "";
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -78,7 +83,7 @@ async function gerarConteudo(marca: Marca, tema: string, nSlides: number): Promi
       temperature: 0.8,
       messages: [
         { role: "system", content: sistemaDaMarca(marca) },
-        { role: "user", content: `Crie um carrossel com exatamente ${nSlides} slides sobre: "${tema}".` },
+        { role: "user", content: `Crie um carrossel com exatamente ${nSlides} slides sobre: "${tema}".${guiaFotos}` },
       ],
     }),
   });
@@ -122,10 +127,19 @@ async function gerarFotoFundo(marca: Marca, descricao: string, ref: string): Pro
 // sem repetir na mesma leva); só cai na IA (fundo decorativo abstrato) quando o
 // banco está vazio. O sorteio do banco é SEQUENCIAL (pro contador de rodízio
 // equilibrar entre os slides); a geração de IA, que é lenta, roda em paralelo.
-async function comFotosDeIA(marca: Marca, id: string, slides: SlideTexto[]): Promise<SlideTexto[]> {
+// `categoriaFoto` restringe o rodízio à categoria que ilustra o tema (texto ↔ foto
+// casados); se ela não tiver fotos, o sorteio já cai pro banco inteiro sozinho.
+// `fotosGuia` (FOTO-PRIMEIRO): fotos JÁ escolhidas pro carrossel, na ordem dos slides de
+// conteúdo — cada slide recebe exatamente a foto sobre a qual o texto dele foi escrito.
+// O CTA fica em cor sólida (chamada limpa, sem foto aleatória por trás).
+async function comFotosDeIA(marca: Marca, id: string, slides: SlideTexto[], categoriaFoto?: string, fotosGuia?: string[]): Promise<SlideTexto[]> {
+  if (fotosGuia?.length) {
+    let k = 0;
+    return slides.map((s) => (s.tipo === "conteudo" && k < fotosGuia.length ? { ...s, imagemUrl: fotosGuia[k++] } : s));
+  }
   // As CAPAS de estilo (mosaico/capa-*) já trazem suas próprias fotos/cor — não recebem foto única.
   const doBanco: (string | null)[] = [];
-  for (let i = 0; i < slides.length; i++) doBanco.push(ehCapaEstilo(slides[i].tipo) ? null : await sortearImagemBanco(marca.id));
+  for (let i = 0; i < slides.length; i++) doBanco.push(ehCapaEstilo(slides[i].tipo) ? null : await sortearImagemBanco(marca.id, categoriaFoto));
   const fotos = await Promise.all(
     slides.map(async (s, i) => (ehCapaEstilo(s.tipo) ? null : doBanco[i] || (await gerarFotoFundo(marca, `${s.titulo}. ${s.texto ?? ""}`, `slide-${id}-${i}`)))),
   );
@@ -135,17 +149,18 @@ async function comFotosDeIA(marca: Marca, id: string, slides: SlideTexto[]): Pro
 // Transforma a CAPA (slide 0) no ESTILO escolhido (ou sorteia se "aleatorio"). Os
 // estilos com foto (foto/faixa/mosaico) puxam do banco; festiva/moldura são só cor.
 // O título gerado pela IA é mantido — só o visual da capa muda. corFundo = cor da capa.
-async function aplicarEstiloCapa(marca: Marca, slides: SlideTexto[], estilo: string, corFundo?: string): Promise<SlideTexto[]> {
+// `categoriaFoto` restringe as fotos da capa à categoria do tema (texto ↔ foto casados).
+async function aplicarEstiloCapa(marca: Marca, slides: SlideTexto[], estilo: string, corFundo?: string, categoriaFoto?: string): Promise<SlideTexto[]> {
   if (!slides.length) return slides;
   let est = estilo;
   if (!(ESTILOS_CAPA as readonly string[]).includes(est)) est = ESTILOS_CAPA[Math.floor(Math.random() * ESTILOS_CAPA.length)];
   if (est === "mosaico") {
-    const fotos = await sortearImagensBanco(marca.id, 4);
+    const fotos = await sortearImagensBanco(marca.id, 4, categoriaFoto);
     if (!fotos.length) est = "festiva"; // sem banco, cai pra capa colorida (sem foto)
     else return slides.map((s, i) => (i === 0 ? { ...s, tipo: "mosaico", fotos, corFundo, imagemUrl: undefined } : s));
   }
   if (est === "foto" || est === "faixa") {
-    const foto = await sortearImagemBanco(marca.id);
+    const foto = await sortearImagemBanco(marca.id, categoriaFoto);
     if (!foto) est = "festiva"; // sem banco, cai pra capa colorida
     else return slides.map((s, i) => (i === 0 ? { ...s, tipo: `capa-${est}` as SlideTexto["tipo"], imagemUrl: foto, corFundo, fotos: undefined } : s));
   }
@@ -171,6 +186,10 @@ export async function gerarCarrossel(input: {
   estiloCapa?: string; // festiva | foto | moldura | faixa | mosaico | aleatorio
   corFundo?: string; // cor de fundo da capa (ou vazio = automático)
   hora?: number; // hora do post (BRT) — permite vários posts no mesmo dia em horas diferentes
+  categoriaFoto?: string; // categoria do banco pras fotos dos slides (vazio = banco inteiro)
+  // FOTO-PRIMEIRO (Preencher Agenda): fotos JÁ escolhidas — 1ª vira a capa, as demais viram
+  // os slides de conteúdo NA ORDEM, e o texto de cada slide é escrito sobre a foto dele.
+  fotosGuia?: { url: string; descricao: string }[];
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -180,7 +199,9 @@ export async function gerarCarrossel(input: {
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const tema = input.tema?.trim();
   if (!tema) return { ok: false as const, erro: "Informe um tema." };
-  const nSlides = Math.min(10, Math.max(4, input.nSlides ?? 7));
+  // Com fotos-guia, o tamanho do carrossel segue as fotos: capa (1ª) + 1 slide por foto + CTA.
+  const guia = (input.fotosGuia ?? []).filter((f) => f?.url);
+  const nSlides = guia.length >= 2 ? Math.min(10, Math.max(4, guia.length + 1)) : Math.min(10, Math.max(4, input.nSlides ?? 7));
 
   // Dia/hora + limite de feed/dia do pacote do dono (carrossel conta junto com o feed).
   // Validado ANTES da IA pra não gastar geração. Marca sem dono/plano (admin) = sem limite.
@@ -194,7 +215,7 @@ export async function gerarCarrossel(input: {
 
   let gerado: Gerado;
   try {
-    gerado = await gerarConteudo(marca, tema, nSlides);
+    gerado = await gerarConteudo(marca, tema, nSlides, guia.length >= 2 ? guia.slice(1).map((f) => f.descricao) : undefined);
   } catch (e) {
     console.error("Erro ao gerar carrossel:", e);
     return { ok: false as const, erro: "Não consegui gerar agora. Confira a chave da OpenAI." };
@@ -216,10 +237,13 @@ export async function gerarCarrossel(input: {
     },
   });
   // Aplica o ESTILO da capa (slide 0) ANTES de preencher as fotos dos demais slides.
-  // Default = aleatório (variedade automática). corFundo vazio = automático (da paleta).
-  const slidesBase = await aplicarEstiloCapa(marca, gerado.slides, input.estiloCapa || "aleatorio", input.corFundo || undefined);
+  // Com fotos-guia, a capa é a 1ª foto escolhida (capa-foto); senão, default = aleatório
+  // (variedade automática). corFundo vazio = automático (da paleta).
+  const slidesBase = guia.length >= 2
+    ? gerado.slides.map((s, i) => (i === 0 ? { ...s, tipo: "capa-foto" as SlideTexto["tipo"], imagemUrl: guia[0].url, corFundo: input.corFundo || undefined, fotos: undefined } : s))
+    : await aplicarEstiloCapa(marca, gerado.slides, input.estiloCapa || "aleatorio", input.corFundo || undefined, input.categoriaFoto);
   // Gera foto de IA pra cada slide. Se alguma falhar, aquele slide fica em cor sólida.
-  const slidesFinais = await comFotosDeIA(marca, criado.id, slidesBase);
+  const slidesFinais = await comFotosDeIA(marca, criado.id, slidesBase, input.categoriaFoto, guia.length >= 2 ? guia.slice(1).map((f) => f.url) : undefined);
   const slides = JSON.stringify(slidesFinais.map((_, i) => `/api/slide/${criado.id}/${i + 1}`));
   // Classifica a categoria de intenção (pra inteligência) a partir do tema + legenda.
   // Best-effort: se a IA falhar, fica null e o backfill resgata depois.

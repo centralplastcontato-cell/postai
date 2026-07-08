@@ -9,6 +9,7 @@ import { type SugestaoBia } from "@/lib/inteligencia";
 import { CalendarioRedes, type SelecaoRede } from "./calendario-redes";
 import { ResumoDoDia } from "./resumo-dia";
 import { AniversariantesForm } from "./aniversariantes-form";
+import { PreencherAgenda, MAX_DIAS_SELECAO } from "./preencher-agenda";
 
 function parseDias(s: string): number[] {
   return s.split(",").map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
@@ -48,6 +49,9 @@ export function RedesSociais({
   const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes" | "story" | "reels">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
   const [dataAlvo, setDataAlvo] = useState<string | null>(null);
+  // PREENCHER AGENDA: modo de seleção de dias + dias marcados no calendário.
+  const [modoPreencher, setModoPreencher] = useState(false);
+  const [diasSelecionados, setDiasSelecionados] = useState<string[]>([]);
 
   const planoCar = parseDias(diasCarrossel);
   const planoFeed = parseDias(diasFeed);
@@ -75,8 +79,25 @@ export function RedesSociais({
   const cls = (ativa: boolean, ativoCor = "bg-vermelho") =>
     `rounded-lg px-4 py-2 text-sm font-semibold transition ${ativa ? `${ativoCor} text-white` : "border border-linha text-muted hover:text-white"}`;
 
+  // Marca/desmarca um dia no modo Preencher Agenda (teto de dias pra não virar um lote gigante).
+  function alternarDia(iso: string) {
+    setDiasSelecionados((atual) =>
+      atual.includes(iso) ? atual.filter((d) => d !== iso) : atual.length >= MAX_DIAS_SELECAO ? atual : [...atual, iso]
+    );
+  }
+
   return (
     <div>
+      <div className="mb-3 flex justify-end">
+        <PreencherAgenda
+          marcaId={marcaId}
+          ativo={modoPreencher}
+          selecionados={diasSelecionados}
+          onAtivar={() => { setModoPreencher(true); setDataAlvo(null); setSelecao(null); }}
+          onCancelar={() => { setModoPreencher(false); setDiasSelecionados([]); }}
+          onConcluido={() => { setModoPreencher(false); setDiasSelecionados([]); }}
+        />
+      </div>
       <div className="mb-6">
         <CalendarioRedes
           posts={posts}
@@ -87,6 +108,9 @@ export function RedesSociais({
           onSelecionarDia={aoSelecionarDia}
           diasCarrossel={diasCarrossel}
           diasFeed={diasFeed}
+          modoSelecao={modoPreencher}
+          selecionados={diasSelecionados}
+          onToggleDia={alternarDia}
         />
       </div>
 

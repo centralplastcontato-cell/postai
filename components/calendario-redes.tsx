@@ -74,6 +74,9 @@ export function CalendarioRedes({
   onSelecionarDia,
   diasCarrossel,
   diasFeed,
+  modoSelecao,
+  selecionados,
+  onToggleDia,
 }: {
   posts: Post[];
   publicacoes: PublicacaoView[];
@@ -83,6 +86,11 @@ export function CalendarioRedes({
   onSelecionarDia: (iso: string) => void;
   diasCarrossel: string;
   diasFeed: string;
+  // Modo PREENCHER AGENDA: clicar num dia marca/desmarca (em vez de abrir o dia).
+  // Só dia de hoje em diante e que tenha carrossel/feed na programação é selecionável.
+  modoSelecao?: boolean;
+  selecionados?: string[];
+  onToggleDia?: (iso: string) => void;
 }) {
   const hoje = new Date();
   const [view, setView] = useState(() => ({ ano: hoje.getFullYear(), mes: hoje.getMonth() }));
@@ -151,37 +159,47 @@ export function CalendarioRedes({
           const ehHoje = chave === hojeChave;
           const escolhido = dataAlvo === chave;
           const comemorativa = dataComemorativaDe(chave);
+          const futuro = chave >= hojeChave;
+          const diaSemana = new Date(view.ano, view.mes, diaCel).getDay();
+          const planCar = futuro && planoCar.includes(diaSemana);
+          const planFeed = futuro && planoFeed.includes(diaSemana);
+          // Modo seleção: só dia com programação (e de hoje em diante) entra no preenchimento.
+          const selecionavel = (planCar || planFeed) && !!onToggleDia;
+          const marcado = !!modoSelecao && (selecionados?.includes(chave) ?? false);
 
           // Dia VAZIO: mantém o lembrete da agenda (tracejado) pra indicar o que criar ali.
           if (!res) {
-            const futuro = chave >= hojeChave;
-            const diaSemana = new Date(view.ano, view.mes, diaCel).getDay();
-            const planCar = futuro && planoCar.includes(diaSemana);
-            const planFeed = futuro && planoFeed.includes(diaSemana);
             const temPlano = planCar || planFeed;
             const planoTxt = [planCar ? "🖼️ carrossel" : "", planFeed ? "📱 feed" : ""].filter(Boolean).join(" · ");
-            const borda = escolhido
-              ? "border-2 border-white font-bold text-white"
-              : ehHoje
-                ? "border-2 border-amber-400 font-bold text-amber-300 hover:bg-preto"
-                : comemorativa
-                  ? "border border-yellow-400/50 font-semibold text-yellow-200/90 hover:bg-preto hover:text-white"
-                  : planCar
-                    ? "border border-dashed border-orange-400/60 text-white/80 hover:bg-preto hover:text-white"
-                    : planFeed
-                      ? "border border-dashed border-sky-500/50 text-white/80 hover:bg-preto hover:text-white"
-                      : "text-muted/70 hover:bg-preto hover:text-white";
+            const borda = modoSelecao
+              ? marcado
+                ? "border-2 border-[#a78bfa] bg-[#7c3aed]/25 font-bold text-white"
+                : selecionavel
+                  ? "border border-dashed border-[#7c3aed]/60 text-white/80 hover:bg-[#7c3aed]/15 hover:text-white"
+                  : "cursor-not-allowed text-muted/40"
+              : escolhido
+                ? "border-2 border-white font-bold text-white"
+                : ehHoje
+                  ? "border-2 border-amber-400 font-bold text-amber-300 hover:bg-preto"
+                  : comemorativa
+                    ? "border border-yellow-400/50 font-semibold text-yellow-200/90 hover:bg-preto hover:text-white"
+                    : planCar
+                      ? "border border-dashed border-orange-400/60 text-white/80 hover:bg-preto hover:text-white"
+                      : planFeed
+                        ? "border border-dashed border-sky-500/50 text-white/80 hover:bg-preto hover:text-white"
+                        : "text-muted/70 hover:bg-preto hover:text-white";
             return (
               <button
                 key={i}
-                onClick={() => onSelecionarDia(chave)}
-                title={comemorativa || temPlano ? undefined : "Gerar conteúdo neste dia"}
+                onClick={() => (modoSelecao ? selecionavel && onToggleDia?.(chave) : onSelecionarDia(chave))}
+                title={modoSelecao ? (selecionavel ? undefined : "Sem carrossel/feed na agenda deste dia") : comemorativa || temPlano ? undefined : "Gerar conteúdo neste dia"}
                 className={`group relative flex min-h-14 items-center justify-center rounded-md text-sm transition sm:min-h-16 sm:text-base ${borda}`}
               >
+                {marcado && <span className="absolute right-0.5 top-0.5 rounded bg-[#7c3aed] px-1 text-[9px] font-bold leading-tight text-white">✓</span>}
                 {comemorativa && <span className="absolute left-0.5 top-0.5 text-[10px] leading-none">🎉</span>}
                 {temPlano && <span className="absolute bottom-0.5 right-0.5 text-[9px] leading-none opacity-60">{planCar && "🖼️"}{planFeed && "📱"}</span>}
                 {diaCel}
-                {(comemorativa || temPlano) && (
+                {!modoSelecao && (comemorativa || temPlano) && (
                   <TooltipData
                     emoji={comemorativa ? comemorativa.emoji : "🗓️"}
                     nome={comemorativa ? comemorativa.nome : `Agenda: ${planoTxt}`}
@@ -192,21 +210,29 @@ export function CalendarioRedes({
             );
           }
 
-          // Dia COM conteúdo: número + um chip por tipo presente (com status).
-          const borda = escolhido
-            ? "border-2 border-white"
-            : ehHoje
-              ? "border-2 border-amber-400"
-              : comemorativa
-                ? "border border-yellow-400/60"
-                : "border border-linha";
+          // Dia COM conteúdo: número + um chip por tipo presente (com status). No modo
+          // seleção continua selecionável (o preenchimento só cria o tipo que FALTAR).
+          const borda = modoSelecao
+            ? marcado
+              ? "border-2 border-[#a78bfa] bg-[#7c3aed]/25"
+              : selecionavel
+                ? "border border-dashed border-[#7c3aed]/60 hover:bg-[#7c3aed]/15"
+                : "cursor-not-allowed border border-linha opacity-40"
+            : escolhido
+              ? "border-2 border-white"
+              : ehHoje
+                ? "border-2 border-amber-400"
+                : comemorativa
+                  ? "border border-yellow-400/60"
+                  : "border border-linha";
           return (
             <button
               key={i}
-              onClick={() => onSelecionarDia(chave)}
-              title={comemorativa ? undefined : "Ver tudo desse dia"}
+              onClick={() => (modoSelecao ? selecionavel && onToggleDia?.(chave) : onSelecionarDia(chave))}
+              title={modoSelecao ? (selecionavel ? undefined : "Sem carrossel/feed na agenda deste dia") : comemorativa ? undefined : "Ver tudo desse dia"}
               className={`group relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-md bg-preto px-0.5 py-1 text-sm font-semibold text-white transition hover:bg-preto-card sm:min-h-16 sm:text-base ${borda}`}
             >
+              {marcado && <span className="absolute right-0.5 top-0.5 rounded bg-[#7c3aed] px-1 text-[9px] font-bold leading-tight text-white">✓</span>}
               {comemorativa && <span className="absolute left-0.5 top-0.5 text-[10px] leading-none">🎉</span>}
               <span className={ehHoje ? "text-amber-300" : ""}>{diaCel}</span>
               <span className="flex flex-wrap items-center justify-center gap-0.5">
