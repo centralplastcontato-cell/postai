@@ -201,23 +201,7 @@ export async function gerarCarrossel(input: {
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   const tema = input.tema?.trim();
   if (!tema) return { ok: false as const, erro: "Informe um tema." };
-  // Com fotos-guia, o tamanho do carrossel segue as fotos: capa (1ª) + 1 slide por foto + CTA.
   const guia = (input.fotosGuia ?? []).filter((f) => f?.url);
-  // FOTO-PRIMEIRO também no caminho manual: sem fotos-guia, escolhe no banco as fotos que
-  // melhor ilustram o tema ANTES de escrever — o texto de cada slide nasce da foto dele
-  // (fim do "Aventuras no Espaço" em cima de foto de tapete vermelho). Se o banco não tem
-  // fotos descritas, fotosAuto=[] e segue o fluxo antigo (rodízio/fundo abstrato).
-  let fotosAuto: { url: string; descricao: string }[] = [];
-  if (guia.length < 2) {
-    const pedidos = Math.min(10, Math.max(4, input.nSlides ?? 7)) - 2; // capa e CTA não levam foto de conteúdo
-    fotosAuto = await escolherImagensPorTema(marca.id, input.categoriaFoto, tema, pedidos);
-  }
-  // Com fotos escolhidas, o carrossel encolhe pra não sobrar slide sem foto (mínimo 4).
-  const nSlides = guia.length >= 2
-    ? Math.min(10, Math.max(4, guia.length + 1))
-    : fotosAuto.length
-      ? Math.min(10, Math.max(4, Math.min(input.nSlides ?? 7, fotosAuto.length + 2)))
-      : Math.min(10, Math.max(4, input.nSlides ?? 7));
 
   // Dia/hora + limite de feed/dia do pacote do dono (carrossel conta junto com o feed).
   // Validado ANTES da IA pra não gastar geração. Marca sem dono/plano (admin) = sem limite.
@@ -228,6 +212,23 @@ export async function gerarCarrossel(input: {
     const lim = await checarLimiteFeed(marca.id, data, plano);
     if (lim.bloqueia) return { ok: false as const, erro: `O pacote ${rotuloPlano(plano)} permite ${lim.limite} post${lim.limite > 1 ? "s" : ""} de feed por dia — esse dia já tem ${lim.jaTem}. Escolha outro dia.` };
   }
+
+  // FOTO-PRIMEIRO também no caminho manual: sem fotos-guia, escolhe no banco as fotos que
+  // melhor ilustram o tema ANTES de escrever — o texto de cada slide nasce da foto dele
+  // (fim do "Aventuras no Espaço" em cima de foto de tapete vermelho). Se o banco não tem
+  // fotos descritas, fotosAuto=[] e segue o fluxo antigo (rodízio/fundo abstrato).
+  let fotosAuto: { url: string; descricao: string }[] = [];
+  if (guia.length < 2) {
+    const pedidos = Math.min(10, Math.max(4, input.nSlides ?? 7)) - 2; // capa e CTA não levam foto de conteúdo
+    fotosAuto = await escolherImagensPorTema(marca.id, input.categoriaFoto, tema, pedidos);
+  }
+  // Com fotos-guia, o tamanho do carrossel segue as fotos: capa (1ª) + 1 slide por foto + CTA.
+  // Com fotos escolhidas, encolhe pra não sobrar slide sem foto (mínimo 4).
+  const nSlides = guia.length >= 2
+    ? Math.min(10, Math.max(4, guia.length + 1))
+    : fotosAuto.length
+      ? Math.min(10, Math.max(4, Math.min(input.nSlides ?? 7, fotosAuto.length + 2)))
+      : Math.min(10, Math.max(4, input.nSlides ?? 7));
 
   let gerado: Gerado;
   try {
