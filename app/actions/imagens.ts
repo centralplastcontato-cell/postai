@@ -26,7 +26,7 @@ export async function atualizarImagemMarca(input: { id: string; descricao?: stri
   const g = await guardaImagem(input.id);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const data: { descricao?: string; categoria?: string } = {};
-  if (typeof input.descricao === "string") data.descricao = input.descricao.trim().slice(0, 200);
+  if (typeof input.descricao === "string") data.descricao = input.descricao.trim().slice(0, 300);
   if (input.categoria && (CATEGORIAS as readonly string[]).includes(input.categoria)) data.categoria = input.categoria;
   if (!Object.keys(data).length) return { ok: true as const };
   const img = await prisma.imagemMarca.update({ where: { id: input.id }, data, select: { marcaId: true } });
