@@ -11,7 +11,7 @@ import { TEMPLATES, type Template } from "@/lib/feed-templates";
 import { categoriaDoTemplate } from "@/lib/categorias";
 import { planoTemStory, rotuloPlano, ehTrial, MSG_TRIAL_POSTAR } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed, checarCreditoTrial } from "@/lib/limites";
-import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto } from "@/app/actions/imagens";
+import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto, escolherImagensPorTema } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import type { Marca } from "@prisma/client";
 
@@ -212,11 +212,24 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
   return null;
 }
 
-// Sorteia até 4 fotos reais do banco (rodízio) e MESCLA no extra da publicação
-// Mosaico — sem apagar o selo/cor já gravados por montarExtra. Usado no gerar e no
-// regerar (cada regerar traz fotos novas, graças ao rodízio por menos-usadas).
-async function aplicarFotosMosaico(pubId: string, marcaId: string, categoria?: string, n = 4) {
-  const fotos = await sortearImagensBanco(marcaId, n, categoria);
+// Escolhe as fotos reais do Mosaico/Vitrine e MESCLA no extra da publicação — sem apagar
+// o selo/cor já gravados por montarExtra. FOTO-PRIMEIRO: `fotosProntas` (plano da Bia) tem
+// prioridade; senão, com `tema`, escolhe as fotos que ILUSTRAM o tema pelas descrições
+// (fim do "Um olhar na cozinha" com foto de fliperama); só cai no rodízio cego quando o
+// banco não tem descrições. Se faltar foto, completa com o rodízio (sem repetir).
+async function aplicarFotosMosaico(pubId: string, marcaId: string, categoria?: string, n = 4, tema?: string, fotosProntas?: string[]) {
+  const prontas = (fotosProntas ?? []).filter(Boolean);
+  let fotos: string[];
+  if (prontas.length >= n) {
+    fotos = prontas.slice(0, n);
+  } else {
+    const porTema = tema?.trim() ? (await escolherImagensPorTema(marcaId, categoria, tema, n)).map((f) => f.url) : [];
+    fotos = porTema.length ? porTema : await sortearImagensBanco(marcaId, n, categoria);
+    if (fotos.length < n) {
+      const extras = (await sortearImagensBanco(marcaId, n - fotos.length + 2, categoria)).filter((u) => !fotos.includes(u));
+      fotos = [...fotos, ...extras].slice(0, n);
+    }
+  }
   const p = await prisma.publicacao.findUnique({ where: { id: pubId }, select: { extra: true } });
   let ex: Record<string, unknown> = {};
   try {
@@ -558,6 +571,7 @@ export async function gerarPublicacao(input: {
   ladoA?: string; // enquete: lado A (ex: Salgados)
   ladoB?: string; // enquete: lado B (ex: Docinhos)
   imagemUrl?: string; // foto de fundo ESCOLHIDA no formulário (banco/upload) — prioridade sobre a automática
+  fotos?: string[]; // mosaico/vitrine: fotos JÁ escolhidas (plano da Bia, foto-primeiro) — o tema nasceu delas
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -624,15 +638,15 @@ export async function gerarPublicacao(input: {
   // gera um fundo decorativo abstrato. (Promoção/Divulgação usam fundo colorido.)
   const querFoto = input.comFoto === undefined ? USA_FOTO[template] : input.comFoto;
   let avisoFoto = false; // usuário PEDIU foto (Story Foto/Faixa) mas o banco estava vazio
-  if (input.imagemUrl) {
+  if (template === "mosaico") {
+    // 4 fotos reais no extra: as do plano da Bia (foto-primeiro) ou escolhidas pelo TEMA.
+    await aplicarFotosMosaico(criado.id, marca.id, input.categoria, 4, input.tema, input.fotos).catch(() => {});
+  } else if (template === "vitrine") {
+    // Vitrine: 6 fotos reais no extra (plano da Bia ou escolhidas pelo tema).
+    await aplicarFotosMosaico(criado.id, marca.id, input.categoria, 6, input.tema, input.fotos).catch(() => {});
+  } else if (input.imagemUrl) {
     // Foto ESCOLHIDA pelo dono no formulário (banco/upload) — tem prioridade sobre a automática.
     await definirImagemPublicacao({ id: criado.id, url: input.imagemUrl }).catch(() => {});
-  } else if (template === "mosaico") {
-    // Puxa as 4 fotos reais do banco (rodízio) e grava no extra.
-    await aplicarFotosMosaico(criado.id, marca.id, input.categoria).catch(() => {});
-  } else if (template === "vitrine") {
-    // Vitrine: puxa 6 fotos reais do banco (rodízio) e grava no extra.
-    await aplicarFotosMosaico(criado.id, marca.id, input.categoria, 6).catch(() => {});
   } else if (querFoto) {
     // Escolhe a foto que MAIS combina com o texto do post (pelas descrições da IA);
     // cai no rodízio normal se não houver descrições/texto.
@@ -847,11 +861,11 @@ export async function regerarPublicacao(id: string) {
       status: "a_postar",
     },
   });
-  // Mosaico/Vitrine: re-sorteia fotos novas do banco (rodízio) a cada regerar.
+  // Mosaico/Vitrine: fotos novas a cada regerar — escolhidas pelo TEMA (rodízio nas candidatas).
   if (template === "mosaico") {
-    await aplicarFotosMosaico(id, p.marcaId, categoria).catch(() => {});
+    await aplicarFotosMosaico(id, p.marcaId, categoria, 4, p.tema ?? undefined).catch(() => {});
   } else if (template === "vitrine") {
-    await aplicarFotosMosaico(id, p.marcaId, categoria, 6).catch(() => {});
+    await aplicarFotosMosaico(id, p.marcaId, categoria, 6, p.tema ?? undefined).catch(() => {});
   }
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const };

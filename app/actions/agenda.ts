@@ -62,10 +62,13 @@ const TEMPLATE_POR_CATEGORIA: Record<CategoriaAuto, Template> = {
   sazonal: "data-comemorativa",
 };
 
-// Quantas fotos o plano escolhe pra cada template de feed: mosaico e divulgação têm arte
-// própria (fotos por rodízio de categoria / cor sólida); os demais levam 1 foto de fundo.
+// Quantas fotos o plano escolhe pra cada template de feed: o mosaico leva as 4 fotos das
+// bolinhas (FOTO-PRIMEIRO: a Bia escolhe as 4 e o tema nasce DELAS — antes eram sorteadas
+// às cegas depois, e saía "Um olhar na cozinha" com foto de fliperama); divulgação é arte
+// de cor sólida (0 fotos); os demais levam 1 foto de fundo.
 function fotosDoFeed(template: Template): number {
-  return template === "mosaico" || template === "divulgacao" ? 0 : 1;
+  if (template === "mosaico") return 4;
+  return template === "divulgacao" ? 0 : 1;
 }
 
 // Estilo de CAPA do carrossel quando NÃO há fotos planejadas (fallback).
@@ -229,7 +232,7 @@ async function planoDaBia(
   const fotosTxt = pool.map((f, i) => `${i + 1}. [${f.categoria}] ${f.descricao}`).join("\n");
   const slotsTxt = slots
     .map((s, i) => {
-      const qtd = s.tipo === "carrossel" ? `escolha ${FOTOS_POR_CARROSSEL} fotos (1ª = capa)` : `escolha 1 foto (ou 0 se a categoria for espaco/institucional)`;
+      const qtd = s.tipo === "carrossel" ? `escolha ${FOTOS_POR_CARROSSEL} fotos (1ª = capa)` : `escolha 1 foto (se der categoria "espaco", escolha 4 fotos que combinem no assunto — viram um MOSAICO e o tema nasce delas; categoria "institucional" pode ficar com 0 foto)`;
       return `${i + 1}. ${rotuloDoDia(s.dia, s.tipo)} — ${qtd}${s.comemorativa ? ` — é ${s.comemorativa}: o tema DEVE ser sobre essa data (categoria "sazonal")` : ""}`;
     })
     .join("\n");
@@ -377,8 +380,8 @@ export async function planejarPreenchimento(marcaId: string, dias: string[], rec
 
   const itens: ItemAgenda[] = lote.map((s, i) => {
     const p = plano[i];
-    // Feed: espaco vira mosaico SÓ com 4+ fotos no pool (senão a arte sai capenga).
-    const template = s.tipo === "feed" ? (p.categoria === "espaco" && fotosPool.length < 4 ? "divulgacao" : TEMPLATE_POR_CATEGORIA[p.categoria]) : undefined;
+    // Feed: espaco vira mosaico SÓ se o plano escolheu as 4 fotos dele (senão a arte sai capenga).
+    const template = s.tipo === "feed" ? (p.categoria === "espaco" && p.fotos.length < 4 ? "divulgacao" : TEMPLATE_POR_CATEGORIA[p.categoria]) : undefined;
     const estiloCapa = s.tipo === "carrossel" ? CAPA_POR_CATEGORIA[p.categoria] : undefined;
     return {
       dia: s.dia,
@@ -441,8 +444,10 @@ export async function gerarItemAgenda(marcaId: string, item: ItemAgenda): Promis
         fotosGuia: fotos.map((f) => ({ url: f.url, descricao: f.descricao })),
       });
     } else {
-      // Feed: a foto escolhida no plano vai DIRETO pro post (nada de sorteio). O tema já
-      // nasceu dessa foto no plano da Bia, então o texto casa com a imagem por origem.
+      // Feed: as fotos escolhidas no plano vão DIRETO pro post (nada de sorteio). O tema já
+      // nasceu delas no plano da Bia, então o texto casa com a imagem por origem. Mosaico
+      // recebe as 4 fotos das bolinhas; os demais templates, a foto única de fundo.
+      const ehMosaico = item.template === "mosaico";
       r = await gerarPublicacao({
         marcaId,
         template: item.template ?? "dica",
@@ -450,7 +455,8 @@ export async function gerarItemAgenda(marcaId: string, item: ItemAgenda): Promis
         data: item.dia,
         corFundo,
         categoria: item.categoriaFoto,
-        imagemUrl: fotos[0]?.url,
+        imagemUrl: ehMosaico ? undefined : fotos[0]?.url,
+        fotos: ehMosaico ? fotos.map((f) => f.url) : undefined,
       });
     }
     // Contabiliza o uso das fotos escolhidas (mantém o rodízio do banco honesto).
