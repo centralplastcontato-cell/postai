@@ -122,7 +122,7 @@ function mesmaCena(a: string, b: string): boolean {
 }
 
 type Slot = { dia: string; tipo: "carrossel" | "feed"; comemorativa?: string; recriar?: boolean };
-type FotoPool = { id: string; url: string; categoria: string; descricao: string };
+type FotoPool = { id: string; url: string; categoria: string; descricao: string; festaId: string | null };
 type PlanoItem = { categoria: CategoriaAuto; tema: string; fotos: FotoPool[] };
 
 // O CÉREBRO da Bia pro plano: mesma conta do cartão dela (números reais quando há massa;
@@ -173,29 +173,45 @@ async function planoDaBia(
   evitar: string,
 ): Promise<PlanoItem[]> {
   // Distribui fotos SEM repetir no lote: cada índice do pool só sai uma vez.
+  // E no MESMO item, no máximo 2 fotos da MESMA festa — um post com 5 fotos da festa do
+  // fulano parece álbum de família, não venda do espaço (relaxa só se o banco for pequeno).
   const usadas = new Set<number>();
+  const contaFestas = (fotos: FotoPool[]): Map<string, number> => {
+    const m = new Map<string, number>();
+    for (const f of fotos) if (f.festaId) m.set(f.festaId, (m.get(f.festaId) ?? 0) + 1);
+    return m;
+  };
   const pegaPorIndices = (idxs: number[], max: number): FotoPool[] => {
     const out: FotoPool[] = [];
+    const porFesta = new Map<string, number>();
     for (const n of idxs) {
       const i = n - 1; // a Bia numera de 1
-      if (i >= 0 && i < pool.length && !usadas.has(i) && out.length < max) {
-        usadas.add(i);
-        out.push(pool[i]);
-      }
+      if (i < 0 || i >= pool.length || usadas.has(i) || out.length >= max) continue;
+      const fid = pool[i].festaId;
+      if (fid && (porFesta.get(fid) ?? 0) >= 2) continue; // corta o excesso da mesma festa
+      usadas.add(i);
+      if (fid) porFesta.set(fid, (porFesta.get(fid) ?? 0) + 1);
+      out.push(pool[i]);
     }
     return out;
   };
-  const pegaProximas = (max: number, categoriaPreferida?: string): FotoPool[] => {
+  const pegaProximas = (max: number, categoriaPreferida?: string, jaNoItem: FotoPool[] = []): FotoPool[] => {
     const out: FotoPool[] = [];
-    // Primeiro tenta a categoria preferida; depois completa com qualquer uma.
-    for (const passa of [true, false]) {
+    const porFesta = contaFestas(jaNoItem);
+    // 1º a categoria preferida, 2º qualquer categoria (ambas respeitando o teto de festa),
+    // 3º libera o teto — banco pequeno não pode deixar slide sem foto.
+    const modos: ("cat" | "qualquer" | "livre")[] = categoriaPreferida ? ["cat", "qualquer", "livre"] : ["qualquer", "livre"];
+    for (const modo of modos) {
       for (let i = 0; i < pool.length && out.length < max; i++) {
         if (usadas.has(i)) continue;
-        if (passa && categoriaPreferida && pool[i].categoria !== categoriaPreferida) continue;
+        const f = pool[i];
+        if (modo === "cat" && f.categoria !== categoriaPreferida) continue;
+        if (modo !== "livre" && f.festaId && (porFesta.get(f.festaId) ?? 0) >= 2) continue;
         usadas.add(i);
-        out.push(pool[i]);
+        if (f.festaId) porFesta.set(f.festaId, (porFesta.get(f.festaId) ?? 0) + 1);
+        out.push(f);
       }
-      if (out.length >= max || !categoriaPreferida) break;
+      if (out.length >= max) break;
     }
     return out;
   };
@@ -229,7 +245,7 @@ async function planoDaBia(
     ? cerebro.analise.categorias.slice(0, 5).map((c, i) => `${i + 1}º ${c.nome} (taxa de intenção ${c.taxa.toFixed(1)}, ${c.n} posts)`).join("; ")
     : "ainda sem números próprios — siga o guia do nicho: " + cerebro.analise.nicho.map((n) => n.nome).join(", ");
   const sugestaoTxt = cerebro.sugestao ? `${cerebro.sugestao.nome} — ${cerebro.sugestao.motivo}` : "sem sugestão no momento";
-  const fotosTxt = pool.map((f, i) => `${i + 1}. [${f.categoria}] ${f.descricao}`).join("\n");
+  const fotosTxt = pool.map((f, i) => `${i + 1}. [${f.categoria}${f.festaId ? ` • festa ${f.festaId.slice(-4)}` : ""}] ${f.descricao}`).join("\n");
   const slotsTxt = slots
     .map((s, i) => {
       const qtd = s.tipo === "carrossel" ? `escolha ${FOTOS_POR_CARROSSEL} fotos (1ª = capa)` : `escolha 1 foto (se der categoria "espaco", escolha 4 fotos que combinem no assunto — viram um MOSAICO e o tema nasce delas; categoria "institucional" pode ficar com 0 foto)`;
@@ -242,13 +258,15 @@ async function planoDaBia(
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        // O plano é a cabeça da semana inteira: gpt-4.1 escolhe fotos e temas bem melhores
+        // que o mini (1 chamada por preenchimento — centavos).
+        model: "gpt-4.1",
         response_format: { type: "json_object" },
         temperature: 0.5,
         messages: [
           {
             role: "system",
-            content: `Você é a Bia, estrategista de conteúdo da marca "${marca.nome}". ${marca.descricao || "Negócio local."} Você monta um PLANO EDITORIAL coeso pra agenda do Instagram. REGRA DE OURO — FOTO-PRIMEIRO: você só pode usar as fotos listadas; primeiro escolha as fotos de cada item, depois escreva o tema SOBRE o que elas mostram. É PROIBIDO propor tema que as fotos escolhidas não mostram (ex: nunca proponha "festa de dinossauros" se nenhuma foto mostra dinossauros). Português do Brasil.`,
+            content: `Você é a Bia, estrategista de conteúdo da marca "${marca.nome}". ${marca.descricao || "Negócio local."} Você monta um PLANO EDITORIAL coeso pra agenda do Instagram — e você VENDE: cada tema promete um BENEFÍCIO pro pai/mãe que as fotos provam. REGRA DE OURO — FOTO-PRIMEIRO: você só pode usar as fotos listadas; primeiro escolha as fotos de cada item, depois escreva o tema SOBRE o que elas mostram. É PROIBIDO propor tema que as fotos escolhidas não mostram (ex: nunca proponha "festa de dinossauros" se nenhuma foto mostra dinossauros). Português do Brasil.`,
           },
           {
             role: "user",
@@ -262,7 +280,7 @@ AGENDA A PREENCHER (${slots.length} itens, em ordem):
 ${slotsTxt}
 
 Para CADA item, devolva:
-- "fotos": os NÚMEROS das fotos escolhidas (da lista acima) — as fotos de um MESMO item combinam no ASSUNTO, mas cada uma mostra uma CENA DIFERENTE (nunca duas fotos parecidas/da mesma cena — num carrossel isso parece foto repetida). NENHUMA foto se repete no lote inteiro. No carrossel, a 1ª é a capa e cada uma vira um slide.
+- "fotos": os NÚMEROS das fotos escolhidas (da lista acima) — as fotos de um MESMO item combinam no ASSUNTO, mas cada uma mostra uma CENA DIFERENTE e vêm de FESTAS DIFERENTES (no máximo 2 da mesma festa por item — 5 fotos da festa do mesmo cliente parece álbum de família, não venda). NENHUMA foto se repete no lote inteiro. O que VENDE é o produto aparecer: priorize cenas de AMBIENTE, decoração, mesa/comida e brinquedos; EVITE retrato/close de rosto e foto posada de família — pessoas entram interagindo com o espaço (cena aberta), não posando pra câmera. No carrossel, a 1ª é a capa e cada uma vira um slide.
 - "tema": nasce das fotos — específico e concreto sobre o que ELAS mostram, conectado com a estratégia (dados acima). Os temas do lote se complementam como campanha, sem repetir ângulo. Evite os já usados: ${evitar || "nenhum"}.
 - "categoria": uma de ${CATEGORIAS_AUTO.join("|")} — priorize as que mais despertam intenção e a sugestão do próximo post, MAS nunca a mesma categoria em dois itens seguidos.
 
@@ -286,7 +304,7 @@ Responda só com JSON: {"itens":[{"categoria":"...","tema":"...","fotos":[12,3,4
           : ordem[i % ordem.length];
       const alvo = fotosDoSlot(s, cat);
       const escolhidas = pegaPorIndices(Array.isArray(it?.fotos) ? it!.fotos! : [], alvo);
-      if (escolhidas.length < alvo) escolhidas.push(...pegaProximas(alvo - escolhidas.length, escolhidas[0]?.categoria || FALLBACK_FOTO[cat]));
+      if (escolhidas.length < alvo) escolhidas.push(...pegaProximas(alvo - escolhidas.length, escolhidas[0]?.categoria || FALLBACK_FOTO[cat], escolhidas));
       return { categoria: cat, tema: it?.tema?.trim() || s.comemorativa || FALLBACK_TEMA[cat], fotos: escolhidas };
     });
   } catch (e) {
@@ -361,7 +379,7 @@ export async function planejarPreenchimento(marcaId: string, dias: string[], rec
     cerebroDaBia(marcaId, marca.intelHistorico),
     prisma.imagemMarca.findMany({
       where: { marcaId, ...PODE_DIVULGAR, NOT: { descricao: "" } },
-      select: { id: true, url: true, categoria: true, descricao: true },
+      select: { id: true, url: true, categoria: true, descricao: true, festaId: true },
       orderBy: [{ usos: "asc" }, { criadoEm: "desc" }],
       take: MAX_FOTOS_PLANO * 3,
     }),

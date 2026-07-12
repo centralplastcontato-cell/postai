@@ -39,6 +39,8 @@ function sistemaDaMarca(marca: Marca): string {
 
 Tom: profissional, próximo e confiável. Sem jargão de guru, sem "prezado cliente", no máximo 1 emoji por slide.
 
+VOCÊ VENDE (não descreve): cada título é um GANCHO de benefício ou emoção pro pai/mãe que decide a festa — nunca um rótulo literal do que aparece na imagem (PROIBIDO título tipo "Mesas temáticas!", "Um local iluminado!", "Decoração bonita"). O texto conecta a cena ao que a família GANHA (memória pra vida toda, zero preocupação, diversão segura, festa sem trabalho) e conduz pro desejo de fechar. Fale COM o leitor ("seu filho", "sua festa"), não sobre a foto.
+
 REGRA CRÍTICA (nunca quebrar): a marca É o próprio local/espaço da festa. NUNCA escreva nada que mande o cliente "escolher o local", "reservar um espaço", "encontrar/procurar/comparar local, salão ou buffet", nem dicas genéricas que sugiram buscar outro lugar — isso manda o cliente pra longe e é um erro grave. Todo conteúdo posiciona a marca como O lugar onde a festa acontece; o convite é sempre comemorar/fechar a festa COM a marca, não procurar local por aí.
 
 Você devolve SEMPRE um JSON válido:
@@ -73,13 +75,15 @@ async function gerarConteudo(marca: Marca, tema: string, nSlides: number, fotosD
   // FOTO-PRIMEIRO: quando os slides já têm fotos reais definidas, o texto de cada slide é
   // escrito SOBRE a foto dele — é isso que faz título/texto/imagem casarem no carrossel.
   const guiaFotos = fotosDesc?.length
-    ? `\nOs slides de conteúdo serão ilustrados por FOTOS REAIS do negócio, nesta ordem:\n${fotosDesc.map((d, i) => `- Slide ${i + 2}: a foto mostra "${d}"`).join("\n")}\nREGRA: o título e o texto de cada slide de conteúdo falam EXATAMENTE do que a foto daquele slide mostra (conectando com o tema). Nunca escreva algo que a foto do slide não mostra.`
+    ? `\nOs slides de conteúdo serão ilustrados por FOTOS REAIS do negócio, nesta ordem:\n${fotosDesc.map((d, i) => `- Slide ${i + 2}: a foto mostra "${d}"`).join("\n")}\nREGRA: a foto de cada slide é a PROVA do que o texto afirma — escreva o BENEFÍCIO que aquela cena comprova pro pai/mãe (conectando com o tema), citando o que se vê. Nunca escreva algo que a foto não mostra, e nunca use título que só nomeia a foto.`
     : "";
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      // Texto CRIATIVO de venda usa o gpt-4.1 (escreve muito melhor que o mini e custa
+      // centavos por carrossel); os utilitários (descrever/casar foto) seguem no mini.
+      model: "gpt-4.1",
       response_format: { type: "json_object" },
       temperature: 0.8,
       messages: [
@@ -569,14 +573,14 @@ async function reescreverSlideSobreFoto(marca: Marca, tema: string, slide: Slide
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4.1",
         response_format: { type: "json_object" },
         temperature: 0.8,
         messages: [
           { role: "system", content: sistemaDaMarca(marca) },
           {
             role: "user",
-            content: `Tema do carrossel: "${tema}". Este slide ganhou uma FOTO NOVA que mostra: "${descricaoFoto}". Reescreva o título e o texto do slide pra falarem EXATAMENTE do que a foto mostra (conectando com o tema); nunca escreva algo que a foto não mostra. Título até ~8 palavras, texto até ~20 palavras. Responda só com JSON: {"titulo":"...","texto":"..."}.`,
+            content: `Tema do carrossel: "${tema}". Este slide ganhou uma FOTO NOVA que mostra: "${descricaoFoto}". Reescreva o título e o texto: a foto é a PROVA — afirme o benefício que a cena comprova pro pai/mãe (conectando com o tema), citando o que se vê; nunca escreva algo que a foto não mostra, e nunca use título que só nomeia a foto. Título até ~8 palavras, texto até ~20 palavras. Responda só com JSON: {"titulo":"...","texto":"..."}.`,
           },
         ],
       }),
@@ -675,14 +679,14 @@ export async function regerarSlide(input: { id: string; indice: number }) {
   if (slide.imagemUrl) {
     const img = await prisma.imagemMarca.findFirst({ where: { marcaId: c.marcaId, url: slide.imagemUrl }, select: { descricao: true } });
     if (img?.descricao?.trim())
-      sobreFoto = ` A foto deste slide mostra: "${img.descricao.trim()}". O novo título e texto falam EXATAMENTE do que a foto mostra (conectando com o tema); nunca escreva algo que a foto não mostra.`;
+      sobreFoto = ` A foto deste slide mostra: "${img.descricao.trim()}". A foto é a PROVA do texto: afirme o benefício que a cena comprova pro pai/mãe (conectando com o tema), citando o que se vê; nunca escreva algo que a foto não mostra, e nunca use título que só nomeia a foto.`;
   }
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-4.1",
         response_format: { type: "json_object" },
         temperature: 0.9,
         messages: [
@@ -733,7 +737,7 @@ export async function adicionarSlide(input: { id: string }) {
         method: "POST",
         headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: "gpt-4.1",
           response_format: { type: "json_object" },
           temperature: 0.9,
           messages: [

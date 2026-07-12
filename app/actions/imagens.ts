@@ -130,8 +130,8 @@ export async function escolherImagemPorTexto(marcaId: string, categoria: string 
         max_tokens: 5,
         temperature: 0,
         messages: [
-          { role: "system", content: "Você escolhe a FOTO que melhor ilustra um post. Responda APENAS com o número da opção." },
-          { role: "user", content: `Tema do post: "${t}".\nFotos disponíveis:\n${lista}\n\nQual número combina mais? Responda só o número.` },
+          { role: "system", content: "Você escolhe a FOTO que melhor VENDE um post de buffet de festas infantis. Responda APENAS com o número da opção." },
+          { role: "user", content: `Tema do post: "${t}".\nFotos disponíveis:\n${lista}\n\nQual número combina mais com o tema E vende melhor? Prefira cena de ambiente, decoração, mesa/comida ou brinquedos; evite retrato/close de rosto e foto posada, a menos que o tema peça pessoas. Responda só o número.` },
         ],
       }),
     });
@@ -167,7 +167,7 @@ export async function escolherImagensPorTema(
     where,
     orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
     take: 24,
-    select: { id: true, url: true, descricao: true },
+    select: { id: true, url: true, descricao: true, festaId: true },
   });
   // Categoria com poucas fotos → abre pro banco inteiro (igual ao sorteio faz).
   if (cands.length < n && categoria) {
@@ -175,13 +175,14 @@ export async function escolherImagensPorTema(
       where: { marcaId, ...PODE_DIVULGAR },
       orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
       take: 24,
-      select: { id: true, url: true, descricao: true },
+      select: { id: true, url: true, descricao: true, festaId: true },
     });
   }
   const comDesc = cands.filter((c) => c.descricao && c.descricao.trim());
   const key = process.env.OPENAI_API_KEY;
   if (!comDesc.length || !key) return [];
-  let escolhidas = comDesc.slice(0, n);
+  // Preferência: a ordem da IA (mais ligada ao tema primeiro); sem IA, a fila do rodízio.
+  let prefs = comDesc;
   if (comDesc.length > n && (tema || "").trim()) {
     try {
       const lista = comDesc.map((c, i) => `${i + 1}. ${c.descricao}`).join("\n");
@@ -193,10 +194,10 @@ export async function escolherImagensPorTema(
           response_format: { type: "json_object" },
           temperature: 0,
           messages: [
-            { role: "system", content: "Você escolhe as fotos que melhor ilustram um carrossel de Instagram. Responda APENAS com JSON." },
+            { role: "system", content: "Você escolhe as fotos de um POST DE VENDA de um buffet de festas infantis no Instagram. Responda APENAS com JSON." },
             {
               role: "user",
-              content: `Tema do carrossel: "${tema.trim()}".\nFotos disponíveis:\n${lista}\n\nEscolha as ${n} fotos que melhor ilustram esse tema, da mais ligada ao tema pra menos ligada (se faltar foto do tema, complete com as melhores fotos gerais de festa). Sem repetir. Responda só com JSON: {"fotos":[números]}`,
+              content: `Tema do post: "${tema.trim()}".\nFotos disponíveis:\n${lista}\n\nEscolha as ${n} fotos que melhor VENDEM esse tema, da mais ligada à menos ligada:\n- o que vende é o PRODUTO aparecer: priorize cenas de ambiente, decoração, mesa/comida e brinquedos;\n- EVITE retrato/close de rosto e foto posada de família, a menos que o tema peça pessoas;\n- cada foto de uma CENA bem diferente (nunca duas parecidas);\n- se faltar foto do tema, complete com as melhores cenas gerais.\nSem repetir. Responda só com JSON: {"fotos":[números]}`,
             },
           ],
         }),
@@ -208,16 +209,27 @@ export async function escolherImagensPorTema(
         const porIA = (j.fotos ?? [])
           .filter((x) => Number.isInteger(x) && x >= 1 && x <= comDesc.length && !vistos.has(x) && (vistos.add(x) || true))
           .map((x) => comDesc[x - 1]);
-        if (porIA.length) {
-          // Completa com as restantes do rodízio até N — vêm com descrição, então o
-          // texto do slide delas também nasce da foto (nunca fica órfão).
-          const resto = comDesc.filter((c) => !porIA.includes(c));
-          escolhidas = [...porIA, ...resto].slice(0, n);
-        }
+        // Completa com as restantes do rodízio — vêm com descrição, então o texto do
+        // slide delas também nasce da foto (nunca fica órfão).
+        if (porIA.length) prefs = [...porIA, ...comDesc.filter((c) => !porIA.includes(c))];
       }
     } catch (e) {
       console.error("Erro ao escolher fotos por tema:", e);
     }
+  }
+  // Espalha entre FESTAS: 1º uma foto por festa, depois admite 2, e só libera o teto se o
+  // banco for pequeno — post com todas as fotos da mesma festa parece álbum de família.
+  const escolhidas: typeof comDesc = [];
+  const porFesta = new Map<string, number>();
+  for (const teto of [1, 2, Number.POSITIVE_INFINITY]) {
+    for (const c of prefs) {
+      if (escolhidas.length >= n) break;
+      if (escolhidas.includes(c)) continue;
+      if (c.festaId && (porFesta.get(c.festaId) ?? 0) >= teto) continue;
+      escolhidas.push(c);
+      if (c.festaId) porFesta.set(c.festaId, (porFesta.get(c.festaId) ?? 0) + 1);
+    }
+    if (escolhidas.length >= n) break;
   }
   await prisma.imagemMarca
     .updateMany({ where: { id: { in: escolhidas.map((e) => e.id) } }, data: { usos: { increment: 1 } } })
