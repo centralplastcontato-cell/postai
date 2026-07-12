@@ -10,6 +10,7 @@ import { baseUrl, AGENTE } from "@/lib/config";
 import { rotuloPlano, ehTrial, MSG_TRIAL_POSTAR } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed, checarCreditoTrial } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto, escolherImagensPorTema } from "@/app/actions/imagens";
+import { descreverImagem } from "@/lib/imagem-ia";
 import { classificarCategoriasIA } from "@/lib/inteligencia";
 import type { Marca } from "@prisma/client";
 
@@ -558,14 +559,58 @@ export async function gerarImagemSlide(input: { id: string; indice: number; desc
   return { ok: true as const, url };
 }
 
+// Reescreve título/texto de UM slide pra falar da foto dele (dada a descrição da foto).
+// Best-effort: null se a IA falhar — o chamador mantém o texto que estava.
+async function reescreverSlideSobreFoto(marca: Marca, tema: string, slide: SlideTexto, descricaoFoto: string): Promise<{ titulo: string; texto: string } | null> {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return null;
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        response_format: { type: "json_object" },
+        temperature: 0.8,
+        messages: [
+          { role: "system", content: sistemaDaMarca(marca) },
+          {
+            role: "user",
+            content: `Tema do carrossel: "${tema}". Este slide ganhou uma FOTO NOVA que mostra: "${descricaoFoto}". Reescreva o título e o texto do slide pra falarem EXATAMENTE do que a foto mostra (conectando com o tema); nunca escreva algo que a foto não mostra. Título até ~8 palavras, texto até ~20 palavras. Responda só com JSON: {"titulo":"...","texto":"..."}.`,
+          },
+        ],
+      }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { titulo?: string; texto?: string };
+    return j.titulo ? { titulo: j.titulo, texto: j.texto ?? "" } : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function definirImagemSlide(input: { id: string; indice: number; url: string }) {
   const g = await guardaConteudo(input.id);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const c = await prisma.conteudo.findUnique({ where: { id: input.id } });
+  const c = await prisma.conteudo.findUnique({ where: { id: input.id }, include: { marca: true } });
   if (!c) return { ok: false as const, erro: "Carrossel não encontrado." };
   const slides = lerSlides(c.slidesTexto);
-  if (!slides?.[input.indice]) return { ok: false as const, erro: "Slide não encontrado." };
-  slides[input.indice] = { ...slides[input.indice], imagemUrl: input.url };
+  const slide = slides?.[input.indice];
+  if (!slide) return { ok: false as const, erro: "Slide não encontrado." };
+  slides![input.indice] = { ...slide, imagemUrl: input.url };
+  // FOTO-PRIMEIRO na troca manual: foto nova em slide de conteúdo (com texto visível) →
+  // o texto se reescreve sozinho pra falar da foto nova. A descrição vem do banco de
+  // imagens; foto enviada de fora do banco é descrita na hora pela IA-visão. Best-effort:
+  // sem descrição ou IA fora do ar, só troca a foto (o dono ajusta no ✏️ se quiser).
+  if (slide.tipo === "conteudo" && !slide.semTexto) {
+    const doBanco = await prisma.imagemMarca.findFirst({ where: { marcaId: c.marcaId, url: input.url }, select: { descricao: true } });
+    const descricao = doBanco?.descricao?.trim() || (await descreverImagem(input.url));
+    if (descricao) {
+      const novo = await reescreverSlideSobreFoto(c.marca, c.tema || c.titulo || c.marca.nome, slide, descricao);
+      if (novo) slides![input.indice] = { ...slides![input.indice], titulo: novo.titulo, texto: novo.texto };
+    }
+  }
   await prisma.conteudo.update({ where: { id: input.id }, data: { slidesTexto: JSON.stringify(slides) } });
   revalidatePath(`/painel/marcas/${c.marcaId}`);
   return { ok: true as const };
