@@ -147,6 +147,84 @@ export async function escolherImagemPorTexto(marcaId: string, categoria: string 
   }
 }
 
+// Escolhe as N fotos do banco que MELHOR ilustram um tema, pelas descrições geradas no
+// upload (1 chamada de texto barata, sem visão). É o FOTO-PRIMEIRO do carrossel: as
+// escolhidas viram o guia dos slides e o texto de cada um é escrito SOBRE a foto dele.
+// As candidatas vêm em rodízio (menos usadas primeiro) pra variar entre gerações; a IA
+// devolve as mais ligadas ao tema primeiro e completa com as melhores fotos gerais.
+// Devolve [] quando não há descrições/chave — o chamador segue o fluxo antigo.
+// Incrementa o uso das escolhidas (mantém o rodízio honesto).
+export async function escolherImagensPorTema(
+  marcaId: string,
+  categoria: string | undefined,
+  tema: string,
+  n: number,
+): Promise<{ url: string; descricao: string }[]> {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok || n < 1) return [];
+  const where = categoria && categoria !== "geral" ? { marcaId, categoria, ...PODE_DIVULGAR } : { marcaId, ...PODE_DIVULGAR };
+  let cands = await prisma.imagemMarca.findMany({
+    where,
+    orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
+    take: 24,
+    select: { id: true, url: true, descricao: true },
+  });
+  // Categoria com poucas fotos → abre pro banco inteiro (igual ao sorteio faz).
+  if (cands.length < n && categoria) {
+    cands = await prisma.imagemMarca.findMany({
+      where: { marcaId, ...PODE_DIVULGAR },
+      orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
+      take: 24,
+      select: { id: true, url: true, descricao: true },
+    });
+  }
+  const comDesc = cands.filter((c) => c.descricao && c.descricao.trim());
+  const key = process.env.OPENAI_API_KEY;
+  if (!comDesc.length || !key) return [];
+  let escolhidas = comDesc.slice(0, n);
+  if (comDesc.length > n && (tema || "").trim()) {
+    try {
+      const lista = comDesc.map((c, i) => `${i + 1}. ${c.descricao}`).join("\n");
+      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          temperature: 0,
+          messages: [
+            { role: "system", content: "Você escolhe as fotos que melhor ilustram um carrossel de Instagram. Responda APENAS com JSON." },
+            {
+              role: "user",
+              content: `Tema do carrossel: "${tema.trim()}".\nFotos disponíveis:\n${lista}\n\nEscolha as ${n} fotos que melhor ilustram esse tema, da mais ligada ao tema pra menos ligada (se faltar foto do tema, complete com as melhores fotos gerais de festa). Sem repetir. Responda só com JSON: {"fotos":[números]}`,
+            },
+          ],
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { fotos?: number[] };
+        const vistos = new Set<number>();
+        const porIA = (j.fotos ?? [])
+          .filter((x) => Number.isInteger(x) && x >= 1 && x <= comDesc.length && !vistos.has(x) && (vistos.add(x) || true))
+          .map((x) => comDesc[x - 1]);
+        if (porIA.length) {
+          // Completa com as restantes do rodízio até N — vêm com descrição, então o
+          // texto do slide delas também nasce da foto (nunca fica órfão).
+          const resto = comDesc.filter((c) => !porIA.includes(c));
+          escolhidas = [...porIA, ...resto].slice(0, n);
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao escolher fotos por tema:", e);
+    }
+  }
+  await prisma.imagemMarca
+    .updateMany({ where: { id: { in: escolhidas.map((e) => e.id) } }, data: { usos: { increment: 1 } } })
+    .catch(() => {});
+  return escolhidas.map((e) => ({ url: e.url, descricao: e.descricao }));
+}
+
 // Descreve as fotos da marca que ainda NÃO têm descrição (as antigas, de antes do recurso).
 // Best-effort, limitado por chamada. Devolve quantas descreveu. Disparado pelo backfill.
 export async function descreverImagensDaMarca(marcaId: string): Promise<number> {
