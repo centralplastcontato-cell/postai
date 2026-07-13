@@ -14,6 +14,7 @@ export type FotoDivulgavel = {
   categoria: string;
   descricao: string;
   festaId: string | null;
+  usos: number; // rodízio: quantas vezes já entrou num post/vídeo (menos usadas primeiro)
 };
 
 export async function fotosDivulgaveis(
@@ -24,7 +25,7 @@ export async function fotosDivulgaveis(
     prisma.imagemMarca.findMany({
       where: { marcaId, ...(opts?.comDescricao ? { NOT: { descricao: "" } } : {}) },
       orderBy: [{ usos: "asc" }, { criadoEm: "desc" }],
-      select: { id: true, url: true, categoria: true, descricao: true, festaId: true },
+      select: { id: true, url: true, categoria: true, descricao: true, festaId: true, usos: true },
       take: opts?.limite ?? 400,
     }),
     prisma.festa.findMany({ where: { marcaId, autorizacao: "autorizada" }, select: { id: true } }),

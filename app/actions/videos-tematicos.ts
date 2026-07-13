@@ -18,6 +18,7 @@ import { dispararMotorReels } from "@/lib/video-engine";
 import { musicaBuffet } from "@/lib/musica-buffet";
 import { baseUrl } from "@/lib/config";
 import { fotosDivulgaveis, type FotoDivulgavel } from "@/lib/fotos-divulgaveis";
+import { ranquearPorTema } from "@/lib/selecao-fotos";
 
 const MOLDURAS = ["nenhuma", "branca", "grossa", "marca"];
 const MAX_FOTOS = 30; // teto do motor (mesmo do vídeo de festa)
@@ -42,12 +43,21 @@ async function apagarMp4SeOrfao(videoId: string, url: string) {
   import("@vercel/blob").then(({ del }) => del(url)).catch(() => {});
 }
 
-// Ordena as fotos do acervo pelo TEMA (mesma cabeça do carrossel foto-primeiro): prioriza
-// cenas de ambiente/decoração/comida/brinquedos, evita retrato/close, espalha entre festas
-// (máx 2 da mesma). Devolve os IDs na ordem sugerida (até `n`).
+// Ordena as fotos do acervo pelo TEMA. Duas etapas:
+//  1) CAÇA no acervo INTEIRO as fotos cuja DESCRIÇÃO fala do assunto (ranquearPorTema) — sem
+//     isso, a IA recebia um cardápio de rodízio e um vídeo de "Brinquedos" vinha só com bolo
+//     e família posando (2/3 do acervo é foto de festa);
+//  2) a IA escolhe e ORDENA entre essas candidatas (prioriza ambiente/decoração/brinquedos,
+//     evita retrato/close). Por fim, espalha entre festas (máx 2 da mesma).
+// Devolve os IDs na ordem sugerida (até `n`).
+const CANDIDATAS_IA = 60; // quantas o ranking entrega pra IA escolher
+
 async function sugerirFotosTema(marcaId: string, tema: string, n: number): Promise<string[]> {
-  const cands = await fotosDivulgaveis(marcaId, { comDescricao: true, limite: 80 });
-  if (!cands.length) return [];
+  const acervo = await fotosDivulgaveis(marcaId, { comDescricao: true, limite: 1000 });
+  if (!acervo.length) return [];
+  // Do tema primeiro; se o tema for raro no acervo, completa com o rodízio (nunca fica sem foto).
+  const { fotos: doTema } = ranquearPorTema(acervo, tema, Math.max(n * 2, 24));
+  const cands = doTema.slice(0, CANDIDATAS_IA);
   const key = process.env.OPENAI_API_KEY;
   let prefs = cands;
   if (key && cands.length > n) {
@@ -64,7 +74,7 @@ async function sugerirFotosTema(marcaId: string, tema: string, n: number): Promi
             { role: "system", content: "Você escolhe as fotos de um VÍDEO (Reels) institucional de um buffet de festas infantis. Responda APENAS com JSON." },
             {
               role: "user",
-              content: `Tema do vídeo: "${tema.trim()}".\nFotos disponíveis:\n${lista}\n\nEscolha até ${n} fotos que melhor mostram esse tema, na ORDEM em que devem aparecer no vídeo (uma narrativa gostosa de assistir):\n- priorize cenas de ambiente, decoração, mesa/comida e brinquedos — o espaço é o produto;\n- EVITE retrato/close de rosto e foto posada de família;\n- cada foto de uma CENA bem diferente (nunca duas parecidas em sequência).\nSem repetir. Responda só com JSON: {"fotos":[números]}`,
+              content: `Tema do vídeo: "${tema.trim()}".\nFotos disponíveis:\n${lista}\n\nEscolha até ${n} fotos que MOSTRAM esse tema, na ORDEM em que devem aparecer no vídeo (uma narrativa gostosa de assistir):\n- a foto tem que mostrar o ASSUNTO do tema — se o tema é "Brinquedos", cada foto tem que ter brinquedo/jogo aparecendo; NÃO escolha foto só porque tem criança feliz;\n- prefira cenas do espaço/produto (ambiente, brinquedo, decoração, comida) a retrato/close de rosto e foto posada de família;\n- cada foto de uma CENA bem diferente (nunca duas parecidas em sequência);\n- se não houver ${n} fotos boas do tema, escolha MENOS — melhor um vídeo curto e certeiro que um cheio de foto que não tem a ver.\nSem repetir. Responda só com JSON: {"fotos":[números]}`,
             },
           ],
         }),
@@ -79,10 +89,9 @@ async function sugerirFotosTema(marcaId: string, tema: string, n: number): Promi
           vistos.add(x);
           porIA.push(cands[x - 1]);
         }
-        if (porIA.length) {
-          const escolhidos = new Set(porIA.map((c) => c.id));
-          prefs = [...porIA, ...cands.filter((c) => !escolhidos.has(c.id))];
-        }
+        // A IA pode escolher MENOS que n (tema com poucas fotos boas) — e deve mesmo: melhor
+        // vídeo curto e certeiro. Só usamos o que ela escolheu (não completamos com sobra).
+        if (porIA.length) prefs = porIA;
       }
     } catch (e) {
       console.error("Erro ao sugerir fotos do vídeo temático:", e);
@@ -90,19 +99,20 @@ async function sugerirFotosTema(marcaId: string, tema: string, n: number): Promi
   }
   // Espalha entre festas: 1º uma foto por festa, depois admite 2, e só libera o teto se o
   // acervo for pequeno — vídeo com tudo da mesma festa parece álbum de família, não venda.
+  const limite = Math.min(n, prefs.length);
   const escolhidas: FotoDivulgavel[] = [];
   const jaEscolhida = new Set<string>();
   const porFesta = new Map<string, number>();
   for (const teto of [1, 2, Number.POSITIVE_INFINITY]) {
     for (const c of prefs) {
-      if (escolhidas.length >= n) break;
+      if (escolhidas.length >= limite) break;
       if (jaEscolhida.has(c.id)) continue;
       if (c.festaId && (porFesta.get(c.festaId) ?? 0) >= teto) continue;
       escolhidas.push(c);
       jaEscolhida.add(c.id);
       if (c.festaId) porFesta.set(c.festaId, (porFesta.get(c.festaId) ?? 0) + 1);
     }
-    if (escolhidas.length >= n) break;
+    if (escolhidas.length >= limite) break;
   }
   return escolhidas.map((c) => c.id);
 }
@@ -133,14 +143,18 @@ export async function fotosDoVideoTematico(videoId: string) {
   const alvo = new Set(v.videoCapa ? [...ids, v.videoCapa] : ids);
   const presentes = new Set(acervo.map((f) => f.id));
   const faltantes = [...alvo].filter((id) => !presentes.has(id));
-  // As escolhidas que ficaram fora da janela (acervo grande) voltam pra lista.
+  // As escolhidas que ficaram fora da janela do acervo (banco grande) voltam pra lista — mas
+  // só se AINDA forem divulgáveis (uma festa pode ter perdido a autorização depois).
   if (faltantes.length) {
-    const extras = await prisma.imagemMarca.findMany({
-      where: { marcaId: v.marcaId, id: { in: faltantes } },
-      select: { id: true, url: true, categoria: true, descricao: true, festaId: true },
-    });
-    // (LGPD já garantida no salvar: só entra foto divulgável; aqui só reexibimos as guardadas)
-    acervo.push(...extras);
+    const [extras, festasOk] = await Promise.all([
+      prisma.imagemMarca.findMany({
+        where: { marcaId: v.marcaId, id: { in: faltantes } },
+        select: { id: true, url: true, categoria: true, descricao: true, festaId: true, usos: true },
+      }),
+      prisma.festa.findMany({ where: { marcaId: v.marcaId, autorizacao: "autorizada" }, select: { id: true } }),
+    ]);
+    const ok = new Set(festasOk.map((f) => f.id));
+    acervo.push(...extras.filter((e) => !e.festaId || ok.has(e.festaId)));
   }
   const porId = new Map(acervo.map((f) => [f.id, f]));
   const escolhidas = ids.map((id) => porId.get(id)).filter((f): f is FotoDivulgavel => !!f);
@@ -234,6 +248,10 @@ export async function gerarVideoTematico(videoId: string) {
 
   const antigo = v.videoUrl; // guardado ANTES do lock (só apagamos depois, e se ninguém usar)
   await prisma.videoTematico.update({ where: { id: videoId }, data: { videoUrl: "gerando" } });
+  // Rodízio: marca as fotos como USADAS (o ranking desconta por uso, então o PRÓXIMO vídeo
+  // do mesmo tema traz cenas diferentes em vez de repetir exatamente as mesmas).
+  const usadas = ids.filter((id) => mapa.has(id));
+  if (usadas.length) await prisma.imagemMarca.updateMany({ where: { id: { in: usadas } }, data: { usos: { increment: 1 } } }).catch(() => {});
   const r = await dispararMotorReels({
     fotos,
     capaUrl,

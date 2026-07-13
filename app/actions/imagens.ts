@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { guardaMarca, guardaImagem } from "@/lib/acesso";
 import { CATEGORIAS } from "@/lib/categorias-imagem";
 import { descreverImagem } from "@/lib/imagem-ia";
+import { fotosDivulgaveis } from "@/lib/fotos-divulgaveis";
+import { ranquearPorTema } from "@/lib/selecao-fotos";
 
 export async function adicionarImagemMarca(input: { marcaId: string; url: string; categoria?: string }) {
   const g = await guardaMarca(input.marcaId);
@@ -102,22 +104,17 @@ export async function sortearImagensBanco(marcaId: string, n: number, categoria?
   return imgs.map((i) => i.url);
 }
 
-// Escolhe a foto do banco que MAIS COMBINA com o texto do post, usando as descrições
-// geradas no upload. É uma chamada de TEXTO barata (sem visão). Cai no rodízio normal
-// (`sortearImagemBanco`) se não houver texto, descrições suficientes ou chave. Incrementa
-// o uso da escolhida (mantém algum rodízio: os candidatos vêm ordenados por menos usado).
+// Escolhe a foto do banco que MAIS COMBINA com o texto do post: primeiro CAÇA no acervo
+// inteiro as que falam do assunto (ranquearPorTema, pelas descrições da IA-visão — a
+// categoria do banco é ruidosa), depois a IA escolhe entre as melhores. Chamada de TEXTO
+// barata (sem visão). Cai no rodízio (`sortearImagemBanco`) sem texto/descrições/chave.
 export async function escolherImagemPorTexto(marcaId: string, categoria: string | undefined, texto: string): Promise<string | null> {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return null;
   const t = (texto || "").trim();
-  const where = categoria && categoria !== "geral" ? { marcaId, categoria, ...PODE_DIVULGAR } : { marcaId, ...PODE_DIVULGAR };
-  const cands = await prisma.imagemMarca.findMany({
-    where,
-    orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
-    take: 12,
-    select: { id: true, url: true, descricao: true },
-  });
-  const comDesc = cands.filter((c) => c.descricao && c.descricao.trim());
+  const acervo = await fotosDivulgaveis(marcaId, { comDescricao: true, limite: 1000 });
+  const alvo = categoria && categoria !== "geral" ? `${t} ${categoria}` : t;
+  const comDesc = t ? ranquearPorTema(acervo, alvo, 12).fotos.slice(0, 20) : acervo.slice(0, 12);
   const key = process.env.OPENAI_API_KEY;
   if (!t || comDesc.length < 2 || !key) return sortearImagemBanco(marcaId, categoria);
   try {
@@ -147,13 +144,14 @@ export async function escolherImagemPorTexto(marcaId: string, categoria: string 
   }
 }
 
-// Escolhe as N fotos do banco que MELHOR ilustram um tema, pelas descrições geradas no
-// upload (1 chamada de texto barata, sem visão). É o FOTO-PRIMEIRO do carrossel: as
-// escolhidas viram o guia dos slides e o texto de cada um é escrito SOBRE a foto dele.
-// As candidatas vêm em rodízio (menos usadas primeiro) pra variar entre gerações; a IA
-// devolve as mais ligadas ao tema primeiro e completa com as melhores fotos gerais.
-// Devolve [] quando não há descrições/chave — o chamador segue o fluxo antigo.
-// Incrementa o uso das escolhidas (mantém o rodízio honesto).
+// Escolhe as N fotos do banco que MELHOR ilustram um tema. Duas etapas:
+//  1) CAÇA no acervo INTEIRO as fotos cuja DESCRIÇÃO fala do assunto (ranquearPorTema) — a
+//     categoria do banco é ruidosa (tem foto de mesa de bolo marcada como "espaco"), então o
+//     que manda é a descrição que a IA-visão escreveu no upload;
+//  2) a IA escolhe e ordena entre as candidatas do tema.
+// É o FOTO-PRIMEIRO do carrossel/mosaico: as escolhidas viram o guia dos slides e o texto de
+// cada um é escrito SOBRE a foto dele. Devolve [] sem descrições/chave (o chamador cai no
+// fluxo antigo). Incrementa o uso das escolhidas (mantém o rodízio honesto).
 export async function escolherImagensPorTema(
   marcaId: string,
   categoria: string | undefined,
@@ -162,23 +160,13 @@ export async function escolherImagensPorTema(
 ): Promise<{ url: string; descricao: string }[]> {
   const g = await guardaMarca(marcaId);
   if (!g.ok || n < 1) return [];
-  const where = categoria && categoria !== "geral" ? { marcaId, categoria, ...PODE_DIVULGAR } : { marcaId, ...PODE_DIVULGAR };
-  let cands = await prisma.imagemMarca.findMany({
-    where,
-    orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
-    take: 24,
-    select: { id: true, url: true, descricao: true, festaId: true },
-  });
-  // Categoria com poucas fotos → abre pro banco inteiro (igual ao sorteio faz).
-  if (cands.length < n && categoria) {
-    cands = await prisma.imagemMarca.findMany({
-      where: { marcaId, ...PODE_DIVULGAR },
-      orderBy: [{ usos: "asc" }, { criadoEm: "asc" }],
-      take: 24,
-      select: { id: true, url: true, descricao: true, festaId: true },
-    });
-  }
-  const comDesc = cands.filter((c) => c.descricao && c.descricao.trim());
+  // Acervo divulgável inteiro (rodízio na ordem), ranqueado pelo tema. A `categoria` pedida
+  // pelo chamador entra como empurrãozinho no ranking — não como filtro rígido (ela erra).
+  const acervo = await fotosDivulgaveis(marcaId, { comDescricao: true, limite: 1000 });
+  if (!acervo.length) return [];
+  const alvo = categoria && categoria !== "geral" ? `${tema} ${categoria}` : tema;
+  const { fotos: doTema } = ranquearPorTema(acervo, alvo, Math.max(n * 3, 18));
+  const comDesc = doTema.slice(0, 40);
   const key = process.env.OPENAI_API_KEY;
   if (!comDesc.length || !key) return [];
   // Preferência: a ordem da IA (mais ligada ao tema primeiro); sem IA, a fila do rodízio.
@@ -197,7 +185,7 @@ export async function escolherImagensPorTema(
             { role: "system", content: "Você escolhe as fotos de um POST DE VENDA de um buffet de festas infantis no Instagram. Responda APENAS com JSON." },
             {
               role: "user",
-              content: `Tema do post: "${tema.trim()}".\nFotos disponíveis:\n${lista}\n\nEscolha as ${n} fotos que melhor VENDEM esse tema, da mais ligada à menos ligada:\n- o que vende é o PRODUTO aparecer: priorize cenas de ambiente, decoração, mesa/comida e brinquedos;\n- EVITE retrato/close de rosto e foto posada de família, a menos que o tema peça pessoas;\n- cada foto de uma CENA bem diferente (nunca duas parecidas);\n- se faltar foto do tema, complete com as melhores cenas gerais.\nSem repetir. Responda só com JSON: {"fotos":[números]}`,
+              content: `Tema do post: "${tema.trim()}".\nFotos disponíveis:\n${lista}\n\nEscolha as ${n} fotos que melhor VENDEM esse tema, da mais ligada à menos ligada:\n- a foto tem que MOSTRAR o assunto do tema (se o tema fala de brinquedos, a foto tem brinquedo aparecendo — não basta ter criança feliz);\n- o que vende é o PRODUTO aparecer: prefira cenas de ambiente, decoração, mesa/comida e brinquedos a retrato/close de rosto e foto posada de família;\n- cada foto de uma CENA bem diferente (nunca duas parecidas).\nSem repetir. Responda só com JSON: {"fotos":[números]}`,
             },
           ],
         }),
