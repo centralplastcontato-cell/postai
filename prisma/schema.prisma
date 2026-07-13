@@ -61,8 +61,31 @@ model Marca {
   metricas    MetricaMarca[]
   festas      Festa[]
   campanhas   Campanha[]
+  videosTematicos VideoTematico[]
 
   @@index([usuarioId])
+}
+
+// Vídeo TEMÁTICO do buffet (Reels institucional, SEM festa): montado com fotos do ACERVO
+// (ImagemMarca) sobre um tema — "Brinquedos", "Nosso espaço", "Decorações de festa"...
+// É evergreen: o MP4 fica guardado pra repostar quando quiser (não entra no arquivamento
+// de 24h dos Reels de festa). videoUrl usa a mesma máquina de estados da Festa:
+// "" (sem vídeo) | "gerando" (motor montando) | URL http (pronto).
+model VideoTematico {
+  id              String   @id @default(cuid())
+  marcaId         String
+  marca           Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
+  titulo          String // o tema do vídeo (vira o texto da capa)
+  videoFotos      String   @default("[]") // JSON: IDs de ImagemMarca na ordem do slideshow
+  videoCapa       String   @default("") // ID da foto da capa ("" = 1ª da sequência)
+  videoMoldura    String   @default("branca") // nenhuma | branca | grossa | marca
+  videoTextoFinal String   @default("") // frase do último quadro ("" = padrão do motor)
+  videoUrl        String   @default("")
+  criadoEm        DateTime @default(now())
+
+  publicacoes Publicacao[] // os Reels agendados/postados a partir deste vídeo (evergreen: vários)
+
+  @@index([marcaId])
 }
 
 // Campanha = uma OFERTA (banner de recompra) que o buffet cria e que aparece no fim de cada
@@ -217,6 +240,12 @@ model Publicacao {
   hashtags  String   @default("")
   imagemUrl String?
   videoUrl  String? // URL do MP4 (Blob) quando formato="reels" — o piloto posta via media_type=REELS
+  // Reels TEMÁTICO (vídeo do buffet, evergreen): de qual VideoTematico este post saiu. É o
+  // vínculo REAL (não por texto do slug) que: (a) protege o MP4 do arquivamento de 24h — o
+  // vídeo é reaproveitado em vários posts; (b) impede apagar do Blob um vídeo ainda agendado.
+  // null = Reels de festa (ou post que não é Reels).
+  videoTematicoId String?
+  videoTematico   VideoTematico? @relation(fields: [videoTematicoId], references: [id], onDelete: SetNull)
   // ID do container de vídeo na Meta enquanto ele PROCESSA (guardado entre as passadas do piloto). "" = ainda não criado.
   reelsContainerId String @default("")
   extra     String? // JSON com dados específicos do template (oferta, validade, selo, linhas do título, cor de fundo...)
@@ -243,6 +272,7 @@ model Publicacao {
   createdAt DateTime @default(now())
 
   @@index([marcaId, data])
+  @@index([videoTematicoId])
 }
 
 // Operadores do painel (admin mestre via ADMIN_SENHA; usuários extras opcionais).

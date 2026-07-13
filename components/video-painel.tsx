@@ -6,9 +6,25 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { type FestaView } from "@/lib/festa-tipos";
+import { type FestaView, type FotoView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
 import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
+import { criarVideoTematico, excluirVideoTematico, fotosDoVideoTematico } from "@/app/actions/videos-tematicos";
+
+// Vídeo TEMÁTICO do buffet (Reels institucional do acervo, sem festa) — view do painel.
+export type VideoTematicoView = {
+  id: string;
+  titulo: string;
+  videoUrl: string; // "" | "gerando" | http (evergreen: nunca "arquivado")
+  videoFotos: string[];
+  videoCapa: string;
+  videoMoldura: string;
+  videoTextoFinal: string;
+  capaUrl: string | null; // thumb do card (capa escolhida ou 1ª foto)
+};
+
+// Temas prontos pro botão de criar (também dá pra digitar um tema livre).
+const TEMAS_PRONTOS = ["Brinquedos", "Nosso espaço", "Decorações de festa", "Comidas e delícias"];
 
 function dataCurta(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
@@ -123,20 +139,148 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
   );
 }
 
-export function VideoPainel({ festas, corMarca }: { festas: FestaView[]; corMarca: string }) {
+// Card de um vídeo TEMÁTICO do buffet — mesma cara do card de festa, sem LGPD/aniversariante.
+function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTematicoView; ocupado: boolean; onAbrirSeletor: () => void; onExcluir: () => void }) {
+  const [ver, setVer] = useState(false);
+  const [confirmaExcluir, setConfirmaExcluir] = useState(false);
+
+  const pronto = v.videoUrl.startsWith("http");
+  const emGeracao = v.videoUrl === "gerando";
+  const badge = pronto
+    ? { txt: "✅ Pronto", cls: "bg-green-600 text-white" }
+    : emGeracao
+    ? { txt: "🎬 Gerando", cls: "bg-amber-500 text-black" }
+    : { txt: "Pra gerar", cls: "bg-black/70 text-white" };
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#7c3aed]/30 bg-preto-card transition hover:border-[#7c3aed]/60">
+      <div className="relative aspect-[9/16] bg-preto">
+        {v.capaUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={v.capaUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-4xl opacity-50">🏰</div>
+        )}
+        <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.cls}`}>{badge.txt}</span>
+        {v.videoFotos.length > 0 && (
+          <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">🎬 {v.videoFotos.length}</span>
+        )}
+        {pronto && (
+          <button onClick={() => setVer(true)} aria-label="Ver vídeo" className="absolute inset-0 flex items-center justify-center">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/55 text-2xl text-white backdrop-blur-sm transition hover:scale-110 hover:bg-[#7c3aed]">▶</span>
+          </button>
+        )}
+        {emGeracao && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/40">
+            <span className="text-3xl">🎬</span>
+            <span className="animate-pulse text-[11px] font-semibold text-white">Montando…</span>
+          </div>
+        )}
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2.5 pt-8">
+          <span className="mb-1 inline-block rounded-full bg-[#7c3aed]/80 px-2 py-0.5 text-[9px] font-bold text-white">🏰 Vídeo do buffet</span>
+          <p className="truncate font-titulo text-sm leading-tight text-white">{v.titulo}</p>
+          <p className="truncate text-[10px] text-white/70">{pronto ? "guardado — reposte quando quiser" : "monte com fotos do acervo"}</p>
+        </div>
+      </div>
+
+      <div className="flex items-stretch gap-1.5 p-2">
+        {pronto ? (
+          <>
+            <button onClick={() => setVer(true)} className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-green-500">▶ Ver vídeo</button>
+            <button onClick={onAbrirSeletor} disabled={ocupado} title="Escolher as fotos e gerar de novo (substitui o vídeo atual)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25 disabled:opacity-50">🔄</button>
+          </>
+        ) : emGeracao ? (
+          <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
+        ) : (
+          <button onClick={onAbrirSeletor} disabled={ocupado} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{ocupado ? "Abrindo…" : "⚡ Fotos & gerar"}</button>
+        )}
+        {!emGeracao && (confirmaExcluir ? (
+          <button onClick={() => { onExcluir(); setConfirmaExcluir(false); }} className="shrink-0 rounded-lg bg-red-700 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-600">Excluir?</button>
+        ) : (
+          <button onClick={() => setConfirmaExcluir(true)} title="Excluir este vídeo temático" className="shrink-0 rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 transition hover:bg-red-950/40">✕</button>
+        ))}
+      </div>
+
+      {ver && pronto && <PlayerModal url={v.videoUrl} onFechar={() => setVer(false)} />}
+    </div>
+  );
+}
+
+export function VideoPainel({ marcaId, festas, tematicos, corMarca }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string }) {
   const router = useRouter();
   const [seletor, setSeletor] = useState<FestaView | null>(null);
+  // criação/edição de vídeo TEMÁTICO
+  const [temaNovo, setTemaNovo] = useState("");
+  const [criando, setCriando] = useState(false);
+  const [msgTema, setMsgTema] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
+  const [carregandoTema, setCarregandoTema] = useState<string | null>(null); // id do temático abrindo o seletor
+  const [seletorTema, setSeletorTema] = useState<{ video: VideoTematicoView; fotos: FotoView[] } | null>(null);
 
   // Auto-refresh enquanto algum vídeo está "Gerando": o motor monta na nuvem e avisa por callback
   // (salva no banco). Aqui o painel se atualiza sozinho a cada 12s pra o card virar "pronto" sem F5.
-  const algumGerando = festas.some((f) => f.videoUrl === "gerando");
+  const algumGerando = festas.some((f) => f.videoUrl === "gerando") || tematicos.some((v) => v.videoUrl === "gerando");
   useEffect(() => {
     if (!algumGerando) return;
     const t = setInterval(() => router.refresh(), 12000);
     return () => clearInterval(t);
   }, [algumGerando, router]);
+
+  async function criarTema(nome: string) {
+    const tema = nome.trim();
+    if (tema.length < 3) { setMsgTema({ tipo: "erro", txt: "Dê um nome pro tema (ex: Brinquedos)." }); return; }
+    setCriando(true); setMsgTema(null);
+    const r = await criarVideoTematico(marcaId, tema).catch(() => ({ ok: false as const, erro: "Não deu pra criar agora." }));
+    setCriando(false);
+    if (!r.ok) { setMsgTema({ tipo: "erro", txt: r.erro || "Não deu pra criar." }); return; }
+    setTemaNovo("");
+    setMsgTema({ tipo: "ok", txt: `✨ Criei "${tema}" já com ${r.sugeridas} fotos sugeridas — toque em ⚡ Fotos & gerar pra revisar.` });
+    router.refresh();
+  }
+  // Abre o seletor do temático: o servidor devolve o acervo divulgável com as fotos JÁ
+  // escolhidas na frente (e garante que nenhuma delas suma, mesmo em acervo grande).
+  async function abrirSeletorTema(v: VideoTematicoView) {
+    setCarregandoTema(v.id); setMsgTema(null);
+    const r = await fotosDoVideoTematico(v.id).catch(() => ({ ok: false as const, erro: "Não consegui carregar as fotos." }));
+    setCarregandoTema(null);
+    if (!r.ok) { setMsgTema({ tipo: "erro", txt: r.erro || "Não consegui carregar as fotos." }); return; }
+    setSeletorTema({ video: v, fotos: r.fotos as FotoView[] });
+  }
+  async function excluirTema(id: string) {
+    setMsgTema(null);
+    const r = await excluirVideoTematico(id).catch(() => ({ ok: false as const, erro: "Não deu pra excluir agora." }));
+    if (!r.ok) { setMsgTema({ tipo: "erro", txt: r.erro || "Não deu pra excluir." }); return; }
+    router.refresh();
+  }
+
   return (
     <div>
+      {/* ---- VÍDEOS DO BUFFET (temáticos, do acervo) ---- */}
+      <div className="mb-4">
+        <p className="text-sm font-semibold text-white">🏰 Vídeos do buffet</p>
+        <p className="mt-1 text-xs text-muted">
+          Reels <strong className="text-white/80">do seu espaço</strong> (sem festa específica): escolha um tema e a IA já sugere as melhores fotos do acervo — brinquedos, decoração, comidas… O vídeo fica <strong className="text-white/80">guardado</strong> pra repostar quando quiser.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {TEMAS_PRONTOS.map((t) => (
+            <button key={t} type="button" disabled={criando} onClick={() => criarTema(t)} className="rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/10 px-3 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-50">➕ {t}</button>
+          ))}
+          <div className="flex items-center gap-1.5">
+            <input value={temaNovo} onChange={(e) => setTemaNovo(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") criarTema(temaNovo); }} placeholder="Outro tema…" className="input-base w-36 py-1.5 text-xs" />
+            <button type="button" disabled={criando || temaNovo.trim().length < 3} onClick={() => criarTema(temaNovo)} className="rounded-lg bg-[#7c3aed] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{criando ? "✨ Criando…" : "Criar"}</button>
+          </div>
+        </div>
+        {msgTema && <p className={`mt-2 text-xs font-semibold ${msgTema.tipo === "ok" ? "text-green-400" : "text-vermelho"}`}>{msgTema.txt}</p>}
+      </div>
+
+      {tematicos.length > 0 && (
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+          {tematicos.map((v) => (
+            <CardTematico key={v.id} v={v} ocupado={carregandoTema === v.id} onAbrirSeletor={() => abrirSeletorTema(v)} onExcluir={() => excluirTema(v.id)} />
+          ))}
+        </div>
+      )}
+
+      {/* ---- VÍDEOS DAS FESTAS ---- */}
       <div className="mb-4">
         <p className="text-sm font-semibold text-white">🎬 Vídeo das festas</p>
         <p className="mt-1 text-xs text-muted">
@@ -168,6 +312,22 @@ export function VideoPainel({ festas, corMarca }: { festas: FestaView[]; corMarc
           corMarca={corMarca}
           jaTemVideo={seletor.videoUrl.startsWith("http")}
           onFechar={() => setSeletor(null)}
+        />
+      )}
+
+      {seletorTema && (
+        <SeletorVideoFotos
+          festaId=""
+          tematicoId={seletorTema.video.id}
+          nome={seletorTema.video.titulo}
+          fotos={seletorTema.fotos}
+          inicial={seletorTema.video.videoFotos}
+          capaInicial={seletorTema.video.videoCapa}
+          molduraInicial={seletorTema.video.videoMoldura}
+          textoFinalInicial={seletorTema.video.videoTextoFinal}
+          corMarca={corMarca}
+          jaTemVideo={seletorTema.video.videoUrl.startsWith("http")}
+          onFechar={() => setSeletorTema(null)}
         />
       )}
     </div>

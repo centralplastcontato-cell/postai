@@ -11,9 +11,12 @@ import { type PublicacaoView } from "./publicacoes-aba";
 import { InputDataBR } from "./input-data-br";
 import { alternarAprovacao, excluirPublicacao } from "@/app/actions/feed";
 import { agendarReelsDaFesta, gerarLegendaReels, atualizarReels, postarReelsAgora } from "@/app/actions/festas";
+import { agendarReelsTematico, gerarLegendaReelsTematico } from "@/app/actions/videos-tematicos";
 import { rotuloHora } from "@/lib/horarios";
 
-export type FestaComVideo = { id: string; nome: string; videoUrl: string; data: string; horario: string };
+// Um vídeo pronto pra agendar: de uma FESTA ou TEMÁTICO (vídeo do buffet, evergreen).
+// O `tipo` diz de qual tabela o `id` veio — nada de prefixo mágico na string.
+export type FestaComVideo = { tipo: "festa" | "tema"; id: string; nome: string; videoUrl: string; data: string; horario: string };
 
 function quando(iso: string): string {
   const d = new Date(iso);
@@ -23,7 +26,9 @@ function quando(iso: string): string {
 }
 
 // Rótulo da festa no seletor: "Samuel · 21/06 13:00" (nome + data e horário DA FESTA).
+// Vídeo temático não tem data de festa: "🏰 Brinquedos (vídeo do buffet)".
 function festaLabel(f: FestaComVideo): string {
+  if (f.tipo === "tema") return `🏰 ${f.nome} (vídeo do buffet)`;
   const dia = new Date(f.data).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
   return `${f.nome} · ${dia}${f.horario ? ` ${f.horario}` : ""}`;
 }
@@ -62,11 +67,17 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
   const [msg, setMsg] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
   const [verUrl, setVerUrl] = useState<string | null>(null);
 
+  // O <select> guarda o id; o tipo (festa|tema) vem do próprio item da lista.
+  const escolhido = festasComVideo.find((f) => f.id === festaId) ?? null;
+
   async function agendar() {
-    if (!festaId) { setMsg({ tipo: "erro", txt: "Escolha a festa." }); return; }
+    if (!escolhido) { setMsg({ tipo: "erro", txt: "Escolha o vídeo." }); return; }
     if (!dataISO) { setMsg({ tipo: "erro", txt: "Escolha a data do post." }); return; }
     setAgendando(true); setMsg(null);
-    const r = await agendarReelsDaFesta(festaId, dataISO, legenda, hora).catch(() => ({ ok: false as const, erro: "Não deu pra agendar agora." }));
+    const r = await (escolhido.tipo === "tema"
+      ? agendarReelsTematico(escolhido.id, dataISO, legenda, hora)
+      : agendarReelsDaFesta(escolhido.id, dataISO, legenda, hora)
+    ).catch(() => ({ ok: false as const, erro: "Não deu pra agendar agora." }));
     setAgendando(false);
     if (!r.ok) { setMsg({ tipo: "erro", txt: r.erro || "Não deu pra agendar." }); return; }
     setMsg({ tipo: "ok", txt: "✓ Reels agendado! Aparece aqui embaixo." });
@@ -74,9 +85,9 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
     router.refresh();
   }
   async function escreverComBia() {
-    if (!festaId) { setMsg({ tipo: "erro", txt: "Escolha a festa primeiro." }); return; }
+    if (!escolhido) { setMsg({ tipo: "erro", txt: "Escolha o vídeo primeiro." }); return; }
     setGerandoLeg(true); setMsg(null);
-    const r = await gerarLegendaReels(festaId).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }));
+    const r = await (escolhido.tipo === "tema" ? gerarLegendaReelsTematico(escolhido.id) : gerarLegendaReels(escolhido.id)).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }));
     setGerandoLeg(false);
     if (!r.ok) { setMsg({ tipo: "erro", txt: r.erro || "Não consegui escrever." }); return; }
     setLegenda(r.legenda);
@@ -120,20 +131,20 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
     <div className="space-y-4">
       {/* AGENDADOR */}
       <div className="rounded-xl border border-linha bg-preto-card p-4">
-        <p className="text-sm font-bold text-white">🎬 Agendar um Reels de festa</p>
-        <p className="mt-0.5 text-xs text-muted">Escolha uma festa com vídeo pronto e marque a data. O vídeo é gerado na aba <strong className="text-white/80">📄 Páginas</strong>.</p>
+        <p className="text-sm font-bold text-white">🎬 Agendar um Reels</p>
+        <p className="mt-0.5 text-xs text-muted">Escolha um vídeo pronto (de festa ou 🏰 do buffet) e marque a data. Os vídeos são gerados na aba <strong className="text-white/80">🎬 Vídeo</strong>. O vídeo do buffet pode ser repostado quantas vezes quiser.</p>
         {festasComVideo.length === 0 ? (
           <p className="mt-3 rounded-lg border border-linha bg-preto px-3 py-2 text-xs text-muted">
-            Nenhuma festa com vídeo pronto ainda. Vá em <strong className="text-white">📄 Páginas</strong>, escolha as fotos de uma festa e gere o vídeo.
+            Nenhum vídeo pronto ainda. Vá na aba <strong className="text-white">🎬 Vídeo</strong>, escolha as fotos e gere.
           </p>
         ) : (
           <>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-xs font-semibold text-white">Festa</label>
+                <label className="block text-xs font-semibold text-white">Vídeo</label>
                 <select value={festaId} onChange={(e) => { setFestaId(e.target.value); setMsg(null); }} className="input-base mt-1 w-full text-sm">
-                  <option value="">Escolha a festa…</option>
-                  {festasComVideo.map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{nomesPostados.has(f.nome) ? "  ✅ já postado" : ""}</option>)}
+                  <option value="">Escolha o vídeo…</option>
+                  {festasComVideo.map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{f.tipo === "festa" && nomesPostados.has(f.nome) ? "  ✅ já postado" : ""}</option>)}
                 </select>
               </div>
               <div>
@@ -146,10 +157,13 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
                 </div>
               </div>
             </div>
-            {festaId && (
-              <button type="button" onClick={() => { const f = festasComVideo.find((x) => x.id === festaId); if (f) setVerUrl(f.videoUrl); }} className="mt-2 text-xs font-semibold text-[#c7b2ff] transition hover:underline">▶ Ver o vídeo dessa festa</button>
+            {escolhido && (
+              <button type="button" onClick={() => setVerUrl(escolhido.videoUrl)} className="mt-2 text-xs font-semibold text-[#c7b2ff] transition hover:underline">▶ Ver esse vídeo</button>
             )}
-            {festaId && nomesPostados.has(festasComVideo.find((f) => f.id === festaId)?.nome ?? "") && (
+            {escolhido?.tipo === "tema" && (
+              <p className="mt-2 rounded-lg border border-[#7c3aed]/30 bg-[#7c3aed]/10 px-3 py-1.5 text-xs font-semibold text-[#c7b2ff]">🏰 Vídeo do buffet — pode ser postado quantas vezes quiser, em datas diferentes.</p>
+            )}
+            {escolhido?.tipo === "festa" && nomesPostados.has(escolhido.nome) && (
               <p className="mt-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs font-semibold text-green-400">✅ Essa festa já teve um Reels postado — só agende de novo se quiser repostar.</p>
             )}
             <div className="mt-3 flex items-center justify-between gap-2">

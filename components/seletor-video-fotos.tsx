@@ -8,6 +8,7 @@
 import { useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo } from "@/app/actions/festas";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 
 const ORDEM = ["salao", "brinquedos", "aniversariante", "parabens", "momentos"];
@@ -17,6 +18,11 @@ const LABEL: Record<string, string> = {
   aniversariante: "👑 Aniversariante",
   parabens: "🎉 Parabéns",
   momentos: "📸 Momentos",
+  // rótulos do modo TEMÁTICO (fotos do acervo — o "momento" vira a categoria do banco)
+  espaco: "🏰 Espaço",
+  festa: "🎉 Festa",
+  comida: "🍔 Comida",
+  geral: "📸 Geral",
 };
 
 const MOLDURAS_UI = [
@@ -35,8 +41,9 @@ function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   return {};
 }
 
-export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
+  tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
   fotos: FotoView[];
   inicial: string[];
@@ -48,8 +55,9 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
   onFechar: () => void;
 }) {
   const router = useRouter();
-  // galeria ordenada por momento (narrativa) — base pra parte "disponíveis"
-  const galeria = ORDEM.flatMap((m) => fotos.filter((f) => f.momento === m)).concat(fotos.filter((f) => !ORDEM.includes(f.momento)));
+  // galeria ordenada por momento (narrativa) — base pra parte "disponíveis".
+  // No modo temático as fotos já chegam na ordem certa (sugeridas primeiro) — não regrupa.
+  const galeria = tematicoId ? fotos : ORDEM.flatMap((m) => fotos.filter((f) => f.momento === m)).concat(fotos.filter((f) => !ORDEM.includes(f.momento)));
   const [sel, setSel] = useState<string[]>(inicial.filter((id) => fotos.some((f) => f.id === id)));
   const [salvando, setSalvando] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null); // foto sendo arrastada (PC ou alça)
@@ -92,22 +100,28 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
     if (alvoId) moverFoto(dragId, alvoId);
   }
   function sugerir() {
+    // Temático: a galeria já chega na ordem sugerida pela IA — pega as primeiras.
+    if (tematicoId) { setSel(galeria.slice(0, 26).map((f) => f.id)); return; }
     const sug: string[] = [];
     for (const m of ORDEM) sug.push(...fotos.filter((f) => f.momento === m).slice(0, 5).map((f) => f.id));
     setSel(sug.slice(0, 24));
   }
-  // A Bia gera uma frase carinhosa de encerramento (usa nome/idade/tema da festa).
+  // A Bia gera uma frase carinhosa de encerramento (festa: nome/idade/tema; temático: o tema).
   async function biaEscreve() {
     setGerandoTexto(true);
     try {
-      const r = await gerarTextoFinalVideo(festaId);
+      const r = tematicoId ? await gerarTextoFinalVideoTematico(tematicoId) : await gerarTextoFinalVideo(festaId);
       if (r.ok && r.texto) setTextoFinal(r.texto);
     } catch {}
     setGerandoTexto(false);
   }
+  async function salvarSelecao() {
+    if (tematicoId) await salvarFotosVideoTematico(tematicoId, sel, capa, moldura, textoFinal);
+    else await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal);
+  }
   async function salvar() {
     setSalvando(true);
-    try { await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal); } catch {}
+    try { await salvarSelecao(); } catch {}
     setSalvando(false);
     router.refresh();
     onFechar();
@@ -117,8 +131,8 @@ export function SeletorVideoFotos({ festaId, nome, fotos, inicial, capaInicial =
     setSalvando(true);
     setErroGerar("");
     try {
-      await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal);
-      const r = await gerarVideoDaFesta(festaId).catch(() => ({ ok: false as const, erro: "Não consegui gerar agora." }));
+      await salvarSelecao();
+      const r = await (tematicoId ? gerarVideoTematico(tematicoId) : gerarVideoDaFesta(festaId)).catch(() => ({ ok: false as const, erro: "Não consegui gerar agora." }));
       if (!r.ok) { setErroGerar(r.erro || "Não deu pra gerar."); setSalvando(false); return; }
       router.refresh();
       onFechar();

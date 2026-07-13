@@ -284,7 +284,10 @@ async function arquivarReelsPostados(m: { id: string; nome: string }, agora: Dat
   try {
     const limite = new Date(agora.getTime() - UM_DIA_MS);
     const antigos = await prisma.publicacao.findMany({
-      where: { marcaId: m.id, formato: "reels", status: "postado", postadoEm: { lt: limite }, videoUrl: { startsWith: "http" } },
+      // Reels TEMÁTICO (vídeo do buffet) é EVERGREEN: o mesmo MP4 é repostado em várias datas,
+      // então nunca arquivamos — apagá-lo quebraria os reposts agendados. O vínculo é a coluna
+      // videoTematicoId (não um prefixo de slug): null = Reels de festa, que arquiva normal.
+      where: { marcaId: m.id, formato: "reels", status: "postado", postadoEm: { lt: limite }, videoUrl: { startsWith: "http" }, videoTematicoId: null },
       select: { id: true, videoUrl: true, titulo: true },
       take: 5, // no máx. 5 por passada — não estoura a janela de 60s do cron
     });

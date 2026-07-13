@@ -9,7 +9,7 @@ import { type PublicacaoView } from "./publicacoes-aba";
 import { type FestaComVideo } from "./reels-aba";
 import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { FestasPainel } from "./festas-painel";
-import { VideoPainel } from "./video-painel";
+import { VideoPainel, type VideoTematicoView } from "./video-painel";
 import { InstagramEspelho } from "./instagram-espelho";
 import { PaginasPainel } from "./paginas-painel";
 import { CampanhasPainel, type CampanhaView } from "./campanhas-painel";
@@ -44,6 +44,7 @@ export function MarcaHub({
   stories,
   reels,
   festasComVideo,
+  videosTematicos,
   imagens,
   festas,
   campanhas,
@@ -65,6 +66,7 @@ export function MarcaHub({
   stories: PublicacaoView[];
   reels: PublicacaoView[];
   festasComVideo: FestaComVideo[];
+  videosTematicos: VideoTematicoView[];
   imagens: ImagemView[];
   festas: FestaView[];
   campanhas: CampanhaView[];
@@ -182,7 +184,7 @@ export function MarcaHub({
         {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} reels={reels} festasComVideo={festasComVideo} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} sugestao={sugestao} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
-        {aba === "video" && <VideoPainel festas={festas} corMarca={marca.corPrimaria} />}
+        {aba === "video" && <VideoPainel marcaId={marca.id} festas={festas} tematicos={videosTematicos} corMarca={marca.corPrimaria} />}
         {aba === "instagram" && <InstagramEspelho marcaId={marca.id} />}
         {aba === "paginas" && <PaginasPainel festas={festas} linkBase={linkBase} />}
         {aba === "campanhas" && <CampanhasPainel marcaId={marca.id} temTelefone={Boolean(marca.telefone)} campanhas={campanhas} acento={marca.corPrimaria} />}

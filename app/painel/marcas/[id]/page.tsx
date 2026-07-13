@@ -47,7 +47,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
 
   // Todas as queries da marca em PARALELO (Promise.all) — antes eram sequenciais e
   // somavam ~4-5s + pressionavam o pool de conexões. Em paralelo cai pra ~1 query.
-  const [conteudos, pubs, imgs, metricas, ativ, festasRaw, campanhasRaw] = await Promise.all([
+  const [conteudos, pubs, imgs, metricas, ativ, festasRaw, campanhasRaw, tematicosRaw] = await Promise.all([
     prisma.conteudo.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.publicacao.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.imagemMarca.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
@@ -55,6 +55,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     prisma.atividadeAgente.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" }, take: 25, select: { id: true, agente: true, texto: true, criadoEm: true } }),
     prisma.festa.findMany({ where: { marcaId: id }, orderBy: [{ data: "desc" }, { criadoEm: "desc" }], include: { fotos: { select: { id: true, url: true, momento: true, descricao: true }, orderBy: { criadoEm: "desc" } } } }),
     prisma.campanha.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
+    prisma.videoTematico.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
   ]);
   const campanhas: CampanhaView[] = campanhasRaw.map((c) => ({
     id: c.id, selo: c.selo, titulo: c.titulo, texto: c.texto, ctaTexto: c.ctaTexto, ctaTipo: c.ctaTipo, ctaValor: c.ctaValor, ativa: c.ativa,
@@ -218,7 +219,30 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     };
   });
   // Festas com vídeo já montado → alimentam o agendador de Reels na aba Redes Sociais.
-  const festasComVideo = festasRaw.filter((f) => (f.videoUrl || "").startsWith("http")).map((f) => ({ id: f.id, nome: f.aniversariante || "Festa", videoUrl: f.videoUrl, data: f.data.toISOString(), horario: f.horario }));
+  const festasComVideo = festasRaw
+    .filter((f) => (f.videoUrl || "").startsWith("http"))
+    .map((f) => ({ tipo: "festa" as const, id: f.id, nome: f.aniversariante || "Festa", videoUrl: f.videoUrl, data: f.data.toISOString(), horario: f.horario }));
+
+  // Vídeos TEMÁTICOS do buffet (Reels institucionais do acervo) — aba 🎬 Vídeo + agendador de
+  // Reels. A capa do card sai de `imgs` (o acervo já veio no Promise.all — sem query extra).
+  const urlDaFoto = new Map(imgs.map((i) => [i.id, i.url]));
+  const videosTematicos = tematicosRaw.map((v) => {
+    const ids = (() => { try { const a = JSON.parse(v.videoFotos || "[]"); return Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string") : []; } catch { return [] as string[]; } })();
+    return {
+      id: v.id,
+      titulo: v.titulo,
+      videoUrl: v.videoUrl,
+      videoFotos: ids,
+      videoCapa: v.videoCapa,
+      videoMoldura: v.videoMoldura,
+      videoTextoFinal: v.videoTextoFinal,
+      capaUrl: (v.videoCapa && urlDaFoto.get(v.videoCapa)) || (ids[0] && urlDaFoto.get(ids[0])) || null,
+    };
+  });
+  // Temáticos prontos entram no seletor do agendador de Reels, na frente das festas.
+  const tematicosComVideo = tematicosRaw
+    .filter((v) => v.videoUrl.startsWith("http"))
+    .map((v) => ({ tipo: "tema" as const, id: v.id, nome: v.titulo, videoUrl: v.videoUrl, data: v.criadoEm.toISOString(), horario: "" }));
 
   // Banco da aba Imagens = só as fotos-BASE PURAS que o dono sobe (sem festa E sem `momento`).
   // Foto vinda de festa tem `momento` preenchido (salão/brinquedos/…) — então, mesmo que perca o
@@ -287,7 +311,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         publicacoes={publicacoes}
         stories={stories}
         reels={reels}
-        festasComVideo={festasComVideo}
+        festasComVideo={[...tematicosComVideo, ...festasComVideo]}
+        videosTematicos={videosTematicos}
         imagens={imagens}
         festas={festas}
         campanhas={campanhas}
