@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo } from "@/app/actions/festas";
 import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarNarracaoVideo, removerNarracaoVideo } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
-import { VOZES, VOZ_PADRAO, fotosParaDuracao } from "@/lib/vozes";
+import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 
 const ORDEM = ["salao", "brinquedos", "aniversariante", "parabens", "momentos"];
 const LABEL: Record<string, string> = {
@@ -52,7 +52,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   molduraInicial?: string;
   textoFinalInicial?: string;
   textosIniciais?: Record<string, string>; // legendas por foto (só no modo temático)
-  narracao?: { texto: string; voz: string; url: string; segundos: number }; // a voz do vídeo
+  narracao?: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz do vídeo
   corMarca?: string;
   jaTemVideo?: boolean;
   onFechar: () => void;
@@ -80,6 +80,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [briefing, setBriefing] = useState("");
   const [roteiro, setRoteiro] = useState(narracao?.texto ?? "");
   const [voz, setVoz] = useState(narracao?.voz || VOZ_PADRAO);
+  const [estilo, setEstilo] = useState(narracao?.estilo || DIRECAO_PADRAO); // COMO a voz fala
   const [audioUrl, setAudioUrl] = useState(narracao?.url ?? "");
   const [audioSeg, setAudioSeg] = useState(narracao?.segundos ?? 0);
   const [escrevendoRoteiro, setEscrevendoRoteiro] = useState(false);
@@ -187,7 +188,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId) return;
     setGerandoVoz(true);
     setMsgVoz(null);
-    const r = await gerarNarracaoVideo(tematicoId, roteiro, voz).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
+    const r = await gerarNarracaoVideo(tematicoId, roteiro, voz, estilo).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
     setGerandoVoz(false);
     if (!r.ok) { setMsgVoz({ tipo: "erro", txt: r.erro || "Não consegui gerar a voz." }); return; }
     setAudioUrl(r.url);
@@ -321,17 +322,45 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
               />
 
-              {/* 3) voz + ouvir */}
+              {/* 3) COMO A VOZ FALA (a direção) — é isso que tira o tom robótico: a voz obedece
+                  esse briefing de verdade. Os botões preenchem, mas dá pra escrever o que quiser. */}
+              <div className="mt-2.5 rounded-md border border-linha bg-preto/40 px-2.5 py-2">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-white">🎭 Como a voz deve falar</span>
+                  {ESTILOS.map((e) => (
+                    <button
+                      key={e.nome}
+                      type="button"
+                      onClick={() => setEstilo(e.direcao)}
+                      title={e.direcao}
+                      className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${estilo === e.direcao ? "border-emerald-400 bg-emerald-500/20 text-emerald-200" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}
+                    >
+                      {e.emoji} {e.nome}
+                    </button>
+                  ))}
+                </div>
+                <textarea
+                  value={estilo}
+                  onChange={(e) => setEstilo(e.target.value)}
+                  rows={3}
+                  maxLength={900}
+                  placeholder="Descreva o jeito de falar: quem é a pessoa, a energia, o sotaque, o que NÃO quer…"
+                  className="mt-1.5 w-full rounded-md border border-linha bg-preto px-2 py-1.5 text-[10px] leading-relaxed text-white/90 placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+                />
+                <p className="mt-1 text-[10px] leading-snug text-muted/70">Escreva como se estivesse dirigindo um locutor no estúdio — <strong className="text-white/70">a voz obedece de verdade</strong>. Ex: “paulista descontraído, energia de showman de circo, abertura explosiva, sem gritaria forçada”.</p>
+              </div>
+
+              {/* 4) voz + ouvir */}
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <select value={voz} onChange={(e) => setVoz(e.target.value)} className="input-base flex-1 py-1.5 text-[11px]" aria-label="Voz da narração">
-                  <optgroup label="⭐ As suas favoritas">
+                  <optgroup label="⭐ As que você aprovou">
                     {VOZES.filter((v) => v.favorita).map((v) => (
-                      <option key={v.id} value={v.id}>⭐ {v.nome} ({v.sexo === "f" ? "voz feminina" : "voz masculina"})</option>
+                      <option key={v.id} value={v.id}>⭐ {v.nome} — {v.sexo === "f" ? "feminina" : "masculina"}, {v.nota}</option>
                     ))}
                   </optgroup>
                   <optgroup label="Outras vozes">
                     {VOZES.filter((v) => !v.favorita).map((v) => (
-                      <option key={v.id} value={v.id}>{v.nome} ({v.sexo === "f" ? "voz feminina" : "voz masculina"})</option>
+                      <option key={v.id} value={v.id}>{v.nome} — {v.sexo === "f" ? "feminina" : "masculina"}, {v.nota}</option>
                     ))}
                   </optgroup>
                 </select>

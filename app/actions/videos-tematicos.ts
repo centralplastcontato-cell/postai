@@ -610,7 +610,7 @@ export async function gerarRoteiroNarracao(videoId: string, briefing: string, se
 
 // Gera a VOZ (Google Chirp3-HD) já misturada com o jingle e guarda no Blob. O dono OUVE antes
 // de mandar montar o vídeo — trocar a voz e ouvir de novo custa centavos e leva 2 segundos.
-export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string) {
+export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string, direcao?: string) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
     include: { marca: { select: { slug: true } } },
@@ -626,12 +626,13 @@ export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: 
   if (v.videoUrl === "gerando") return { ok: false as const, erro: "O vídeo está sendo montado agora — espere terminar pra mexer na narração." };
 
   const voz = vozValida(vozId || v.narracaoVoz || VOZ_PADRAO);
+  const estilo = (direcao ?? v.narracaoEstilo ?? "").trim().slice(0, 900);
   const antigo = v.narracaoUrl;
   try {
-    const { url, segundos } = await gerarNarracaoMp3({ texto: t, vozId: voz, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6) });
+    const { url, segundos } = await gerarNarracaoMp3({ texto: t, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6) });
     await prisma.videoTematico.update({
       where: { id: videoId },
-      data: { narracaoTexto: t, narracaoVoz: voz, narracaoUrl: url, narracaoSeg: Math.round(segundos) },
+      data: { narracaoTexto: t, narracaoVoz: voz, narracaoEstilo: estilo, narracaoUrl: url, narracaoSeg: Math.round(segundos) },
     });
     // A narração anterior não serve mais — o Blob tem limite.
     if (antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});

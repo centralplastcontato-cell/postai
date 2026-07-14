@@ -21,7 +21,7 @@ export type VideoTematicoView = {
   videoMoldura: string;
   videoTextoFinal: string;
   videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
-  narracao: { texto: string; voz: string; url: string; segundos: number }; // a voz que fala no vídeo
+  narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
   capaUrl: string | null; // thumb do card (capa escolhida ou 1ª foto)
 };
 

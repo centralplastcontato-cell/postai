@@ -89,7 +89,11 @@ model VideoTematico {
   // é escrito na mão; a voz é do Google (Chirp3-HD, pt-BR). O áudio final é a locução MISTURADA
   // com o jingle da marca (o motor só aceita UMA trilha) e mora no Blob.
   narracaoTexto String @default("") // o roteiro falado ("" = vídeo sem narração, só o jingle)
-  narracaoVoz   String @default("") // id da voz (ex: pt-BR-Chirp3-HD-Vindemiatrix)
+  narracaoVoz   String @default("") // id da voz Gemini (ex: Puck, Leda, Fenrir…)
+  // DIREÇÃO DE VOZ: o briefing de COMO falar ("animador de festinha, showman paulista, energia
+  // de circo, abertura explosiva…"). As vozes Gemini obedecem isso de verdade — é o que tira o
+  // tom robótico. "" = usa a direção padrão (animada e calorosa).
+  narracaoEstilo String @default("")
   narracaoUrl   String @default("") // MP3 pronto (voz + jingle) no Blob
   narracaoSeg   Int    @default(0)  // duração da narração — define quantas fotos o vídeo leva
   criadoEm        DateTime @default(now())

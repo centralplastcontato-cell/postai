@@ -11,7 +11,7 @@
 import { GoogleAuth } from "google-auth-library";
 import { put } from "@vercel/blob";
 import { Mp3Encoder } from "@breezystack/lamejs";
-import { vozValida } from "@/lib/vozes";
+import { vozValida, MODELO_VOZ, DIRECAO_PADRAO } from "@/lib/vozes";
 
 const TAXA = 24000; // 24 kHz mono — o que o Google devolve e o que o jingle já está
 // A voz é ATENUADA na mesma medida em que o jingle entra (0,84 + 0,16 = 1,0). Sem isso a soma
@@ -34,28 +34,57 @@ function credenciais(): Record<string, unknown> {
   return JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
 }
 
-// Texto → PCM (Int16) com a voz escolhida. LINEAR16 vem sem compressão: a duração é exata
-// (amostras ÷ 24000) e a mistura não precisa decodificar nada.
-async function falar(texto: string, vozId: string): Promise<Int16Array> {
+// Texto → PCM (Int16) com a voz escolhida e a DIREÇÃO de voz. LINEAR16 vem sem compressão: a
+// duração é exata (amostras ÷ 24000) e a mistura não precisa decodificar nada.
+//
+// As vozes GEMINI obedecem o `prompt` (a direção: "fale como um animador de festinha…") — é o
+// que tira o tom robótico. Elas têm cota por minuto, então: se der 429, espera e tenta de novo;
+// se insistir, cai na voz Chirp3-HD de MESMO NOME (natural, mas sem direção) — melhor um vídeo
+// com voz simples do que nenhum vídeo.
+async function falar(texto: string, vozId: string, direcao: string): Promise<Int16Array> {
   const auth = new GoogleAuth({ credentials: credenciais(), scopes: ["https://www.googleapis.com/auth/cloud-platform"] });
   const { token } = await (await auth.getClient()).getAccessToken();
-  const r = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      input: { text: texto },
-      voice: { languageCode: "pt-BR", name: vozValida(vozId) },
-      audioConfig: { audioEncoding: "LINEAR16", sampleRateHertz: TAXA, speakingRate: 1.08 },
-    }),
-    // Sem timeout, um Google lento consumiria os 60s da função e o dono veria um erro cru
-    // em vez da mensagem tratada.
-    signal: AbortSignal.timeout(20000),
+  const voz = vozValida(vozId);
+  const prompt = (direcao || "").trim() || DIRECAO_PADRAO;
+
+  type Resposta = { pcm: Int16Array } | { status: number; erro: string };
+  const pedir = async (url: string, body: unknown): Promise<Resposta> => {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      // Sem timeout, um Google lento consumiria os 60s da função e o dono veria um erro cru.
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!r.ok) return { status: r.status, erro: (await r.text()).slice(0, 200) };
+    const j = (await r.json()) as { audioContent?: string };
+    if (!j.audioContent) return { status: 500, erro: "O Google não devolveu áudio." };
+    return { pcm: pcmDoWav(Buffer.from(j.audioContent, "base64")) };
+  };
+
+  const corpoGemini = {
+    input: { text: texto, prompt },
+    voice: { languageCode: "pt-BR", name: voz, modelName: MODELO_VOZ },
+    audioConfig: { audioEncoding: "LINEAR16", sampleRateHertz: TAXA },
+  };
+
+  for (let tent = 1; tent <= 2; tent++) {
+    const r = await pedir("https://texttospeech.googleapis.com/v1beta1/text:synthesize", corpoGemini);
+    if ("pcm" in r) return r.pcm;
+    if (r.status !== 429) throw new Error(`Voz (Gemini) ${r.status}: ${r.erro}`);
+    console.error(`Cota da voz Gemini estourada (tentativa ${tent}) — esperando…`);
+    await new Promise((res) => setTimeout(res, 4000));
+  }
+
+  // Plano B: a mesma voz na geração anterior (natural, porém sem obedecer a direção).
+  console.error("Cota da voz Gemini insistiu — caindo na voz simples (sem direção).");
+  const r = await pedir("https://texttospeech.googleapis.com/v1/text:synthesize", {
+    input: { text: texto },
+    voice: { languageCode: "pt-BR", name: `pt-BR-Chirp3-HD-${voz}` },
+    audioConfig: { audioEncoding: "LINEAR16", sampleRateHertz: TAXA, speakingRate: 1.08 },
   });
-  if (!r.ok) throw new Error(`Google TTS ${r.status}: ${(await r.text()).slice(0, 200)}`);
-  const j = (await r.json()) as { audioContent?: string };
-  if (!j.audioContent) throw new Error("O Google não devolveu áudio.");
-  const wav = Buffer.from(j.audioContent, "base64");
-  return pcmDoWav(wav);
+  if ("pcm" in r) return r.pcm;
+  throw new Error(`Voz ${r.status}: ${r.erro}`);
 }
 
 // Lê as amostras de um WAV PCM 16 bits (pula o cabeçalho, achando o bloco "data").
@@ -107,11 +136,11 @@ function misturar(voz: Int16Array, jingle: Int16Array | null): Buffer {
 
 // Gera a narração completa e sobe no Blob. Devolve a URL e a duração (que decide quantas fotos
 // o vídeo leva — o motor dá ~2,3s por foto).
-export async function gerarNarracaoMp3(opts: { texto: string; vozId: string; slugMarca: string; ref: string }): Promise<{ url: string; segundos: number }> {
+export async function gerarNarracaoMp3(opts: { texto: string; vozId: string; direcao?: string; slugMarca: string; ref: string }): Promise<{ url: string; segundos: number }> {
   const texto = opts.texto.trim();
   if (!texto) throw new Error("Sem texto pra narrar.");
 
-  const voz = await falar(texto, opts.vozId);
+  const voz = await falar(texto, opts.vozId, opts.direcao || "");
 
   let jingle: Int16Array | null = null;
   const urlJingle = JINGLES_PCM[opts.slugMarca];
