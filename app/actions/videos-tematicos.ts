@@ -200,7 +200,7 @@ export async function excluirVideoTematico(videoId: string) {
 // Salva a SELEÇÃO ordenada de fotos do vídeo temático (máx 30). Só aceita fotos da MARCA que
 // podem ser divulgadas (LGPD) — festa pendente/negada nunca entra em vídeo público.
 export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string, textos?: Record<string, string>) {
-  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoCapa: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -222,9 +222,13 @@ export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[
   if (textoFinal !== undefined) data.videoTextoFinal = textoFinal.trim().slice(0, 60);
   // LEGENDAS vêm junto (o seletor manda o que está na tela): assim uma frase digitada e o clique
   // direto em "Gerar" não se perdem — e legenda de foto que saiu da sequência é podada.
+  // A CAPA entra na lista mesmo se a foto dela estiver fora da sequência (dá pra estrelar uma
+  // foto do acervo): a frase dela é o gancho que abre o vídeo e não pode se perder.
   if (textos) {
+    const capaFinal = data.videoCapa !== undefined ? data.videoCapa : v.videoCapa;
+    const chaves = capaFinal ? [...ordenadas, capaFinal] : ordenadas;
     const limpo: Record<string, string> = {};
-    for (const id of ordenadas) {
+    for (const id of new Set(chaves)) {
       const f = (textos[id] || "").trim().slice(0, 80);
       if (f) limpo[id] = f;
     }
@@ -316,7 +320,10 @@ export async function gerarVideoTematico(videoId: string) {
     corMoldura: v.marca.corPrimaria || "#FFFFFF",
     logoUrl: v.marca.logoUrl,
     musicaUrl: musicaBuffet(v.marca.slug) || undefined,
-    textoCapa: v.titulo,
+    // FRASE DE CAPA (o que abre o vídeo): o gancho que a Bia escreve, guardado em videoTextos
+    // na chave da foto de capa. Sem frase, cai no nome do tema — mas "Brinquedos" na capa é
+    // etiqueta, não venda; por isso a Bia sempre escreve uma.
+    textoCapa: (v.videoCapa && (legendas[v.videoCapa] || "").trim()) || v.titulo,
     nomeArquivo: `${v.marca.slug || "reels"}-tema`,
     ...(v.videoTextoFinal?.trim() ? { tituloFinal: v.videoTextoFinal.trim(), subFinal: "" } : {}),
     // O motor só ECOA esse id no callback — mandamos o id do vídeo temático e o
@@ -361,8 +368,9 @@ export async function gerarTextosVideoTematico(videoId: string) {
   ]);
   const okFesta = new Set(festasOk.map((f) => f.id));
   const desc = new Map(imgs.filter((i) => !i.festaId || okFesta.has(i.festaId)).map((i) => [i.id, i.descricao]));
-  // A capa não leva legenda (o motor já escreve o título nela).
-  const doSlideshow = ids.filter((id) => id !== v.videoCapa && desc.get(id)?.trim());
+  // A capa tem a FRASE DE CAPA (o gancho que abre o vídeo) — não uma legenda de quadro.
+  const capaId = v.videoCapa && desc.has(v.videoCapa) ? v.videoCapa : ids.find((id) => desc.has(id)) || "";
+  const doSlideshow = ids.filter((id) => id !== capaId && desc.get(id)?.trim());
   if (!doSlideshow.length) return { ok: false as const, erro: "As fotos escolhidas ainda não têm descrição." };
 
   const lista = doSlideshow.map((id, i) => `${i + 1}. ${desc.get(id)}`).join("\n");
@@ -379,25 +387,29 @@ export async function gerarTextosVideoTematico(videoId: string) {
           {
             role: "system",
             content: `Você é a social media do buffet infantil "${v.marca.nome}". ${v.marca.descricao || ""}
-Você escreve a COPY de um Reels sobre "${v.titulo}" — frases curtas que aparecem POR CIMA das fotos, uma por quadro.
+Você escreve a COPY de um Reels sobre "${v.titulo}" — frases curtas que aparecem POR CIMA das fotos.
 REGRAS:
-- Fale COM o pai/mãe que decide a festa ("seu filho", "sua festa"), vendendo o BENEFÍCIO (diversão segura, memórias, festa sem trabalho pra você) — não descreva a foto ("Mesa decorada") nem rotule ("Brinquedos").
+- Fale COM o pai/mãe que decide a festa ("seu filho", "sua festa"), vendendo o BENEFÍCIO (diversão segura, memórias, festa sem trabalho pra você) — não descreva a foto ("Mesa decorada") nem rotule ("Brinquedos", "Nosso espaço").
 - Cada frase nasce da FOTO daquele quadro: fale do que ela mostra, conectando com o benefício.
 - Frases CURTAS: 3 a 8 palavras. Nada de ponto final em todas; pode usar "!" com moderação. No máximo 1 emoji no vídeo inteiro.
-- A copy tem ARCO: a 1ª frase é um gancho, as do meio entregam o que a família ganha, a última é um convite.
+- A copy tem ARCO: a CAPA é o gancho que segura o dedo, as do meio entregam o que a família ganha, a última é um convite.
 - A marca É o lugar da festa: nunca mande "procurar um local".`,
           },
           {
             role: "user",
-            content: `Fotos do vídeo, na ordem em que aparecem:\n${lista}\n\nEscolha ${quantas} fotos-chave (bem espalhadas ao longo do vídeo, nunca duas seguidas) e escreva a frase de cada uma. As outras fotos passam sem texto.\nResponda só com JSON: {"legendas":[{"foto":número,"frase":"..."}]}`,
+            content: `Fotos do vídeo, na ordem em que aparecem:\n${lista}\n\n1) Escreva a FRASE DE CAPA: é o primeiro texto que a pessoa lê, sobre a foto de abertura — um GANCHO que faz parar de rolar o feed (até 6 palavras, até 40 caracteres). NUNCA use o nome do tema como capa ("Brinquedos", "Nosso espaço") — isso é etiqueta, não gancho.\n2) Escolha ${quantas} fotos-chave (bem espalhadas, nunca duas seguidas) e escreva a frase de cada uma. As outras fotos passam sem texto.\nResponda só com JSON: {"capa":"...","legendas":[{"foto":número,"frase":"..."}]}`,
           },
         ],
       }),
     });
     if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
     const data = await resp.json();
-    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { legendas?: { foto?: number; frase?: string }[] };
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { capa?: string; legendas?: { foto?: number; frase?: string }[] };
     const mapa: Record<string, string> = {};
+    // Frase de CAPA (o gancho que abre o vídeo) — guardada na chave da foto de capa. Curta:
+    // o motor escreve ela sobre a foto de abertura e frase longa não caberia.
+    const capa = (j.capa || "").trim().slice(0, 48);
+    if (capaId && capa) mapa[capaId] = capa;
     for (const item of j.legendas ?? []) {
       const i = Number(item?.foto);
       const frase = (item?.frase || "").trim().slice(0, 80);
@@ -407,7 +419,7 @@ REGRAS:
     if (!Object.keys(mapa).length) throw new Error("A IA não devolveu legendas.");
     await prisma.videoTematico.update({ where: { id: videoId }, data: { videoTextos: JSON.stringify(mapa) } });
     revalidatePath(`/painel/marcas/${v.marcaId}`);
-    return { ok: true as const, textos: mapa, quantas: Object.keys(mapa).length };
+    return { ok: true as const, textos: mapa, quantas: Object.keys(mapa).length, capa: capa || null };
   } catch (e) {
     console.error("Erro ao escrever a copy do vídeo:", e);
     return { ok: false as const, erro: "Não consegui escrever a copy agora." };
