@@ -43,7 +43,12 @@ const falhou = (msg: string) => new Response(msg, { status: 503, headers: { "cac
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: string }> }) {
   const { id, n } = await ctx.params;
-  const idx = Math.max(1, parseInt(n, 10) || 1) - 1; // aceita "3" e "3.jpg"
+  const num = parseInt(n, 10); // aceita "3" e "3.jpg"
+  // n = 0 é a CAPA (a foto de abertura com a frase-gancho). Ela também é desenhada aqui porque
+  // o motor escreve o texto da capa numa fonte fixa e SEM quebrar linha — frase de gancho de
+  // verdade estourava a tela ("Diversão que vira lembrança pra vida" virava "rsão que vira...").
+  const ehCapa = num === 0;
+  const idx = ehCapa ? -1 : Math.max(1, num || 1) - 1;
 
   try {
     const v = await prisma.videoTematico.findUnique({
@@ -57,7 +62,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       const a = JSON.parse(v.videoFotos || "[]");
       ids = Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string") : [];
     } catch {}
-    const fotoId = ids[idx];
+    const fotoId = ehCapa ? v.videoCapa || ids[0] : ids[idx];
     if (!fotoId) return falhou("Quadro fora da sequência.");
 
     // LGPD — foto só entra se for da MESMA marca e estiver liberada (solta OU de festa
@@ -80,12 +85,27 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     const cor = v.marca.corPrimaria || "#7C3AED";
     const fundo = v.marca.corFundo || "#0E0E0E";
 
+    // A CAPA dá mais espaço pro gancho (ele é o que segura o dedo) — foto um pouco menor.
+    // E deixa uma faixa livre no TOPO: na capa, o motor carimba o logo da marca ali no meio
+    // (nos outros quadros ele carimba embaixo à direita — testado).
+    const areaH = ehCapa ? 1120 : AREA_FOTO_H;
     // Moldura justa: escala a foto pra caber na área, mantendo a proporção dela.
-    const escala = Math.min(AREA_FOTO_L / foto.largura, AREA_FOTO_H / foto.altura);
+    const escala = Math.min(AREA_FOTO_L / foto.largura, areaH / foto.altura);
     const fw = Math.round(foto.largura * escala);
     const fh = Math.round(foto.altura * escala);
-    // Frase longa = fonte menor (cabe sem estourar a faixa da legenda).
-    const tam = legenda.length > 85 ? 44 : legenda.length > 52 ? 50 : 58;
+    // Frase longa = fonte menor (cabe sem estourar). A capa é maior e forte (é o gancho), e
+    // pode ocupar a largura toda — o logo do motor fica embaixo dela, não do lado.
+    const tam = ehCapa
+      ? legenda.length > 40
+        ? 66
+        : legenda.length > 26
+          ? 78
+          : 92
+      : legenda.length > 85
+        ? 44
+        : legenda.length > 52
+          ? 50
+          : 58;
 
     const png = await new ImageResponse(
       (
@@ -97,26 +117,48 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            padding: "60px 60px 210px", // o rodapé é do LOGO do motor — nada nosso ali embaixo
+            // O rodapé (ou o topo, na capa) é do LOGO do motor — nada nosso nessas faixas.
+            padding: ehCapa ? "215px 60px 150px" : "60px 60px 210px",
             backgroundImage: `linear-gradient(160deg, ${cor} 0%, ${fundo} 100%)`,
             fontFamily: "Baloo",
           }}
         >
           {/* a FOTO, com a moldura branca justa nela */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: `${AREA_FOTO_H}px` }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: `${areaH}px` }}>
             <div style={{ display: "flex", padding: `${BORDA}px`, backgroundColor: "#ffffff", borderRadius: 8, boxShadow: "0 18px 50px rgba(0,0,0,0.45)" }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={foto.src} width={fw} height={fh} style={{ width: `${fw}px`, height: `${fh}px`, objectFit: "cover", borderRadius: 2 }} />
             </div>
           </div>
 
-          {/* a LEGENDA (quando a foto tem uma) — sem ela, a foto passa limpa.
-              Largura limitada: o logo do motor mora no canto de baixo à direita. */}
-          <div style={{ display: "flex", flexDirection: "column", width: `${LARG_LEGENDA}px`, marginRight: "auto", marginTop: 44, minHeight: 190 }}>
+          {/* O TEXTO. Na CAPA é o GANCHO: fonte grande, largura inteira, quebra de linha de
+              verdade (o motor escrevia numa linha só e cortava as pontas). Nos outros quadros
+              é a legenda, mais discreta e estreita (o logo do motor mora no canto direito). */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              width: ehCapa ? "100%" : `${LARG_LEGENDA}px`,
+              marginRight: ehCapa ? 0 : "auto",
+              marginTop: ehCapa ? 52 : 44,
+              minHeight: 190,
+            }}
+          >
             {legenda ? (
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", width: 96, height: 9, backgroundColor: "#ffffff", borderRadius: 5, marginBottom: 22, opacity: 0.9 }} />
-                <div style={{ display: "flex", fontSize: tam, fontWeight: 600, color: "#ffffff", lineHeight: 1.18, textShadow: "0 3px 14px rgba(0,0,0,0.45)" }}>{legenda}</div>
+                <div style={{ display: "flex", width: ehCapa ? 130 : 96, height: ehCapa ? 12 : 9, backgroundColor: "#ffffff", borderRadius: 6, marginBottom: ehCapa ? 28 : 22, opacity: 0.9 }} />
+                <div
+                  style={{
+                    display: "flex",
+                    fontSize: tam,
+                    fontWeight: 600,
+                    color: "#ffffff",
+                    lineHeight: ehCapa ? 1.1 : 1.18,
+                    textShadow: ehCapa ? "0 4px 20px rgba(0,0,0,0.55)" : "0 3px 14px rgba(0,0,0,0.45)",
+                  }}
+                >
+                  {legenda}
+                </div>
               </div>
             ) : (
               <div style={{ display: "flex" }} />

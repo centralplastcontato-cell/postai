@@ -312,21 +312,28 @@ export async function gerarVideoTematico(videoId: string) {
   // tirou depois, ou que virou capa) não pode fazer o vídeo inteiro trocar de estilo à toa.
   const temLegenda = idsSlideshow.some((id) => (legendas[id] || "").trim());
 
+  // A FRASE DE CAPA (o gancho de abertura) também vira arte NOSSA: o motor escreve o texto da
+  // capa numa fonte fixa, numa linha só — um gancho de verdade estourava a tela e as pontas
+  // eram cortadas ("Diversão que vira lembrança pra vida" → "rsão que vira lembrança pra").
+  // Desenhando aqui, a frase quebra linha e a fonte encolhe conforme o tamanho.
+  const fraseCapa = (v.videoCapa && (legendas[v.videoCapa] || "").trim()) || "";
+
+  // O motor (Cloud Run) baixa os quadros — a URL tem que ser PÚBLICA. Rodando local, o
+  // baseUrl() é localhost e o motor não alcança: usamos o mesmo host do callback (produção),
+  // que lê o MESMO banco e desenha o quadro igual.
+  let base = baseUrl();
+  try {
+    if (process.env.VIDEO_CALLBACK_URL) base = new URL(process.env.VIDEO_CALLBACK_URL).origin;
+  } catch {} // env torta não pode derrubar a geração
+  base = base.replace(/\/$/, "");
+  // O ?v= é a ÚNICA chave de cache do quadro: precisa mudar quando QUALQUER coisa desenhada
+  // muda — legenda, fotos, capa, a URL de cada foto E a identidade da marca (cor/logo/site).
+  const versao = hashCurto(
+    [v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
+  );
+
   let fotosMotor: string[];
   if (temLegenda) {
-    // O motor (Cloud Run) baixa os quadros — a URL tem que ser PÚBLICA. Rodando local, o
-    // baseUrl() é localhost e o motor não alcança: usamos o mesmo host do callback (produção),
-    // que lê o MESMO banco e desenha o quadro igual.
-    let base = baseUrl();
-    try {
-      if (process.env.VIDEO_CALLBACK_URL) base = new URL(process.env.VIDEO_CALLBACK_URL).origin;
-    } catch {} // env torta não pode derrubar a geração
-    base = base.replace(/\/$/, "");
-    // O ?v= é a ÚNICA chave de cache do quadro: precisa mudar quando QUALQUER coisa desenhada
-    // muda — legenda, fotos, capa, a URL de cada foto E a identidade da marca (cor/logo/site).
-    const versao = hashCurto(
-      [v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
-    );
     // O índice do quadro é a posição da foto em videoFotos (a rota lê o MESMO array).
     fotosMotor = idsSlideshow.map((id) => `${base}/api/quadro-tema/${videoId}/${ids.indexOf(id) + 1}.jpg?v=${versao}`);
   } else {
@@ -337,6 +344,10 @@ export async function gerarVideoTematico(videoId: string) {
   }
   if (!fotosMotor.length) return { ok: false as const, erro: "Escolha pelo menos 2 fotos pro vídeo (uma vira a capa)." };
 
+  // Com frase de capa, a capa é a NOSSA arte (n=0) e o motor não escreve nada por cima.
+  const capaFinal = fraseCapa ? `${base}/api/quadro-tema/${videoId}/0.jpg?v=${versao}` : capaUrl;
+  const textoDaCapa = fraseCapa ? "" : v.titulo;
+
   const antigo = v.videoUrl; // guardado ANTES do lock (só apagamos depois, e se ninguém usar)
   await prisma.videoTematico.update({ where: { id: videoId }, data: { videoUrl: "gerando" } });
   // Rodízio: marca como USADAS só as fotos que REALMENTE entraram no vídeo (a narração pode
@@ -346,17 +357,16 @@ export async function gerarVideoTematico(videoId: string) {
   if (usadas.length) await prisma.imagemMarca.updateMany({ where: { id: { in: usadas } }, data: { usos: { increment: 1 } } }).catch(() => {});
   const r = await dispararMotorReels({
     fotos: fotosMotor,
-    capaUrl,
+    capaUrl: capaFinal,
     moldura: temLegenda ? "nenhuma" : v.videoMoldura || "branca",
     corMoldura: v.marca.corPrimaria || "#FFFFFF",
     logoUrl: v.marca.logoUrl,
     // A trilha do vídeo: a NARRAÇÃO (que já vem com o jingle misturado por baixo) ou, sem
     // narração, o jingle puro. O motor só aceita uma trilha — por isso a mistura é nossa.
     musicaUrl: temNarracao ? v.narracaoUrl : musicaBuffet(v.marca.slug) || undefined,
-    // FRASE DE CAPA (o que abre o vídeo): o gancho que a Bia escreve, guardado em videoTextos
-    // na chave da foto de capa. Sem frase, cai no nome do tema — mas "Brinquedos" na capa é
-    // etiqueta, não venda; por isso a Bia sempre escreve uma.
-    textoCapa: (v.videoCapa && (legendas[v.videoCapa] || "").trim()) || v.titulo,
+    // Com frase de capa, a arte JÁ traz o texto (a nossa, que quebra linha) — o motor não pode
+    // escrever nada por cima. Sem frase, ele escreve o nome do tema, como antes.
+    textoCapa: textoDaCapa,
     nomeArquivo: `${v.marca.slug || "reels"}-tema`,
     ...(v.videoTextoFinal?.trim() ? { tituloFinal: v.videoTextoFinal.trim(), subFinal: "" } : {}),
     // O motor só ECOA esse id no callback — mandamos o id do vídeo temático e o
