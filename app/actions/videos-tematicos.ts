@@ -426,6 +426,81 @@ REGRAS:
   }
 }
 
+// A Bia escreve (ou REESCREVE) a legenda de UMA foto só — o botão ✨ ao lado do campo dela.
+// Serve pras fotos que ficaram "sem legenda" e pra trocar uma frase que não agradou: a Bia
+// olha a descrição DAQUELA foto e vê as frases das outras, pra não repetir ideia.
+// Na foto de CAPA, ela escreve o GANCHO de abertura (mais curto).
+export async function gerarLegendaUmaFotoVideo(videoId: string, fotoId: string) {
+  const v = await prisma.videoTematico.findUnique({
+    where: { id: videoId },
+    include: { marca: { select: { nome: true, descricao: true } } },
+  });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+
+  // LGPD + marca: só foto desta marca e divulgável.
+  const img = await prisma.imagemMarca.findFirst({
+    where: { id: fotoId, marcaId: v.marcaId, OR: [{ festaId: null }, { festa: { autorizacao: "autorizada" } }] },
+    select: { descricao: true },
+  });
+  if (!img?.descricao?.trim()) return { ok: false as const, erro: "Essa foto ainda não tem descrição — a Bia precisa dela pra escrever." };
+
+  let mapa: Record<string, string> = {};
+  try {
+    const m = JSON.parse(v.videoTextos || "{}");
+    if (m && typeof m === "object" && !Array.isArray(m)) mapa = m as Record<string, string>;
+  } catch {}
+  const ehCapa = v.videoCapa === fotoId;
+  const outras = Object.entries(mapa)
+    .filter(([id, f]) => id !== fotoId && (f || "").trim())
+    .map(([, f]) => `"${f}"`)
+    .join("; ");
+  const atual = (mapa[fotoId] || "").trim();
+
+  const limite = ehCapa ? 48 : 80;
+  const pedido = ehCapa
+    ? `A FOTO DE CAPA mostra: "${img.descricao}".\nEscreva a FRASE DE ABERTURA do vídeo: o gancho que faz o pai/mãe parar de rolar o feed. Até 6 palavras (máx ${limite} caracteres). NUNCA use o nome do tema ("${v.titulo}") — isso é etiqueta, não gancho.`
+    : `A FOTO deste quadro mostra: "${img.descricao}".\nEscreva a legenda que aparece embaixo dela no vídeo: 3 a 8 palavras, vendendo o BENEFÍCIO que essa cena comprova pro pai/mãe (máx ${limite} caracteres).`;
+  const contexto = outras ? `\n\nJá existem estas frases no vídeo — NÃO repita a ideia nem as palavras delas: ${outras}.` : "";
+  const trocar = atual ? `\n\nA frase atual desta foto é "${atual}" — escreva uma DIFERENTE, com outro ângulo.` : "";
+
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4.1",
+        response_format: { type: "json_object" },
+        temperature: 0.95, // alta: clicar de novo tem que trazer uma opção NOVA
+        messages: [
+          {
+            role: "system",
+            content: `Você é a social media do buffet infantil "${v.marca.nome}". ${v.marca.descricao || ""}
+O vídeo é um Reels sobre "${v.titulo}". Você escreve UMA frase curta que aparece por cima de uma foto.
+REGRAS: fale COM o pai/mãe que decide a festa ("seu filho", "sua festa") vendendo o BENEFÍCIO (diversão segura, memórias, festa sem trabalho pra você); a frase NASCE da foto (fale do que ela mostra), mas NUNCA descreva a foto ("Mesa decorada") nem rotule ("Brinquedos"). Sem ponto final obrigatório; no máximo 1 emoji. A marca É o lugar da festa — nunca mande procurar local.`,
+          },
+          { role: "user", content: `${pedido}${contexto}${trocar}\n\nResponda só com JSON: {"frase":"..."}` },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+    const data = await resp.json();
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { frase?: string };
+    const frase = (j.frase || "").trim().replace(/^["']|["']$/g, "").slice(0, limite);
+    if (!frase) throw new Error("A IA não devolveu frase.");
+    mapa[fotoId] = frase;
+    await prisma.videoTematico.update({ where: { id: videoId }, data: { videoTextos: JSON.stringify(mapa) } });
+    revalidatePath(`/painel/marcas/${v.marcaId}`);
+    return { ok: true as const, frase, ehCapa };
+  } catch (e) {
+    console.error("Erro ao escrever a legenda da foto:", e);
+    return { ok: false as const, erro: "Não consegui escrever agora." };
+  }
+}
+
 // Edita à mão a legenda de UMA foto do vídeo (o dono ajusta o que a Bia escreveu).
 export async function editarTextoFotoVideo(videoId: string, fotoId: string, frase: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoTextos: true } });
