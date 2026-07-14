@@ -344,9 +344,11 @@ export async function gerarVideoTematico(videoId: string) {
   }
   if (!fotosMotor.length) return { ok: false as const, erro: "Escolha pelo menos 2 fotos pro vídeo (uma vira a capa)." };
 
-  // Com frase de capa, a capa é a NOSSA arte (n=0) e o motor não escreve nada por cima.
+  // Com frase de capa, a capa é a NOSSA arte (n=0). Sem frase, vai a foto crua — mas SEM texto:
+  // o nome do tema ("Brinquedos") é etiqueta interna, não abertura de vídeo. Melhor capa limpa
+  // do que capa com etiqueta. Por isso o motor nunca escreve nada na capa.
   const capaFinal = fraseCapa ? `${base}/api/quadro-tema/${videoId}/0.jpg?v=${versao}` : capaUrl;
-  const textoDaCapa = fraseCapa ? "" : v.titulo;
+  const textoDaCapa = "";
 
   const antigo = v.videoUrl; // guardado ANTES do lock (só apagamos depois, e se ninguém usar)
   await prisma.videoTematico.update({ where: { id: videoId }, data: { videoUrl: "gerando" } });
@@ -364,8 +366,8 @@ export async function gerarVideoTematico(videoId: string) {
     // A trilha do vídeo: a NARRAÇÃO (que já vem com o jingle misturado por baixo) ou, sem
     // narração, o jingle puro. O motor só aceita uma trilha — por isso a mistura é nossa.
     musicaUrl: temNarracao ? v.narracaoUrl : musicaBuffet(v.marca.slug) || undefined,
-    // Com frase de capa, a arte JÁ traz o texto (a nossa, que quebra linha) — o motor não pode
-    // escrever nada por cima. Sem frase, ele escreve o nome do tema, como antes.
+    // A arte da capa JÁ traz o texto (a nossa, que quebra linha) — o motor nunca escreve nada
+    // por cima (ele usa fonte fixa, numa linha só, e cortava as pontas da frase).
     textoCapa: textoDaCapa,
     nomeArquivo: `${v.marca.slug || "reels"}-tema`,
     ...(v.videoTextoFinal?.trim() ? { tituloFinal: v.videoTextoFinal.trim(), subFinal: "" } : {}),

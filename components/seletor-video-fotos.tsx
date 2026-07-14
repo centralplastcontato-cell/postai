@@ -91,7 +91,21 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
   }
   function definirCapa(id: string) {
-    setCapa((c) => (c === id ? "" : id)); // clicar de novo na capa atual tira (volta pra automático)
+    setCapa((antiga) => {
+      const nova = antiga === id ? "" : id; // clicar de novo na capa atual tira (volta pra automático)
+      // A FRASE DE ABERTURA pertence à CAPA, não à foto: trocar a foto de capa leva a frase
+      // junto. Sem isso, a frase ficava órfã na foto antiga e o vídeo abria sem gancho.
+      if (tematicoId && antiga && nova && antiga !== nova) {
+        setTextos((t) => {
+          const frase = (t[antiga] || "").trim();
+          if (!frase || (t[nova] || "").trim()) return t; // nada pra mover, ou a nova já tem texto
+          const novo = { ...t, [nova]: frase };
+          delete novo[antiga];
+          return novo;
+        });
+      }
+      return nova;
+    });
   }
   // ---- REORDENAR por ID (estável mesmo enquanto a ordem muda) ----
   // PC: arraste o card com o MOUSE (HTML5 drag). CELULAR: a ALÇA (grip) de cada foto tem
