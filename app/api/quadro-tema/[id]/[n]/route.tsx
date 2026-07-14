@@ -2,7 +2,7 @@ import sharp from "sharp";
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes } from "@/lib/arte";
-import { fotoSeguraComTamanho, logoEmbutido } from "@/lib/foto-arte";
+import { fotoSeguraComTamanho } from "@/lib/foto-arte";
 
 // QUADRO do vídeo temático: a foto EMOLDURADA sobre o fundo da marca, com a LEGENDA embaixo
 // (a copy que a Bia escreve). É esta arte 9:16 que o MOTOR DE VÍDEO baixa pra montar o Reels —
@@ -18,8 +18,9 @@ import { fotoSeguraComTamanho, logoEmbutido } from "@/lib/foto-arte";
 //  - JPEG (não PNG): o next/og só emite PNG (~2-3 MB); convertemos com sharp (~300 KB). O motor
 //    baixa 26 quadros — 78 MB viraria gargalo de download. A URL termina em .jpg pra ele não
 //    depender só do content-type.
-//  - LOGO EMBUTIDO: nada de <img src="/api/marca-logo"> (cada quadro chamaria outra função:
-//    26 quadros = 52 funções, e o logo falhando derrubava o desenho inteiro).
+//  - SEM LOGO no quadro: o MOTOR já carimba o logo da marca no canto de baixo à direita de
+//    todo quadro — desenhar outro aqui deixava o vídeo com DOIS logos. Por isso o rodapé fica
+//    livre e a legenda tem largura limitada (não passa por baixo do logo dele).
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -30,9 +31,13 @@ const CACHE = "public, s-maxage=31536000, max-age=31536000, immutable";
 
 const L = 1080; // largura do Reels
 const A = 1920; // altura do Reels
-const AREA_FOTO_H = 1180; // altura máxima da área da foto
-const AREA_FOTO_L = 940; // largura máxima da área da foto
+const AREA_FOTO_H = 1330; // altura máxima da área da foto
+const AREA_FOTO_L = 950; // largura máxima da área da foto
 const BORDA = 16; // espessura da moldura branca
+// O MOTOR carimba o logo da marca no canto inferior DIREITO de todo quadro. Por isso o quadro
+// NÃO desenha logo (sairiam dois) e a legenda fica limitada a esta largura, à esquerda — senão
+// a frase passaria por baixo do logo dele.
+const LARG_LEGENDA = 730;
 
 const falhou = (msg: string) => new Response(msg, { status: 503, headers: { "cache-control": "no-store" } });
 
@@ -43,7 +48,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
   try {
     const v = await prisma.videoTematico.findUnique({
       where: { id },
-      include: { marca: { select: { corPrimaria: true, corFundo: true, logoUrl: true, site: true, nome: true } } },
+      include: { marca: { select: { corPrimaria: true, corFundo: true } } },
     });
     if (!v) return falhou("Vídeo não encontrado.");
 
@@ -69,19 +74,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       legenda = (mapa?.[fotoId] || "").trim();
     } catch {}
 
-    const [foto, logo] = await Promise.all([fotoSeguraComTamanho(img.url), logoEmbutido(v.marca.logoUrl)]);
+    const foto = await fotoSeguraComTamanho(img.url);
     if (!foto) return falhou("Não consegui preparar a foto.");
 
     const cor = v.marca.corPrimaria || "#7C3AED";
     const fundo = v.marca.corFundo || "#0E0E0E";
-    const site = v.marca.site || "";
 
     // Moldura justa: escala a foto pra caber na área, mantendo a proporção dela.
     const escala = Math.min(AREA_FOTO_L / foto.largura, AREA_FOTO_H / foto.altura);
     const fw = Math.round(foto.largura * escala);
     const fh = Math.round(foto.altura * escala);
-    // Frase longa = fonte menor (cabe sem estourar o quadro).
-    const tam = legenda.length > 90 ? 46 : legenda.length > 55 ? 52 : 60;
+    // Frase longa = fonte menor (cabe sem estourar a faixa da legenda).
+    const tam = legenda.length > 85 ? 44 : legenda.length > 52 ? 50 : 58;
 
     const png = await new ImageResponse(
       (
@@ -92,24 +96,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            justifyContent: "space-between",
-            padding: "70px 60px 80px",
+            justifyContent: "center",
+            padding: "60px 60px 210px", // o rodapé é do LOGO do motor — nada nosso ali embaixo
             backgroundImage: `linear-gradient(160deg, ${cor} 0%, ${fundo} 100%)`,
             fontFamily: "Baloo",
           }}
         >
-          {/* logo numa pastilha branca (letra colorida de logo some no fundo da marca) */}
-          <div style={{ display: "flex", height: 116, alignItems: "center" }}>
-            {logo ? (
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "14px 30px", backgroundColor: "#ffffff", borderRadius: 999, boxShadow: "0 8px 26px rgba(0,0,0,0.28)" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={logo} width={Math.round(88 * 1.76)} height={88} style={{ objectFit: "contain" }} />
-              </div>
-            ) : (
-              <span style={{ display: "flex", fontSize: 40, fontWeight: 600, color: "#fff", letterSpacing: 2 }}>{(v.marca.nome || "").toUpperCase()}</span>
-            )}
-          </div>
-
           {/* a FOTO, com a moldura branca justa nela */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: `${AREA_FOTO_H}px` }}>
             <div style={{ display: "flex", padding: `${BORDA}px`, backgroundColor: "#ffffff", borderRadius: 8, boxShadow: "0 18px 50px rgba(0,0,0,0.45)" }}>
@@ -118,17 +110,17 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
             </div>
           </div>
 
-          {/* a LEGENDA (quando a foto tem uma) — sem ela, a foto passa limpa */}
-          <div style={{ display: "flex", flexDirection: "column", width: "100%", minHeight: 210 }}>
+          {/* a LEGENDA (quando a foto tem uma) — sem ela, a foto passa limpa.
+              Largura limitada: o logo do motor mora no canto de baixo à direita. */}
+          <div style={{ display: "flex", flexDirection: "column", width: `${LARG_LEGENDA}px`, marginRight: "auto", marginTop: 44, minHeight: 190 }}>
             {legenda ? (
               <div style={{ display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", width: 96, height: 9, backgroundColor: "#ffffff", borderRadius: 5, marginBottom: 24, opacity: 0.9 }} />
+                <div style={{ display: "flex", width: 96, height: 9, backgroundColor: "#ffffff", borderRadius: 5, marginBottom: 22, opacity: 0.9 }} />
                 <div style={{ display: "flex", fontSize: tam, fontWeight: 600, color: "#ffffff", lineHeight: 1.18, textShadow: "0 3px 14px rgba(0,0,0,0.45)" }}>{legenda}</div>
               </div>
             ) : (
               <div style={{ display: "flex" }} />
             )}
-            {site ? <div style={{ display: "flex", marginTop: 26, fontSize: 26, color: "rgba(255,255,255,0.72)" }}>{site}</div> : null}
           </div>
         </div>
       ),
