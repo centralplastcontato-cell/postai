@@ -67,3 +67,56 @@ export async function fotosSeguras(urls?: (string | undefined | null)[] | null):
   if (!urls?.length) return [];
   return Promise.all(urls.map(async (u) => (await fotoSegura(u)) ?? "")).then((a) => a.filter(Boolean));
 }
+
+// Bytes de uma imagem que pode vir como data URI (banco) ou http (Blob). Com TIMEOUT: sem ele,
+// um Blob lento prenderia a função até morrer no limite de 60s.
+async function bytesDaImagem(url: string, ms = 8000): Promise<Buffer | undefined> {
+  if (url.startsWith("data:")) {
+    const b64 = url.split(",")[1];
+    return b64 ? Buffer.from(b64, "base64") : undefined;
+  }
+  if (!urlExternaSegura(url)) return undefined;
+  const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(ms) });
+  if (!r.ok) return undefined;
+  return Buffer.from(await r.arrayBuffer());
+}
+
+// Igual à fotoSegura, mas devolve TAMBÉM as dimensões — pra desenhar a moldura JUSTA na foto
+// (sem ela, uma foto horizontal dentro de uma caixa vertical ganharia tarjas brancas enormes).
+// Usada nos quadros do vídeo temático. Uma passada só de sharp (o tamanho vem no resolveWithObject).
+export async function fotoSeguraComTamanho(url?: string | null): Promise<{ src: string; largura: number; altura: number } | undefined> {
+  if (!url) return undefined;
+  try {
+    const buf = await bytesDaImagem(url);
+    if (!buf) return undefined;
+    const { data, info } = await sharp(buf)
+      .rotate() // respeita a orientação EXIF antes de medir
+      .resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 82 })
+      .toBuffer({ resolveWithObject: true });
+    if (!info.width || !info.height) return undefined;
+    return { src: `data:image/jpeg;base64,${data.toString("base64")}`, largura: info.width, altura: info.height };
+  } catch {
+    return undefined;
+  }
+}
+
+// Logo da marca EMBUTIDO na arte (data URI), em vez de uma URL do nosso próprio site: assim o
+// quadro não precisa chamar /api/marca-logo (26 quadros chamariam 26 funções extras — e se
+// essa chamada falhasse, o desenho inteiro quebrava). Achatado sobre BRANCO porque o logo
+// aparece numa pastilha branca (logo de buffet costuma ter letra colorida que some no fundo).
+export async function logoEmbutido(logoUrl?: string | null): Promise<string | undefined> {
+  if (!logoUrl) return undefined;
+  try {
+    const buf = await bytesDaImagem(logoUrl);
+    if (!buf) return undefined;
+    const jpg = await sharp(buf)
+      .resize({ width: 640, height: 640, fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" }) // PNG transparente → fundo branco (o da pastilha)
+      .jpeg({ quality: 92 })
+      .toBuffer();
+    return `data:image/jpeg;base64,${jpg.toString("base64")}`;
+  } catch {
+    return undefined;
+  }
+}

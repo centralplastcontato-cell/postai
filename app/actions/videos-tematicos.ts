@@ -33,6 +33,14 @@ function lerIds(json: string): string[] {
   }
 }
 
+// Hash curto do conteúdo → entra no ?v= das URLs dos quadros. Muda quando a legenda/foto muda,
+// então o motor (e o CDN) buscam a arte NOVA em vez de servir a antiga do cache.
+function hashCurto(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
 // Apaga o MP4 do Blob — MAS só se nenhum Reels (agendado ou postado) ainda apontar pra ele.
 // Evergreen: o dono agenda vários reposts do mesmo vídeo; apagar o arquivo por baixo faria o
 // piloto tentar postar uma URL morta (e um post que falha trava a fila de Reels da marca).
@@ -191,7 +199,7 @@ export async function excluirVideoTematico(videoId: string) {
 
 // Salva a SELEÇÃO ordenada de fotos do vídeo temático (máx 30). Só aceita fotos da MARCA que
 // podem ser divulgadas (LGPD) — festa pendente/negada nunca entra em vídeo público.
-export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string) {
+export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string, textos?: Record<string, string>) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
@@ -208,10 +216,20 @@ export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[
   const set = new Set(imgs.filter((i) => !i.festaId || okFesta.has(i.festaId)).map((i) => i.id));
 
   const ordenadas = fotoIds.filter((id) => set.has(id)).slice(0, MAX_FOTOS);
-  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string; videoTextoFinal?: string } = { videoFotos: JSON.stringify(ordenadas) };
+  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string; videoTextoFinal?: string; videoTextos?: string } = { videoFotos: JSON.stringify(ordenadas) };
   if (capa !== undefined) data.videoCapa = capa === "" || set.has(capa) ? capa : "";
   if (moldura !== undefined) data.videoMoldura = MOLDURAS.includes(moldura) ? moldura : "branca";
   if (textoFinal !== undefined) data.videoTextoFinal = textoFinal.trim().slice(0, 60);
+  // LEGENDAS vêm junto (o seletor manda o que está na tela): assim uma frase digitada e o clique
+  // direto em "Gerar" não se perdem — e legenda de foto que saiu da sequência é podada.
+  if (textos) {
+    const limpo: Record<string, string> = {};
+    for (const id of ordenadas) {
+      const f = (textos[id] || "").trim().slice(0, 80);
+      if (f) limpo[id] = f;
+    }
+    data.videoTextos = JSON.stringify(limpo);
+  }
   await prisma.videoTematico.update({ where: { id: videoId }, data });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, total: ordenadas.length };
@@ -222,7 +240,7 @@ export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[
 export async function gerarVideoTematico(videoId: string) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
-    include: { marca: { select: { logoUrl: true, slug: true, corPrimaria: true } } },
+    include: { marca: { select: { logoUrl: true, slug: true, corPrimaria: true, corFundo: true, site: true } } },
   });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
@@ -243,8 +261,47 @@ export async function gerarVideoTematico(videoId: string) {
   if (!fotos.length) return { ok: false as const, erro: "As fotos escolhidas não estão mais disponíveis — escolha de novo." };
 
   const capaUrl = (v.videoCapa && mapa.get(v.videoCapa)) || fotos[0];
-  const semCapa = fotos.filter((u) => u !== capaUrl);
-  if (semCapa.length > 0) fotos = semCapa;
+
+  // COM LEGENDA (a copy da Bia): cada quadro do slideshow vira uma ARTE nossa (/api/quadro-tema)
+  // — foto emoldurada sobre a cor da marca, com a frase embaixo. O motor só junta os quadros e
+  // põe a música (o contrato dele não tem texto por foto), então o texto vai "queimado" na
+  // imagem. A moldura vai "nenhuma" porque a arte já traz a dela.
+  // SEM legenda: segue o caminho antigo (fotos cruas; o motor faz fundo borrado + moldura).
+  const idsSlideshow = ids.filter((id) => mapa.has(id) && mapa.get(id) !== capaUrl);
+  const legendas = (() => {
+    try {
+      const m = JSON.parse(v.videoTextos || "{}");
+      return m && typeof m === "object" && !Array.isArray(m) ? (m as Record<string, string>) : {};
+    } catch {
+      return {} as Record<string, string>;
+    }
+  })();
+  // Só conta legenda das fotos que ESTÃO no slideshow agora — legenda órfã (de foto que o dono
+  // tirou depois, ou que virou capa) não pode fazer o vídeo inteiro trocar de estilo à toa.
+  const temLegenda = idsSlideshow.some((id) => (legendas[id] || "").trim());
+
+  let fotosMotor: string[];
+  if (temLegenda) {
+    // O motor (Cloud Run) baixa os quadros — a URL tem que ser PÚBLICA. Rodando local, o
+    // baseUrl() é localhost e o motor não alcança: usamos o mesmo host do callback (produção),
+    // que lê o MESMO banco e desenha o quadro igual.
+    let base = baseUrl();
+    try {
+      if (process.env.VIDEO_CALLBACK_URL) base = new URL(process.env.VIDEO_CALLBACK_URL).origin;
+    } catch {} // env torta não pode derrubar a geração
+    base = base.replace(/\/$/, "");
+    // O ?v= é a ÚNICA chave de cache do quadro: precisa mudar quando QUALQUER coisa desenhada
+    // muda — legenda, fotos, capa, a URL de cada foto E a identidade da marca (cor/logo/site).
+    const versao = hashCurto(
+      [v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
+    );
+    // O índice do quadro é a posição da foto em videoFotos (a rota lê o MESMO array).
+    fotosMotor = idsSlideshow.map((id) => `${base}/api/quadro-tema/${videoId}/${ids.indexOf(id) + 1}.jpg?v=${versao}`);
+  } else {
+    const semCapa = fotos.filter((u) => u !== capaUrl);
+    fotosMotor = semCapa.length > 0 ? semCapa : fotos;
+  }
+  if (!fotosMotor.length) return { ok: false as const, erro: "Escolha pelo menos 2 fotos pro vídeo (uma vira a capa)." };
 
   const antigo = v.videoUrl; // guardado ANTES do lock (só apagamos depois, e se ninguém usar)
   await prisma.videoTematico.update({ where: { id: videoId }, data: { videoUrl: "gerando" } });
@@ -253,9 +310,9 @@ export async function gerarVideoTematico(videoId: string) {
   const usadas = ids.filter((id) => mapa.has(id));
   if (usadas.length) await prisma.imagemMarca.updateMany({ where: { id: { in: usadas } }, data: { usos: { increment: 1 } } }).catch(() => {});
   const r = await dispararMotorReels({
-    fotos,
+    fotos: fotosMotor,
     capaUrl,
-    moldura: v.videoMoldura || "branca",
+    moldura: temLegenda ? "nenhuma" : v.videoMoldura || "branca",
     corMoldura: v.marca.corPrimaria || "#FFFFFF",
     logoUrl: v.marca.logoUrl,
     musicaUrl: musicaBuffet(v.marca.slug) || undefined,
@@ -275,6 +332,103 @@ export async function gerarVideoTematico(videoId: string) {
   // Vídeo NOVO a caminho → apaga o antigo do Blob, MAS só se nenhum Reels ainda o usa
   // (evergreen: pode haver repost agendado apontando pro arquivo atual).
   await apagarMp4SeOrfao(videoId, antigo);
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const };
+}
+
+// A Bia escreve a COPY do vídeo: uma legenda curta em algumas fotos-chave (não em todas —
+// texto demais cansa), com começo-meio-fim: gancho → o que o pai/mãe ganha → convite.
+// Cada frase fala do que a FOTO daquele quadro mostra (foto-primeiro, como no carrossel).
+// Devolve o mapa { fotoId: frase } pra o dono revisar/editar no seletor antes de gerar.
+export async function gerarTextosVideoTematico(videoId: string) {
+  const v = await prisma.videoTematico.findUnique({
+    where: { id: videoId },
+    include: { marca: { select: { nome: true, descricao: true } } },
+  });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+
+  const ids = lerIds(v.videoFotos);
+  if (!ids.length) return { ok: false as const, erro: "Escolha as fotos do vídeo primeiro." };
+  // Mesma trava do gerar/salvar: só fotos DESTA marca e divulgáveis (LGPD) — nem a descrição
+  // de uma foto não autorizada vai pra IA, nem vira legenda no vídeo.
+  const [imgs, festasOk] = await Promise.all([
+    prisma.imagemMarca.findMany({ where: { marcaId: v.marcaId, id: { in: ids } }, select: { id: true, descricao: true, festaId: true } }),
+    prisma.festa.findMany({ where: { marcaId: v.marcaId, autorizacao: "autorizada" }, select: { id: true } }),
+  ]);
+  const okFesta = new Set(festasOk.map((f) => f.id));
+  const desc = new Map(imgs.filter((i) => !i.festaId || okFesta.has(i.festaId)).map((i) => [i.id, i.descricao]));
+  // A capa não leva legenda (o motor já escreve o título nela).
+  const doSlideshow = ids.filter((id) => id !== v.videoCapa && desc.get(id)?.trim());
+  if (!doSlideshow.length) return { ok: false as const, erro: "As fotos escolhidas ainda não têm descrição." };
+
+  const lista = doSlideshow.map((id, i) => `${i + 1}. ${desc.get(id)}`).join("\n");
+  const quantas = Math.min(8, Math.max(4, Math.round(doSlideshow.length / 3))); // ~1 a cada 3 fotos
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4.1",
+        response_format: { type: "json_object" },
+        temperature: 0.85,
+        messages: [
+          {
+            role: "system",
+            content: `Você é a social media do buffet infantil "${v.marca.nome}". ${v.marca.descricao || ""}
+Você escreve a COPY de um Reels sobre "${v.titulo}" — frases curtas que aparecem POR CIMA das fotos, uma por quadro.
+REGRAS:
+- Fale COM o pai/mãe que decide a festa ("seu filho", "sua festa"), vendendo o BENEFÍCIO (diversão segura, memórias, festa sem trabalho pra você) — não descreva a foto ("Mesa decorada") nem rotule ("Brinquedos").
+- Cada frase nasce da FOTO daquele quadro: fale do que ela mostra, conectando com o benefício.
+- Frases CURTAS: 3 a 8 palavras. Nada de ponto final em todas; pode usar "!" com moderação. No máximo 1 emoji no vídeo inteiro.
+- A copy tem ARCO: a 1ª frase é um gancho, as do meio entregam o que a família ganha, a última é um convite.
+- A marca É o lugar da festa: nunca mande "procurar um local".`,
+          },
+          {
+            role: "user",
+            content: `Fotos do vídeo, na ordem em que aparecem:\n${lista}\n\nEscolha ${quantas} fotos-chave (bem espalhadas ao longo do vídeo, nunca duas seguidas) e escreva a frase de cada uma. As outras fotos passam sem texto.\nResponda só com JSON: {"legendas":[{"foto":número,"frase":"..."}]}`,
+          },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+    const data = await resp.json();
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { legendas?: { foto?: number; frase?: string }[] };
+    const mapa: Record<string, string> = {};
+    for (const item of j.legendas ?? []) {
+      const i = Number(item?.foto);
+      const frase = (item?.frase || "").trim().slice(0, 80);
+      if (!Number.isInteger(i) || i < 1 || i > doSlideshow.length || !frase) continue;
+      mapa[doSlideshow[i - 1]] = frase;
+    }
+    if (!Object.keys(mapa).length) throw new Error("A IA não devolveu legendas.");
+    await prisma.videoTematico.update({ where: { id: videoId }, data: { videoTextos: JSON.stringify(mapa) } });
+    revalidatePath(`/painel/marcas/${v.marcaId}`);
+    return { ok: true as const, textos: mapa, quantas: Object.keys(mapa).length };
+  } catch (e) {
+    console.error("Erro ao escrever a copy do vídeo:", e);
+    return { ok: false as const, erro: "Não consegui escrever a copy agora." };
+  }
+}
+
+// Edita à mão a legenda de UMA foto do vídeo (o dono ajusta o que a Bia escreveu).
+export async function editarTextoFotoVideo(videoId: string, fotoId: string, frase: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoTextos: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  let mapa: Record<string, string> = {};
+  try {
+    const m = JSON.parse(v.videoTextos || "{}");
+    if (m && typeof m === "object") mapa = m as Record<string, string>;
+  } catch {}
+  const f = (frase || "").trim().slice(0, 80);
+  if (f) mapa[fotoId] = f;
+  else delete mapa[fotoId]; // frase vazia = a foto passa limpa
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { videoTextos: JSON.stringify(mapa) } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const };
 }

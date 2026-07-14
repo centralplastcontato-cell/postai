@@ -77,6 +77,10 @@ model VideoTematico {
   marca           Marca    @relation(fields: [marcaId], references: [id], onDelete: Cascade)
   titulo          String // o tema do vídeo (vira o texto da capa)
   videoFotos      String   @default("[]") // JSON: IDs de ImagemMarca na ordem do slideshow
+  // LEGENDAS por foto (a copy que aparece embaixo da imagem no vídeo). JSON: mapa
+  // { fotoId: "frase" } — foto sem entrada (ou frase vazia) passa limpa, sem texto.
+  // A Bia escreve uma copy com começo-meio-fim nas fotos-chave; o dono edita no seletor.
+  videoTextos     String   @default("{}")
   videoCapa       String   @default("") // ID da foto da capa ("" = 1ª da sequência)
   videoMoldura    String   @default("branca") // nenhuma | branca | grossa | marca
   videoTextoFinal String   @default("") // frase do último quadro ("" = padrão do motor)

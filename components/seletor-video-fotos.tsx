@@ -8,7 +8,7 @@
 import { useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 
 const ORDEM = ["salao", "brinquedos", "aniversariante", "parabens", "momentos"];
@@ -41,7 +41,7 @@ function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   return {};
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", textosIniciais = {}, corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -50,6 +50,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   capaInicial?: string;
   molduraInicial?: string;
   textoFinalInicial?: string;
+  textosIniciais?: Record<string, string>; // legendas por foto (só no modo temático)
   corMarca?: string;
   jaTemVideo?: boolean;
   onFechar: () => void;
@@ -68,6 +69,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
   const [textoFinal, setTextoFinal] = useState<string>(textoFinalInicial || ""); // mensagem do slide final
   const [gerandoTexto, setGerandoTexto] = useState(false); // a Bia escrevendo o texto final
+  // LEGENDAS por foto (só no vídeo temático): a copy que aparece embaixo da imagem no vídeo.
+  const [textos, setTextos] = useState<Record<string, string>>(textosIniciais);
+  const [escrevendoCopy, setEscrevendoCopy] = useState(false); // a Bia escrevendo a copy do vídeo
+  const [msgCopy, setMsgCopy] = useState("");
 
   function toggle(id: string) {
     setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -115,8 +120,38 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     } catch {}
     setGerandoTexto(false);
   }
+  // A Bia escreve a COPY do vídeo (frases em ~1 a cada 3 fotos, com começo-meio-fim).
+  // Salva a seleção antes: a Bia escreve SOBRE as fotos que estão na sequência agora.
+  async function biaEscreveCopy() {
+    if (!tematicoId) return;
+    setEscrevendoCopy(true);
+    setMsgCopy("");
+    try {
+      await salvarFotosVideoTematico(tematicoId, sel, capa, moldura, textoFinal, textos);
+      const r = await gerarTextosVideoTematico(tematicoId);
+      if (!r.ok) setMsgCopy(r.erro || "Não consegui escrever agora.");
+      else {
+        setTextos(r.textos);
+        setMsgCopy(`✓ A Bia escreveu ${r.quantas} frases — dá pra editar em cada foto.`);
+      }
+    } catch {
+      setMsgCopy("Não consegui escrever agora.");
+    }
+    setEscrevendoCopy(false);
+  }
+  // Legenda de UMA foto, editada na mão (vazio = a foto passa limpa, sem texto).
+  function mudarTexto(fotoId: string, frase: string) {
+    setTextos((t) => ({ ...t, [fotoId]: frase }));
+  }
+  async function salvarTextoFoto(fotoId: string) {
+    if (!tematicoId) return;
+    await editarTextoFotoVideo(tematicoId, fotoId, textos[fotoId] ?? "").catch(() => {});
+  }
+
+  // As LEGENDAS vão junto no salvar (não só no onBlur do campo): digitar a frase e clicar
+  // direto em "Gerar" não pode perder o texto.
   async function salvarSelecao() {
-    if (tematicoId) await salvarFotosVideoTematico(tematicoId, sel, capa, moldura, textoFinal);
+    if (tematicoId) await salvarFotosVideoTematico(tematicoId, sel, capa, moldura, textoFinal, textos);
     else await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal);
   }
   async function salvar() {
@@ -194,6 +229,18 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             )}
           </div>
 
+          {/* COPY DO VÍDEO (só no vídeo do buffet): frases que aparecem embaixo das fotos */}
+          {tematicoId && (
+            <div className="mt-2.5 rounded-lg border border-[#7c3aed]/30 bg-[#7c3aed]/5 px-3 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-white">💬 Legendas nas fotos <span className="font-normal text-muted">(a copy que aparece no vídeo)</span></span>
+                <button type="button" onClick={biaEscreveCopy} disabled={escrevendoCopy || sel.length < 2} title={sel.length < 2 ? "Escolha as fotos primeiro" : "A Bia escreve uma copy com começo, meio e fim — frases em algumas fotos-chave"} className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-50">{escrevendoCopy ? "✍️ escrevendo…" : "✨ Bia escreve a copy"}</button>
+              </div>
+              <p className="mt-1.5 text-[10px] leading-snug text-muted/80">A Bia escreve em <strong className="text-white/70">algumas fotos-chave</strong> (as outras passam limpas). Depois é só editar o texto embaixo de cada foto — <strong className="text-white/70">apagar o texto tira a legenda</strong> daquela foto.</p>
+              {msgCopy && <p className={`mt-1.5 text-[11px] font-semibold ${msgCopy.startsWith("✓") ? "text-green-400" : "text-vermelho"}`}>{msgCopy}</p>}
+            </div>
+          )}
+
           {/* mensagem do SLIDE FINAL (último quadro do vídeo) — o dono escreve ou a Bia gera */}
           <div className="mt-2.5 rounded-lg border border-linha bg-preto/40 px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
@@ -214,8 +261,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 {escolhidas.map((f, i) => {
                   const ehCapa = capa === f.id;
                   return (
+                  <div key={f.id}>
                   <div
-                    key={f.id}
                     data-id={f.id}
                     draggable
                     onDragStart={() => setDragId(f.id)}
@@ -246,6 +293,21 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <button type="button" onClick={(e) => { e.stopPropagation(); definirCapa(f.id); }} aria-label={ehCapa ? "Tirar capa" : "Definir como capa"} title={ehCapa ? "Tirar como capa (clique pra remover)" : "Usar esta foto como capa do vídeo"} className={`absolute bottom-1 left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition ${ehCapa ? "bg-black/80 text-amber-300 ring-2 ring-amber-300 hover:bg-vermelho hover:text-white hover:ring-vermelho" : "bg-black/70 text-white hover:bg-black"}`}>⭐</button>
                     <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
                     <span className={`absolute bottom-0 left-0 right-0 px-8 py-0.5 text-center text-[9px] font-bold ${ehCapa ? "bg-amber-400/90 text-black" : "bg-black/65 font-semibold text-white/90"}`}>{ehCapa ? "⭐ CAPA" : (LABEL[f.momento] || f.momento)}</span>
+                    </div>
+                    {/* LEGENDA da foto (vídeo do buffet): o que aparece embaixo dela no vídeo.
+                        A capa não leva (o título do vídeo já entra nela). Vazio = passa limpa. */}
+                    {tematicoId && !ehCapa && (
+                      <input
+                        type="text"
+                        value={textos[f.id] ?? ""}
+                        onChange={(e) => mudarTexto(f.id, e.target.value)}
+                        onBlur={() => salvarTextoFoto(f.id)}
+                        maxLength={80}
+                        placeholder="sem legenda"
+                        title="Frase que aparece embaixo desta foto no vídeo (vazio = sem texto)"
+                        className={`mt-1 w-full rounded-md border bg-preto px-2 py-1.5 text-[11px] text-white placeholder:text-muted/40 focus:outline-none ${textos[f.id]?.trim() ? "border-[#7c3aed]/60" : "border-linha"}`}
+                      />
+                    )}
                   </div>
                   );
                 })}

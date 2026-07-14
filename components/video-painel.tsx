@@ -20,6 +20,7 @@ export type VideoTematicoView = {
   videoCapa: string;
   videoMoldura: string;
   videoTextoFinal: string;
+  videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
   capaUrl: string | null; // thumb do card (capa escolhida ou 1ª foto)
 };
 
@@ -325,6 +326,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca }: { marcaId:
           capaInicial={seletorTema.video.videoCapa}
           molduraInicial={seletorTema.video.videoMoldura}
           textoFinalInicial={seletorTema.video.videoTextoFinal}
+          textosIniciais={seletorTema.video.videoTextos}
           corMarca={corMarca}
           jaTemVideo={seletorTema.video.videoUrl.startsWith("http")}
           onFechar={() => setSeletorTema(null)}
