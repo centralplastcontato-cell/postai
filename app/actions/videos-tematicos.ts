@@ -19,6 +19,8 @@ import { musicaBuffet } from "@/lib/musica-buffet";
 import { baseUrl } from "@/lib/config";
 import { fotosDivulgaveis, type FotoDivulgavel } from "@/lib/fotos-divulgaveis";
 import { ranquearPorTema } from "@/lib/selecao-fotos";
+import { gerarNarracaoMp3 } from "@/lib/narracao";
+import { vozValida, VOZ_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 
 const MOLDURAS = ["nenhuma", "branca", "grossa", "marca"];
 const MAX_FOTOS = 30; // teto do motor (mesmo do vídeo de festa)
@@ -176,7 +178,7 @@ export async function fotosDoVideoTematico(videoId: string) {
 }
 
 export async function excluirVideoTematico(videoId: string) {
-  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoUrl: true, titulo: true } });
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoUrl: true, titulo: true, narracaoUrl: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -193,6 +195,8 @@ export async function excluirVideoTematico(videoId: string) {
     const postados = await prisma.publicacao.count({ where: { videoUrl: url, status: "postado" } }).catch(() => 1);
     if (postados === 0) import("@vercel/blob").then(({ del }) => del(url)).catch(() => {});
   }
+  // A NARRAÇÃO some junto — sem o vídeo, ninguém mais acha esse MP3 (o Blob tem limite).
+  if (v.narracaoUrl.startsWith("http")) import("@vercel/blob").then(({ del }) => del(v.narracaoUrl)).catch(() => {});
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const };
 }
@@ -271,7 +275,6 @@ export async function gerarVideoTematico(videoId: string) {
   // põe a música (o contrato dele não tem texto por foto), então o texto vai "queimado" na
   // imagem. A moldura vai "nenhuma" porque a arte já traz a dela.
   // SEM legenda: segue o caminho antigo (fotos cruas; o motor faz fundo borrado + moldura).
-  const idsSlideshow = ids.filter((id) => mapa.has(id) && mapa.get(id) !== capaUrl);
   const legendas = (() => {
     try {
       const m = JSON.parse(v.videoTextos || "{}");
@@ -280,6 +283,31 @@ export async function gerarVideoTematico(videoId: string) {
       return {} as Record<string, string>;
     }
   })();
+
+  // COM NARRAÇÃO, é a VOZ que manda no tamanho do vídeo: o motor dá ~2,3s por foto, então o
+  // vídeo usa só as fotos que cabem na locução — senão a voz acabaria e o vídeo seguiria mudo.
+  const temNarracao = v.narracaoUrl.startsWith("http") && v.narracaoSeg > 0;
+  const idsTodos = ids.filter((id) => mapa.has(id) && mapa.get(id) !== capaUrl);
+  let idsSlideshow = idsTodos;
+  if (temNarracao) {
+    const cabem = fotosParaDuracao(v.narracaoSeg, MAX_FOTOS);
+    // Fotos DE MENOS = a voz é cortada no meio (e o convite final nunca é ouvido). Melhor
+    // recusar com uma conta clara do que entregar um vídeo com a fala truncada.
+    if (idsTodos.length < cabem) {
+      return {
+        ok: false as const,
+        erro: `A narração tem ${v.narracaoSeg}s e precisa de ${cabem} fotos — você escolheu ${idsTodos.length}. Adicione mais fotos ou peça um roteiro mais curto.`,
+      };
+    }
+    // Fotos DE MAIS: corta — mas mantendo as que TÊM LEGENDA (a Bia espalha as frases pelo
+    // vídeo; um corte cego pelas primeiras deixaria o vídeo sem texto nenhum). A ordem
+    // original da sequência é preservada.
+    const posicao = new Map(idsTodos.map((id, i) => [id, i]));
+    const comLegenda = idsTodos.filter((id) => (legendas[id] || "").trim());
+    const semLegenda = idsTodos.filter((id) => !(legendas[id] || "").trim());
+    const escolhidas = [...comLegenda.slice(0, cabem), ...semLegenda].slice(0, cabem);
+    idsSlideshow = escolhidas.sort((a, b) => (posicao.get(a) ?? 0) - (posicao.get(b) ?? 0));
+  }
   // Só conta legenda das fotos que ESTÃO no slideshow agora — legenda órfã (de foto que o dono
   // tirou depois, ou que virou capa) não pode fazer o vídeo inteiro trocar de estilo à toa.
   const temLegenda = idsSlideshow.some((id) => (legendas[id] || "").trim());
@@ -302,16 +330,19 @@ export async function gerarVideoTematico(videoId: string) {
     // O índice do quadro é a posição da foto em videoFotos (a rota lê o MESMO array).
     fotosMotor = idsSlideshow.map((id) => `${base}/api/quadro-tema/${videoId}/${ids.indexOf(id) + 1}.jpg?v=${versao}`);
   } else {
-    const semCapa = fotos.filter((u) => u !== capaUrl);
-    fotosMotor = semCapa.length > 0 ? semCapa : fotos;
+    // Sem legenda: fotos cruas (o motor faz fundo borrado + moldura). Respeita o corte da
+    // narração também — a lista sai de idsSlideshow, não de todas as fotos.
+    fotosMotor = idsSlideshow.map((id) => mapa.get(id)).filter((u): u is string => !!u);
+    if (!fotosMotor.length) fotosMotor = fotos.filter((u) => u !== capaUrl);
   }
   if (!fotosMotor.length) return { ok: false as const, erro: "Escolha pelo menos 2 fotos pro vídeo (uma vira a capa)." };
 
   const antigo = v.videoUrl; // guardado ANTES do lock (só apagamos depois, e se ninguém usar)
   await prisma.videoTematico.update({ where: { id: videoId }, data: { videoUrl: "gerando" } });
-  // Rodízio: marca as fotos como USADAS (o ranking desconta por uso, então o PRÓXIMO vídeo
-  // do mesmo tema traz cenas diferentes em vez de repetir exatamente as mesmas).
-  const usadas = ids.filter((id) => mapa.has(id));
+  // Rodízio: marca como USADAS só as fotos que REALMENTE entraram no vídeo (a narração pode
+  // ter cortado as demais). Contar foto que nunca foi ao ar faria o ranking evitá-la no
+  // próximo vídeo do mesmo tema — perderíamos cenas boas sem elas nunca terem aparecido.
+  const usadas = [...new Set([...idsSlideshow, ...(v.videoCapa && mapa.has(v.videoCapa) ? [v.videoCapa] : [])])];
   if (usadas.length) await prisma.imagemMarca.updateMany({ where: { id: { in: usadas } }, data: { usos: { increment: 1 } } }).catch(() => {});
   const r = await dispararMotorReels({
     fotos: fotosMotor,
@@ -319,7 +350,9 @@ export async function gerarVideoTematico(videoId: string) {
     moldura: temLegenda ? "nenhuma" : v.videoMoldura || "branca",
     corMoldura: v.marca.corPrimaria || "#FFFFFF",
     logoUrl: v.marca.logoUrl,
-    musicaUrl: musicaBuffet(v.marca.slug) || undefined,
+    // A trilha do vídeo: a NARRAÇÃO (que já vem com o jingle misturado por baixo) ou, sem
+    // narração, o jingle puro. O motor só aceita uma trilha — por isso a mistura é nossa.
+    musicaUrl: temNarracao ? v.narracaoUrl : musicaBuffet(v.marca.slug) || undefined,
     // FRASE DE CAPA (o que abre o vídeo): o gancho que a Bia escreve, guardado em videoTextos
     // na chave da foto de capa. Sem frase, cai no nome do tema — mas "Brinquedos" na capa é
     // etiqueta, não venda; por isso a Bia sempre escreve uma.
@@ -499,6 +532,121 @@ REGRAS: fale COM o pai/mãe que decide a festa ("seu filho", "sua festa") venden
     console.error("Erro ao escrever a legenda da foto:", e);
     return { ok: false as const, erro: "Não consegui escrever agora." };
   }
+}
+
+// ---- NARRAÇÃO (a voz que fala no vídeo) ----
+
+// A Bia escreve o ROTEIRO da locução a partir do BRIEFING do dono ("quero anunciar a promoção
+// de julho, 10 pessoas grátis até dia 20"). Texto pra ser FALADO — frases curtas, respiro,
+// jeito de gente. Devolve o roteiro pro dono revisar antes de virar voz.
+export async function gerarRoteiroNarracao(videoId: string, briefing: string, segundosAlvo = 25) {
+  const v = await prisma.videoTematico.findUnique({
+    where: { id: videoId },
+    include: { marca: { select: { nome: true, descricao: true, telefone: true } } },
+  });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+
+  const b = (briefing || "").trim();
+  // ~2,6 palavras por segundo de locução (medido nas vozes do Google a 1.08x).
+  const palavras = Math.max(30, Math.round(segundosAlvo * 2.6));
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4.1",
+        response_format: { type: "json_object" },
+        temperature: 0.9,
+        messages: [
+          {
+            role: "system",
+            content: `Você escreve o ROTEIRO DA LOCUÇÃO de um vídeo do buffet infantil "${v.marca.nome}". ${v.marca.descricao || ""}
+É texto PRA SER FALADO em voz alta, não pra ser lido. Regras que fazem a voz soar humana:
+- Frases CURTAS. Uma ideia por frase.
+- Use "..." onde a voz deve respirar/pausar, e "!" onde ela sobe.
+- Fale como brasileiro fala: "pra", "tá", "cê", "olha só", "pois é". Nada de texto empolado.
+- Comece com um GANCHO que segura a atenção nos 3 primeiros segundos.
+- Fale COM o pai/mãe ("seu filho", "sua festa"), vendendo o BENEFÍCIO — não liste características.
+- Termine com uma CHAMADA clara pra ação.
+- Números por extenso ("vinte por cento", "dia vinte") — a voz lê melhor.
+- Sem emoji, sem hashtag, sem marcação de cena. SÓ o que a voz fala.
+- A marca É o lugar da festa: nunca mande procurar outro local.
+- Tamanho: cerca de ${palavras} palavras (a locução tem que durar ~${segundosAlvo}s).`,
+          },
+          {
+            role: "user",
+            content: `Tema do vídeo: "${v.titulo}".\nO que o dono quer anunciar: ${b || "um convite pra conhecer o buffet e fechar a festa aqui"}.${v.marca.telefone ? `\nWhatsApp da marca: ${v.marca.telefone} (só cite se fizer sentido na chamada final).` : ""}\n\nEscreva o roteiro. Responda só com JSON: {"roteiro":"..."}`,
+          },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+    const data = await resp.json();
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { roteiro?: string };
+    const roteiro = (j.roteiro || "").trim().slice(0, 1200);
+    if (!roteiro) throw new Error("A IA não devolveu roteiro.");
+    await prisma.videoTematico.update({ where: { id: videoId }, data: { narracaoTexto: roteiro } });
+    revalidatePath(`/painel/marcas/${v.marcaId}`);
+    return { ok: true as const, roteiro };
+  } catch (e) {
+    console.error("Erro ao escrever o roteiro da narração:", e);
+    return { ok: false as const, erro: "Não consegui escrever o roteiro agora." };
+  }
+}
+
+// Gera a VOZ (Google Chirp3-HD) já misturada com o jingle e guarda no Blob. O dono OUVE antes
+// de mandar montar o vídeo — trocar a voz e ouvir de novo custa centavos e leva 2 segundos.
+export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string) {
+  const v = await prisma.videoTematico.findUnique({
+    where: { id: videoId },
+    include: { marca: { select: { slug: true } } },
+  });
+  // (videoUrl entra no select pelo include padrão — usado logo abaixo pra barrar a corrida)
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const t = (texto || "").trim().slice(0, 1200);
+  if (t.length < 20) return { ok: false as const, erro: "Escreva o roteiro da narração primeiro." };
+  // O motor está BAIXANDO essa trilha agora — trocar/apagar o MP3 no meio da montagem deixaria
+  // o Reels mudo (e o vídeo preso em "gerando", porque o motor erraria sem callback).
+  if (v.videoUrl === "gerando") return { ok: false as const, erro: "O vídeo está sendo montado agora — espere terminar pra mexer na narração." };
+
+  const voz = vozValida(vozId || v.narracaoVoz || VOZ_PADRAO);
+  const antigo = v.narracaoUrl;
+  try {
+    const { url, segundos } = await gerarNarracaoMp3({ texto: t, vozId: voz, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6) });
+    await prisma.videoTematico.update({
+      where: { id: videoId },
+      data: { narracaoTexto: t, narracaoVoz: voz, narracaoUrl: url, narracaoSeg: Math.round(segundos) },
+    });
+    // A narração anterior não serve mais — o Blob tem limite.
+    if (antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
+    revalidatePath(`/painel/marcas/${v.marcaId}`);
+    return { ok: true as const, url, segundos, fotos: fotosParaDuracao(segundos, MAX_FOTOS) };
+  } catch (e) {
+    console.error("Erro ao gerar a narração:", e);
+    return { ok: false as const, erro: "Não consegui gerar a voz agora." };
+  }
+}
+
+// Tira a narração do vídeo (volta a ser só imagens + jingle).
+export async function removerNarracaoVideo(videoId: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, narracaoUrl: true, videoUrl: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (v.videoUrl === "gerando") return { ok: false as const, erro: "O vídeo está sendo montado agora — espere terminar pra tirar a narração." };
+  await prisma.videoTematico.update({
+    where: { id: videoId },
+    data: { narracaoTexto: "", narracaoUrl: "", narracaoSeg: 0 },
+  });
+  if (v.narracaoUrl.startsWith("http")) import("@vercel/blob").then(({ del }) => del(v.narracaoUrl)).catch(() => {});
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const };
 }
 
 // Edita à mão a legenda de UMA foto do vídeo (o dono ajusta o que a Bia escreveu).

@@ -10,6 +10,7 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "@prisma/client": "^6.19.3",
     "@vercel/blob": "^2.4.0",
     "google-auth-library": "^10.7.0",

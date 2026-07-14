@@ -8,8 +8,9 @@
 import { useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarNarracaoVideo, removerNarracaoVideo } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
+import { VOZES, VOZ_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 
 const ORDEM = ["salao", "brinquedos", "aniversariante", "parabens", "momentos"];
 const LABEL: Record<string, string> = {
@@ -41,7 +42,7 @@ function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   return {};
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", textosIniciais = {}, corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", textosIniciais = {}, narracao, corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -51,6 +52,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   molduraInicial?: string;
   textoFinalInicial?: string;
   textosIniciais?: Record<string, string>; // legendas por foto (só no modo temático)
+  narracao?: { texto: string; voz: string; url: string; segundos: number }; // a voz do vídeo
   corMarca?: string;
   jaTemVideo?: boolean;
   onFechar: () => void;
@@ -74,6 +76,15 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [escrevendoCopy, setEscrevendoCopy] = useState(false); // a Bia escrevendo a copy do vídeo
   const [msgCopy, setMsgCopy] = useState("");
   const [biaNaFoto, setBiaNaFoto] = useState<string | null>(null); // id da foto onde a Bia está escrevendo
+  // NARRAÇÃO: o briefing do dono → a Bia escreve o roteiro → escolhe a voz → OUVE → vai pro vídeo
+  const [briefing, setBriefing] = useState("");
+  const [roteiro, setRoteiro] = useState(narracao?.texto ?? "");
+  const [voz, setVoz] = useState(narracao?.voz || VOZ_PADRAO);
+  const [audioUrl, setAudioUrl] = useState(narracao?.url ?? "");
+  const [audioSeg, setAudioSeg] = useState(narracao?.segundos ?? 0);
+  const [escrevendoRoteiro, setEscrevendoRoteiro] = useState(false);
+  const [gerandoVoz, setGerandoVoz] = useState(false);
+  const [msgVoz, setMsgVoz] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
 
   function toggle(id: string) {
     setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -161,6 +172,37 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
 
   // As LEGENDAS vão junto no salvar (não só no onBlur do campo): digitar a frase e clicar
   // direto em "Gerar" não pode perder o texto.
+  // ---- NARRAÇÃO ----
+  async function biaEscreveRoteiro() {
+    if (!tematicoId) return;
+    setEscrevendoRoteiro(true);
+    setMsgVoz(null);
+    const r = await gerarRoteiroNarracao(tematicoId, briefing, 25).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }));
+    setEscrevendoRoteiro(false);
+    if (!r.ok) { setMsgVoz({ tipo: "erro", txt: r.erro || "Não consegui escrever." }); return; }
+    setRoteiro(r.roteiro);
+    setMsgVoz({ tipo: "ok", txt: "✓ Roteiro pronto — leia, ajuste se quiser e clique em 🔊 Ouvir." });
+  }
+  async function ouvirNarracao() {
+    if (!tematicoId) return;
+    setGerandoVoz(true);
+    setMsgVoz(null);
+    const r = await gerarNarracaoVideo(tematicoId, roteiro, voz).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
+    setGerandoVoz(false);
+    if (!r.ok) { setMsgVoz({ tipo: "erro", txt: r.erro || "Não consegui gerar a voz." }); return; }
+    setAudioUrl(r.url);
+    setAudioSeg(r.segundos);
+    setMsgVoz({ tipo: "ok", txt: `🔊 Narração de ${r.segundos}s pronta — o vídeo vai usar as ${r.fotos} primeiras fotos pra casar com a voz.` });
+  }
+  async function tirarNarracao() {
+    if (!tematicoId) return;
+    setGerandoVoz(true);
+    await removerNarracaoVideo(tematicoId).catch(() => {});
+    setGerandoVoz(false);
+    setRoteiro(""); setAudioUrl(""); setAudioSeg(0); setBriefing("");
+    setMsgVoz({ tipo: "ok", txt: "Narração removida — o vídeo volta a ser só imagens + jingle." });
+  }
+
   async function salvarSelecao() {
     if (tematicoId) await salvarFotosVideoTematico(tematicoId, sel, capa, moldura, textoFinal, textos);
     else await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal);
@@ -239,6 +281,91 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
               </button>
             )}
           </div>
+
+          {/* NARRAÇÃO (só no vídeo do buffet): a VOZ que fala no vídeo, com o jingle por baixo.
+              Fluxo: você diz o que quer anunciar → a Bia escreve o roteiro → escolhe a voz →
+              OUVE aqui mesmo → só então gera o vídeo. */}
+          {tematicoId && (
+            <div className="mt-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-white">🎙️ Narração <span className="font-normal text-muted">(uma voz falando no vídeo)</span></span>
+                {audioUrl && (
+                  <button type="button" onClick={tirarNarracao} disabled={gerandoVoz} className="shrink-0 rounded-md border border-red-900/60 px-2 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕ tirar a voz</button>
+                )}
+              </div>
+
+              {/* 1) o que você quer anunciar */}
+              <div className="mt-2 flex flex-wrap items-end gap-1.5">
+                <div className="min-w-[200px] flex-1">
+                  <label className="block text-[10px] font-semibold text-muted">O que você quer anunciar?</label>
+                  <input
+                    type="text"
+                    value={briefing}
+                    onChange={(e) => setBriefing(e.target.value)}
+                    placeholder="Ex: promoção de julho — fechou até dia 20, ganha 10 pessoas grátis"
+                    className="mt-1 w-full rounded-md border border-linha bg-preto px-2 py-2 text-[11px] text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <button type="button" onClick={biaEscreveRoteiro} disabled={escrevendoRoteiro || gerandoVoz} title="A Bia escreve o roteiro da locução (texto feito pra ser FALADO)" className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50">
+                  {escrevendoRoteiro ? "✍️ escrevendo…" : "✨ Bia escreve o roteiro"}
+                </button>
+              </div>
+
+              {/* 2) o roteiro (editável) */}
+              <textarea
+                value={roteiro}
+                onChange={(e) => setRoteiro(e.target.value)}
+                rows={4}
+                maxLength={1200}
+                placeholder="O roteiro da fala aparece aqui — dá pra editar cada palavra."
+                className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+              />
+
+              {/* 3) voz + ouvir */}
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <select value={voz} onChange={(e) => setVoz(e.target.value)} className="input-base flex-1 py-1.5 text-[11px]" aria-label="Voz da narração">
+                  <optgroup label="⭐ As suas favoritas">
+                    {VOZES.filter((v) => v.favorita).map((v) => (
+                      <option key={v.id} value={v.id}>⭐ {v.nome} ({v.sexo === "f" ? "voz feminina" : "voz masculina"})</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Outras vozes">
+                    {VOZES.filter((v) => !v.favorita).map((v) => (
+                      <option key={v.id} value={v.id}>{v.nome} ({v.sexo === "f" ? "voz feminina" : "voz masculina"})</option>
+                    ))}
+                  </optgroup>
+                </select>
+                <button type="button" onClick={ouvirNarracao} disabled={gerandoVoz || roteiro.trim().length < 20} title={roteiro.trim().length < 20 ? "Escreva o roteiro primeiro" : "Gera a voz com o jingle por baixo e toca aqui"} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
+                  {gerandoVoz ? "🎙️ gerando…" : audioUrl ? "🔊 Ouvir de novo" : "🔊 Ouvir"}
+                </button>
+              </div>
+
+              {/* 4) o player + o aviso de quantas fotos o vídeo vai usar */}
+              {audioUrl && (() => {
+                const precisa = fotosParaDuracao(audioSeg);
+                const temFotos = sel.length; // a capa sai da sequência, então sobra 1 a menos
+                const faltam = precisa - (temFotos - 1);
+                return (
+                  <div className="mt-2">
+                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                    <audio src={audioUrl} controls className="h-8 w-full" />
+                    {faltam > 0 ? (
+                      <p className="mt-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug font-semibold text-amber-300">
+                        ⚠️ A voz tem <strong>{audioSeg}s</strong> e precisa de <strong>{precisa} fotos</strong> além da capa — faltam <strong>{faltam}</strong>. Adicione mais fotos (ou peça um roteiro mais curto), senão a fala é cortada no meio.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[10px] leading-snug text-emerald-300/90">
+                        A voz tem <strong>{audioSeg}s</strong> → o vídeo usa <strong>{precisa} fotos</strong> (a fala e as imagens terminam juntas). As com legenda entram na frente.
+                        {temFotos - 1 > precisa && <> As outras <strong>{temFotos - 1 - precisa}</strong> ficam de fora — quer todas? peça um roteiro mais longo.</>}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
+              {msgVoz && <p className={`mt-1.5 text-[11px] font-semibold ${msgVoz.tipo === "ok" ? "text-emerald-400" : "text-vermelho"}`}>{msgVoz.txt}</p>}
+              {!audioUrl && !msgVoz && <p className="mt-1.5 text-[10px] leading-snug text-muted/80">Sem narração, o vídeo sai com o <strong className="text-white/70">jingle do buffet</strong> como hoje. Com narração, a voz entra por cima do jingle.</p>}
+            </div>
+          )}
 
           {/* COPY DO VÍDEO (só no vídeo do buffet): frases que aparecem embaixo das fotos */}
           {tematicoId && (
