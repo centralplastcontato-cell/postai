@@ -42,7 +42,7 @@ function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   return {};
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", textosIniciais = {}, narracao, corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -51,6 +51,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   capaInicial?: string;
   molduraInicial?: string;
   textoFinalInicial?: string;
+  tituloCapaInicial?: string; // título da capa escrito à mão (só no vídeo de FESTA); "" = automático
+  tituloCapaAuto?: string; // o título automático ("Fulano fez X aninhos") — vira o placeholder
   textosIniciais?: Record<string, string>; // legendas por foto (só no modo temático)
   narracao?: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz do vídeo
   corMarca?: string;
@@ -70,6 +72,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [capa, setCapa] = useState<string>(fotos.some((f) => f.id === capaInicial) ? capaInicial : "");
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
   const [textoFinal, setTextoFinal] = useState<string>(textoFinalInicial || ""); // mensagem do slide final
+  const [tituloCapa, setTituloCapa] = useState<string>(tituloCapaInicial || ""); // título da capa (vídeo de festa)
   const [gerandoTexto, setGerandoTexto] = useState(false); // a Bia escrevendo o texto final
   // LEGENDAS por foto (só no vídeo temático): a copy que aparece embaixo da imagem no vídeo.
   const [textos, setTextos] = useState<Record<string, string>>(textosIniciais);
@@ -220,7 +223,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
 
   async function salvarSelecao() {
     if (tematicoId) await salvarFotosVideoTematico(tematicoId, sel, capa, moldura, textoFinal, textos);
-    else await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal);
+    else await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal, tituloCapa);
   }
   async function salvar() {
     setSalvando(true);
@@ -275,6 +278,28 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
 
         <div className="flex-1 overflow-y-auto px-4 pb-6">
           <p className="pt-3 text-[11px] leading-relaxed text-amber-300/90">⭐ Toque na <strong className="text-amber-200">estrela</strong> de uma foto pra ela virar a <strong className="text-amber-200">capa</strong> do vídeo (entra nítida, com o título por cima). Sem escolher, a 1ª foto vira a capa.{capa && (<button type="button" onClick={() => setCapa("")} className="ml-1.5 rounded bg-white/10 px-2 py-0.5 font-semibold text-white transition hover:bg-vermelho">✕ tirar capa</button>)}</p>
+          {/* TÍTULO DA CAPA (só no vídeo de FESTA — no temático a abertura é a frase da foto-capa).
+              Vazio = usa o automático ("Fulano fez X aninhos"). O texto quebra linha sozinho. */}
+          {!tematicoId && (
+            <div className="mt-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-white">✍️ Título da capa <span className="font-normal text-muted">(a frase grande na 1ª tela do vídeo)</span></span>
+                {tituloCapa.trim() && (
+                  <button type="button" onClick={() => setTituloCapa("")} title="Voltar pro título automático" className="shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white transition hover:bg-vermelho">✕ usar o automático</button>
+                )}
+              </div>
+              <input
+                type="text"
+                value={tituloCapa}
+                onChange={(e) => setTituloCapa(e.target.value)}
+                maxLength={60}
+                placeholder={tituloCapaAuto ? `Em branco = "${tituloCapaAuto}"` : "Escreva o título da capa"}
+                className="mt-2 w-full rounded-lg border border-linha bg-preto px-3 py-2.5 text-sm text-white placeholder:text-muted/50 focus:border-amber-400 focus:outline-none"
+              />
+              <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Aparece <strong className="text-white/70">grande na capa</strong>. Deixe em branco pra usar o automático{tituloCapaAuto ? <> (<span className="text-white/70">{tituloCapaAuto}</span>)</> : ""}. Pode escrever à vontade — o texto <strong className="text-white/70">quebra a linha sozinho</strong>, não precisa caber numa linha só.</p>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-1.5 pt-2">
             <span className="text-[11px] font-semibold text-muted">🖼️ Moldura das fotos:</span>
             {MOLDURAS_UI.map((m) => (

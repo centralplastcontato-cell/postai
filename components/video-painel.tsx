@@ -7,7 +7,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { type FestaView, type FotoView } from "@/lib/festa-tipos";
-import { rotuloAniversariantes } from "@/lib/aniversariantes";
+import { rotuloAniversariantes, tituloCapaFesta } from "@/lib/aniversariantes";
 import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
 import { criarVideoTematico, excluirVideoTematico, fotosDoVideoTematico } from "@/app/actions/videos-tematicos";
 
@@ -322,6 +322,8 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca }: { marcaId:
           capaInicial={seletor.videoCapa}
           molduraInicial={seletor.videoMoldura}
           textoFinalInicial={seletor.videoTextoFinal}
+          tituloCapaInicial={seletor.videoTituloCapa}
+          tituloCapaAuto={tituloCapaFesta(seletor.aniversariantes, rotuloAniversariantes(seletor.aniversariantes))}
           corMarca={corMarca}
           jaTemVideo={seletor.videoUrl.startsWith("http")}
           onFechar={() => setSeletor(null)}

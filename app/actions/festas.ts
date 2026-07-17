@@ -303,7 +303,7 @@ export async function moverFotoMomento(festaToken: string, fotoId: string, novoM
 // Salva a SELEÇÃO ordenada de fotos pro VÍDEO/Reels da festa (do PAINEL — guardaMarca). Só aceita
 // fotos que SÃO desta festa; guarda os IDs na ordem escolhida (máx 30). Lista vazia volta pro automático.
 const MOLDURAS = ["nenhuma", "branca", "grossa", "marca"];
-export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string) {
+export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string, tituloCapa?: string) {
   const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -311,7 +311,7 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?
   const validas = await prisma.imagemMarca.findMany({ where: { festaId, id: { in: fotoIds } }, select: { id: true } });
   const set = new Set(validas.map((v) => v.id));
   const ordenadas = fotoIds.filter((id) => set.has(id)).slice(0, 30); // mantém a ordem escolhida
-  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string; videoTextoFinal?: string } = { videoFotos: JSON.stringify(ordenadas) };
+  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string; videoTextoFinal?: string; videoTituloCapa?: string } = { videoFotos: JSON.stringify(ordenadas) };
   // capa: só aceita "" (automático) ou um fotoId que SEJA desta festa
   if (capa !== undefined) {
     const capaOk = capa === "" ? true : (await prisma.imagemMarca.count({ where: { festaId, id: capa } })) > 0;
@@ -319,6 +319,7 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?
   }
   if (moldura !== undefined) data.videoMoldura = MOLDURAS.includes(moldura) ? moldura : "branca";
   if (textoFinal !== undefined) data.videoTextoFinal = textoFinal.trim().slice(0, 60); // limpa e limita
+  if (tituloCapa !== undefined) data.videoTituloCapa = tituloCapa.trim().slice(0, 60); // "" = volta pro automático
   await prisma.festa.update({ where: { id: festaId }, data });
   revalidatePath(`/painel/marcas/${festa.marcaId}`);
   return { ok: true as const, total: ordenadas.length };
@@ -513,7 +514,7 @@ export async function postarReelsAgora(pubId: string) {
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true } }, fotos: { select: { id: true, url: true } } },
+    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true } }, fotos: { select: { id: true, url: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -547,9 +548,9 @@ export async function gerarVideoDaFesta(festaId: string) {
     if (process.env.VIDEO_CALLBACK_URL) base = new URL(process.env.VIDEO_CALLBACK_URL).origin;
   } catch {} // env torta não pode derrubar a geração
   base = base.replace(/\/$/, "");
-  // ?v= é a única chave de cache da capa: muda quando QUALQUER coisa desenhada muda (título,
-  // qual foto é a capa, a URL dela e a cor da marca).
-  const versaoCapa = hashCurto([festa.aniversariantes, festa.aniversariante, festa.videoCapa, capaUrl, festa.marca.corPrimaria].join("|"));
+  // ?v= é a única chave de cache da capa: muda quando QUALQUER coisa desenhada muda (título
+  // automático OU o escrito à mão, qual foto é a capa, a URL dela e a cor da marca).
+  const versaoCapa = hashCurto([festa.aniversariantes, festa.aniversariante, festa.videoTituloCapa, festa.videoCapa, capaUrl, festa.marca.corPrimaria].join("|"));
   const capaDesenhada = `${base}/api/capa-festa/${festaId}.jpg?v=${versaoCapa}`;
 
   await prisma.festa.update({ where: { id: festaId }, data: { videoUrl: "gerando" } });

@@ -173,6 +173,9 @@ model Festa {
   videoMoldura   String   @default("branca")
   // Mensagem do SLIDE FINAL do vídeo (o dono escreve ou a Bia gera). "" = usa o padrão do motor.
   videoTextoFinal String  @default("")
+  // Título da CAPA do vídeo, escrito à mão pelo dono. "" = usa o automático ("Fulano fez X aninhos",
+  // ver lib/aniversariantes.ts tituloCapaFesta). A rota /api/capa-festa desenha (quebra linha).
+  videoTituloCapa String  @default("")
   // URL do VÍDEO/Reels já montado desta festa (no Blob). "" = ainda não gerado.
   videoUrl       String   @default("")
   // O gerente liga/desliga o card "Avalie no Google" no álbum dos pais (por festa).

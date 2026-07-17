@@ -96,6 +96,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoCapa: f.videoCapa || "",
       videoMoldura: f.videoMoldura || "branca",
       videoTextoFinal: f.videoTextoFinal || "",
+      videoTituloCapa: f.videoTituloCapa || "",
       videoUrl: f.videoUrl || "",
       videoPostado: !!f.videoUrl && urlsReelsPostados.has(f.videoUrl),
       mostrarAvaliacao: f.mostrarAvaliacao,

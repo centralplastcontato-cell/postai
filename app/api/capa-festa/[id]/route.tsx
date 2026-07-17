@@ -44,6 +44,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         aniversariante: true,
         aniversariantes: true,
         videoCapa: true,
+        videoTituloCapa: true,
         marca: { select: { corPrimaria: true, corFundo: true } },
         fotos: { select: { id: true, url: true } },
       },
@@ -53,8 +54,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     const cor = festa.marca.corPrimaria || "#7C3AED";
     const fundo = festa.marca.corFundo || "#0E0E0E";
 
+    // Título editado à mão pelo dono TEM prioridade; vazio → o automático ("Fulano fez X aninhos").
     const anivs = parseAniversariantes(festa.aniversariantes);
-    const titulo = tituloCapaFesta(anivs, festa.aniversariante);
+    const titulo = festa.videoTituloCapa?.trim() || tituloCapaFesta(anivs, festa.aniversariante);
 
     // a foto da capa: a escolhida (videoCapa) ou a 1ª da festa.
     const mapa = new Map(festa.fotos.map((f) => [f.id, f.url]));
