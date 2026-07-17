@@ -465,11 +465,16 @@ export async function gerarItemAgenda(marcaId: string, item: ItemAgenda): Promis
       // Feed: as fotos escolhidas no plano vão DIRETO pro post (nada de sorteio). O tema já
       // nasceu delas no plano da Bia, então o texto casa com a imagem por origem. Mosaico
       // recebe as 4 fotos das bolinhas; os demais templates, a foto única de fundo.
-      const ehMosaico = item.template === "mosaico";
+      const templateFeed = item.template ?? "dica";
+      const ehMosaico = templateFeed === "mosaico";
+      // DICA é a exceção do "foto-primeiro": o tema nascido da foto travava o conteúdo em
+      // decoração/festa temática (a foto é de festa). Mandamos tema VAZIO → o gerarTexto sorteia
+      // um assunto da lista ampla (comida, horário, segurança, orçamento…). A foto vira só fundo.
+      const temaFeed = templateFeed === "dica" ? "" : item.tema;
       r = await gerarPublicacao({
         marcaId,
-        template: item.template ?? "dica",
-        tema: item.tema,
+        template: templateFeed,
+        tema: temaFeed,
         data: item.dia,
         corFundo,
         categoria: item.categoriaFoto,
