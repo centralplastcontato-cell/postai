@@ -35,3 +35,16 @@ export function rotuloAniversariantes(lista: Aniversariante[]): string {
   if (ps.length <= 1) return ps[0] || "";
   return `${ps.slice(0, -1).join(", ")} e ${ps[ps.length - 1]}`;
 }
+
+// Título da CAPA do vídeo da festa. Mostra TODOS os nomes (gêmeos/irmãos aparecem juntos, não
+// só o primeiro) e afirma a idade só quando dá: "Luisa e Maria Sofia fez 11 aninhos" (idades
+// iguais) ou "Enrico fez 4 aninhos" (um só). Idades diferentes/ausentes → "Festa de <nomes>"
+// (não dá pra dizer "fez X"). A rota /api/capa-festa desenha isso quebrando linha, então nome
+// comprido não estoura mais a tela. labelFallback = Festa.aniversariante (label já pronto).
+export function tituloCapaFesta(lista: Aniversariante[], labelFallback?: string): string {
+  const nomes = nomesAniversariantes(lista) || (labelFallback || "").trim();
+  const idades = lista.map((a) => a.idade).filter((n): n is number => n != null);
+  const mesmaIdade = lista.length > 0 && idades.length === lista.length && new Set(idades).size === 1;
+  if (mesmaIdade) return `${nomes} fez ${idades[0]} ${idades[0] === 1 ? "aninho" : "aninhos"}`;
+  return nomes ? `Festa de ${nomes}` : "Festa";
+}

@@ -101,6 +101,45 @@ export async function fotoSeguraComTamanho(url?: string | null): Promise<{ src: 
   }
 }
 
+// Prepara a foto pra CAPA do vídeo da festa (9:16): devolve DUAS versões da mesma foto —
+//  - bg: recorte COVER 9:16, borrado e escurecido (vira o fundo, no lugar do preto chapado);
+//  - fg: a foto INTEIRA (fit inside, sem cortar ninguém — importante em foto de grupo), com
+//    as dimensões reais pra desenhar sem tarja.
+// Uma única baixada, dois encodes de sharp. Undefined se a foto falhar (a rota cai no gradiente).
+export async function fotoParaCapa(
+  url: string | null | undefined,
+  L: number,
+  A: number,
+): Promise<{ bg: string; fg: string; fw: number; fh: number } | undefined> {
+  if (!url) return undefined;
+  try {
+    const buf = await bytesDaImagem(url);
+    if (!buf) return undefined;
+    const base = sharp(buf).rotate(); // respeita a orientação EXIF antes de recortar/medir
+    const bgBuf = await base
+      .clone()
+      .resize({ width: L, height: A, fit: "cover", position: "centre" })
+      .blur(38)
+      .modulate({ brightness: 0.55 }) // escurece: dá contraste pro título e pra foto da frente
+      .jpeg({ quality: 70 })
+      .toBuffer();
+    const { data: fgData, info: fgInfo } = await base
+      .clone()
+      .resize({ width: Math.round(L * 0.92), height: Math.round(A * 0.66), fit: "inside", withoutEnlargement: true })
+      .jpeg({ quality: 86 })
+      .toBuffer({ resolveWithObject: true });
+    if (!fgInfo.width || !fgInfo.height) return undefined;
+    return {
+      bg: `data:image/jpeg;base64,${bgBuf.toString("base64")}`,
+      fg: `data:image/jpeg;base64,${fgData.toString("base64")}`,
+      fw: fgInfo.width,
+      fh: fgInfo.height,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 // Logo da marca EMBUTIDO na arte (data URI), em vez de uma URL do nosso próprio site: assim o
 // quadro não precisa chamar /api/marca-logo (26 quadros chamariam 26 funções extras — e se
 // essa chamada falhasse, o desenho inteiro quebrava). Achatado sobre BRANCO porque o logo

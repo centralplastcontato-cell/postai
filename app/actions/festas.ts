@@ -13,6 +13,13 @@ import { dispararMotorReels } from "@/lib/video-engine";
 import { musicaBuffet } from "@/lib/musica-buffet";
 import { baseUrl } from "@/lib/config";
 
+// Hash curto e estável (djb2) pra chave de cache (?v=) das artes desenhadas por nós.
+function hashCurto(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
 // ===========================================================================
 // ÁLBUM DA FESTA — server actions
 //
@@ -528,21 +535,33 @@ export async function gerarVideoDaFesta(festaId: string) {
   const semCapa = fotos.filter((u) => u !== capaUrl);
   if (semCapa.length > 0) fotos = semCapa;
 
-  const anivs = parseAniversariantes(festa.aniversariantes);
-  const nome = anivs[0]?.nome || festa.aniversariante || "a criança";
-  const idade = anivs[0]?.idade;
-  const textoCapa = idade ? `${nome} fez ${idade} aninhos` : `Festa da ${nome}`;
   const musicaUrl = musicaBuffet(festa.marca.slug) || undefined;
+
+  // A CAPA é desenhada por NÓS (/api/capa-festa): o título "Fulano fez X aninhos" QUEBRA LINHA e a
+  // fonte encolhe, então nome comprido / dois aniversariantes ("Luisa e Maria Sofia fez 11 aninhos")
+  // não estouram mais a tela. O motor recebe a capa PRONTA e não escreve texto por cima (textoCapa="").
+  // A URL precisa ser PÚBLICA: rodando local o motor não alcança o localhost — usamos o mesmo host do
+  // callback (produção, mesmo banco), igual o vídeo temático faz.
+  let base = baseUrl();
+  try {
+    if (process.env.VIDEO_CALLBACK_URL) base = new URL(process.env.VIDEO_CALLBACK_URL).origin;
+  } catch {} // env torta não pode derrubar a geração
+  base = base.replace(/\/$/, "");
+  // ?v= é a única chave de cache da capa: muda quando QUALQUER coisa desenhada muda (título,
+  // qual foto é a capa, a URL dela e a cor da marca).
+  const versaoCapa = hashCurto([festa.aniversariantes, festa.aniversariante, festa.videoCapa, capaUrl, festa.marca.corPrimaria].join("|"));
+  const capaDesenhada = `${base}/api/capa-festa/${festaId}.jpg?v=${versaoCapa}`;
 
   await prisma.festa.update({ where: { id: festaId }, data: { videoUrl: "gerando" } });
   const r = await dispararMotorReels({
     fotos,
-    capaUrl,
+    capaUrl: capaDesenhada,
     moldura: festa.videoMoldura || "branca",
     corMoldura: festa.marca.corPrimaria || "#FFFFFF",
     logoUrl: festa.marca.logoUrl,
     musicaUrl,
-    textoCapa,
+    // A capa JÁ traz o título (a nossa, que quebra linha) — o motor NÃO escreve nada por cima.
+    textoCapa: "",
     nomeArquivo: festa.marca.slug || "reels",
     // texto FINAL escolhido pelo dono (ou pela Bia). Vazio = motor usa o padrão "Muito obrigado!".
     ...(festa.videoTextoFinal?.trim() ? { tituloFinal: festa.videoTextoFinal.trim(), subFinal: "" } : {}),
