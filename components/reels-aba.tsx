@@ -121,11 +121,20 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
     router.refresh();
   }
 
+  // Nome da festa a partir do título do Reels ("Reels — Samuel" → "Samuel").
+  const nomeDoReels = (r: PublicacaoView) => (r.titulo || "").replace(/^Reels\s*[—–-]\s*/i, "").trim();
   // festas cujo Reels JÁ foi postado — pra marcar no seletor e não reagendar por engano.
-  // cruza pelo nome no título do Reels ("Reels — Samuel" → "Samuel").
-  const nomesPostados = new Set(
-    reels.filter((r) => r.status === "postado").map((r) => (r.titulo || "").replace(/^Reels\s*[—–-]\s*/i, "").trim())
-  );
+  const nomesPostados = new Set(reels.filter((r) => r.status === "postado").map(nomeDoReels));
+  // festas cujo Reels JÁ está AGENDADO (na fila, ainda não postado) — evita agendar o mesmo 2×.
+  const nomesAgendados = new Set(reels.filter((r) => r.status !== "postado").map(nomeDoReels));
+  // Selo do vídeo no seletor: postado tem prioridade; senão, agendado. Só pra festa (o vídeo do
+  // buffet é evergreen — pode ser postado quantas vezes quiser, não faz sentido marcar).
+  const seloVideo = (f: FestaComVideo): string => {
+    if (f.tipo !== "festa") return "";
+    if (nomesPostados.has(f.nome)) return "  ✅ já postado";
+    if (nomesAgendados.has(f.nome)) return "  ⏰ já agendado";
+    return "";
+  };
 
   return (
     <div className="space-y-4">
@@ -144,7 +153,7 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
                 <label className="block text-xs font-semibold text-white">Vídeo</label>
                 <select value={festaId} onChange={(e) => { setFestaId(e.target.value); setMsg(null); }} className="input-base mt-1 w-full text-sm">
                   <option value="">Escolha o vídeo…</option>
-                  {festasComVideo.map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{f.tipo === "festa" && nomesPostados.has(f.nome) ? "  ✅ já postado" : ""}</option>)}
+                  {festasComVideo.map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{seloVideo(f)}</option>)}
                 </select>
               </div>
               <div>
@@ -165,6 +174,9 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
             )}
             {escolhido?.tipo === "festa" && nomesPostados.has(escolhido.nome) && (
               <p className="mt-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs font-semibold text-green-400">✅ Essa festa já teve um Reels postado — só agende de novo se quiser repostar.</p>
+            )}
+            {escolhido?.tipo === "festa" && !nomesPostados.has(escolhido.nome) && nomesAgendados.has(escolhido.nome) && (
+              <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300">⏰ Esse vídeo já está agendado (na fila, esperando pra postar). Só agende de novo se quiser postar duas vezes.</p>
             )}
             <div className="mt-3 flex items-center justify-between gap-2">
               <label className="block text-xs font-semibold text-white">Legenda <span className="font-normal text-muted">(opcional)</span></label>
