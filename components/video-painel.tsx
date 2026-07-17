@@ -23,6 +23,7 @@ export type VideoTematicoView = {
   videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
   narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
   capaUrl: string | null; // thumb do card (capa escolhida ou 1ª foto)
+  postadoVezes: number; // quantas vezes esse vídeo já foi postado (0 = nunca) — evergreen, segue repostável
 };
 
 // Temas prontos pro botão de criar (também dá pra digitar um tema livre).
@@ -148,11 +149,21 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
 
   const pronto = v.videoUrl.startsWith("http");
   const emGeracao = v.videoUrl === "gerando";
-  const badge = pronto
+  const postado = pronto && v.postadoVezes > 0; // já foi ao ar (mas segue guardado pra repostar)
+  // Postado vem ANTES de "Pronto": se o vídeo do buffet já foi postado, o selo mostra isso.
+  const badge = postado
+    ? { txt: "📮 Postado", cls: "bg-sky-600 text-white" }
+    : pronto
     ? { txt: "✅ Pronto", cls: "bg-green-600 text-white" }
     : emGeracao
     ? { txt: "🎬 Gerando", cls: "bg-amber-500 text-black" }
     : { txt: "Pra gerar", cls: "bg-black/70 text-white" };
+  // O vídeo do buffet é reutilizável: mesmo postado, o texto reforça que dá pra repostar.
+  const rodape = postado
+    ? `${v.postadoVezes > 1 ? `postado ${v.postadoVezes}×` : "já postado"} — reposte quando quiser`
+    : pronto
+    ? "guardado — reposte quando quiser"
+    : "monte com fotos do acervo";
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[#7c3aed]/30 bg-preto-card transition hover:border-[#7c3aed]/60">
@@ -181,7 +192,7 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent p-2.5 pt-8">
           <span className="mb-1 inline-block rounded-full bg-[#7c3aed]/80 px-2 py-0.5 text-[9px] font-bold text-white">🏰 Vídeo do buffet</span>
           <p className="truncate font-titulo text-sm leading-tight text-white">{v.titulo}</p>
-          <p className="truncate text-[10px] text-white/70">{pronto ? "guardado — reposte quando quiser" : "monte com fotos do acervo"}</p>
+          <p className="truncate text-[10px] text-white/70">{rodape}</p>
         </div>
       </div>
 

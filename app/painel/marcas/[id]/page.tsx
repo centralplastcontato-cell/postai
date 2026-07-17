@@ -226,6 +226,14 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   // Vídeos TEMÁTICOS do buffet (Reels institucionais do acervo) — aba 🎬 Vídeo + agendador de
   // Reels. A capa do card sai de `imgs` (o acervo já veio no Promise.all — sem query extra).
   const urlDaFoto = new Map(imgs.map((i) => [i.id, i.url]));
+  // Quantas vezes cada vídeo temático já foi POSTADO (o vínculo é a FK Publicacao.videoTematicoId).
+  // Diferente da festa, o temático é evergreen: mostra "📮 Postado" mas segue repostável.
+  const vezesPostadoTema = new Map<string, number>();
+  for (const p of pubs) {
+    if (p.formato === "reels" && p.status === "postado" && p.videoTematicoId) {
+      vezesPostadoTema.set(p.videoTematicoId, (vezesPostadoTema.get(p.videoTematicoId) || 0) + 1);
+    }
+  }
   const videosTematicos = tematicosRaw.map((v) => {
     const ids = (() => { try { const a = JSON.parse(v.videoFotos || "[]"); return Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string") : []; } catch { return [] as string[]; } })();
     return {
@@ -239,6 +247,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoTextos: (() => { try { const m = JSON.parse(v.videoTextos || "{}"); return m && typeof m === "object" && !Array.isArray(m) ? (m as Record<string, string>) : {}; } catch { return {}; } })(),
       narracao: { texto: v.narracaoTexto, voz: v.narracaoVoz, estilo: v.narracaoEstilo, url: v.narracaoUrl, segundos: v.narracaoSeg },
       capaUrl: (v.videoCapa && urlDaFoto.get(v.videoCapa)) || (ids[0] && urlDaFoto.get(ids[0])) || null,
+      postadoVezes: vezesPostadoTema.get(v.id) || 0,
     };
   });
   // Temáticos prontos entram no seletor do agendador de Reels, na frente das festas.
