@@ -5,7 +5,7 @@ import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { marcaPorTokenFotos, festaPorToken, gerarTokenFesta, gerarTokenAlbum } from "@/lib/festa";
-import { parseAniversariantes, nomesAniversariantes } from "@/lib/aniversariantes";
+import { parseAniversariantes, nomesAniversariantes, tituloCapaFesta } from "@/lib/aniversariantes";
 import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO, LIMITE_FOTOS_FESTA } from "@/lib/momentos-festa";
 import { descreverImagem } from "@/lib/imagem-ia";
 import { publicarReelsNasRedes } from "@/lib/instagram";
@@ -460,6 +460,51 @@ export async function gerarTextoFinalVideo(festaId: string) {
     return { ok: true as const, texto: texto || fallback.slice(0, 48) };
   } catch {
     return { ok: true as const, texto: fallback.slice(0, 48) };
+  }
+}
+
+// A Bia sugere o TÍTULO DA CAPA (o gancho da 1ª tela). Diferente do texto final: aqui ela cita
+// o(s) nome(s) e a idade e faz uma frase que dá vontade de assistir. Fallback = o título
+// automático (tituloCapaFesta) — se a IA/chave falhar, nunca volta vazio.
+export async function gerarTituloCapaVideo(festaId: string) {
+  const festa = await prisma.festa.findUnique({
+    where: { id: festaId },
+    select: { marcaId: true, tema: true, aniversariante: true, aniversariantes: true, marca: { select: { nome: true } } },
+  });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+
+  const anivs = parseAniversariantes(festa.aniversariantes);
+  const nomes = nomesAniversariantes(anivs) || festa.aniversariante || "";
+  const idade = anivs[0]?.idade;
+  const tema = (festa.tema || "").trim();
+  const fallback = tituloCapaFesta(anivs, festa.aniversariante) || "Que festa inesquecível!";
+
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: true as const, texto: fallback.slice(0, 60) };
+
+  const sistema = `Você escreve o TÍTULO DA CAPA (a 1ª tela, o gancho que segura o dedo de quem rola o feed) de um vídeo de festa infantil do buffet "${festa.marca.nome}". Regras ESTRITAS:
+- UMA frase curta e forte, no MÁXIMO 52 caracteres.
+- CITE o(s) nome(s) da(s) criança(s); use a idade se fizer sentido.
+- Tom alegre e brasileiro, que dá vontade de assistir.
+- No MÁXIMO 1 emoji (pode ser nenhum).
+- Sem aspas, sem hashtag.`;
+  const pedido = `${anivs.length > 1 ? "Aniversariantes" : "Aniversariante"}: ${nomes || "uma criança"}${idade != null ? `, ${idade} anos` : ""}${tema ? `, tema ${tema}` : ""}.`;
+
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-4o-mini", temperature: 0.9, max_tokens: 40, messages: [{ role: "system", content: sistema }, { role: "user", content: pedido }] }),
+    });
+    if (!resp.ok) return { ok: true as const, texto: fallback.slice(0, 60) };
+    const data = await resp.json();
+    const raw = data?.choices?.[0]?.message?.content;
+    const texto = raw ? String(raw).trim().replace(/^["']|["']$/g, "").slice(0, 60) : fallback;
+    return { ok: true as const, texto: texto || fallback.slice(0, 60) };
+  } catch {
+    return { ok: true as const, texto: fallback.slice(0, 60) };
   }
 }
 

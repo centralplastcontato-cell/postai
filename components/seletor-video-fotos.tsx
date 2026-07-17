@@ -7,7 +7,7 @@
 
 import { useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo } from "@/app/actions/festas";
+import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo } from "@/app/actions/festas";
 import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarNarracaoVideo, removerNarracaoVideo } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
@@ -73,6 +73,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
   const [textoFinal, setTextoFinal] = useState<string>(textoFinalInicial || ""); // mensagem do slide final
   const [tituloCapa, setTituloCapa] = useState<string>(tituloCapaInicial || ""); // título da capa (vídeo de festa)
+  const [gerandoTitulo, setGerandoTitulo] = useState(false); // a Bia sugerindo o título da capa
   const [gerandoTexto, setGerandoTexto] = useState(false); // a Bia escrevendo o texto final
   // LEGENDAS por foto (só no vídeo temático): a copy que aparece embaixo da imagem no vídeo.
   const [textos, setTextos] = useState<Record<string, string>>(textosIniciais);
@@ -149,6 +150,16 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       if (r.ok && r.texto) setTextoFinal(r.texto);
     } catch {}
     setGerandoTexto(false);
+  }
+  // A Bia sugere o TÍTULO DA CAPA (o gancho da 1ª tela) — só no vídeo de festa.
+  async function biaEscreveTitulo() {
+    if (tematicoId) return;
+    setGerandoTitulo(true);
+    try {
+      const r = await gerarTituloCapaVideo(festaId);
+      if (r.ok && r.texto) setTituloCapa(r.texto);
+    } catch {}
+    setGerandoTitulo(false);
   }
   // A Bia escreve a COPY do vídeo (frases em ~1 a cada 3 fotos, com começo-meio-fim).
   // Salva a seleção antes: a Bia escreve SOBRE as fotos que estão na sequência agora.
@@ -284,9 +295,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             <div className="mt-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-white">✍️ Título da capa <span className="font-normal text-muted">(a frase grande na 1ª tela do vídeo)</span></span>
-                {tituloCapa.trim() && (
-                  <button type="button" onClick={() => setTituloCapa("")} title="Voltar pro título automático" className="shrink-0 rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white transition hover:bg-vermelho">✕ usar o automático</button>
-                )}
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {tituloCapa.trim() && (
+                    <button type="button" onClick={() => setTituloCapa("")} title="Voltar pro título automático" className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white transition hover:bg-vermelho">✕ usar o automático</button>
+                  )}
+                  <button type="button" onClick={biaEscreveTitulo} disabled={gerandoTitulo} title="A Bia sugere um título pra capa (usa os nomes, a idade e o tema)" className="rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-60">{gerandoTitulo ? "✍️ escrevendo…" : "✨ Bia escreve"}</button>
+                </div>
               </div>
               <input
                 type="text"
