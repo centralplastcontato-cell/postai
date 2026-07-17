@@ -263,6 +263,44 @@ const GUIA: Record<Template, string> = {
     'Crie uma VITRINE que mostra a VARIEDADE do buffet em fotos reais (ex: comidinhas, brinquedos, festas). O "titulo" é uma chamada CURTA e gostosa (2 a 4 palavras, ex: "Comidinhas deliciosas!", "Diversão garantida"). O "texto" é um subtítulo curto e convidativo (ex: "Muitas opções que todo mundo ama!"). NÃO invente preço/promoção. As fotos vêm do banco automaticamente.',
 };
 
+// ÂNGULOS de DICA (conteúdo) — lista AMPLA de assuntos pra uma festa infantil. Sem isso, o
+// gpt-4o-mini travava sempre em "decoração/festa temática" (era o assunto mais óbvio) e o dono
+// regenerava sem sair disso. A cada dica SEM tema definido, sorteamos um destes pra variar de
+// verdade — comida, horário, convidados, segurança, orçamento, brincadeiras, etc. A marca é o
+// LOCAL da festa: nenhum ângulo manda "procurar/escolher local" (o sistema já proíbe isso).
+const ANGULOS_DICA = [
+  "quanto tempo antes começar a organizar a festa",
+  "como definir quantas crianças convidar",
+  "o melhor horário pra festa conforme a idade das crianças",
+  "quando e como enviar os convites",
+  "montar um cardápio que agrada crianças E adultos",
+  "quanto de comida calcular por criança",
+  "opções pra crianças com alergia ou restrição alimentar",
+  "manter as crianças hidratadas e com lanchinho ao longo da festa",
+  "a duração ideal de uma festa infantil sem cansar",
+  "brincadeiras e atividades pra diferentes idades ao mesmo tempo",
+  "o que muda na festa de 1 aninho (bebê) x criança maior",
+  "lembrancinhas simples que as crianças amam",
+  "como organizar a hora do parabéns sem correria",
+  "dicas pra registrar as melhores fotos e vídeos da festa",
+  "como envolver e acolher os pais convidados",
+  "cuidados de segurança com as crianças durante a festa",
+  "como fechar a festa quando o sono/cansaço bate",
+  "como economizar na festa sem perder a graça",
+  "um checklist do que não pode faltar no dia da festa",
+  "delegar tarefas pra os pais também curtirem a festa",
+  "festa no calor: conforto e hidratação das crianças",
+  "como escolher a melhor data (fugir de feriado e véspera de aula)",
+  "diversão de verdade: menos telas, mais brincadeira",
+  "como incluir crianças tímidas ou com necessidades diferentes",
+  "combinar comidinhas doces e salgadas sem desperdício",
+  "o que fazer pra o aniversariante aproveitar a própria festa",
+];
+
+function anguloDicaAleatorio(): string {
+  return ANGULOS_DICA[Math.floor(Math.random() * ANGULOS_DICA.length)];
+}
+
 // Formato de JSON esperado por template (a Promoção pede oferta/validade).
 const FORMATO_JSON: Record<Template, string> = {
   promocao: `{
@@ -452,9 +490,16 @@ async function chatOpenAI(key: string, body: object, tentativas = 3): Promise<st
 async function gerarTexto(marca: Marca, template: Template, tema?: string, travas?: Travas): Promise<Gerado> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new ErroOpenAI("A chave da OpenAI não está configurada (OPENAI_API_KEY).");
-  let pedido = tema?.trim()
-    ? `${GUIA[template]} Tema/assunto sugerido: "${tema.trim()}".`
-    : `${GUIA[template]} Escolha um ângulo novo e útil.`;
+  let pedido: string;
+  if (tema?.trim()) {
+    pedido = `${GUIA[template]} Tema/assunto sugerido: "${tema.trim()}".`;
+  } else if (template === "dica") {
+    // Sem tema, a dica travava em decoração/festa temática. Sorteia um assunto da lista ampla.
+    const ang = anguloDicaAleatorio();
+    pedido = `${GUIA.dica} O ASSUNTO desta dica é: "${ang}". Fique NESSE assunto e dê uma dica concreta e específica. NÃO fale de decoração nem de festa temática, a menos que o próprio assunto peça.`;
+  } else {
+    pedido = `${GUIA[template]} Escolha um ângulo novo e útil.`;
+  }
   // A oferta/validade digitadas pelo usuário são FIXAS — a IA não pode inventar outras.
   const fixos: string[] = [];
   if (travas?.oferta) fixos.push(`a oferta/desconto é EXATAMENTE "${travas.oferta}"`);
@@ -838,7 +883,11 @@ export async function regerarPublicacao(id: string) {
 
   let gerado: Gerado;
   try {
-    gerado = await gerarTexto(p.marca, template, p.tema ?? undefined, travas);
+    // "dica": NÃO reusa o tema salvo — senão regerar fica preso no mesmo assunto (ex: decoração).
+    // Passa undefined pra sortear um ângulo novo a cada clique. Os outros templates preservam o
+    // tema (a promoção/preço/depoimento precisam do assunto fixo).
+    const temaRegerar = template === "dica" ? undefined : (p.tema ?? undefined);
+    gerado = await gerarTexto(p.marca, template, temaRegerar, travas);
   } catch (e) {
     console.error("Erro ao regerar publicação:", e);
     return { ok: false as const, erro: "Não consegui regerar agora." };
@@ -895,7 +944,8 @@ export async function regerarComoNova(id: string) {
   return gerarPublicacao({
     marcaId: p.marcaId,
     template,
-    tema: p.tema ?? undefined,
+    // "dica": sorteia um assunto novo em vez de repetir o tema salvo (variedade ao "regerar").
+    tema: template === "dica" ? undefined : (p.tema ?? undefined),
     data: hojeBRT,
     oferta: str(ex.ofertaTravada),
     validade: str(ex.validadeTravada),
