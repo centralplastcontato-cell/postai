@@ -467,9 +467,9 @@ export async function gerarItemAgenda(marcaId: string, item: ItemAgenda): Promis
       // recebe as 4 fotos das bolinhas; os demais templates, a foto única de fundo.
       const templateFeed = item.template ?? "dica";
       const ehMosaico = templateFeed === "mosaico";
-      // DICA é a exceção do "foto-primeiro": o tema nascido da foto travava o conteúdo em
-      // decoração/festa temática (a foto é de festa). Mandamos tema VAZIO → o gerarTexto sorteia
-      // um assunto da lista ampla (comida, horário, segurança, orçamento…). A foto vira só fundo.
+      // DICA é FOTO-PRIMEIRO: o texto NASCE da descrição da foto do plano (imagem sempre conversa
+      // com o texto) — mas como uma DICA útil, não "olha que decoração linda". Tema vazio pra não
+      // reusar a frase-tema do plano; o gerarTexto usa a fotoDesc.
       const temaFeed = templateFeed === "dica" ? "" : item.tema;
       r = await gerarPublicacao({
         marcaId,
@@ -479,6 +479,7 @@ export async function gerarItemAgenda(marcaId: string, item: ItemAgenda): Promis
         corFundo,
         categoria: item.categoriaFoto,
         imagemUrl: ehMosaico ? undefined : fotos[0]?.url,
+        fotoDesc: templateFeed === "dica" ? fotos[0]?.descricao : undefined,
         fotos: ehMosaico ? fotos.map((f) => f.url) : undefined,
       });
     }

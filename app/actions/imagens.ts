@@ -77,6 +77,32 @@ export async function sortearImagemBanco(marcaId: string, categoria?: string): P
   return img.url;
 }
 
+// Sorteia UMA foto do banco (rodízio: menos usada, desempate pela mais antiga) que TENHA
+// descrição — pro FOTO-PRIMEIRO da DICA: a foto vem antes e o texto nasce do que ela mostra.
+// Só devolve foto COM descrição (a IA precisa dela pra escrever a dica); sem nenhuma, devolve
+// null e o post cai no fundo colorido. `excluirUrl` faz o "regerar" trocar de foto. Incrementa
+// o uso (mantém o rodízio honesto).
+export async function sortearFotoComDescricao(
+  marcaId: string,
+  categoria?: string,
+  excluirUrl?: string,
+): Promise<{ id: string; url: string; descricao: string } | null> {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return null;
+  const comDesc = { NOT: { descricao: "" } };
+  const excl = excluirUrl ? { url: { not: excluirUrl } } : {};
+  const pick = (where: object) =>
+    prisma.imagemMarca.findFirst({ where, orderBy: [{ usos: "asc" }, { criadoEm: "asc" }], select: { id: true, url: true, descricao: true } });
+  let img =
+    (categoria && categoria !== "geral" ? await pick({ marcaId, categoria, ...PODE_DIVULGAR, ...comDesc, ...excl }) : null) ||
+    (await pick({ marcaId, ...PODE_DIVULGAR, ...comDesc, ...excl })) ||
+    // Só sobrou a foto que a gente queria evitar? Melhor repetir foto do que sair sem tema.
+    (excluirUrl ? await pick({ marcaId, ...PODE_DIVULGAR, ...comDesc }) : null);
+  if (!img) return null;
+  await prisma.imagemMarca.update({ where: { id: img.id }, data: { usos: { increment: 1 } } }).catch(() => {});
+  return { id: img.id, url: img.url, descricao: img.descricao || "" };
+}
+
 // Pega N fotos DISTINTAS do banco em rodízio (as N menos usadas, desempate pela
 // mais antiga) e incrementa o uso de todas de uma vez. Pro Mosaico, que mostra
 // várias fotos juntas. Se a categoria pedida não tiver fotos suficientes, completa

@@ -11,7 +11,7 @@ import { TEMPLATES, type Template } from "@/lib/feed-templates";
 import { categoriaDoTemplate } from "@/lib/categorias";
 import { planoTemStory, rotuloPlano, ehTrial, MSG_TRIAL_POSTAR } from "@/lib/plano";
 import { planoDaMarca, checarLimiteFeed, checarCreditoTrial } from "@/lib/limites";
-import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto, escolherImagensPorTema } from "@/app/actions/imagens";
+import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto, escolherImagensPorTema, sortearFotoComDescricao } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import type { Marca } from "@prisma/client";
 
@@ -487,14 +487,19 @@ async function chatOpenAI(key: string, body: object, tentativas = 3): Promise<st
   throw new ErroOpenAI("A OpenAI está instável agora. Tente de novo em instantes.");
 }
 
-async function gerarTexto(marca: Marca, template: Template, tema?: string, travas?: Travas): Promise<Gerado> {
+async function gerarTexto(marca: Marca, template: Template, tema?: string, travas?: Travas, fotoDesc?: string): Promise<Gerado> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new ErroOpenAI("A chave da OpenAI não está configurada (OPENAI_API_KEY).");
   let pedido: string;
-  if (tema?.trim()) {
+  if (template === "dica" && fotoDesc?.trim()) {
+    // FOTO-PRIMEIRO: a dica NASCE da foto que a acompanha — assim a imagem SEMPRE conversa com o
+    // texto. Uma dica útil INSPIRADA no que a foto mostra (mesa de doces → quantos docinhos; brinquedo
+    // → brincadeira por idade; espaço → conforto), nunca "olha que decoração linda".
+    pedido = `${GUIA.dica} A foto que acompanha o post mostra: "${fotoDesc.trim()}". Escreva uma DICA prática, ESPECÍFICA e ACIONÁVEL, ligada ao que a foto mostra, útil pra uma família que vai fazer a festa (ex: mesa de doces → quantos docinhos por criança; brinquedo → brincadeira por faixa etária; bolo → como escolher o tamanho/servir; salão cheio → como organizar a hora do parabéns). Traga um número, um horário, uma quantidade ou um passo concreto sempre que der. EVITE conselho genérico tipo "escolha um tema que as crianças amam". NÃO descreva a foto nem elogie a decoração, e NÃO invente nada que não esteja na descrição.`;
+  } else if (tema?.trim()) {
     pedido = `${GUIA[template]} Tema/assunto sugerido: "${tema.trim()}".`;
   } else if (template === "dica") {
-    // Sem tema, a dica travava em decoração/festa temática. Sorteia um assunto da lista ampla.
+    // Sem foto nem tema (fundo colorido): sorteia um assunto da lista ampla pra variar de verdade.
     const ang = anguloDicaAleatorio();
     pedido = `${GUIA.dica} O ASSUNTO desta dica é: "${ang}". Fique NESSE assunto e dê uma dica concreta e específica. NÃO fale de decoração nem de festa temática, a menos que o próprio assunto peça.`;
   } else {
@@ -617,6 +622,7 @@ export async function gerarPublicacao(input: {
   ladoB?: string; // enquete: lado B (ex: Docinhos)
   imagemUrl?: string; // foto de fundo ESCOLHIDA no formulário (banco/upload) — prioridade sobre a automática
   fotos?: string[]; // mosaico/vitrine: fotos JÁ escolhidas (plano da Bia, foto-primeiro) — o tema nasceu delas
+  fotoDesc?: string; // dica: descrição da foto escolhida (o piloto passa a do plano) — o texto nasce dela
 }) {
   const g = await guardaMarca(input.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -650,9 +656,21 @@ export async function gerarPublicacao(input: {
     if (lim.bloqueia) return { ok: false as const, erro: `O pacote ${rotuloPlano(plano)} permite ${lim.limite} post${lim.limite > 1 ? "s" : ""} de feed por dia — esse dia já tem ${lim.jaTem}. Escolha outro dia.` };
   }
 
+  // Templates com foto (dica etc.): prioriza FOTO REAL do banco. `querFoto` decidido aqui em cima
+  // porque a DICA é FOTO-PRIMEIRO — escolhe a foto ANTES do texto pra o texto nascer dela.
+  const querFoto = input.comFoto === undefined ? USA_FOTO[template] : input.comFoto;
+  let fotoDica: { url: string; descricao: string } | null = null;
+  if (template === "dica" && querFoto) {
+    // Foto escolhida pelo dono (imagemUrl) ou mandada pelo piloto (imagemUrl+fotoDesc) tem prioridade;
+    // senão sorteia uma do banco em rodízio. Sem foto COM descrição → null → cai no fundo colorido.
+    if (input.imagemUrl) fotoDica = { url: input.imagemUrl, descricao: input.fotoDesc?.trim() || "" };
+    else fotoDica = await sortearFotoComDescricao(marca.id, input.categoria);
+  }
+
   let gerado: Gerado;
   try {
-    gerado = await gerarTexto(marca, template, input.tema, travas);
+    // A dica nasce da DESCRIÇÃO da foto (foto-primeiro) — a imagem sempre conversa com o texto.
+    gerado = await gerarTexto(marca, template, input.tema, travas, fotoDica?.descricao);
   } catch (e) {
     console.error("Erro ao gerar publicação:", e);
     const msg = e instanceof ErroOpenAI ? e.message : "Não consegui gerar agora. Tente de novo em instantes.";
@@ -681,7 +699,6 @@ export async function gerarPublicacao(input: {
   // Templates com foto: prioriza FOTO REAL do banco da marca (da categoria pedida,
   // ex: dica de cardápio → foto de comida); só se o banco estiver vazio é que a IA
   // gera um fundo decorativo abstrato. (Promoção/Divulgação usam fundo colorido.)
-  const querFoto = input.comFoto === undefined ? USA_FOTO[template] : input.comFoto;
   let avisoFoto = false; // usuário PEDIU foto (Story Foto/Faixa) mas o banco estava vazio
   if (template === "mosaico") {
     // 4 fotos reais no extra: as do plano da Bia (foto-primeiro) ou escolhidas pelo TEMA.
@@ -689,6 +706,10 @@ export async function gerarPublicacao(input: {
   } else if (template === "vitrine") {
     // Vitrine: 6 fotos reais no extra (plano da Bia ou escolhidas pelo tema).
     await aplicarFotosMosaico(criado.id, marca.id, input.categoria, 6, input.tema, input.fotos).catch(() => {});
+  } else if (template === "dica") {
+    // FOTO-PRIMEIRO: anexa a foto que já foi escolhida lá em cima (o texto nasceu da descrição dela).
+    // Sem foto com descrição no banco → fica sem imagem = fundo colorido da marca (nunca briga).
+    if (fotoDica?.url) await definirImagemPublicacao({ id: criado.id, url: fotoDica.url }).catch(() => {});
   } else if (input.imagemUrl) {
     // Foto ESCOLHIDA pelo dono no formulário (banco/upload) — tem prioridade sobre a automática.
     await definirImagemPublicacao({ id: criado.id, url: input.imagemUrl }).catch(() => {});
@@ -881,13 +902,19 @@ export async function regerarPublicacao(id: string) {
     categoria = typeof ex.categoria === "string" ? ex.categoria : undefined;
   } catch {}
 
+  // "dica" é FOTO-PRIMEIRO também no regerar: TROCA de foto (exclui a atual, p.imagemUrl) e o texto
+  // nasce da nova — assim cada clique traz outra foto E outra dica, sempre casando imagem e texto.
+  const fotoDicaRe = template === "dica" && USA_FOTO.dica
+    ? await sortearFotoComDescricao(p.marcaId, categoria, p.imagemUrl || undefined)
+    : null;
+
   let gerado: Gerado;
   try {
     // "dica": NÃO reusa o tema salvo — senão regerar fica preso no mesmo assunto (ex: decoração).
-    // Passa undefined pra sortear um ângulo novo a cada clique. Os outros templates preservam o
-    // tema (a promoção/preço/depoimento precisam do assunto fixo).
+    // O texto nasce da foto nova (fotoDicaRe.descricao); sem foto no banco, cai num assunto
+    // sorteado (fundo colorido). Os outros templates preservam o tema (promoção/preço/depoimento).
     const temaRegerar = template === "dica" ? undefined : (p.tema ?? undefined);
-    gerado = await gerarTexto(p.marca, template, temaRegerar, travas);
+    gerado = await gerarTexto(p.marca, template, temaRegerar, travas, fotoDicaRe?.descricao);
   } catch (e) {
     console.error("Erro ao regerar publicação:", e);
     return { ok: false as const, erro: "Não consegui regerar agora." };
@@ -915,6 +942,10 @@ export async function regerarPublicacao(id: string) {
     await aplicarFotosMosaico(id, p.marcaId, categoria, 4, p.tema ?? undefined).catch(() => {});
   } else if (template === "vitrine") {
     await aplicarFotosMosaico(id, p.marcaId, categoria, 6, p.tema ?? undefined).catch(() => {});
+  } else if (template === "dica") {
+    // Troca pela foto nova (o texto nasceu dela). Sem foto no banco → tira a imagem = fundo colorido.
+    if (fotoDicaRe?.url) await definirImagemPublicacao({ id, url: fotoDicaRe.url }).catch(() => {});
+    else await removerImagemPublicacao(id).catch(() => {});
   }
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const };
