@@ -86,6 +86,9 @@ export function montarDadosAlbum(
     googleReviewUrl: extras.googleReviewUrl ?? null,
     campanha: extras.campanha ?? null,
     musicaUrl: extras.musicaUrl ?? null,
+    // Prazo pra baixar: 15 dias A PARTIR DA FESTA. O componente mostra a contagem regressiva
+    // (nudge pros pais baixarem logo). ISO — os dias são calculados no cliente (hora do visitante).
+    expiraEm: new Date(festa.data.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString(),
     preview: extras.preview,
   };
 }

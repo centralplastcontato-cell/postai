@@ -40,6 +40,7 @@ export type AlbumData = {
     ctaTexto: string;
     ctaUrl: string | null;
   } | null;
+  expiraEm: string | null; // ISO: prazo pra baixar as fotos (15 dias após a festa). Vira contagem regressiva.
   preview: boolean;
 };
 
@@ -75,11 +76,79 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
 
   const [aberta, setAberta] = useState<number | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  // download: false = parado | "todas" = zip em andamento | número = baixando aquela foto
+  const [baixando, setBaixando] = useState<false | "todas" | number>(false);
+  // contagem regressiva (calculada no CLIENTE, com a hora do visitante — evita divergência de SSR)
+  const [dias, setDias] = useState<number | null>(null);
 
   const mostrarToast = useCallback((msg: string) => {
     setToast(msg);
     window.setTimeout(() => setToast(null), 2800);
   }, []);
+
+  useEffect(() => {
+    if (!dados.expiraEm) return;
+    setDias(Math.ceil((new Date(dados.expiraEm).getTime() - Date.now()) / 86400000));
+  }, [dados.expiraEm]);
+
+  // Nome-base do arquivo a partir do título ("Lourenço fez 1!" → "lourenco-fez-1").
+  const nomeBase = useCallback(() => {
+    const s = (dados.titulo || "fotos-da-festa")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+    return s || "fotos-da-festa";
+  }, [dados.titulo]);
+
+  // Dispara o download de um blob no navegador (cria <a download> temporário).
+  function salvarBlob(blob: Blob, nomeArquivo: string) {
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(href), 4000);
+  }
+
+  // Baixa UMA foto (as URLs do Blob têm CORS liberado, então dá pra buscar do navegador).
+  async function baixarUma(url: string, i: number) {
+    if (baixando !== false) return;
+    setBaixando(i);
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error("fetch");
+      salvarBlob(await r.blob(), `${nomeBase()}-${String(i + 1).padStart(2, "0")}.jpg`);
+    } catch {
+      mostrarToast("😕 Não consegui baixar agora. Tenta de novo.");
+    }
+    setBaixando(false);
+  }
+
+  // Baixa TODAS as fotos num .zip (monta o zip no próprio navegador, com jszip).
+  async function baixarTodas() {
+    if (baixando !== false || todas.length === 0) return;
+    setBaixando("todas");
+    try {
+      const { default: JSZip } = await import("jszip");
+      const zip = new JSZip();
+      let n = 0;
+      for (let i = 0; i < todas.length; i++) {
+        try {
+          const r = await fetch(todas[i].url);
+          if (!r.ok) continue;
+          zip.file(`${String(i + 1).padStart(2, "0")}.jpg`, await r.blob());
+          n++;
+        } catch { /* pula a que falhar, não trava o resto */ }
+      }
+      if (n === 0) throw new Error("nenhuma");
+      salvarBlob(await zip.generateAsync({ type: "blob" }), `${nomeBase()}.zip`);
+      mostrarToast(`✅ ${n} foto${n > 1 ? "s" : ""} baixada${n > 1 ? "s" : ""}!`);
+    } catch {
+      mostrarToast("😕 Não consegui baixar as fotos agora. Tenta de novo.");
+    }
+    setBaixando(false);
+  }
 
   const fechar = useCallback(() => setAberta(null), []);
   const proxima = useCallback(() => setAberta((i) => (i === null ? i : (i + 1) % todas.length)), [todas.length]);
@@ -181,11 +250,12 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
             <button
-              onClick={() => mostrarToast("⬇️ No álbum real, isso baixa todas as fotos de uma vez.")}
-              className="rounded-full bg-white px-5 py-2.5 text-sm font-bold shadow-sm transition hover:scale-[1.03] [text-shadow:none]"
+              onClick={baixarTodas}
+              disabled={baixando !== false}
+              className="rounded-full bg-white px-5 py-2.5 text-sm font-bold shadow-sm transition hover:scale-[1.03] disabled:cursor-progress disabled:opacity-70 [text-shadow:none]"
               style={{ color: acento }}
             >
-              ⬇️ Baixar todas
+              {baixando === "todas" ? "⏳ Baixando…" : "⬇️ Baixar todas"}
             </button>
             <button
               onClick={compartilhar}
@@ -194,6 +264,13 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
               💜 Compartilhar
             </button>
           </div>
+
+          {/* Contagem regressiva — nudge pros pais baixarem logo (15 dias a partir da festa). */}
+          {dias !== null && dias > 0 && (
+            <p className="mt-4 text-xs font-semibold text-white/90 [text-shadow:0_1px_4px_rgba(0,0,0,0.4)]">
+              ⏳ Baixe logo! As fotos ficam disponíveis por mais <strong className="underline decoration-white/50 underline-offset-2">{dias} {dias === 1 ? "dia" : "dias"}</strong>.
+            </p>
+          )}
         </div>
 
         {visual.padrao && (
@@ -421,10 +498,11 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
           <div className="px-6 pb-6 pt-3 text-center" onClick={(e) => e.stopPropagation()}>
             {todas[aberta].desc && <p className="mx-auto max-w-lg text-sm text-white/80">{todas[aberta].desc}</p>}
             <button
-              onClick={() => mostrarToast("⬇️ No álbum real, isso baixa essa foto.")}
-              className="mt-3 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/20"
+              onClick={() => baixarUma(todas[aberta].url, aberta)}
+              disabled={baixando !== false}
+              className="mt-3 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20 disabled:cursor-progress disabled:opacity-70"
             >
-              ⬇️ Baixar esta foto
+              {baixando === aberta ? "⏳ Baixando…" : "⬇️ Baixar esta foto"}
             </button>
           </div>
         </div>
