@@ -14,11 +14,10 @@ import { Mp3Encoder } from "@breezystack/lamejs";
 import { vozValida, MODELO_VOZ, DIRECAO_PADRAO } from "@/lib/vozes";
 
 const TAXA = 24000; // 24 kHz mono — o que o Google devolve e o que o jingle já está
-// A voz é ATENUADA na mesma medida em que o jingle entra (0,84 + 0,16 = 1,0). Sem isso a soma
-// estoura o teto nos picos da locução e o corte vira crepitação — justo nas palavras que a voz
-// enfatiza, que são as que vendem.
-const VOL_VOZ = 0.84;
-const VOL_JINGLE = 0.16; // a música fica bem por baixo da voz
+// A voz é ATENUADA na mesma medida em que a música entra (a soma nunca passa de 1,0). Sem isso a
+// soma estoura o teto nos picos da locução e o corte vira crepitação — justo nas palavras que a
+// voz enfatiza, que são as que vendem. `montarTrilha` calcula essa cessão amostra a amostra.
+const VOL_JINGLE = 0.16; // volume PADRÃO da música por baixo da voz (o slider muda isso)
 const RABICHO_S = 1.2; // um tiquinho de jingle depois que a voz termina (não corta seco)
 const FADE_S = 1.5; // o jingle some suave no final
 
@@ -106,29 +105,70 @@ function pcmDoWav(buf: Buffer): Int16Array {
   throw new Error("WAV sem bloco de dados.");
 }
 
-// Soma a voz com o jingle (que dá a volta se for mais curto) e devolve o MP3. `volMusica` (0..0,40)
-// deixa o dono regular a MÚSICA de fundo: 0 = sem música (voz limpa), maior = música mais alta.
-// A voz cede o espaço que a música ocupa (volVoz = 1 - volMusica) pra soma nunca estourar o teto.
-function misturar(voz: Int16Array, jingle: Int16Array | null, volMusica?: number): Buffer {
-  const volJingle = Math.max(0, Math.min(0.4, volMusica ?? VOL_JINGLE));
-  const total = voz.length + Math.round(RABICHO_S * TAXA);
-  const fadeIni = Math.max(0, total - Math.round(FADE_S * TAXA));
-  const saida = new Int16Array(total);
-  const temJingle = !!jingle && jingle.length > 0 && volJingle > 0;
-  const volVoz = temJingle ? Math.max(0.6, 1 - volJingle) : 1; // sem/na música muda, a voz vai inteira
-  for (let i = 0; i < total; i++) {
-    let v = i < voz.length ? voz[i] * volVoz : 0;
-    if (temJingle) {
-      const fade = i >= fadeIni ? Math.max(0, 1 - (i - fadeIni) / (total - fadeIni)) : 1;
-      v += jingle![i % jingle!.length] * volJingle * fade;
-    }
-    saida[i] = Math.max(-32768, Math.min(32767, Math.round(v))); // trava de segurança
+const GAP_S = 1.0; // silêncio mínimo (só música) entre a 1ª e a 2ª fala
+const RAMP_S = 0.4; // rampa suave ao abaixar/subir a música na entrada/saída da voz (sem "pulo")
+
+// Monta a TRILHA completa (Int16) e devolve com a duração. Estrutura:
+//   [1ª fala + música baixinha] → [SÓ MÚSICA, mais cheia] → [2ª fala/CTA + música baixinha] → rabicho
+// Assim TODAS as fotos aparecem: a voz vende no começo, a música carrega o meio e a 2ª fala fecha
+// com o convite. `alvoSegundos` = tamanho do vídeo INTEIRO (todas as fotos) — a música estica até lá.
+// A música DUCKA (abaixa) sob as falas e sobe no meio; a soma nunca estoura (a voz cede o espaço dela).
+function montarTrilha(
+  voz1: Int16Array,
+  voz2: Int16Array | null,
+  jingle: Int16Array | null,
+  volMusica?: number,
+  alvoSegundos?: number,
+): { pcm: Int16Array; segundos: number } {
+  const temJingle = !!jingle && jingle.length > 0;
+  const volBaixo = temJingle ? Math.max(0, Math.min(0.4, volMusica ?? VOL_JINGLE)) : 0; // sob a voz
+  const volMeio = temJingle && volBaixo > 0 ? Math.min(0.5, Math.max(volBaixo, 0.3)) : volBaixo; // no meio (sem voz)
+  const gap = Math.round(GAP_S * TAXA);
+  const ramp = Math.round(RAMP_S * TAXA);
+  const tail = Math.round(RABICHO_S * TAXA);
+  const len1 = voz1.length;
+  const len2 = voz2 ? voz2.length : 0;
+
+  // Duração alvo (todas as fotos) — mas nunca menor que o necessário pra as falas caberem.
+  const alvo = alvoSegundos && alvoSegundos > 0 ? Math.round(alvoSegundos * TAXA) : 0;
+  let total: number, start2: number;
+  if (voz2) {
+    const minTotal = len1 + gap + len2 + tail;
+    total = Math.max(alvo, minTotal);
+    start2 = total - tail - len2; // a 2ª fala termina `tail` antes do fim
+    if (start2 < len1 + gap) { start2 = len1 + gap; total = start2 + len2 + tail; }
+  } else {
+    total = Math.max(alvo, len1 + tail);
+    start2 = -1;
   }
+
+  const fadeIni = Math.max(0, total - Math.round(FADE_S * TAXA)); // música some suave no fim
+  // Quão "dentro da voz" está a amostra i (1 = na voz, com rampa; 0 = só música) — pro ducking.
+  const dentro = (i: number, a: number, b: number) =>
+    i >= a && i < b ? 1 : i < a ? Math.max(0, 1 - (a - i) / ramp) : Math.max(0, 1 - (i - b) / ramp);
+
+  const saida = new Int16Array(total);
+  for (let i = 0; i < total; i++) {
+    const vz = i < len1 ? voz1[i] : voz2 && i >= start2 && i < start2 + len2 ? voz2[i - start2] : 0;
+    const ins = Math.max(dentro(i, 0, len1), voz2 ? dentro(i, start2, start2 + len2) : 0);
+    const volJ = volMeio + (volBaixo - volMeio) * ins; // ins=1 → baixo (sob a voz); ins=0 → cheio (meio)
+    let v = vz * (1 - volJ); // a voz cede o espaço da música → soma nunca passa do teto
+    if (temJingle && volJ > 0) {
+      const fade = i >= fadeIni ? Math.max(0, 1 - (i - fadeIni) / (total - fadeIni)) : 1;
+      v += jingle![i % jingle!.length] * volJ * fade;
+    }
+    saida[i] = Math.max(-32768, Math.min(32767, Math.round(v)));
+  }
+  return { pcm: saida, segundos: Math.round((total / TAXA) * 10) / 10 };
+}
+
+// Int16 → MP3 (lamejs), em quadros de 1152 amostras.
+function encodarMp3(pcm: Int16Array): Buffer {
   const enc = new Mp3Encoder(1, TAXA, 128);
   const partes: Uint8Array[] = [];
-  const BLOCO = 1152; // o MP3 é codificado em quadros desse tamanho
-  for (let i = 0; i < saida.length; i += BLOCO) {
-    const buf = enc.encodeBuffer(saida.subarray(i, Math.min(i + BLOCO, saida.length)));
+  const BLOCO = 1152;
+  for (let i = 0; i < pcm.length; i += BLOCO) {
+    const buf = enc.encodeBuffer(pcm.subarray(i, Math.min(i + BLOCO, pcm.length)));
     if (buf.length) partes.push(buf);
   }
   const fim = enc.flush();
@@ -136,13 +176,24 @@ function misturar(voz: Int16Array, jingle: Int16Array | null, volMusica?: number
   return Buffer.concat(partes.map((p) => Buffer.from(p)));
 }
 
-// Gera a narração completa e sobe no Blob. Devolve a URL e a duração (que decide quantas fotos
-// o vídeo leva — o motor dá ~2,3s por foto).
-export async function gerarNarracaoMp3(opts: { texto: string; vozId: string; direcao?: string; slugMarca: string; ref: string; volMusica?: number }): Promise<{ url: string; segundos: number }> {
+// Gera a narração completa e sobe no Blob. `texto2` = 2ª fala (CTA no fim, opcional). `alvoSegundos`
+// = tamanho do vídeo com TODAS as fotos (a música estica até lá). Devolve URL + duração real.
+export async function gerarNarracaoMp3(opts: {
+  texto: string;
+  texto2?: string;
+  vozId: string;
+  direcao?: string;
+  slugMarca: string;
+  ref: string;
+  volMusica?: number;
+  alvoSegundos?: number;
+}): Promise<{ url: string; segundos: number }> {
   const texto = opts.texto.trim();
   if (!texto) throw new Error("Sem texto pra narrar.");
 
-  const voz = await falar(texto, opts.vozId, opts.direcao || "");
+  const voz1 = await falar(texto, opts.vozId, opts.direcao || "");
+  const t2 = (opts.texto2 || "").trim();
+  const voz2 = t2 ? await falar(t2, opts.vozId, opts.direcao || "") : null;
 
   let jingle: Int16Array | null = null;
   const urlJingle = JINGLES_PCM[opts.slugMarca];
@@ -155,8 +206,8 @@ export async function gerarNarracaoMp3(opts: { texto: string; vozId: string; dir
     }
   }
 
-  const mp3 = misturar(voz, jingle, opts.volMusica);
-  const segundos = Math.round((voz.length / TAXA + RABICHO_S) * 10) / 10;
+  const { pcm, segundos } = montarTrilha(voz1, voz2, jingle, opts.volMusica, opts.alvoSegundos);
+  const mp3 = encodarMp3(pcm);
   const blob = await put(`narracoes/${opts.slugMarca}-${opts.ref}-${Date.now()}.mp3`, mp3, {
     access: "public",
     contentType: "audio/mpeg",

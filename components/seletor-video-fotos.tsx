@@ -8,7 +8,7 @@
 import { useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarNarracaoVideo, removerNarracaoVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 
@@ -84,12 +84,14 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // NARRAÇÃO: o briefing do dono → a Bia escreve o roteiro → escolhe a voz → OUVE → vai pro vídeo
   const [briefing, setBriefing] = useState("");
   const [roteiro, setRoteiro] = useState(narracao?.texto ?? "");
+  const [roteiro2, setRoteiro2] = useState(""); // 2ª fala (CTA no fim) — opcional; não persiste
   const [voz, setVoz] = useState(narracao?.voz || VOZ_PADRAO);
   const [estilo, setEstilo] = useState(narracao?.estilo || DIRECAO_PADRAO); // COMO a voz fala
   const [volMusica, setVolMusica] = useState(50); // volume da MÚSICA de fundo (0-100; 50 = padrão)
   const [audioUrl, setAudioUrl] = useState(narracao?.url ?? "");
   const [audioSeg, setAudioSeg] = useState(narracao?.segundos ?? 0);
   const [escrevendoRoteiro, setEscrevendoRoteiro] = useState(false);
+  const [escrevendoCta, setEscrevendoCta] = useState(false); // a Bia escrevendo a 2ª fala
   const [gerandoVoz, setGerandoVoz] = useState(false);
   const [msgVoz, setMsgVoz] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
 
@@ -214,13 +216,25 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setRoteiro(r.roteiro);
     setMsgVoz({ tipo: "ok", txt: "✓ Roteiro pronto — leia, ajuste se quiser e clique em 🔊 Ouvir." });
   }
+  // A Bia escreve a 2ª FALA (o CTA do fim — "acesse o site e faça seu orçamento…").
+  async function biaEscreveCta() {
+    if (!tematicoId) return;
+    setEscrevendoCta(true);
+    const r = await gerarCtaNarracao(tematicoId).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }));
+    setEscrevendoCta(false);
+    if (r.ok && r.cta) setRoteiro2(r.cta);
+  }
   async function ouvirNarracao() {
     if (!tematicoId) return;
     setGerandoVoz(true);
     setMsgVoz(null);
     // slider 0-100 → volume do jingle na mistura (50 = 0,16 padrão; 100 = 0,32; 0 = sem música).
     const musicaVol = Math.round((volMusica / 100) * 0.32 * 100) / 100;
-    const r = await gerarNarracaoVideo(tematicoId, roteiro, voz, estilo, musicaVol).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
+    // duração ALVO = o vídeo com TODAS as fotos (uma vira a capa) — a música estica até lá, e
+    // com a 2ª fala a voz volta no fim. ~2,3s por foto + 6s fixos (capa + slide final).
+    const nSlide = Math.max(1, sel.length - 1);
+    const alvoSegundos = Math.round(nSlide * 2.3 + 6);
+    const r = await gerarNarracaoVideo(tematicoId, roteiro, voz, estilo, musicaVol, roteiro2, alvoSegundos).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
     setGerandoVoz(false);
     if (!r.ok) { setMsgVoz({ tipo: "erro", txt: r.erro || "Não consegui gerar a voz." }); return; }
     setAudioUrl(r.url);
@@ -379,7 +393,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 </button>
               </div>
 
-              {/* 2) o roteiro (editável) */}
+              {/* 2) o roteiro (editável) — a 1ª FALA, do começo do vídeo */}
               <textarea
                 value={roteiro}
                 onChange={(e) => setRoteiro(e.target.value)}
@@ -388,6 +402,26 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 placeholder="O roteiro da fala aparece aqui — dá pra editar cada palavra."
                 className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
               />
+
+              {/* 2b) a 2ª FALA (CTA no fim) — opcional. Com ela, TODAS as fotos entram: a voz fala no
+                   começo, a música carrega o meio, e a voz VOLTA no fim pra o convite. */}
+              <div className="mt-2.5 rounded-md border border-emerald-500/25 bg-emerald-500/[0.04] px-2.5 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-1.5">
+                  <span className="text-[11px] font-semibold text-white">🔁 Fala do final <span className="font-normal text-muted">(o convite — a voz volta no fim)</span></span>
+                  <button type="button" onClick={biaEscreveCta} disabled={escrevendoCta || gerandoVoz} title="A Bia escreve a fala final (CTA) — ex: acesse o site e faça seu orçamento" className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50">
+                    {escrevendoCta ? "✍️ escrevendo…" : "✨ Bia escreve o final"}
+                  </button>
+                </div>
+                <textarea
+                  value={roteiro2}
+                  onChange={(e) => setRoteiro2(e.target.value)}
+                  rows={2}
+                  maxLength={400}
+                  placeholder="Ex: Acesse www.castelodadiversao.com.br e faça seu orçamento agora mesmo!"
+                  className="mt-1.5 w-full rounded-md border border-linha bg-preto px-2 py-1.5 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+                />
+                <p className="mt-1 text-[10px] leading-snug text-muted/70">Deixe em branco = a voz fala só no começo e a música leva até o fim. Com uma fala aqui, a voz <strong className="text-white/70">volta no fim</strong> pra o convite — e <strong className="text-white/70">todas as fotos aparecem</strong>.</p>
+              </div>
 
               {/* 3) COMO A VOZ FALA (a direção) — é isso que tira o tom robótico: a voz obedece
                   esse briefing de verdade. Os botões preenchem, mas dá pra escrever o que quiser. */}
@@ -461,12 +495,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <audio src={audioUrl} controls className="h-8 w-full" />
                     {faltam > 0 ? (
                       <p className="mt-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug font-semibold text-amber-300">
-                        ⚠️ A voz tem <strong>{audioSeg}s</strong> e precisa de <strong>{precisa} fotos</strong> além da capa — faltam <strong>{faltam}</strong>. Adicione mais fotos (ou peça um roteiro mais curto), senão a fala é cortada no meio.
+                        ⚠️ As falas somam <strong>{audioSeg}s</strong> e não cabem nas fotos escolhidas — faltam <strong>{faltam}</strong>. Adicione mais fotos (ou encurte as falas), senão o convite do fim é cortado.
                       </p>
                     ) : (
                       <p className="mt-1 text-[10px] leading-snug text-emerald-300/90">
-                        A voz tem <strong>{audioSeg}s</strong> → o vídeo usa <strong>{precisa} fotos</strong> (a fala e as imagens terminam juntas). As com legenda entram na frente.
-                        {temFotos - 1 > precisa && <> As outras <strong>{temFotos - 1 - precisa}</strong> ficam de fora — quer todas? peça um roteiro mais longo.</>}
+                        🎵 Trilha de <strong>{audioSeg}s</strong> pronta — <strong>todas as suas fotos entram</strong> no vídeo (a voz fala no começo{roteiro2.trim() ? " e volta no fim pro convite" : ""}, e a música leva o meio). As com legenda entram na frente.
                       </p>
                     )}
                   </div>

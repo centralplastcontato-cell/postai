@@ -610,9 +610,59 @@ export async function gerarRoteiroNarracao(videoId: string, briefing: string, se
   }
 }
 
+// A Bia escreve a 2ª FALA (CTA) — a fala CURTA do FIM do vídeo, que convida a agir (fazer o
+// orçamento, acessar o site). NÃO persiste (fica no MP3 quando o dono gera a voz); só devolve o texto.
+export async function gerarCtaNarracao(videoId: string) {
+  const v = await prisma.videoTematico.findUnique({
+    where: { id: videoId },
+    include: { marca: { select: { nome: true, site: true, telefone: true } } },
+  });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const key = process.env.OPENAI_API_KEY;
+
+  const site = (v.marca.site || "").replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+  const fallback = site
+    ? `Acesse ${site} e faça seu orçamento agora mesmo!`
+    : "Chama a gente e garanta a festa do seu filho agora mesmo!";
+  if (!key) return { ok: true as const, cta: fallback };
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4.1",
+        response_format: { type: "json_object" },
+        temperature: 0.9,
+        messages: [
+          {
+            role: "system",
+            content: `Você escreve a FALA FINAL (CTA) de um vídeo do buffet infantil "${v.marca.nome}" — pra ser FALADA em voz alta no fim do vídeo. Regras:
+- UMA a DUAS frases CURTAS (no máximo ~18 palavras no total).
+- Tom empolgado e direto, convidando a pessoa a AGIR AGORA (fazer o orçamento / garantir a festa).
+${site ? `- Cite o site no fim: ${site} (deixe a URL na fala pra a voz ler).` : ""}${v.marca.telefone ? `\n- Pode convidar a chamar no WhatsApp.` : ""}
+- A marca É o lugar da festa; nunca mande procurar outro local.
+- Sem emoji, sem hashtag, sem marcação de cena. Só o que a voz fala.`,
+          },
+          { role: "user", content: `Tema do vídeo: "${v.titulo}". Escreva a fala final (CTA). Responda só com JSON: {"cta":"..."}` },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+    const data = await resp.json();
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { cta?: string };
+    const cta = (j.cta || "").trim().slice(0, 300);
+    return { ok: true as const, cta: cta || fallback };
+  } catch (e) {
+    console.error("Erro ao escrever o CTA da narração:", e);
+    return { ok: true as const, cta: fallback };
+  }
+}
+
 // Gera a VOZ (Google Chirp3-HD) já misturada com o jingle e guarda no Blob. O dono OUVE antes
 // de mandar montar o vídeo — trocar a voz e ouvir de novo custa centavos e leva 2 segundos.
-export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string, direcao?: string, volMusica?: number) {
+export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string, direcao?: string, volMusica?: number, texto2?: string, alvoSegundos?: number) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
     include: { marca: { select: { slug: true } } },
@@ -633,7 +683,11 @@ export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: 
   try {
     // volMusica: 0 = sem música | ~0,16 = padrão | maior = música mais alta. Clampa por segurança.
     const vm = typeof volMusica === "number" && isFinite(volMusica) ? Math.max(0, Math.min(0.4, volMusica)) : undefined;
-    const { url, segundos } = await gerarNarracaoMp3({ texto: t, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), volMusica: vm });
+    // 2ª fala (CTA no fim, opcional) e a duração ALVO do vídeo com TODAS as fotos — a música
+    // estica até lá pra nenhuma foto ficar de fora. Clampa a duração num intervalo são.
+    const t2 = (texto2 || "").trim().slice(0, 400);
+    const alvo = typeof alvoSegundos === "number" && isFinite(alvoSegundos) ? Math.max(10, Math.min(120, alvoSegundos)) : undefined;
+    const { url, segundos } = await gerarNarracaoMp3({ texto: t, texto2: t2 || undefined, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), volMusica: vm, alvoSegundos: alvo });
     await prisma.videoTematico.update({
       where: { id: videoId },
       data: { narracaoTexto: t, narracaoVoz: voz, narracaoEstilo: estilo, narracaoUrl: url, narracaoSeg: Math.round(segundos) },
