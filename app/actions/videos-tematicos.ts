@@ -612,7 +612,7 @@ export async function gerarRoteiroNarracao(videoId: string, briefing: string, se
 
 // Gera a VOZ (Google Chirp3-HD) já misturada com o jingle e guarda no Blob. O dono OUVE antes
 // de mandar montar o vídeo — trocar a voz e ouvir de novo custa centavos e leva 2 segundos.
-export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string, direcao?: string) {
+export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string, direcao?: string, volMusica?: number) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
     include: { marca: { select: { slug: true } } },
@@ -631,7 +631,9 @@ export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: 
   const estilo = (direcao ?? v.narracaoEstilo ?? "").trim().slice(0, 900);
   const antigo = v.narracaoUrl;
   try {
-    const { url, segundos } = await gerarNarracaoMp3({ texto: t, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6) });
+    // volMusica: 0 = sem música | ~0,16 = padrão | maior = música mais alta. Clampa por segurança.
+    const vm = typeof volMusica === "number" && isFinite(volMusica) ? Math.max(0, Math.min(0.4, volMusica)) : undefined;
+    const { url, segundos } = await gerarNarracaoMp3({ texto: t, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), volMusica: vm });
     await prisma.videoTematico.update({
       where: { id: videoId },
       data: { narracaoTexto: t, narracaoVoz: voz, narracaoEstilo: estilo, narracaoUrl: url, narracaoSeg: Math.round(segundos) },

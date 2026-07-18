@@ -86,6 +86,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [roteiro, setRoteiro] = useState(narracao?.texto ?? "");
   const [voz, setVoz] = useState(narracao?.voz || VOZ_PADRAO);
   const [estilo, setEstilo] = useState(narracao?.estilo || DIRECAO_PADRAO); // COMO a voz fala
+  const [volMusica, setVolMusica] = useState(50); // volume da MÚSICA de fundo (0-100; 50 = padrão)
   const [audioUrl, setAudioUrl] = useState(narracao?.url ?? "");
   const [audioSeg, setAudioSeg] = useState(narracao?.segundos ?? 0);
   const [escrevendoRoteiro, setEscrevendoRoteiro] = useState(false);
@@ -217,7 +218,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId) return;
     setGerandoVoz(true);
     setMsgVoz(null);
-    const r = await gerarNarracaoVideo(tematicoId, roteiro, voz, estilo).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
+    // slider 0-100 → volume do jingle na mistura (50 = 0,16 padrão; 100 = 0,32; 0 = sem música).
+    const musicaVol = Math.round((volMusica / 100) * 0.32 * 100) / 100;
+    const r = await gerarNarracaoVideo(tematicoId, roteiro, voz, estilo, musicaVol).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
     setGerandoVoz(false);
     if (!r.ok) { setMsgVoz({ tipo: "erro", txt: r.erro || "Não consegui gerar a voz." }); return; }
     setAudioUrl(r.url);
@@ -414,7 +417,21 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 <p className="mt-1 text-[10px] leading-snug text-muted/70">Escreva como se estivesse dirigindo um locutor no estúdio — <strong className="text-white/70">a voz obedece de verdade</strong>. Ex: “paulista descontraído, energia de showman de circo, abertura explosiva, sem gritaria forçada”.</p>
               </div>
 
-              {/* 4) voz + ouvir */}
+              {/* 4) VOLUME da música de fundo (entra por baixo da voz). 0 = voz limpa; 50 = padrão. */}
+              <div className="mt-2.5 rounded-md border border-linha bg-preto/40 px-2.5 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-white">🎵 Volume da música de fundo</span>
+                  <span className="text-[10px] font-semibold text-emerald-300">{volMusica === 0 ? "sem música" : volMusica === 50 ? "padrão" : `${volMusica}%`}</span>
+                </div>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span className="text-[10px] text-muted">🔈</span>
+                  <input type="range" min={0} max={100} step={5} value={volMusica} onChange={(e) => setVolMusica(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-emerald-500" aria-label="Volume da música de fundo" />
+                  <span className="text-[10px] text-muted">🔊</span>
+                </div>
+                <p className="mt-1 text-[10px] leading-snug text-muted/70">Arraste pra deixar a <strong className="text-white/70">música mais baixa ou mais alta</strong> por trás da voz. Tudo à esquerda = <strong className="text-white/70">só a voz</strong>, sem música. Vale ao clicar em <strong className="text-white/70">🔊 Ouvir</strong>.</p>
+              </div>
+
+              {/* 5) voz + ouvir */}
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 <select value={voz} onChange={(e) => setVoz(e.target.value)} className="input-base flex-1 py-1.5 text-[11px]" aria-label="Voz da narração">
                   <optgroup label="⭐ As que você aprovou">

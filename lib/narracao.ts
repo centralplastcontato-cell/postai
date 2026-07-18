@@ -106,19 +106,21 @@ function pcmDoWav(buf: Buffer): Int16Array {
   throw new Error("WAV sem bloco de dados.");
 }
 
-// Soma a voz com o jingle (que dá a volta se for mais curto) e devolve o MP3.
-function misturar(voz: Int16Array, jingle: Int16Array | null): Buffer {
+// Soma a voz com o jingle (que dá a volta se for mais curto) e devolve o MP3. `volMusica` (0..0,40)
+// deixa o dono regular a MÚSICA de fundo: 0 = sem música (voz limpa), maior = música mais alta.
+// A voz cede o espaço que a música ocupa (volVoz = 1 - volMusica) pra soma nunca estourar o teto.
+function misturar(voz: Int16Array, jingle: Int16Array | null, volMusica?: number): Buffer {
+  const volJingle = Math.max(0, Math.min(0.4, volMusica ?? VOL_JINGLE));
   const total = voz.length + Math.round(RABICHO_S * TAXA);
   const fadeIni = Math.max(0, total - Math.round(FADE_S * TAXA));
   const saida = new Int16Array(total);
-  const temJingle = !!jingle && jingle.length > 0;
+  const temJingle = !!jingle && jingle.length > 0 && volJingle > 0;
+  const volVoz = temJingle ? Math.max(0.6, 1 - volJingle) : 1; // sem/na música muda, a voz vai inteira
   for (let i = 0; i < total; i++) {
-    // Com jingle, a voz cede espaço (0,84) pra música (0,16) — a soma nunca passa do teto.
-    // Sem jingle, a voz vai inteira (não faz sentido abaixá-la à toa).
-    let v = i < voz.length ? voz[i] * (temJingle ? VOL_VOZ : 1) : 0;
+    let v = i < voz.length ? voz[i] * volVoz : 0;
     if (temJingle) {
       const fade = i >= fadeIni ? Math.max(0, 1 - (i - fadeIni) / (total - fadeIni)) : 1;
-      v += jingle![i % jingle!.length] * VOL_JINGLE * fade;
+      v += jingle![i % jingle!.length] * volJingle * fade;
     }
     saida[i] = Math.max(-32768, Math.min(32767, Math.round(v))); // trava de segurança
   }
@@ -136,7 +138,7 @@ function misturar(voz: Int16Array, jingle: Int16Array | null): Buffer {
 
 // Gera a narração completa e sobe no Blob. Devolve a URL e a duração (que decide quantas fotos
 // o vídeo leva — o motor dá ~2,3s por foto).
-export async function gerarNarracaoMp3(opts: { texto: string; vozId: string; direcao?: string; slugMarca: string; ref: string }): Promise<{ url: string; segundos: number }> {
+export async function gerarNarracaoMp3(opts: { texto: string; vozId: string; direcao?: string; slugMarca: string; ref: string; volMusica?: number }): Promise<{ url: string; segundos: number }> {
   const texto = opts.texto.trim();
   if (!texto) throw new Error("Sem texto pra narrar.");
 
@@ -153,7 +155,7 @@ export async function gerarNarracaoMp3(opts: { texto: string; vozId: string; dir
     }
   }
 
-  const mp3 = misturar(voz, jingle);
+  const mp3 = misturar(voz, jingle, opts.volMusica);
   const segundos = Math.round((voz.length / TAXA + RABICHO_S) * 10) / 10;
   const blob = await put(`narracoes/${opts.slugMarca}-${opts.ref}-${Date.now()}.mp3`, mp3, {
     access: "public",
