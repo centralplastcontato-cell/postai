@@ -71,6 +71,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // foto escolhida pra CAPA (fotoId). "" = a 1ª foto vira capa automaticamente.
   const [capa, setCapa] = useState<string>(fotos.some((f) => f.id === capaInicial) ? capaInicial : "");
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
+  const [filtroCat, setFiltroCat] = useState<string>(""); // filtro por tipo de foto na hora de ADICIONAR ("" = todas)
   const [textoFinal, setTextoFinal] = useState<string>(textoFinalInicial || ""); // mensagem do slide final
   const [tituloCapa, setTituloCapa] = useState<string>(tituloCapaInicial || ""); // título da capa (vídeo de festa)
   const [gerandoTitulo, setGerandoTitulo] = useState(false); // a Bia sugerindo o título da capa
@@ -262,6 +263,16 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const segs = sel.length ? Math.round(sel.length * 2.3 + 6) : 0;
   const escolhidas = sel.map((id) => fotos.find((f) => f.id === id)).filter((f): f is FotoView => !!f);
   const disponiveis = galeria.filter((f) => !sel.includes(f.id));
+  // FILTRO por tipo de foto (Festa, Espaço, Comida…): quais categorias existem entre as
+  // disponíveis, com contagem — pro dono achar rápido o tipo de foto que quer no vídeo.
+  const contagemCat = new Map<string, number>();
+  for (const f of disponiveis) contagemCat.set(f.momento, (contagemCat.get(f.momento) || 0) + 1);
+  const ordemCat = ["festa", "espaco", "brinquedos", "comida", "geral", "salao", "aniversariante", "parabens", "momentos"];
+  const catsDisponiveis = [...contagemCat.keys()].sort((a, b) => {
+    const ia = ordemCat.indexOf(a), ib = ordemCat.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  const disponiveisFiltradas = filtroCat ? disponiveis.filter((f) => f.momento === filtroCat) : disponiveis;
   // foto de exemplo pro mini-preview da moldura (uma do slideshow, não a capa)
   const fotoPrevFV = escolhidas.find((f) => f.id !== capa) || escolhidas[0] || galeria[0];
   const fotoPrev = fotoPrevFV?.url;
@@ -558,8 +569,24 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
               <p className="mb-2 text-[11px] text-muted">
                 {escolhidas.length > 0 ? "➕ Mais fotos" : "👆 Toque nas fotos na ordem que você quer"} — cada toque adiciona ao fim da sequência. Pra ~65s, escolha umas <strong className="text-white/80">25-28</strong>.
               </p>
+
+              {/* FILTRO por tipo de foto (Festa, Espaço, Comida…) — só aparece se houver 2+ tipos. */}
+              {catsDisponiveis.length >= 2 && (
+                <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-semibold text-muted">🔎 Mostrar:</span>
+                  <button type="button" onClick={() => setFiltroCat("")} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${filtroCat === "" ? "border-[#7c3aed] bg-[#7c3aed] text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+                    Todas ({disponiveis.length})
+                  </button>
+                  {catsDisponiveis.map((c) => (
+                    <button key={c} type="button" onClick={() => setFiltroCat(c)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${filtroCat === c ? "border-[#7c3aed] bg-[#7c3aed] text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+                      {LABEL[c] || c} ({contagemCat.get(c)})
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
-                {disponiveis.map((f) => {
+                {disponiveisFiltradas.map((f) => {
                   const ehCapa = capa === f.id;
                   return (
                   <div key={f.id} onClick={() => toggle(f.id)} title="Tocar pra adicionar" className={`group relative cursor-pointer overflow-hidden rounded-lg border-2 transition ${ehCapa ? "border-amber-400" : "border-transparent hover:border-white/30"}`}>
@@ -572,6 +599,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   );
                 })}
               </div>
+              {filtroCat && disponiveisFiltradas.length === 0 && (
+                <p className="py-4 text-center text-[11px] text-muted">Todas as fotos de <strong className="text-white/80">{LABEL[filtroCat] || filtroCat}</strong> já entraram na sequência. <button type="button" onClick={() => setFiltroCat("")} className="font-semibold text-[#c7b2ff] underline">Ver todas</button></p>
+              )}
             </div>
           )}
         </div>
