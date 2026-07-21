@@ -69,6 +69,24 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const urlsReelsPostados = new Set(
     pubs.filter((p) => p.formato === "reels" && p.status === "postado" && (p.videoUrl || "").startsWith("http")).map((p) => p.videoUrl),
   );
+  // Reels de festa NA FILA (agendado, ainda não postado) → o card da aba Vídeo marca "⏰ Agendado
+  // dd/mm", pra o dono bater o olho e não agendar a mesma festa duas vezes. O vínculo é o id da
+  // festa embutido no slug ("reels-<6 últimos>-…") — exato, não confunde dois "Pedro". Só quando
+  // o slug NÃO tem esse id (agendados antigos) é que caímos no nome do título, de reserva.
+  // Guardamos a data MAIS PRÓXIMA: é a próxima vez que aquele vídeo vai ao ar.
+  const agendadoPorId = new Map<string, Date>();
+  const agendadoPorNome = new Map<string, Date>();
+  const maisCedo = (m: Map<string, Date>, k: string, d: Date) => {
+    const atual = m.get(k);
+    if (!atual || d < atual) m.set(k, d);
+  };
+  for (const p of pubs) {
+    if (p.formato !== "reels" || p.status === "postado" || p.videoTematicoId) continue;
+    const suf = (p.slug.match(/^reels-([a-z0-9]{6})-/) || [])[1];
+    if (suf) { maisCedo(agendadoPorId, suf, p.data); continue; }
+    const nome = (p.titulo || "").replace(/^Reels\s*[—–-]\s*/i, "").trim();
+    if (nome) maisCedo(agendadoPorNome, nome, p.data);
+  }
   const festas: FestaView[] = await Promise.all(festasRaw.map(async (f) => {
     const anivs = parseAniversariantes(f.aniversariantes);
     let token = f.token;
@@ -99,6 +117,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoTituloCapa: f.videoTituloCapa || "",
       videoUrl: f.videoUrl || "",
       videoPostado: !!f.videoUrl && urlsReelsPostados.has(f.videoUrl),
+      videoAgendadoEm: (agendadoPorId.get(f.id.slice(-6)) ?? agendadoPorNome.get((f.aniversariante || "").trim()))?.toISOString() ?? null,
       mostrarAvaliacao: f.mostrarAvaliacao,
       fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento, descricao: foto.descricao })),
     };
@@ -234,6 +253,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const vezesPostadoTema = new Map<string, number>();
   const ultimoPostTema = new Map<string, Date>();
   const naFilaTema = new Map<string, number>();
+  const proximoTema = new Map<string, Date>(); // a próxima data agendada (a mais perto de hoje)
   for (const p of pubs) {
     if (p.formato !== "reels" || !p.videoTematicoId) continue;
     if (p.status === "postado") {
@@ -243,6 +263,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       if (!atual || quando > atual) ultimoPostTema.set(p.videoTematicoId, quando);
     } else {
       naFilaTema.set(p.videoTematicoId, (naFilaTema.get(p.videoTematicoId) || 0) + 1);
+      maisCedo(proximoTema, p.videoTematicoId, p.data);
     }
   }
   const videosTematicos = tematicosRaw.map((v) => {
@@ -259,6 +280,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       narracao: { texto: v.narracaoTexto, voz: v.narracaoVoz, estilo: v.narracaoEstilo, url: v.narracaoUrl, segundos: v.narracaoSeg },
       capaUrl: (v.videoCapa && urlDaFoto.get(v.videoCapa)) || (ids[0] && urlDaFoto.get(ids[0])) || null,
       postadoVezes: vezesPostadoTema.get(v.id) || 0,
+      naFila: naFilaTema.get(v.id) || 0,
+      agendadoEm: proximoTema.get(v.id)?.toISOString() ?? null,
     };
   });
   // Temáticos prontos entram no seletor do agendador de Reels, na frente das festas. Como não

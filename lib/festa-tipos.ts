@@ -25,6 +25,9 @@ export type FestaView = {
   videoTituloCapa: string; // título da capa escrito à mão ("" = automático "Fulano fez X aninhos")
   videoUrl: string; // URL do vídeo/Reels já montado ("" = ainda não gerado)
   videoPostado?: boolean; // o Reels desta festa JÁ foi postado pelo Postaí (antes mesmo de arquivar em 24h)
+  // O Reels desta festa está NA FILA: dia em que vai sair (o mais próximo, se houver mais de um).
+  // null = nada agendado. É o que o card da aba Vídeo mostra pra não agendar a mesma festa 2×.
+  videoAgendadoEm?: string | null;
   mostrarAvaliacao: boolean; // o gerente liga/desliga o card "Avalie no Google" no álbum
   fotos: FotoView[];
 };

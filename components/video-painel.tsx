@@ -24,6 +24,8 @@ export type VideoTematicoView = {
   narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
   capaUrl: string | null; // thumb do card (capa escolhida ou 1ª foto)
   postadoVezes: number; // quantas vezes esse vídeo já foi postado (0 = nunca) — evergreen, segue repostável
+  naFila: number; // posts desse vídeo AGENDADOS, ainda esperando a data (0 = nada na fila)
+  agendadoEm: string | null; // a próxima data agendada (null = nada na fila)
 };
 
 // Temas prontos pro botão de criar (também dá pra digitar um tema livre).
@@ -53,6 +55,10 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
   const emGeracao = f.videoUrl === "gerando";
   const arquivado = f.videoUrl === "arquivado"; // já foi POSTADO e o MP4 foi apagado (+24h) — regerável das fotos
   const postado = f.videoPostado === true; // já postado pelo Postaí, mas o vídeo ainda está disponível (antes das 24h)
+  // NA FILA: tem Reels agendado esperando a data. Não substitui o status (o vídeo segue "Pronto") —
+  // é um selo a mais, pra o dono achar de longe o que já está marcado. Vale até em festa já
+  // postada: se ele agendou um repost, a fila continua sendo a informação que importa.
+  const agendadoEm = f.videoAgendadoEm || null;
   const nomes = rotuloAniversariantes(f.aniversariantes) || "Festa";
   const capa = f.fotos[0]?.url;
 
@@ -75,7 +81,8 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
     : { txt: "✓ Autorizado", cls: "bg-green-500 text-black" };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-linha bg-preto-card transition hover:border-white/15">
+    // A borda roxa acesa é o atalho visual: card agendado se destaca na grade inteira.
+    <div className={`overflow-hidden rounded-2xl border bg-preto-card transition ${agendadoEm ? "border-[#7c3aed]/70 hover:border-[#7c3aed]" : "border-linha hover:border-white/15"}`}>
       {/* miniatura vertical 9:16 */}
       <div className="relative aspect-[9/16] bg-preto">
         {capa ? (
@@ -85,8 +92,13 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
           <div className="flex h-full w-full items-center justify-center text-4xl opacity-50">🎬</div>
         )}
 
-        {/* badge de status (topo) */}
-        <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.cls}`}>{badge.txt}</span>
+        {/* badges do topo: status e, embaixo dele, o selo de agendado */}
+        <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.cls}`}>{badge.txt}</span>
+          {agendadoEm && (
+            <span title={`Reels agendado pra ${dataCurta(agendadoEm)}`} className="rounded-full bg-[#7c3aed] px-2 py-0.5 text-[10px] font-bold text-white">⏰ Agendado {dataCurta(agendadoEm)}</span>
+          )}
+        </div>
 
         {/* contador de fotos do vídeo (topo dir.) */}
         {f.videoFotos.length > 0 && (
@@ -164,9 +176,12 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
     : pronto
     ? "guardado — reposte quando quiser"
     : "monte com fotos do acervo";
+  // Evergreen: aqui "agendado" convive com "postado" (ele volta ao ar em datas diferentes), então
+  // o selo mostra a PRÓXIMA data e, se tiver mais de um marcado, quantos ainda estão na fila.
+  const naFila = v.agendadoEm ? `⏰ Agendado ${dataCurta(v.agendadoEm)}${v.naFila > 1 ? ` +${v.naFila - 1}` : ""}` : "";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-[#7c3aed]/30 bg-preto-card transition hover:border-[#7c3aed]/60">
+    <div className={`overflow-hidden rounded-2xl border bg-preto-card transition ${naFila ? "border-[#7c3aed] shadow-[0_0_0_1px_rgba(124,58,237,0.5)]" : "border-[#7c3aed]/30 hover:border-[#7c3aed]/60"}`}>
       <div className="relative aspect-[9/16] bg-preto">
         {v.capaUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -174,7 +189,10 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
         ) : (
           <div className="flex h-full w-full items-center justify-center text-4xl opacity-50">🏰</div>
         )}
-        <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.cls}`}>{badge.txt}</span>
+        <div className="absolute left-2 top-2 flex flex-col items-start gap-1">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${badge.cls}`}>{badge.txt}</span>
+          {naFila && <span className="rounded-full bg-[#7c3aed] px-2 py-0.5 text-[10px] font-bold text-white">{naFila}</span>}
+        </div>
         {v.videoFotos.length > 0 && (
           <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">🎬 {v.videoFotos.length}</span>
         )}
