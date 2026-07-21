@@ -16,7 +16,19 @@ import { rotuloHora } from "@/lib/horarios";
 
 // Um vídeo pronto pra agendar: de uma FESTA ou TEMÁTICO (vídeo do buffet, evergreen).
 // O `tipo` diz de qual tabela o `id` veio — nada de prefixo mágico na string.
-export type FestaComVideo = { tipo: "festa" | "tema"; id: string; nome: string; videoUrl: string; data: string; horario: string };
+// No temático, `data` é o dia em que o VÍDEO ficou pronto (não existe festa) e vem junto o
+// histórico de posts: ele é reaproveitado, então o dono precisa ver quantas vezes já foi ao ar.
+export type FestaComVideo = {
+  tipo: "festa" | "tema";
+  id: string;
+  nome: string;
+  videoUrl: string;
+  data: string;
+  horario: string;
+  postadoVezes?: number; // só no temático: quantas vezes já foi postado (0 = nunca)
+  ultimoPostEm?: string | null; // só no temático: a última vez que foi ao ar
+  naFila?: number; // só no temático: posts desse vídeo agendados, esperando a data
+};
 
 function quando(iso: string): string {
   const d = new Date(iso);
@@ -25,12 +37,35 @@ function quando(iso: string): string {
   return `${dia} às ${hora}`;
 }
 
+// "12/07" e "12/07/2026" (fuso SP) — a idade do vídeo do buffet.
+function diaMes(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+}
+function diaMesAno(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 // Rótulo da festa no seletor: "Samuel · 21/06 13:00" (nome + data e horário DA FESTA).
-// Vídeo temático não tem data de festa: "🏰 Brinquedos (vídeo do buffet)".
+// Vídeo temático não tem festa nem data de festa — no lugar disso mostra QUANDO FOI FEITO:
+// "🏰 Brinquedos (vídeo do buffet) · feito 12/07".
 function festaLabel(f: FestaComVideo): string {
-  if (f.tipo === "tema") return `🏰 ${f.nome} (vídeo do buffet)`;
-  const dia = new Date(f.data).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+  if (f.tipo === "tema") return `🏰 ${f.nome} (vídeo do buffet) · feito ${diaMes(f.data)}`;
+  const dia = diaMes(f.data);
   return `${f.nome} · ${dia}${f.horario ? ` ${f.horario}` : ""}`;
+}
+
+// O histórico do vídeo do buffet em português de gente, pro aviso embaixo do seletor.
+function historicoTema(f: FestaComVideo): string {
+  const n = f.postadoVezes || 0;
+  const fila = f.naFila || 0;
+  const partes: string[] = [];
+  partes.push(
+    n === 0
+      ? "Nunca foi postado ainda."
+      : `Já foi postado ${n === 1 ? "1 vez" : `${n} vezes`}${f.ultimoPostEm ? ` — a última em ${diaMesAno(f.ultimoPostEm)}` : ""}.`,
+  );
+  if (fila > 0) partes.push(`${fila === 1 ? "Tem 1 post dele" : `Tem ${fila} posts dele`} na fila, esperando a data.`);
+  return partes.join(" ");
 }
 
 // ISO → "YYYY-MM-DD" (fuso SP) e a hora (0-23 SP) — pra pré-preencher a edição de um agendado.
@@ -127,10 +162,15 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
   const nomesPostados = new Set(reels.filter((r) => r.status === "postado").map(nomeDoReels));
   // festas cujo Reels JÁ está AGENDADO (na fila, ainda não postado) — evita agendar o mesmo 2×.
   const nomesAgendados = new Set(reels.filter((r) => r.status !== "postado").map(nomeDoReels));
-  // Selo do vídeo no seletor: postado tem prioridade; senão, agendado. Só pra festa (o vídeo do
-  // buffet é evergreen — pode ser postado quantas vezes quiser, não faz sentido marcar).
+  // Selo do vídeo no seletor. FESTA: postado tem prioridade; senão, agendado (o vídeo da festa é
+  // pra postar uma vez). VÍDEO DO BUFFET: é evergreen, então não é "já postado ou não" — é
+  // QUANTAS vezes já foi ao ar (contagem que vem pronta do servidor, pela FK videoTematicoId).
   const seloVideo = (f: FestaComVideo): string => {
-    if (f.tipo !== "festa") return "";
+    if (f.tipo === "tema") {
+      const n = f.postadoVezes || 0;
+      const fila = f.naFila || 0;
+      return (n === 0 ? "  🆕 nunca postado" : `  ✅ postado ${n}×`) + (fila > 0 ? `  ⏰ ${fila} na fila` : "");
+    }
     if (nomesPostados.has(f.nome)) return "  ✅ já postado";
     if (nomesAgendados.has(f.nome)) return "  ⏰ já agendado";
     return "";
@@ -170,7 +210,9 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
               <button type="button" onClick={() => setVerUrl(escolhido.videoUrl)} className="mt-2 text-xs font-semibold text-[#c7b2ff] transition hover:underline">▶ Ver esse vídeo</button>
             )}
             {escolhido?.tipo === "tema" && (
-              <p className="mt-2 rounded-lg border border-[#7c3aed]/30 bg-[#7c3aed]/10 px-3 py-1.5 text-xs font-semibold text-[#c7b2ff]">🏰 Vídeo do buffet — pode ser postado quantas vezes quiser, em datas diferentes.</p>
+              <p className="mt-2 rounded-lg border border-[#7c3aed]/30 bg-[#7c3aed]/10 px-3 py-1.5 text-xs font-semibold text-[#c7b2ff]">
+                🏰 Vídeo do buffet — feito em {diaMesAno(escolhido.data)}. {historicoTema(escolhido)} Pode ser postado quantas vezes quiser, em datas diferentes.
+              </p>
             )}
             {escolhido?.tipo === "festa" && nomesPostados.has(escolhido.nome) && (
               <p className="mt-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs font-semibold text-green-400">✅ Essa festa já teve um Reels postado — só agende de novo se quiser repostar.</p>

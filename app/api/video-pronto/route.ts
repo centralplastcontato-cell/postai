@@ -41,7 +41,12 @@ export async function POST(req: Request) {
     }
 
     if (tematico) {
-      await prisma.videoTematico.update({ where: { id }, data: { videoUrl: novaUrl } });
+      // Deu certo: carimba a data em que o MP4 ficou pronto (o seletor de Reels mostra a idade
+      // do vídeo do buffet). Deu errado: só volta pro "sem vídeo", sem mexer no carimbo antigo.
+      await prisma.videoTematico.update({
+        where: { id },
+        data: novaUrl ? { videoUrl: novaUrl, videoEm: new Date() } : { videoUrl: novaUrl },
+      });
       await registrarAtividade(
         AGENTE,
         novaUrl ? `🎬 O vídeo do buffet "${tematico.titulo}" ficou pronto!` : `Não consegui gerar o vídeo "${tematico.titulo}": ${body.erro || "erro"}`,

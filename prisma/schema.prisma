@@ -85,6 +85,10 @@ model VideoTematico {
   videoMoldura    String   @default("branca") // nenhuma | branca | grossa | marca
   videoTextoFinal String   @default("") // frase do último quadro ("" = padrão do motor)
   videoUrl        String   @default("")
+  // Quando o MP4 FICOU PRONTO (o motor avisou). Diferente de `criadoEm`: o vídeo do buffet é
+  // remontado várias vezes (troca de fotos, narração nova) e o dono precisa saber a idade do
+  // ARQUIVO que está no ar. null = vídeo antigo, feito antes deste campo → cai no `criadoEm`.
+  videoEm         DateTime?
   // NARRAÇÃO (a voz que fala no vídeo). O roteiro sai da Bia (a partir do briefing do dono) ou
   // é escrito na mão; a voz é do Google (Chirp3-HD, pt-BR). O áudio final é a locução MISTURADA
   // com o jingle da marca (o motor só aceita UMA trilha) e mora no Blob.

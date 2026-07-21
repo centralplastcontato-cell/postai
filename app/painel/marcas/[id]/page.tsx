@@ -229,10 +229,20 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const urlDaFoto = new Map(imgs.map((i) => [i.id, i.url]));
   // Quantas vezes cada vídeo temático já foi POSTADO (o vínculo é a FK Publicacao.videoTematicoId).
   // Diferente da festa, o temático é evergreen: mostra "📮 Postado" mas segue repostável.
+  // Junto com isso, QUANDO foi a última vez e QUANTOS ainda estão na fila — o seletor de Reels
+  // mostra esse histórico, já que o vídeo do buffet não tem festa nem data pra se orientar.
   const vezesPostadoTema = new Map<string, number>();
+  const ultimoPostTema = new Map<string, Date>();
+  const naFilaTema = new Map<string, number>();
   for (const p of pubs) {
-    if (p.formato === "reels" && p.status === "postado" && p.videoTematicoId) {
+    if (p.formato !== "reels" || !p.videoTematicoId) continue;
+    if (p.status === "postado") {
       vezesPostadoTema.set(p.videoTematicoId, (vezesPostadoTema.get(p.videoTematicoId) || 0) + 1);
+      const quando = p.postadoEm ?? p.data;
+      const atual = ultimoPostTema.get(p.videoTematicoId);
+      if (!atual || quando > atual) ultimoPostTema.set(p.videoTematicoId, quando);
+    } else {
+      naFilaTema.set(p.videoTematicoId, (naFilaTema.get(p.videoTematicoId) || 0) + 1);
     }
   }
   const videosTematicos = tematicosRaw.map((v) => {
@@ -251,10 +261,22 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       postadoVezes: vezesPostadoTema.get(v.id) || 0,
     };
   });
-  // Temáticos prontos entram no seletor do agendador de Reels, na frente das festas.
+  // Temáticos prontos entram no seletor do agendador de Reels, na frente das festas. Como não
+  // têm festa, `data` = quando o VÍDEO ficou pronto (videoEm; nos antigos, a criação do tema) e
+  // vão junto o histórico de posts — é o que o seletor mostra no lugar do "Fulano · 12/07".
   const tematicosComVideo = tematicosRaw
     .filter((v) => v.videoUrl.startsWith("http"))
-    .map((v) => ({ tipo: "tema" as const, id: v.id, nome: v.titulo, videoUrl: v.videoUrl, data: v.criadoEm.toISOString(), horario: "" }));
+    .map((v) => ({
+      tipo: "tema" as const,
+      id: v.id,
+      nome: v.titulo,
+      videoUrl: v.videoUrl,
+      data: (v.videoEm ?? v.criadoEm).toISOString(),
+      horario: "",
+      postadoVezes: vezesPostadoTema.get(v.id) || 0,
+      ultimoPostEm: ultimoPostTema.get(v.id)?.toISOString() ?? null,
+      naFila: naFilaTema.get(v.id) || 0,
+    }));
 
   // Banco da aba Imagens = só as fotos-BASE PURAS que o dono sobe (sem festa E sem `momento`).
   // Foto vinda de festa tem `momento` preenchido (salão/brinquedos/…) — então, mesmo que perca o
