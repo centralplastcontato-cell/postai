@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MarketingCalendario, type Post } from "./marketing-calendario";
 import { PublicacoesAba, type PublicacaoView } from "./publicacoes-aba";
 import { StoriesAba } from "./stories-aba";
@@ -49,9 +49,13 @@ export function RedesSociais({
   const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes" | "story" | "reels">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
   const [dataAlvo, setDataAlvo] = useState<string | null>(null);
+  const [reelsFoco, setReelsFoco] = useState<string | null>(null); // reels a abrir/editar ao vir do "Abrir →"
   // PREENCHER AGENDA: modo de seleção de dias + dias marcados no calendário.
   const [modoPreencher, setModoPreencher] = useState(false);
   const [diasSelecionados, setDiasSelecionados] = useState<string[]>([]);
+
+  // Ao SAIR da aba Reels, esquece o foco — senão, ao voltar na mão, a edição reabriria sozinha.
+  useEffect(() => { if (subaba !== "reels") setReelsFoco(null); }, [subaba]);
 
   const planoCar = parseDias(diasCarrossel);
   const planoFeed = parseDias(diasFeed);
@@ -61,7 +65,7 @@ export function RedesSociais({
   function abrirDoResumo(tipo: "carrossel" | "feed" | "story" | "reels", id: string) {
     if (tipo === "carrossel") { setSelecao({ tipo: "carrossel", id }); setSubaba("carrosseis"); }
     else if (tipo === "feed") { setSelecao({ tipo: "feed", id }); setSubaba("publicacoes"); }
-    else if (tipo === "reels") { setSelecao(null); setSubaba("reels"); }
+    else if (tipo === "reels") { setSelecao(null); setReelsFoco(id); setSubaba("reels"); }
     else { setSelecao(null); setSubaba("story"); }
   }
 
@@ -189,7 +193,7 @@ export function RedesSociais({
         />
       )}
 
-      {subaba === "reels" && <ReelsAba reels={reels} festasComVideo={festasComVideo} dataAlvo={dataAlvo} horaPadrao={horaPost} />}
+      {subaba === "reels" && <ReelsAba reels={reels} festasComVideo={festasComVideo} dataAlvo={dataAlvo} horaPadrao={horaPost} focoId={reelsFoco} />}
     </div>
   );
 }

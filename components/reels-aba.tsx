@@ -76,7 +76,18 @@ function horaSP(iso: string): number {
   return Number(new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(new Date(iso))) % 24;
 }
 
-export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reels: PublicacaoView[]; festasComVideo: FestaComVideo[]; dataAlvo: string | null; horaPadrao: number }) {
+const POR_PAGINA = 8;
+// Ordena: AGENDADOS primeiro (mais próximos de postar no topo), depois os POSTADOS (recentes primeiro).
+function ordenarReels(reels: PublicacaoView[]): PublicacaoView[] {
+  return [...reels].sort((a, b) => {
+    const pa = a.status === "postado" ? 1 : 0, pb = b.status === "postado" ? 1 : 0;
+    if (pa !== pb) return pa - pb;
+    const ta = new Date(a.data).getTime(), tb = new Date(b.data).getTime();
+    return pa === 1 ? tb - ta : ta - tb;
+  });
+}
+
+export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }: { reels: PublicacaoView[]; festasComVideo: FestaComVideo[]; dataAlvo: string | null; horaPadrao: number; focoId?: string | null }) {
   const router = useRouter();
   const [pend, startT] = useTransition();
   const [ocupadoId, setOcupadoId] = useState<string | null>(null);
@@ -103,6 +114,22 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
   const [gerandoLeg, setGerandoLeg] = useState(false);
   const [msg, setMsg] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
   const [verUrl, setVerUrl] = useState<string | null>(null);
+  const [destaque, setDestaque] = useState<string | null>(null); // reels destacado ao vir do "Abrir →"
+
+  // Ao clicar "Abrir →" num Reels na Agenda: vai pra página dele, ABRE a edição (legenda pronta pra
+  // reescrever), destaca e rola até ele. Antes o "Abrir →" só trocava de aba e o dono se perdia.
+  useEffect(() => {
+    if (!focoId) return;
+    const r = reels.find((x) => x.id === focoId);
+    if (!r) return;
+    const idx = ordenarReels(reels).findIndex((x) => x.id === focoId);
+    if (idx >= 0) setPagina(Math.floor(idx / POR_PAGINA));
+    if (r.status !== "postado") abrirEdicao(r);
+    setDestaque(focoId);
+    const t1 = setTimeout(() => document.getElementById(`reel-${focoId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+    const t2 = setTimeout(() => setDestaque(null), 3000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [focoId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // O <select> guarda o id; o tipo (festa|tema) vem do próprio item da lista.
   const escolhido = festasComVideo.find((f) => f.id === festaId) ?? null;
@@ -180,13 +207,7 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
 
   // Ordena: AGENDADOS primeiro (mais próximos de postar no topo), depois os POSTADOS (mais
   // recentes primeiro). Depois pagina (a lista cresce muito com o tempo).
-  const POR_PAGINA = 8;
-  const reelsOrdenados = [...reels].sort((a, b) => {
-    const pa = a.status === "postado" ? 1 : 0, pb = b.status === "postado" ? 1 : 0;
-    if (pa !== pb) return pa - pb;
-    const ta = new Date(a.data).getTime(), tb = new Date(b.data).getTime();
-    return pa === 1 ? tb - ta : ta - tb;
-  });
+  const reelsOrdenados = ordenarReels(reels);
   const totalPaginas = Math.max(1, Math.ceil(reelsOrdenados.length / POR_PAGINA));
   const paginaAtual = Math.min(pagina, totalPaginas - 1);
   const reelsVisiveis = reelsOrdenados.slice(paginaAtual * POR_PAGINA, paginaAtual * POR_PAGINA + POR_PAGINA);
@@ -258,7 +279,7 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
             const postado = r.status === "postado";
             const ocupado = ocupadoId === r.id && pend;
             return (
-              <div key={r.id} className="flex gap-3 rounded-xl border border-linha bg-preto-card p-3">
+              <div key={r.id} id={`reel-${r.id}`} className={`flex gap-3 rounded-xl border bg-preto-card p-3 transition ${destaque === r.id ? "border-[#7c3aed] ring-2 ring-[#7c3aed]/60" : "border-linha"}`}>
                 {r.videoUrl ? (
                   // eslint-disable-next-line jsx-a11y/media-has-caption
                   <video src={`${r.videoUrl}#t=0.5`} preload="metadata" controls playsInline className="h-40 w-24 shrink-0 rounded-lg bg-black object-cover" />
