@@ -85,6 +85,7 @@ model VideoTematico {
   videoCapa       String   @default("") // ID da foto da capa ("" = 1ª da sequência)
   videoMoldura    String   @default("branca") // nenhuma | branca | grossa | marca
   videoTextoFinal String   @default("") // frase do último quadro ("" = padrão do motor)
+  videoFundo      String   @default("") // fundo do quadro: "" (foto borrada, padrão) | "cheia" (foto preenche a tela)
   videoUrl        String   @default("")
   // Quando o MP4 FICOU PRONTO (o motor avisou). Diferente de `criadoEm`: o vídeo do buffet é
   // remontado várias vezes (troca de fotos, narração nova) e o dono precisa saber a idade do

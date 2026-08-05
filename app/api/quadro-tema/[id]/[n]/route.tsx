@@ -107,90 +107,83 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
           ? 50
           : 58;
 
-    // FUNDO: a própria foto BORRADA e escurecida preenche a tela (visual moderno, sem o bloco de
-    // cor) — mesmo estilo que o motor usa nos quadros sem legenda, agora consistente. Blur com
-    // sharp (o next/og não suporta filtro de blur). Se falhar, cai no degradê das cores da marca.
+    // Estilo do FUNDO do quadro (escolhido pelo dono): "cheia" = a foto preenche a tela toda (sem
+    // moldura); senão (padrão) a foto BORRADA e escurecida atrás, com a foto emoldurada por cima.
+    const modo = v.videoFundo === "cheia" ? "cheia" : "desfocada";
+
+    // Fundo borrado (modo padrão): borra a foto com sharp (o next/og não faz blur). Se falhar,
+    // cai no degradê das cores da marca.
     let bgBlur = "";
-    try {
-      const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
-      const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).blur(30).modulate({ brightness: 0.5 }).jpeg({ quality: 62 }).toBuffer();
-      bgBlur = `data:image/jpeg;base64,${b.toString("base64")}`;
-    } catch (e) {
-      console.error("Não consegui borrar o fundo (uso o degradê):", e);
+    if (modo === "desfocada") {
+      try {
+        const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
+        const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).blur(30).modulate({ brightness: 0.5 }).jpeg({ quality: 62 }).toBuffer();
+        bgBlur = `data:image/jpeg;base64,${b.toString("base64")}`;
+      } catch (e) {
+        console.error("Não consegui borrar o fundo (uso o degradê):", e);
+      }
     }
 
-    const png = await new ImageResponse(
-      (
+    // A LEGENDA (ou o GANCHO, na capa) — a MESMA peça nos dois modos de fundo.
+    const legendaEl = legenda ? (
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", width: ehCapa ? 130 : 96, height: ehCapa ? 12 : 9, backgroundColor: "#ffffff", borderRadius: 6, marginBottom: ehCapa ? 28 : 22, opacity: 0.9 }} />
+        <div style={{ display: "flex", fontSize: tam, fontWeight: 600, color: "#ffffff", lineHeight: ehCapa ? 1.1 : 1.18, textShadow: ehCapa ? "0 4px 20px rgba(0,0,0,0.55)" : "0 3px 14px rgba(0,0,0,0.45)" }}>{legenda}</div>
+      </div>
+    ) : (
+      <div style={{ display: "flex" }} />
+    );
+
+    const el =
+      modo === "cheia" ? (
+        // FOTO NA TELA TODA: preenche o 9:16 (corta as beiradas); legenda embaixo, sobre um
+        // escurecido pra ler. Sem moldura.
+        <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative", fontFamily: "Baloo" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={foto.src} width={L} height={A} style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, objectFit: "cover" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", padding: ehCapa ? "215px 60px 150px" : "60px 60px 210px", backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0) 38%, rgba(0,0,0,0.35) 68%, rgba(0,0,0,0.82) 100%)" }}>
+            <div style={{ display: "flex", flexDirection: "column", width: ehCapa ? "100%" : `${LARG_LEGENDA}px`, minHeight: 120 }}>{legendaEl}</div>
+          </div>
+        </div>
+      ) : (
+        // FOTO BORRADA ATRÁS (padrão): foto emoldurada e centralizada, sobre a versão borrada dela.
         <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative", fontFamily: "Baloo" }}>
           {bgBlur ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={bgBlur} width={L} height={A} style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, objectFit: "cover" }} />
           ) : null}
           <div
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: `${L}px`,
-            height: `${A}px`,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            // O rodapé (ou o topo, na capa) é do LOGO do motor — nada nosso nessas faixas.
-            padding: ehCapa ? "215px 60px 150px" : "60px 60px 210px",
-            // com fundo borrado: leve escurecida pra o branco (moldura/texto) destacar; sem blur = degradê da marca.
-            backgroundImage: bgBlur
-              ? "linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.60) 100%)"
-              : `linear-gradient(160deg, ${cor} 0%, ${fundo} 100%)`,
-          }}
-        >
-          {/* a FOTO, com a moldura branca justa nela */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: `${areaH}px` }}>
-            <div style={{ display: "flex", padding: `${BORDA}px`, backgroundColor: "#ffffff", borderRadius: 8, boxShadow: "0 18px 50px rgba(0,0,0,0.45)" }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={foto.src} width={fw} height={fh} style={{ width: `${fw}px`, height: `${fh}px`, objectFit: "cover", borderRadius: 2 }} />
-            </div>
-          </div>
-
-          {/* O TEXTO. Na CAPA é o GANCHO: fonte grande, largura inteira, quebra de linha de
-              verdade (o motor escrevia numa linha só e cortava as pontas). Nos outros quadros
-              é a legenda, mais discreta e estreita (o logo do motor mora no canto direito). */}
-          <div
             style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: `${L}px`,
+              height: `${A}px`,
               display: "flex",
               flexDirection: "column",
-              width: ehCapa ? "100%" : `${LARG_LEGENDA}px`,
-              marginRight: ehCapa ? 0 : "auto",
-              marginTop: ehCapa ? 52 : 44,
-              minHeight: 190,
+              alignItems: "center",
+              justifyContent: "center",
+              // O rodapé (ou o topo, na capa) é do LOGO do motor — nada nosso nessas faixas.
+              padding: ehCapa ? "215px 60px 150px" : "60px 60px 210px",
+              backgroundImage: bgBlur
+                ? "linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.60) 100%)"
+                : `linear-gradient(160deg, ${cor} 0%, ${fundo} 100%)`,
             }}
           >
-            {legenda ? (
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                <div style={{ display: "flex", width: ehCapa ? 130 : 96, height: ehCapa ? 12 : 9, backgroundColor: "#ffffff", borderRadius: 6, marginBottom: ehCapa ? 28 : 22, opacity: 0.9 }} />
-                <div
-                  style={{
-                    display: "flex",
-                    fontSize: tam,
-                    fontWeight: 600,
-                    color: "#ffffff",
-                    lineHeight: ehCapa ? 1.1 : 1.18,
-                    textShadow: ehCapa ? "0 4px 20px rgba(0,0,0,0.55)" : "0 3px 14px rgba(0,0,0,0.45)",
-                  }}
-                >
-                  {legenda}
-                </div>
+            {/* a FOTO, com a moldura branca justa nela */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: `${areaH}px` }}>
+              <div style={{ display: "flex", padding: `${BORDA}px`, backgroundColor: "#ffffff", borderRadius: 8, boxShadow: "0 18px 50px rgba(0,0,0,0.45)" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={foto.src} width={fw} height={fh} style={{ width: `${fw}px`, height: `${fh}px`, objectFit: "cover", borderRadius: 2 }} />
               </div>
-            ) : (
-              <div style={{ display: "flex" }} />
-            )}
-          </div>
+            </div>
+            {/* O TEXTO (gancho na capa; legenda estreita nos demais, o logo do motor mora à direita). */}
+            <div style={{ display: "flex", flexDirection: "column", width: ehCapa ? "100%" : `${LARG_LEGENDA}px`, marginRight: ehCapa ? 0 : "auto", marginTop: ehCapa ? 52 : 44, minHeight: 190 }}>{legendaEl}</div>
           </div>
         </div>
-      ),
-      { width: L, height: A, fonts: carregarFontes() },
-    ).arrayBuffer();
+      );
+
+    const png = await new ImageResponse(el, { width: L, height: A, fonts: carregarFontes() }).arrayBuffer();
 
     // PNG (2-3 MB) → JPEG (~300 KB): o motor baixa 26 quadros; o download é o gargalo, não o CPU.
     const jpg = await sharp(Buffer.from(png)).jpeg({ quality: 88, chromaSubsampling: "4:4:4" }).toBuffer();

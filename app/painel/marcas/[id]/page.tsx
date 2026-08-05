@@ -277,6 +277,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoCapa: v.videoCapa,
       videoMoldura: v.videoMoldura,
       videoTextoFinal: v.videoTextoFinal,
+      videoFundo: v.videoFundo || "",
       videoTextos: (() => { try { const m = JSON.parse(v.videoTextos || "{}"); return m && typeof m === "object" && !Array.isArray(m) ? (m as Record<string, string>) : {}; } catch { return {}; } })(),
       narracao: { texto: v.narracaoTexto, voz: v.narracaoVoz, estilo: v.narracaoEstilo, url: v.narracaoUrl, segundos: v.narracaoSeg },
       capaUrl: (v.videoCapa && urlDaFoto.get(v.videoCapa)) || (ids[0] && urlDaFoto.get(ids[0])) || null,

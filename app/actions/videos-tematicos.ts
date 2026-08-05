@@ -243,6 +243,19 @@ export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[
   return { ok: true as const, total: ordenadas.length };
 }
 
+// Fundo dos quadros do vídeo do buffet: "" (foto BORRADA de fundo, padrão) | "cheia" (a foto
+// PREENCHE a tela, sem moldura). Muda como o /api/quadro-tema desenha cada quadro.
+export async function definirFundoVideo(videoId: string, fundo: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const valor = fundo === "cheia" ? "cheia" : ""; // só aceita os dois estilos
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { videoFundo: valor } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, fundo: valor };
+}
+
 // Dispara o MOTOR pra montar o vídeo temático (mesmo motor do Reels de festa). O texto da capa
 // é o TEMA. O callback /api/video-pronto reconhece o id e salva a URL aqui.
 export async function gerarVideoTematico(videoId: string) {
@@ -331,7 +344,7 @@ export async function gerarVideoTematico(videoId: string) {
   // "q2" = VERSÃO do desenho do quadro (fundo virou foto BORRADA). Bumpar isso quando o visual do
   // quadro muda força a CDN a redesenhar (o ?v= só depende de dados; sem isso, serviria o antigo).
   const versao = hashCurto(
-    ["q2", v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
+    ["q2", v.videoFundo, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
 
   let fotosMotor: string[];
