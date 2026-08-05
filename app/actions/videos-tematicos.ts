@@ -203,7 +203,7 @@ export async function excluirVideoTematico(videoId: string) {
 
 // Salva a SELEÇÃO ordenada de fotos do vídeo temático (máx 30). Só aceita fotos da MARCA que
 // podem ser divulgadas (LGPD) — festa pendente/negada nunca entra em vídeo público.
-export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string, textos?: Record<string, string>) {
+export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string, textos?: Record<string, string>, musica?: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoCapa: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
@@ -220,10 +220,12 @@ export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[
   const set = new Set(imgs.filter((i) => !i.festaId || okFesta.has(i.festaId)).map((i) => i.id));
 
   const ordenadas = fotoIds.filter((id) => set.has(id)).slice(0, MAX_FOTOS);
-  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string; videoTextoFinal?: string; videoTextos?: string } = { videoFotos: JSON.stringify(ordenadas) };
+  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string; videoTextoFinal?: string; videoTextos?: string; videoMusica?: string } = { videoFotos: JSON.stringify(ordenadas) };
   if (capa !== undefined) data.videoCapa = capa === "" || set.has(capa) ? capa : "";
   if (moldura !== undefined) data.videoMoldura = MOLDURAS.includes(moldura) ? moldura : "branca";
   if (textoFinal !== undefined) data.videoTextoFinal = textoFinal.trim().slice(0, 60);
+  // música escolhida: "" = jingle do buffet; senão só aceita URL http (do nosso upload)
+  if (musica !== undefined) data.videoMusica = musica.startsWith("http") ? musica : "";
   // LEGENDAS vêm junto (o seletor manda o que está na tela): assim uma frase digitada e o clique
   // direto em "Gerar" não se perdem — e legenda de foto que saiu da sequência é podada.
   // A CAPA entra na lista mesmo se a foto dela estiver fora da sequência (dá pra estrelar uma
@@ -241,6 +243,38 @@ export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[
   await prisma.videoTematico.update({ where: { id: videoId }, data });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, total: ordenadas.length };
+}
+
+// --- Biblioteca de músicas da marca, no contexto do vídeo do BUFFET (mesma lib compartilhada) ---
+type MusicaBanco = { url: string; nome: string };
+function lerMusicas(json: string | null): MusicaBanco[] {
+  try {
+    const a = JSON.parse(json || "[]");
+    return Array.isArray(a) ? a.filter((m): m is MusicaBanco => !!m && typeof m.url === "string" && m.url.startsWith("http")) : [];
+  } catch { return []; }
+}
+// Lista as trilhas da marca + o link do jingle do buffet (recebe o videoId só pra achar a marca).
+export async function listarMusicasDaMarcaTema(videoId: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado.", musicas: [] as MusicaBanco[], buffetUrl: "" };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro, musicas: [] as MusicaBanco[], buffetUrl: "" };
+  const marca = await prisma.marca.findUnique({ where: { id: v.marcaId }, select: { musicas: true, slug: true } });
+  return { ok: true as const, musicas: lerMusicas(marca?.musicas ?? "[]"), buffetUrl: musicaBuffet(marca?.slug ?? "") || "" };
+}
+// Adiciona uma trilha recém-enviada à biblioteca da marca (dedup por URL; mantém as últimas 40).
+export async function adicionarMusicaAoBancoTema(videoId: string, url: string, nome: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado.", musicas: [] as MusicaBanco[] };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro, musicas: [] as MusicaBanco[] };
+  if (!url.startsWith("http")) return { ok: false as const, erro: "URL inválida.", musicas: [] as MusicaBanco[] };
+  const marca = await prisma.marca.findUnique({ where: { id: v.marcaId }, select: { musicas: true } });
+  const atuais = lerMusicas(marca?.musicas ?? "[]").filter((m) => m.url !== url);
+  const lista = [{ url, nome: (nome || "música").slice(0, 80) }, ...atuais].slice(0, 40);
+  await prisma.marca.update({ where: { id: v.marcaId }, data: { musicas: JSON.stringify(lista) } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, musicas: lista };
 }
 
 // Fundo dos quadros do vídeo do buffet: "" (foto BORRADA de fundo, padrão) | "cheia" (a foto
@@ -380,7 +414,9 @@ export async function gerarVideoTematico(videoId: string) {
     logoUrl: v.marca.logoUrl,
     // A trilha do vídeo: a NARRAÇÃO (que já vem com o jingle misturado por baixo) ou, sem
     // narração, o jingle puro. O motor só aceita uma trilha — por isso a mistura é nossa.
-    musicaUrl: temNarracao ? v.narracaoUrl : musicaBuffet(v.marca.slug) || undefined,
+    // Com narração: a voz (com o jingle já misturado). Sem narração: a trilha ESCOLHIDA pelo dono
+    // (videoMusica) tem prioridade; senão, o jingle do buffet.
+    musicaUrl: temNarracao ? v.narracaoUrl : (v.videoMusica?.startsWith("http") ? v.videoMusica : musicaBuffet(v.marca.slug)) || undefined,
     // A arte da capa JÁ traz o texto (a nossa, que quebra linha) — o motor nunca escreve nada
     // por cima (ele usa fonte fixa, numa linha só, e cortava as pontas da frase).
     textoCapa: textoDaCapa,

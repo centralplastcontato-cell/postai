@@ -86,6 +86,7 @@ model VideoTematico {
   videoMoldura    String   @default("branca") // nenhuma | branca | grossa | marca
   videoTextoFinal String   @default("") // frase do último quadro ("" = padrão do motor)
   videoFundo      String   @default("") // fundo do quadro: "" (foto borrada, padrão) | "cheia" (foto preenche a tela)
+  videoMusica     String   @default("") // trilha escolhida (URL do MP3); "" = jingle do buffet. Vale quando NÃO há narração.
   videoUrl        String   @default("")
   // Quando o MP4 FICOU PRONTO (o motor avisou). Diferente de `criadoEm`: o vídeo do buffet é
   // remontado várias vezes (troca de fotos, narração nova) e o dono precisa saber a idade do

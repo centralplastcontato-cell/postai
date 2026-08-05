@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
@@ -193,10 +193,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [tocando, setTocando] = useState<string>(""); // URL da música tocando agora ("" = nenhuma)
   const [buffetUrl, setBuffetUrl] = useState<string>(""); // link da música padrão do buffet (pra dar play)
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // Ao abrir (vídeo de FESTA), busca a biblioteca de músicas da marca + o link da do buffet.
+  // Ao abrir, busca a biblioteca de músicas da marca + o link do jingle do buffet (festa ou buffet).
   useEffect(() => {
-    if (tematicoId) return;
-    listarMusicasDaMarca(festaId).then((r) => { if (r.ok) { if (r.musicas.length) setBanco(r.musicas); setBuffetUrl(r.buffetUrl || ""); } }).catch(() => {});
+    const p = tematicoId ? listarMusicasDaMarcaTema(tematicoId) : listarMusicasDaMarca(festaId);
+    p.then((r) => { if (r.ok) { if (r.musicas.length) setBanco(r.musicas); setBuffetUrl(r.buffetUrl || ""); } }).catch(() => {});
   }, [festaId, tematicoId]);
   // Toca/pausa uma trilha pra ouvir antes de escolher (um player só; tocar outra troca a fonte).
   function ouvir(url: string) {
@@ -364,7 +364,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   }
 
   async function salvarSelecao() {
-    if (tematicoId) await salvarFotosVideoTematico(tematicoId, sel, capa, moldura, textoFinal, textos);
+    if (tematicoId) await salvarFotosVideoTematico(tematicoId, sel, capa, moldura, textoFinal, textos, musica);
     else await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal, tituloCapa, musica);
   }
   // Envia o MP3 (áudio) pro Blob e guarda a URL como a trilha desta festa.
@@ -381,7 +381,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         setMusica(data.url); // já deixa a nova música escolhida
         // Guarda na BIBLIOTECA da marca pra reusar nos próximos vídeos (e mostra já na lista).
         const nome = data.nome || file.name;
-        const r = await adicionarMusicaAoBanco(festaId, data.url, nome).catch(() => null);
+        const r = await (tematicoId ? adicionarMusicaAoBancoTema(tematicoId, data.url, nome) : adicionarMusicaAoBanco(festaId, data.url, nome)).catch(() => null);
         if (r?.ok) setBanco(r.musicas);
         else setBanco((b) => (b.some((m) => m.url === data.url) ? b : [{ url: data.url, nome }, ...b]));
       } else setErroGerar(data.erro || "Não consegui enviar a música.");
@@ -689,9 +689,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Essa frase aparece no <strong className="text-white/70">último quadro</strong> do vídeo, com o logo. Curtinha (até ~48 letras).</p>
           </div>
 
-          {/* MÚSICA do vídeo (só no vídeo de FESTA) — o dono envia o MP3, OUVE (▶️) e ESCOLHE numa
-              lista. As trilhas enviadas ficam na BIBLIOTECA da marca pra reusar em qualquer vídeo. */}
-          {!tematicoId && (
+          {/* MÚSICA do vídeo (festa E buffet) — o dono envia o MP3, OUVE (▶️) e ESCOLHE numa lista.
+              As trilhas enviadas ficam na BIBLIOTECA da marca pra reusar em qualquer vídeo. */}
+          {(
           <div className="mt-2.5 rounded-lg border border-linha bg-preto/40 px-3 py-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-semibold text-white">🎵 Música do vídeo</span>
@@ -736,6 +736,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             <audio ref={audioRef} onEnded={() => setTocando("")} className="hidden" />
 
             <p className="mt-2 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis em <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#c7b2ff] underline">Pixabay Music</a> (botão <strong className="text-white/70">🔎 Buscar músicas</strong>) e toque em <strong className="text-white/70">➕ Enviar música</strong>. Use o <strong className="text-white/70">▶️</strong> pra ouvir antes de escolher — as enviadas ficam guardadas aqui pra reusar.</p>
+            {tematicoId && (
+              <p className="mt-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-300/90">⚠️ No vídeo do buffet, a música escolhida vale quando o vídeo <strong>não tem narração (voz)</strong>. Com narração, o fundo é o jingle por baixo da voz.</p>
+            )}
           </div>
           )}
 
