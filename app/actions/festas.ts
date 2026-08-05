@@ -336,14 +336,15 @@ function lerMusicas(json: string | null): MusicaBanco[] {
   } catch { return []; }
 }
 
-// Lista as trilhas da biblioteca da marca (recebe o festaId só pra descobrir/guardar a marca).
+// Lista as trilhas da biblioteca da marca + o link da música PADRÃO do buffet (pra dar play nela
+// também). Recebe o festaId só pra descobrir/guardar a marca.
 export async function listarMusicasDaMarca(festaId: string) {
   const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
-  if (!festa) return { ok: false as const, erro: "Festa não encontrada.", musicas: [] as MusicaBanco[] };
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada.", musicas: [] as MusicaBanco[], buffetUrl: "" };
   const g = await guardaMarca(festa.marcaId);
-  if (!g.ok) return { ok: false as const, erro: g.erro, musicas: [] as MusicaBanco[] };
-  const marca = await prisma.marca.findUnique({ where: { id: festa.marcaId }, select: { musicas: true } });
-  return { ok: true as const, musicas: lerMusicas(marca?.musicas ?? "[]") };
+  if (!g.ok) return { ok: false as const, erro: g.erro, musicas: [] as MusicaBanco[], buffetUrl: "" };
+  const marca = await prisma.marca.findUnique({ where: { id: festa.marcaId }, select: { musicas: true, slug: true } });
+  return { ok: true as const, musicas: lerMusicas(marca?.musicas ?? "[]"), buffetUrl: musicaBuffet(marca?.slug ?? "") || "" };
 }
 
 // Adiciona uma trilha recém-enviada à biblioteca da marca (dedup por URL; mantém as últimas 40).

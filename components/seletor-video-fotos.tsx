@@ -100,11 +100,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [subindoMusica, setSubindoMusica] = useState(false); // enviando o MP3
   const [banco, setBanco] = useState<{ url: string; nome: string }[]>(musicasBanco); // biblioteca de trilhas da marca
   const [tocando, setTocando] = useState<string>(""); // URL da música tocando agora ("" = nenhuma)
+  const [buffetUrl, setBuffetUrl] = useState<string>(""); // link da música padrão do buffet (pra dar play)
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  // Ao abrir (vídeo de FESTA), busca a biblioteca de músicas já enviadas pra esta marca.
+  // Ao abrir (vídeo de FESTA), busca a biblioteca de músicas da marca + o link da do buffet.
   useEffect(() => {
     if (tematicoId) return;
-    listarMusicasDaMarca(festaId).then((r) => { if (r.ok && r.musicas.length) setBanco(r.musicas); }).catch(() => {});
+    listarMusicasDaMarca(festaId).then((r) => { if (r.ok) { if (r.musicas.length) setBanco(r.musicas); setBuffetUrl(r.buffetUrl || ""); } }).catch(() => {});
   }, [festaId, tematicoId]);
   // Toca/pausa uma trilha pra ouvir antes de escolher (um player só; tocar outra troca a fonte).
   function ouvir(url: string) {
@@ -591,11 +592,15 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
 
             {/* Lista pra ESCOLHER: 1ª opção é a do buffet; depois as enviadas (▶️ pra ouvir antes). */}
             <div className="mt-2 flex flex-col gap-1.5">
-              <button type="button" onClick={() => setMusica("")} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition ${!musica ? "border-[#7c3aed] bg-[#7c3aed]/15" : "border-linha hover:border-white/30"}`}>
-                <span className="text-base">🏰</span>
-                <span className="flex-1 truncate text-[12px] font-semibold text-white">Música padrão do buffet</span>
+              <div className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 transition ${!musica ? "border-[#7c3aed] bg-[#7c3aed]/15" : "border-linha"}`}>
+                {buffetUrl ? (
+                  <button type="button" onClick={() => ouvir(buffetUrl)} aria-label={tocando === buffetUrl ? "Pausar" : "Ouvir"} title={tocando === buffetUrl ? "Pausar" : "Ouvir a música do buffet"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/50 text-sm text-white transition hover:bg-[#7c3aed]">{tocando === buffetUrl ? "⏸" : "▶️"}</button>
+                ) : (
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center text-base">🏰</span>
+                )}
+                <button type="button" onClick={() => setMusica("")} className="min-w-0 flex-1 truncate text-left text-[12px] font-semibold text-white">🏰 Música padrão do buffet</button>
                 {!musica && <span className="shrink-0 text-[10px] font-bold text-[#c7b2ff]">✓ escolhida</span>}
-              </button>
+              </div>
               {banco.map((m) => {
                 const escolhida = musica === m.url;
                 const play = tocando === m.url;
