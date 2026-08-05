@@ -11,14 +11,13 @@ import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloC
 import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
+import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
 
-const ORDEM = ["salao", "brinquedos", "aniversariante", "parabens", "momentos"];
+// Ordem narrativa do vídeo = a ordem dos momentos (fonte única em lib/momentos-festa.ts).
+const ORDEM: string[] = MOMENTOS_FESTA.map((m) => m.id);
 const LABEL: Record<string, string> = {
-  salao: "🎀 Salão",
-  brinquedos: "🎠 Brinquedos",
-  aniversariante: "👑 Aniversariante",
-  parabens: "🎉 Parabéns",
-  momentos: "📸 Momentos",
+  // rótulos curtos dos momentos da FESTA (selo da foto) — vêm da lista central
+  ...Object.fromEntries(MOMENTOS_FESTA.map((m) => [m.id, m.curto])),
   // rótulos do modo TEMÁTICO (fotos do acervo — o "momento" vira a categoria do banco)
   espaco: "🏰 Espaço",
   festa: "🎉 Festa",
@@ -331,7 +330,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // disponíveis, com contagem — pro dono achar rápido o tipo de foto que quer no vídeo.
   const contagemCat = new Map<string, number>();
   for (const f of disponiveis) contagemCat.set(f.momento, (contagemCat.get(f.momento) || 0) + 1);
-  const ordemCat = ["festa", "espaco", "brinquedos", "comida", "geral", "salao", "aniversariante", "parabens", "momentos"];
+  // momentos da festa na ordem narrativa (ORDEM) + as categorias do modo temático
+  const ordemCat = [...ORDEM, "espaco", "festa", "comida", "geral"];
   const catsDisponiveis = [...contagemCat.keys()].sort((a, b) => {
     const ia = ordemCat.indexOf(a), ib = ordemCat.indexOf(b);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);

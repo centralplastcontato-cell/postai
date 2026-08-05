@@ -4,18 +4,21 @@
 
 import { type AlbumData, type AlbumMomento } from "@/components/album-festa";
 import { parseAniversariantes, nomesAniversariantes } from "@/lib/aniversariantes";
-import { normalizarMomento } from "@/lib/momentos-festa";
+import { normalizarMomento, MOMENTOS_FESTA } from "@/lib/momentos-festa";
 import { temaVisual } from "@/lib/temas-festa";
 
 // Apresentação carinhosa de cada momento (os ids internos viram títulos pros pais).
 const APRES: Record<string, { emoji: string; titulo: string; sub: string }> = {
-  salao: { emoji: "🎀", titulo: "Chegada e decoração", sub: "O espaço montado com todo carinho" },
+  chegada: { emoji: "🚪", titulo: "Chegada e recepção", sub: "A família chegando pra comemorar" },
+  salao: { emoji: "🎀", titulo: "Espaço e decoração", sub: "O espaço montado com todo carinho" },
   brinquedos: { emoji: "🎠", titulo: "Brinquedos e diversão", sub: "A criançada aproveitando cada cantinho" },
+  tapete: { emoji: "🌟", titulo: "Tapete vermelho", sub: "A entrada especial do aniversariante" },
   aniversariante: { emoji: "👑", titulo: "O aniversariante", sub: "A estrela do dia" },
   parabens: { emoji: "🎂", titulo: "Hora dos parabéns", sub: "O momento mais esperado" },
   momentos: { emoji: "📸", titulo: "Momentos especiais", sub: "Aqueles cliques que ficam pra sempre" },
 };
-const ORDEM = ["salao", "brinquedos", "aniversariante", "parabens", "momentos"];
+// Ordem das seções do álbum = a ordem narrativa dos momentos (fonte única em momentos-festa.ts).
+const ORDEM: string[] = MOMENTOS_FESTA.map((m) => m.id);
 
 export type FestaParaAlbum = {
   data: Date;
