@@ -37,12 +37,18 @@ function dataCurta(iso: string): string {
 
 // Player do Reels em tela cheia (clicar fora ou no ✕ fecha).
 function PlayerModal({ url, onFechar }: { url: string; onFechar: () => void }) {
+  const [copiado, setCopiado] = useState(false);
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4" onClick={onFechar}>
+    <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/90 p-4" onClick={onFechar}>
       <div onClick={(e) => e.stopPropagation()} className="relative">
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <video src={url} controls autoPlay playsInline className="max-h-[85vh] rounded-xl" />
+        <video src={url} controls playsInline preload="metadata" className="max-h-[80vh] rounded-xl" />
         <button onClick={onFechar} aria-label="Fechar" className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-black">✕</button>
+      </div>
+      {/* Ações de apoio: abrir o vídeo direto (bom teste quando não carrega) e copiar o link. */}
+      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
+        <a href={url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">↗ Abrir em nova aba</a>
+        <button type="button" onClick={() => { navigator.clipboard?.writeText(url).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); }).catch(() => {}); }} className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">{copiado ? "✓ Copiado" : "🔗 Copiar link"}</button>
       </div>
     </div>
   );
