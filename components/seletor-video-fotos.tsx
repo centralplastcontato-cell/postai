@@ -41,6 +41,45 @@ function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   return {};
 }
 
+// --- Detector de fotos PARECIDAS/repetidas (ex: fotos em rajada do mesmo momento) ---
+// dHash 8×8 (64 bits, guardados como array de 0/1) calculado no NAVEGADOR: reduz a foto a 9×8 tons
+// de cinza e marca 1/0 comparando cada pixel com o vizinho. Fotos parecidas têm hashes parecidos
+// (poucos bits de diferença). Se o navegador não puder ler os pixels (CORS), devolve null e não sinaliza.
+function hamming(a: number[], b: number[]): number {
+  let c = 0;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) c++;
+  return c;
+}
+function dHashFoto(url: string): Promise<number[] | null> {
+  return new Promise((resolve) => {
+    if (typeof document === "undefined") return resolve(null);
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      try {
+        const cv = document.createElement("canvas");
+        cv.width = 9; cv.height = 8;
+        const ctx = cv.getContext("2d");
+        if (!ctx) return resolve(null);
+        ctx.drawImage(img, 0, 0, 9, 8);
+        const d = ctx.getImageData(0, 0, 9, 8).data;
+        const bits: number[] = [];
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const i1 = (r * 9 + c) * 4, i2 = (r * 9 + c + 1) * 4;
+            const g1 = 0.299 * d[i1] + 0.587 * d[i1 + 1] + 0.114 * d[i1 + 2];
+            const g2 = 0.299 * d[i2] + 0.587 * d[i2 + 1] + 0.114 * d[i2 + 2];
+            bits.push(g1 < g2 ? 1 : 0);
+          }
+        }
+        resolve(bits);
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
@@ -90,6 +129,41 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setFundo(novo);
     definirFundoVideo(tematicoId, novo).catch(() => {});
   }
+  // FOTOS PARECIDAS: mapa fotoId → nº do grupo (só fotos que têm alguma parecida entram). Calculado
+  // no navegador ao abrir; sinaliza com o selo 🔁 pra o dono evitar repetir fotos quase iguais.
+  const [dupGrupo, setDupGrupo] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      const hs: { id: string; h: number[] }[] = [];
+      for (const f of fotos) {
+        const h = await dHashFoto(f.url);
+        if (cancelado) return;
+        if (h !== null) hs.push({ id: f.id, h });
+      }
+      // union-find: junta as parecidas (poucos bits de diferença) na mesma "família".
+      const pai = new Map<string, string>();
+      hs.forEach((x) => pai.set(x.id, x.id));
+      const raiz = (x: string): string => { while (pai.get(x) !== x) { pai.set(x, pai.get(pai.get(x)!)!); x = pai.get(x)!; } return x; };
+      const LIMITE = 10; // ≤10 bits de diferença ≈ foto muito parecida/repetida
+      for (let i = 0; i < hs.length; i++) for (let j = i + 1; j < hs.length; j++) {
+        if (hamming(hs[i].h, hs[j].h) <= LIMITE) pai.set(raiz(hs[i].id), raiz(hs[j].id));
+      }
+      const cont = new Map<string, number>();
+      hs.forEach((x) => { const r = raiz(x.id); cont.set(r, (cont.get(r) || 0) + 1); });
+      const numDaRaiz = new Map<string, number>();
+      let n = 0;
+      const g = new Map<string, number>();
+      hs.forEach((x) => {
+        const r = raiz(x.id);
+        if ((cont.get(r) || 0) < 2) return; // só grupos com 2+ fotos contam como "repetidas"
+        if (!numDaRaiz.has(r)) numDaRaiz.set(r, ++n);
+        g.set(x.id, numDaRaiz.get(r)!);
+      });
+      if (!cancelado) setDupGrupo(g);
+    })();
+    return () => { cancelado = true; };
+  }, [fotos]);
   const [filtroCat, setFiltroCat] = useState<string>(""); // filtro por tipo de foto na hora de ADICIONAR ("" = todas)
   const [textoFinal, setTextoFinal] = useState<string>(textoFinalInicial || ""); // mensagem do slide final
   const [tituloCapa, setTituloCapa] = useState<string>(tituloCapaInicial || ""); // título da capa (vídeo de festa)
@@ -369,6 +443,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         </div>
 
         {erroGerar && <p className="border-b border-linha bg-vermelho/10 px-4 py-1.5 text-center text-xs text-vermelho">{erroGerar}</p>}
+        {dupGrupo.size > 0 && (
+          <p className="border-b border-linha bg-amber-400/10 px-4 py-1.5 text-center text-[11px] text-amber-300">
+            <span className="rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black text-black">🔁</span> = fotos <strong className="text-amber-200">parecidas</strong> entre si (mesmo número = mesma "família"). Evite pôr muitas iguais no vídeo.
+          </p>
+        )}
 
         <div className="flex-1 overflow-y-auto px-4 pb-6">
           <p className="pt-3 text-[11px] leading-relaxed text-amber-300/90">⭐ Toque na <strong className="text-amber-200">estrela</strong> de uma foto pra ela virar a <strong className="text-amber-200">capa</strong> do vídeo (entra nítida, com o título por cima). Sem escolher, a 1ª foto vira a capa.{capa && (<button type="button" onClick={() => setCapa("")} className="ml-1.5 rounded bg-white/10 px-2 py-0.5 font-semibold text-white transition hover:bg-vermelho">✕ tirar capa</button>)}</p>
@@ -692,6 +771,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     </div>
                     <span className="absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-vermelho text-xs font-bold text-white shadow">{i + 1}</span>
                     <button type="button" onClick={() => toggle(f.id)} aria-label="Tirar" className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl bg-black/75 text-sm leading-none text-white transition hover:bg-vermelho">×</button>
+                    {dupGrupo.get(f.id) && (
+                      <span title="Foto PARECIDA com outra(s) da lista — evite repetir no vídeo" className="absolute right-1 top-8 z-10 rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black leading-none text-black shadow">🔁{dupGrupo.get(f.id)}</span>
+                    )}
                     <button type="button" onClick={(e) => { e.stopPropagation(); definirCapa(f.id); }} aria-label={ehCapa ? "Tirar capa" : "Definir como capa"} title={ehCapa ? "Tirar como capa (clique pra remover)" : "Usar esta foto como capa do vídeo"} className={`absolute bottom-1 left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition ${ehCapa ? "bg-black/80 text-amber-300 ring-2 ring-amber-300 hover:bg-vermelho hover:text-white hover:ring-vermelho" : "bg-black/70 text-white hover:bg-black"}`}>⭐</button>
                     <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
                     <span className={`absolute bottom-0 left-0 right-0 px-8 py-0.5 text-center text-[9px] font-bold ${ehCapa ? "bg-amber-400/90 text-black" : "bg-black/65 font-semibold text-white/90"}`}>{ehCapa ? "⭐ CAPA" : (LABEL[f.momento] || f.momento)}</span>
@@ -760,6 +842,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   <div key={f.id} onClick={() => toggle(f.id)} title="Tocar pra adicionar" className={`group relative cursor-pointer overflow-hidden rounded-lg border-2 transition ${ehCapa ? "border-amber-400" : "border-transparent hover:border-white/30"}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={f.url} alt="" className={`aspect-square w-full object-cover transition ${ehCapa ? "" : "opacity-60 group-hover:opacity-100"}`} />
+                    {dupGrupo.get(f.id) && (
+                      <span title="Foto PARECIDA com outra(s) da lista — evite repetir no vídeo" className="absolute left-1 top-1 z-10 rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black leading-none text-black shadow">🔁{dupGrupo.get(f.id)}</span>
+                    )}
                     <button type="button" onClick={(e) => { e.stopPropagation(); definirCapa(f.id); }} aria-label={ehCapa ? "Tirar capa" : "Definir como capa"} title={ehCapa ? "Tirar como capa (clique pra remover)" : "Usar esta foto como capa do vídeo"} className={`absolute bottom-1 left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition ${ehCapa ? "bg-black/80 text-amber-300 ring-2 ring-amber-300 hover:bg-vermelho hover:text-white hover:ring-vermelho" : "bg-black/70 text-white hover:bg-black"}`}>⭐</button>
                     <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
                     <span className={`absolute bottom-0 left-0 right-0 px-8 py-0.5 text-center text-[9px] font-bold ${ehCapa ? "bg-amber-400/90 text-black" : "bg-black/65 font-semibold text-white/90"}`}>{ehCapa ? "⭐ CAPA" : (LABEL[f.momento] || f.momento)}</span>
