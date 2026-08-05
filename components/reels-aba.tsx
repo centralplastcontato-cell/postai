@@ -80,6 +80,8 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
   const router = useRouter();
   const [pend, startT] = useTransition();
   const [ocupadoId, setOcupadoId] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(0); // paginação da lista de reels
+  const [confExcluir, setConfExcluir] = useState<string | null>(null); // confirma "tirar da lista" (postado)
   // edição de um Reels JÁ agendado (data, hora, legenda)
   const [editando, setEditando] = useState<string | null>(null);
   const [edData, setEdData] = useState("");
@@ -176,6 +178,19 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
     return "";
   };
 
+  // Ordena: AGENDADOS primeiro (mais próximos de postar no topo), depois os POSTADOS (mais
+  // recentes primeiro). Depois pagina (a lista cresce muito com o tempo).
+  const POR_PAGINA = 8;
+  const reelsOrdenados = [...reels].sort((a, b) => {
+    const pa = a.status === "postado" ? 1 : 0, pb = b.status === "postado" ? 1 : 0;
+    if (pa !== pb) return pa - pb;
+    const ta = new Date(a.data).getTime(), tb = new Date(b.data).getTime();
+    return pa === 1 ? tb - ta : ta - tb;
+  });
+  const totalPaginas = Math.max(1, Math.ceil(reelsOrdenados.length / POR_PAGINA));
+  const paginaAtual = Math.min(pagina, totalPaginas - 1);
+  const reelsVisiveis = reelsOrdenados.slice(paginaAtual * POR_PAGINA, paginaAtual * POR_PAGINA + POR_PAGINA);
+
   return (
     <div className="space-y-4">
       {/* AGENDADOR */}
@@ -231,14 +246,15 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
         )}
       </div>
 
-      {/* LISTA dos agendados */}
+      {/* LISTA dos reels — agendados primeiro (próximos a postar), depois os postados. Paginada
+          (POR_PAGINA) porque a lista cresce muito com o tempo. */}
       {reels.length === 0 ? (
         <div className="rounded-xl border border-linha bg-preto-card p-6 text-center text-sm text-muted">
           Nenhum Reels agendado ainda — use o quadro acima. ⬆️
         </div>
       ) : (
         <div className="space-y-3">
-          {reels.map((r) => {
+          {reelsVisiveis.map((r) => {
             const postado = r.status === "postado";
             const ocupado = ocupadoId === r.id && pend;
             return (
@@ -288,10 +304,31 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao }: { reel
                       <button onClick={() => excluir(r.id)} disabled={ocupado} className="rounded-md border border-red-900 px-2.5 py-1 text-xs text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">Excluir</button>
                     </div>
                   )}
+                  {/* Reels JÁ postado: dá pra TIRAR DA LISTA aqui (declutter) — não remove do Instagram. */}
+                  {postado && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {confExcluir === r.id ? (
+                        <>
+                          <button onClick={() => { excluir(r.id); setConfExcluir(null); }} disabled={ocupado} className="rounded-md bg-red-700 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-red-600 disabled:opacity-40">Tirar da lista?</button>
+                          <button onClick={() => setConfExcluir(null)} className="rounded-md border border-linha px-2.5 py-1 text-xs text-muted transition hover:text-white">Cancelar</button>
+                        </>
+                      ) : (
+                        <button onClick={() => setConfExcluir(r.id)} title="Tira este Reels só da sua lista aqui — NÃO remove do Instagram" className="rounded-md border border-red-900 px-2.5 py-1 text-xs text-red-400 transition hover:bg-red-950/40">🗑️ Tirar da lista</button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
+          {/* controles de página — a lista de reels cresce muito com o tempo */}
+          {totalPaginas > 1 && (
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <button onClick={() => setPagina(Math.max(0, paginaAtual - 1))} disabled={paginaAtual === 0} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">← Anterior</button>
+              <span className="text-xs text-muted">Página <strong className="text-white">{paginaAtual + 1}</strong> de {totalPaginas}</span>
+              <button onClick={() => setPagina(Math.min(totalPaginas - 1, paginaAtual + 1))} disabled={paginaAtual >= totalPaginas - 1} className="rounded-md border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-vermelho hover:text-white disabled:opacity-30">Próxima →</button>
+            </div>
+          )}
         </div>
       )}
 
