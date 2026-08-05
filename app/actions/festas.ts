@@ -303,7 +303,7 @@ export async function moverFotoMomento(festaToken: string, fotoId: string, novoM
 // Salva a SELEÇÃO ordenada de fotos pro VÍDEO/Reels da festa (do PAINEL — guardaMarca). Só aceita
 // fotos que SÃO desta festa; guarda os IDs na ordem escolhida (máx 30). Lista vazia volta pro automático.
 const MOLDURAS = ["nenhuma", "branca", "grossa", "marca"];
-export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string, tituloCapa?: string) {
+export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?: string, moldura?: string, textoFinal?: string, tituloCapa?: string, musica?: string) {
   const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -311,7 +311,7 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?
   const validas = await prisma.imagemMarca.findMany({ where: { festaId, id: { in: fotoIds } }, select: { id: true } });
   const set = new Set(validas.map((v) => v.id));
   const ordenadas = fotoIds.filter((id) => set.has(id)).slice(0, 30); // mantém a ordem escolhida
-  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string; videoTextoFinal?: string; videoTituloCapa?: string } = { videoFotos: JSON.stringify(ordenadas) };
+  const data: { videoFotos: string; videoCapa?: string; videoMoldura?: string; videoTextoFinal?: string; videoTituloCapa?: string; videoMusica?: string } = { videoFotos: JSON.stringify(ordenadas) };
   // capa: só aceita "" (automático) ou um fotoId que SEJA desta festa
   if (capa !== undefined) {
     const capaOk = capa === "" ? true : (await prisma.imagemMarca.count({ where: { festaId, id: capa } })) > 0;
@@ -320,6 +320,8 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?
   if (moldura !== undefined) data.videoMoldura = MOLDURAS.includes(moldura) ? moldura : "branca";
   if (textoFinal !== undefined) data.videoTextoFinal = textoFinal.trim().slice(0, 60); // limpa e limita
   if (tituloCapa !== undefined) data.videoTituloCapa = tituloCapa.trim().slice(0, 60); // "" = volta pro automático
+  // música: "" = usa a padrão do buffet; senão só aceita URL http (do nosso upload no Blob)
+  if (musica !== undefined) data.videoMusica = musica.startsWith("http") ? musica : "";
   await prisma.festa.update({ where: { id: festaId }, data });
   revalidatePath(`/painel/marcas/${festa.marcaId}`);
   return { ok: true as const, total: ordenadas.length };
@@ -559,7 +561,7 @@ export async function postarReelsAgora(pubId: string) {
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true } }, fotos: { select: { id: true, url: true } } },
+    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true } }, fotos: { select: { id: true, url: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -581,7 +583,8 @@ export async function gerarVideoDaFesta(festaId: string) {
   const semCapa = fotos.filter((u) => u !== capaUrl);
   if (semCapa.length > 0) fotos = semCapa;
 
-  const musicaUrl = musicaBuffet(festa.marca.slug) || undefined;
+  // música: a que o dono enviou pra ESTA festa (videoMusica) tem prioridade; senão, a padrão do buffet.
+  const musicaUrl = (festa.videoMusica?.startsWith("http") ? festa.videoMusica : musicaBuffet(festa.marca.slug)) || undefined;
 
   // A CAPA é desenhada por NÓS (/api/capa-festa): o título "Fulano fez X aninhos" QUEBRA LINHA e a
   // fonte encolhe, então nome comprido / dois aniversariantes ("Luisa e Maria Sofia fez 11 aninhos")

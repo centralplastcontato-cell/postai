@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { estaLogado } from "@/lib/auth";
-import { subirFotoNormalizada } from "@/lib/blob-upload";
+import { subirFotoNormalizada, subirMusica } from "@/lib/blob-upload";
 
 export const runtime = "nodejs";
 
@@ -68,6 +68,15 @@ export async function POST(req: Request) {
         console.error("Erro ao processar o logo:", e);
         return Response.json({ ok: false, erro: "Não consegui processar o logo." });
       }
+    }
+
+    // Música (trilha do vídeo): sobe o áudio como veio (sem sharp — não é imagem).
+    if (tipo === "musica") {
+      const ehAudio = (file.type || "").startsWith("audio/") || /\.(mp3|m4a|aac|wav|ogg|oga)$/i.test(file.name);
+      if (!ehAudio) return Response.json({ ok: false, erro: "Envie um arquivo de música (MP3, M4A, WAV…)." });
+      if (file.size > 15 * 1024 * 1024) return Response.json({ ok: false, erro: "Música muito grande (máx. 15MB). Use uma faixa mais curta." });
+      const { url, nome } = await subirMusica(file);
+      return Response.json({ ok: true, url, nome });
     }
 
     // Demais imagens (fotos do banco/posts): normaliza pra JPEG e sobe no Blob.

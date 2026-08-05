@@ -154,6 +154,14 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
   );
 }
 
+// Nome amigável de uma trilha a partir da URL do Blob (tira o "123456-" e a extensão).
+function nomeDaMusica(url: string): string {
+  try {
+    const base = decodeURIComponent(url.split("/").pop() || "música");
+    return base.replace(/^\d+-/, "").replace(/\.[^.]+$/, "").replace(/_/g, " ").trim() || "música";
+  } catch { return "música"; }
+}
+
 // Card de um vídeo TEMÁTICO do buffet — mesma cara do card de festa, sem LGPD/aniversariante.
 function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTematicoView; ocupado: boolean; onAbrirSeletor: () => void; onExcluir: () => void }) {
   const [ver, setVer] = useState(false);
@@ -246,6 +254,8 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca }: { marcaId:
   const [msgTema, setMsgTema] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
   const [carregandoTema, setCarregandoTema] = useState<string | null>(null); // id do temático abrindo o seletor
   const [seletorTema, setSeletorTema] = useState<{ video: VideoTematicoView; fotos: FotoView[] } | null>(null);
+  // "Banco" de trilhas: as músicas já enviadas em outros vídeos desta marca, pra reusar sem re-upload.
+  const musicasBanco = Array.from(new Set(festas.map((f) => f.videoMusica).filter((u) => u && u.startsWith("http")))).map((url) => ({ url, nome: nomeDaMusica(url) }));
 
   // Auto-refresh enquanto algum vídeo está "Gerando": o motor monta na nuvem e avisa por callback
   // (salva no banco). Aqui o painel se atualiza sozinho a cada 12s pra o card virar "pronto" sem F5.
@@ -342,6 +352,8 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca }: { marcaId:
           textoFinalInicial={seletor.videoTextoFinal}
           tituloCapaInicial={seletor.videoTituloCapa}
           tituloCapaAuto={tituloCapaFesta(seletor.aniversariantes, rotuloAniversariantes(seletor.aniversariantes))}
+          musicaInicial={seletor.videoMusica}
+          musicasBanco={musicasBanco}
           corMarca={corMarca}
           jaTemVideo={seletor.videoUrl.startsWith("http")}
           onFechar={() => setSeletor(null)}

@@ -180,6 +180,9 @@ model Festa {
   // Título da CAPA do vídeo, escrito à mão pelo dono. "" = usa o automático ("Fulano fez X aninhos",
   // ver lib/aniversariantes.ts tituloCapaFesta). A rota /api/capa-festa desenha (quebra linha).
   videoTituloCapa String  @default("")
+  // Trilha sonora do vídeo desta festa (URL do MP3 no Blob, enviado pelo dono). "" = usa a música
+  // padrão do buffet (lib/musica-buffet.ts). Assim cada festa pode ter uma música própria.
+  videoMusica    String   @default("")
   // URL do VÍDEO/Reels já montado desta festa (no Blob). "" = ainda não gerado.
   videoUrl       String   @default("")
   // O gerente liga/desliga o card "Avalie no Google" no álbum dos pais (por festa).

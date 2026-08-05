@@ -42,7 +42,15 @@ function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   return {};
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+// Nome amigável de uma trilha a partir da URL do Blob (tira o "123456-" e a extensão).
+function nomeMusica(url: string): string {
+  try {
+    const base = decodeURIComponent(url.split("/").pop() || "música");
+    return base.replace(/^\d+-/, "").replace(/\.[^.]+$/, "").replace(/_/g, " ").trim() || "música";
+  } catch { return "música"; }
+}
+
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -55,6 +63,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   tituloCapaAuto?: string; // o título automático ("Fulano fez X aninhos") — vira o placeholder
   textosIniciais?: Record<string, string>; // legendas por foto (só no modo temático)
   narracao?: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz do vídeo
+  musicaInicial?: string;
+  musicasBanco?: { url: string; nome: string }[];
   corMarca?: string;
   jaTemVideo?: boolean;
   onFechar: () => void;
@@ -94,6 +104,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [escrevendoCta, setEscrevendoCta] = useState(false); // a Bia escrevendo a 2ª fala
   const [gerandoVoz, setGerandoVoz] = useState(false);
   const [msgVoz, setMsgVoz] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
+  const [musica, setMusica] = useState<string>(musicaInicial || ""); // trilha da festa ("" = música do buffet)
+  const [subindoMusica, setSubindoMusica] = useState(false); // enviando o MP3
 
   function toggle(id: string) {
     setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -252,7 +264,22 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
 
   async function salvarSelecao() {
     if (tematicoId) await salvarFotosVideoTematico(tematicoId, sel, capa, moldura, textoFinal, textos);
-    else await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal, tituloCapa);
+    else await salvarFotosVideo(festaId, sel, capa, moldura, textoFinal, tituloCapa, musica);
+  }
+  // Envia o MP3 (áudio) pro Blob e guarda a URL como a trilha desta festa.
+  async function enviarMusica(file?: File) {
+    if (!file) return;
+    setSubindoMusica(true);
+    setErroGerar("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const resp = await fetch("/api/marketing/upload?tipo=musica", { method: "POST", body: form });
+      const data = await resp.json();
+      if (data.ok && data.url) setMusica(data.url);
+      else setErroGerar(data.erro || "Não consegui enviar a música.");
+    } catch { setErroGerar("Não consegui enviar a música."); }
+    setSubindoMusica(false);
   }
   async function salvar() {
     setSalvando(true);
@@ -533,6 +560,36 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             </div>
             <input type="text" value={textoFinal} onChange={(e) => setTextoFinal(e.target.value)} maxLength={48} placeholder='Em branco = "Muito obrigado!"' className="mt-2 w-full rounded-lg border border-linha bg-preto px-3 py-2.5 text-sm text-white placeholder:text-muted/50 focus:border-vermelho focus:outline-none" />
             <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Essa frase aparece no <strong className="text-white/70">último quadro</strong> do vídeo, com o logo. Curtinha (até ~48 letras).</p>
+          </div>
+
+          {/* MÚSICA do vídeo — o dono envia o próprio MP3 (ou usa a padrão do buffet). As trilhas já
+              usadas em outros vídeos aparecem como atalho pra reusar sem enviar de novo. */}
+          <div className="mt-2.5 rounded-lg border border-linha bg-preto/40 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-white">🎵 Música do vídeo</span>
+              <label className={`shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 ${subindoMusica ? "opacity-60" : "cursor-pointer"}`}>
+                {subindoMusica ? "🎵 enviando…" : "🎵 Enviar música"}
+                <input type="file" accept="audio/*" className="hidden" disabled={subindoMusica} onChange={(e) => enviarMusica(e.target.files?.[0])} />
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] text-white/80">
+              {musica ? (
+                <>🎶 Usando: <strong className="text-white">{nomeMusica(musica)}</strong>
+                  <button type="button" onClick={() => setMusica("")} className="ml-1.5 rounded bg-white/10 px-2 py-0.5 font-semibold text-white transition hover:bg-vermelho">✕ usar a do buffet</button>
+                </>
+              ) : (
+                <>🎶 Usando a <strong className="text-white">música padrão do buffet</strong>.</>
+              )}
+            </p>
+            {musicasBanco.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] uppercase tracking-wider text-muted">Reusar:</span>
+                {musicasBanco.map((m) => (
+                  <button key={m.url} type="button" onClick={() => setMusica(m.url)} className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition ${musica === m.url ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:border-white/30 hover:text-white"}`}>🎵 {m.nome}</button>
+                ))}
+              </div>
+            )}
+            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis (ex: <strong className="text-white/70">Pixabay Music</strong>) e envie aqui (MP3). A música fica guardada pra reusar nos próximos vídeos.</p>
           </div>
 
           {/* 1) SUA SEQUÊNCIA — fotos grandes, arraste pra reordenar, × pra tirar */}

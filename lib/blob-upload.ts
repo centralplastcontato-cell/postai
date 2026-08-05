@@ -29,3 +29,16 @@ export async function subirFotoNormalizada(file: File): Promise<string> {
   });
   return blob.url;
 }
+
+// Sobe uma MÚSICA (MP3/áudio) pro Vercel Blob, como veio (sem sharp — não é imagem). Vira a
+// trilha sonora do vídeo da festa. Devolve a URL pública + o nome original (pra mostrar na tela).
+export async function subirMusica(file: File): Promise<{ url: string; nome: string }> {
+  const buf = Buffer.from(await file.arrayBuffer());
+  const nomeBase = file.name.replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9.-]/g, "_") || "musica";
+  const ext = (file.name.split(".").pop() || "mp3").toLowerCase().replace(/[^a-z0-9]/g, "") || "mp3";
+  const blob = await put(`musicas/${Date.now()}-${nomeBase}.${ext}`, buf, {
+    access: "public",
+    contentType: file.type || "audio/mpeg",
+  });
+  return { url: blob.url, nome: file.name };
+}
