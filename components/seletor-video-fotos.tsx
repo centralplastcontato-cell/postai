@@ -569,7 +569,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
               <span className="text-xs font-semibold text-white">🎵 Música do vídeo</span>
               <label className={`shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 ${subindoMusica ? "opacity-60" : "cursor-pointer"}`}>
                 {subindoMusica ? "🎵 enviando…" : "🎵 Enviar música"}
-                <input type="file" accept="audio/*" className="hidden" disabled={subindoMusica} onChange={(e) => enviarMusica(e.target.files?.[0])} />
+                {/* SEM accept="audio/*": no iPad esse filtro TRAVA os MP3 no seletor (bug do iOS).
+                    Sem filtro, o arquivo fica selecionável; o servidor valida que é áudio de verdade. */}
+                <input type="file" className="hidden" disabled={subindoMusica} onChange={(e) => enviarMusica(e.target.files?.[0])} />
               </label>
             </div>
             <p className="mt-2 text-[11px] text-white/80">
