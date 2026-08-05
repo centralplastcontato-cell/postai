@@ -327,6 +327,40 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?
   return { ok: true as const, total: ordenadas.length };
 }
 
+// Biblioteca de MÚSICAS da marca: as trilhas que o dono já enviou, pra reusar em qualquer vídeo.
+type MusicaBanco = { url: string; nome: string };
+function lerMusicas(json: string | null): MusicaBanco[] {
+  try {
+    const a = JSON.parse(json || "[]");
+    return Array.isArray(a) ? a.filter((m): m is MusicaBanco => !!m && typeof m.url === "string" && m.url.startsWith("http")) : [];
+  } catch { return []; }
+}
+
+// Lista as trilhas da biblioteca da marca (recebe o festaId só pra descobrir/guardar a marca).
+export async function listarMusicasDaMarca(festaId: string) {
+  const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada.", musicas: [] as MusicaBanco[] };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro, musicas: [] as MusicaBanco[] };
+  const marca = await prisma.marca.findUnique({ where: { id: festa.marcaId }, select: { musicas: true } });
+  return { ok: true as const, musicas: lerMusicas(marca?.musicas ?? "[]") };
+}
+
+// Adiciona uma trilha recém-enviada à biblioteca da marca (dedup por URL; mantém as últimas 40).
+export async function adicionarMusicaAoBanco(festaId: string, url: string, nome: string) {
+  const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada.", musicas: [] as MusicaBanco[] };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro, musicas: [] as MusicaBanco[] };
+  if (!url.startsWith("http")) return { ok: false as const, erro: "URL inválida.", musicas: [] as MusicaBanco[] };
+  const marca = await prisma.marca.findUnique({ where: { id: festa.marcaId }, select: { musicas: true } });
+  const atuais = lerMusicas(marca?.musicas ?? "[]").filter((m) => m.url !== url);
+  const lista = [{ url, nome: (nome || "música").slice(0, 80) }, ...atuais].slice(0, 40);
+  await prisma.marca.update({ where: { id: festa.marcaId }, data: { musicas: JSON.stringify(lista) } });
+  revalidatePath(`/painel/marcas/${festa.marcaId}`);
+  return { ok: true as const, musicas: lista };
+}
+
 // Cria um POST DE REELS agendado a partir do vídeo JÁ montado da festa. Entra na Agenda como
 // Publicacao formato="reels" (status a_postar), pronto pra revisar e ser postado pelo piloto.
 // TRAVA LGPD: festa sem autorização dos pais NUNCA vira divulgação pública.

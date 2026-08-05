@@ -5,9 +5,9 @@
 //  2) "Adicionar" — as disponíveis, toque na ordem que quiser e elas sobem pra sequência.
 // Arrastar acontece nas próprias fotos grandes (não numa tira pequena). Vazio = automático.
 
-import { useState, type CSSProperties } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo } from "@/app/actions/festas";
+import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
 import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
@@ -40,14 +40,6 @@ function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   if (m === "grossa") return { padding: 6 * esc, background: "#ffffff", borderRadius: 2 };
   if (m === "marca") return { padding: 3 * esc, background: cor, borderRadius: 2 };
   return {};
-}
-
-// Nome amigável de uma trilha a partir da URL do Blob (tira o "123456-" e a extensão).
-function nomeMusica(url: string): string {
-  try {
-    const base = decodeURIComponent(url.split("/").pop() || "música");
-    return base.replace(/^\d+-/, "").replace(/\.[^.]+$/, "").replace(/_/g, " ").trim() || "música";
-  } catch { return "música"; }
 }
 
 export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
@@ -106,6 +98,21 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [msgVoz, setMsgVoz] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
   const [musica, setMusica] = useState<string>(musicaInicial || ""); // trilha da festa ("" = música do buffet)
   const [subindoMusica, setSubindoMusica] = useState(false); // enviando o MP3
+  const [banco, setBanco] = useState<{ url: string; nome: string }[]>(musicasBanco); // biblioteca de trilhas da marca
+  const [tocando, setTocando] = useState<string>(""); // URL da música tocando agora ("" = nenhuma)
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Ao abrir (vídeo de FESTA), busca a biblioteca de músicas já enviadas pra esta marca.
+  useEffect(() => {
+    if (tematicoId) return;
+    listarMusicasDaMarca(festaId).then((r) => { if (r.ok && r.musicas.length) setBanco(r.musicas); }).catch(() => {});
+  }, [festaId, tematicoId]);
+  // Toca/pausa uma trilha pra ouvir antes de escolher (um player só; tocar outra troca a fonte).
+  function ouvir(url: string) {
+    const a = audioRef.current;
+    if (!a) return;
+    if (tocando === url) { a.pause(); setTocando(""); return; }
+    a.src = url; a.currentTime = 0; a.play().catch(() => {}); setTocando(url);
+  }
 
   function toggle(id: string) {
     setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -276,8 +283,14 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       form.append("file", file);
       const resp = await fetch("/api/marketing/upload?tipo=musica", { method: "POST", body: form });
       const data = await resp.json();
-      if (data.ok && data.url) setMusica(data.url);
-      else setErroGerar(data.erro || "Não consegui enviar a música.");
+      if (data.ok && data.url) {
+        setMusica(data.url); // já deixa a nova música escolhida
+        // Guarda na BIBLIOTECA da marca pra reusar nos próximos vídeos (e mostra já na lista).
+        const nome = data.nome || file.name;
+        const r = await adicionarMusicaAoBanco(festaId, data.url, nome).catch(() => null);
+        if (r?.ok) setBanco(r.musicas);
+        else setBanco((b) => (b.some((m) => m.url === data.url) ? b : [{ url: data.url, nome }, ...b]));
+      } else setErroGerar(data.erro || "Não consegui enviar a música.");
     } catch { setErroGerar("Não consegui enviar a música."); }
     setSubindoMusica(false);
   }
@@ -562,37 +575,47 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Essa frase aparece no <strong className="text-white/70">último quadro</strong> do vídeo, com o logo. Curtinha (até ~48 letras).</p>
           </div>
 
-          {/* MÚSICA do vídeo — o dono envia o próprio MP3 (ou usa a padrão do buffet). As trilhas já
-              usadas em outros vídeos aparecem como atalho pra reusar sem enviar de novo. */}
+          {/* MÚSICA do vídeo (só no vídeo de FESTA) — o dono envia o MP3, OUVE (▶️) e ESCOLHE numa
+              lista. As trilhas enviadas ficam na BIBLIOTECA da marca pra reusar em qualquer vídeo. */}
+          {!tematicoId && (
           <div className="mt-2.5 rounded-lg border border-linha bg-preto/40 px-3 py-2.5">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-white">🎵 Música do vídeo</span>
               <label className={`shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 ${subindoMusica ? "opacity-60" : "cursor-pointer"}`}>
-                {subindoMusica ? "🎵 enviando…" : "🎵 Enviar música"}
+                {subindoMusica ? "🎵 enviando…" : "➕ Enviar música"}
                 {/* SEM accept="audio/*": no iPad esse filtro TRAVA os MP3 no seletor (bug do iOS).
                     Sem filtro, o arquivo fica selecionável; o servidor valida que é áudio de verdade. */}
                 <input type="file" className="hidden" disabled={subindoMusica} onChange={(e) => enviarMusica(e.target.files?.[0])} />
               </label>
             </div>
-            <p className="mt-2 text-[11px] text-white/80">
-              {musica ? (
-                <>🎶 Usando: <strong className="text-white">{nomeMusica(musica)}</strong>
-                  <button type="button" onClick={() => setMusica("")} className="ml-1.5 rounded bg-white/10 px-2 py-0.5 font-semibold text-white transition hover:bg-vermelho">✕ usar a do buffet</button>
-                </>
-              ) : (
-                <>🎶 Usando a <strong className="text-white">música padrão do buffet</strong>.</>
-              )}
-            </p>
-            {musicasBanco.length > 0 && (
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <span className="text-[10px] uppercase tracking-wider text-muted">Reusar:</span>
-                {musicasBanco.map((m) => (
-                  <button key={m.url} type="button" onClick={() => setMusica(m.url)} className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition ${musica === m.url ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:border-white/30 hover:text-white"}`}>🎵 {m.nome}</button>
-                ))}
-              </div>
-            )}
-            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis (ex: <strong className="text-white/70">Pixabay Music</strong>) e envie aqui (MP3). A música fica guardada pra reusar nos próximos vídeos.</p>
+
+            {/* Lista pra ESCOLHER: 1ª opção é a do buffet; depois as enviadas (▶️ pra ouvir antes). */}
+            <div className="mt-2 flex flex-col gap-1.5">
+              <button type="button" onClick={() => setMusica("")} className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition ${!musica ? "border-[#7c3aed] bg-[#7c3aed]/15" : "border-linha hover:border-white/30"}`}>
+                <span className="text-base">🏰</span>
+                <span className="flex-1 truncate text-[12px] font-semibold text-white">Música padrão do buffet</span>
+                {!musica && <span className="shrink-0 text-[10px] font-bold text-[#c7b2ff]">✓ escolhida</span>}
+              </button>
+              {banco.map((m) => {
+                const escolhida = musica === m.url;
+                const play = tocando === m.url;
+                return (
+                  <div key={m.url} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 transition ${escolhida ? "border-[#7c3aed] bg-[#7c3aed]/15" : "border-linha"}`}>
+                    <button type="button" onClick={() => ouvir(m.url)} aria-label={play ? "Pausar" : "Ouvir"} title={play ? "Pausar" : "Ouvir esta música"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/50 text-sm text-white transition hover:bg-[#7c3aed]">{play ? "⏸" : "▶️"}</button>
+                    <button type="button" onClick={() => setMusica(m.url)} className="min-w-0 flex-1 truncate text-left text-[12px] font-semibold text-white">🎵 {m.nome}</button>
+                    {escolhida && <span className="shrink-0 text-[10px] font-bold text-[#c7b2ff]">✓ escolhida</span>}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* player ÚNICO (escondido) que o ▶️/⏸ de cada trilha controla */}
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <audio ref={audioRef} onEnded={() => setTocando("")} className="hidden" />
+
+            <p className="mt-2 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis (ex: <strong className="text-white/70">Pixabay Music</strong>) e toque em <strong className="text-white/70">➕ Enviar música</strong>. Use o <strong className="text-white/70">▶️</strong> pra ouvir antes de escolher — as enviadas ficam guardadas aqui pra reusar.</p>
           </div>
+          )}
 
           {/* 1) SUA SEQUÊNCIA — fotos grandes, arraste pra reordenar, × pra tirar */}
           {escolhidas.length > 0 && (
