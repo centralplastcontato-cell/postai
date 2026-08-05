@@ -253,6 +253,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   function sugerir() {
     setSel(montarSugestao());
   }
+  // Reencaixa as fotos ESCOLHIDAS na ordem narrativa (as que você adicionou na mão saem do fim e
+  // vão pro lugar do momento delas). Mantém o MESMO conjunto de fotos — só muda a ORDEM.
+  function reorganizar() {
+    const pos = new Map(galeria.map((f, i) => [f.id, i]));
+    setSel((s) => [...s].sort((a, b) => (pos.get(a) ?? 9999) - (pos.get(b) ?? 9999)));
+  }
   // A Bia gera uma frase carinhosa de encerramento (festa: nome/idade/tema; temático: o tema).
   async function biaEscreve() {
     setGerandoTexto(true);
@@ -435,6 +441,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
           </span>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={sugerir} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">✨ Sugerir</button>
+            {sel.length > 1 && <button onClick={reorganizar} title="Reencaixa as fotos que você adicionou na mão no lugar certo (na ordem dos momentos)" className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">🔀 Reorganizar</button>}
             {sel.length > 0 && <button onClick={() => setSel([])} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-white">Limpar</button>}
             <button onClick={salvar} disabled={salvando} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho disabled:opacity-60">{salvando ? "…" : "Salvar"}</button>
             <button onClick={salvarEGerar} disabled={salvando || sel.length === 0} title={sel.length === 0 ? "Escolha as fotos primeiro" : "Salvar a seleção e gerar o vídeo"} className="rounded-lg bg-[#7c3aed] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{jaTemVideo ? "🔄 Refazer vídeo" : "⚡ Gerar vídeo"}</button>
