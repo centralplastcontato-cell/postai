@@ -328,8 +328,10 @@ export async function gerarVideoTematico(videoId: string) {
   base = base.replace(/\/$/, "");
   // O ?v= é a ÚNICA chave de cache do quadro: precisa mudar quando QUALQUER coisa desenhada
   // muda — legenda, fotos, capa, a URL de cada foto E a identidade da marca (cor/logo/site).
+  // "q2" = VERSÃO do desenho do quadro (fundo virou foto BORRADA). Bumpar isso quando o visual do
+  // quadro muda força a CDN a redesenhar (o ?v= só depende de dados; sem isso, serviria o antigo).
   const versao = hashCurto(
-    [v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
+    ["q2", v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
 
   let fotosMotor: string[];

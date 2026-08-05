@@ -107,10 +107,30 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
           ? 50
           : 58;
 
+    // FUNDO: a própria foto BORRADA e escurecida preenche a tela (visual moderno, sem o bloco de
+    // cor) — mesmo estilo que o motor usa nos quadros sem legenda, agora consistente. Blur com
+    // sharp (o next/og não suporta filtro de blur). Se falhar, cai no degradê das cores da marca.
+    let bgBlur = "";
+    try {
+      const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
+      const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).blur(30).modulate({ brightness: 0.5 }).jpeg({ quality: 62 }).toBuffer();
+      bgBlur = `data:image/jpeg;base64,${b.toString("base64")}`;
+    } catch (e) {
+      console.error("Não consegui borrar o fundo (uso o degradê):", e);
+    }
+
     const png = await new ImageResponse(
       (
-        <div
+        <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative", fontFamily: "Baloo" }}>
+          {bgBlur ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={bgBlur} width={L} height={A} style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, objectFit: "cover" }} />
+          ) : null}
+          <div
           style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
             width: `${L}px`,
             height: `${A}px`,
             display: "flex",
@@ -119,8 +139,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
             justifyContent: "center",
             // O rodapé (ou o topo, na capa) é do LOGO do motor — nada nosso nessas faixas.
             padding: ehCapa ? "215px 60px 150px" : "60px 60px 210px",
-            backgroundImage: `linear-gradient(160deg, ${cor} 0%, ${fundo} 100%)`,
-            fontFamily: "Baloo",
+            // com fundo borrado: leve escurecida pra o branco (moldura/texto) destacar; sem blur = degradê da marca.
+            backgroundImage: bgBlur
+              ? "linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.60) 100%)"
+              : `linear-gradient(160deg, ${cor} 0%, ${fundo} 100%)`,
           }}
         >
           {/* a FOTO, com a moldura branca justa nela */}
@@ -163,6 +185,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
             ) : (
               <div style={{ display: "flex" }} />
             )}
+          </div>
           </div>
         </div>
       ),
