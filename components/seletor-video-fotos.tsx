@@ -65,7 +65,17 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // galeria ordenada por momento (narrativa) — base pra parte "disponíveis".
   // No modo temático as fotos já chegam na ordem certa (sugeridas primeiro) — não regrupa.
   const galeria = tematicoId ? fotos : ORDEM.flatMap((m) => fotos.filter((f) => f.momento === m)).concat(fotos.filter((f) => !ORDEM.includes(f.momento)));
-  const [sel, setSel] = useState<string[]>(inicial.filter((id) => fotos.some((f) => f.id === id)));
+  // Sugestão AUTOMÁTICA da sequência (narrativa): salão → brinquedos → aniversariante → parabéns
+  // → momentos, ~6 por etapa (até 28). É a mesma lógica do botão "✨ Sugerir".
+  function montarSugestao(): string[] {
+    if (tematicoId) return galeria.slice(0, 26).map((f) => f.id);
+    const sug: string[] = [];
+    for (const m of ORDEM) sug.push(...fotos.filter((f) => f.momento === m).slice(0, 6).map((f) => f.id));
+    return sug.slice(0, 28);
+  }
+  const salvas = inicial.filter((id) => fotos.some((f) => f.id === id));
+  // Sem seleção salva → já abre com a sequência sugerida (pronta pra gerar). Com seleção salva, mantém a do dono.
+  const [sel, setSel] = useState<string[]>(salvas.length ? salvas : montarSugestao());
   const [salvando, setSalvando] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null); // foto sendo arrastada (PC ou alça)
   const [ampliada, setAmpliada] = useState<FotoView | null>(null); // foto aberta em tela cheia
@@ -160,11 +170,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (alvoId) moverFoto(dragId, alvoId);
   }
   function sugerir() {
-    // Temático: a galeria já chega na ordem sugerida pela IA — pega as primeiras.
-    if (tematicoId) { setSel(galeria.slice(0, 26).map((f) => f.id)); return; }
-    const sug: string[] = [];
-    for (const m of ORDEM) sug.push(...fotos.filter((f) => f.momento === m).slice(0, 5).map((f) => f.id));
-    setSel(sug.slice(0, 24));
+    setSel(montarSugestao());
   }
   // A Bia gera uma frase carinhosa de encerramento (festa: nome/idade/tema; temático: o tema).
   async function biaEscreve() {
