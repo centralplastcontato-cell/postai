@@ -586,14 +586,18 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
               lista. As trilhas enviadas ficam na BIBLIOTECA da marca pra reusar em qualquer vídeo. */}
           {!tematicoId && (
           <div className="mt-2.5 rounded-lg border border-linha bg-preto/40 px-3 py-2.5">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-semibold text-white">🎵 Música do vídeo</span>
-              <label className={`shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 ${subindoMusica ? "opacity-60" : "cursor-pointer"}`}>
-                {subindoMusica ? "🎵 enviando…" : "➕ Enviar música"}
-                {/* SEM accept="audio/*": no iPad esse filtro TRAVA os MP3 no seletor (bug do iOS).
-                    Sem filtro, o arquivo fica selecionável; o servidor valida que é áudio de verdade. */}
-                <input type="file" className="hidden" disabled={subindoMusica} onChange={(e) => enviarMusica(e.target.files?.[0])} />
-              </label>
+              <div className="flex shrink-0 items-center gap-1.5">
+                {/* Baixar mais trilhas grátis (Pixabay Music) — abre em aba nova; depois é só Enviar. */}
+                <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" title="Abrir o Pixabay Music (trilhas grátis e liberadas) numa aba nova" className="rounded-lg border border-linha px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:border-white/30 hover:text-white">🔎 Buscar músicas</a>
+                <label className={`rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 ${subindoMusica ? "opacity-60" : "cursor-pointer"}`}>
+                  {subindoMusica ? "🎵 enviando…" : "➕ Enviar música"}
+                  {/* SEM accept="audio/*": no iPad esse filtro TRAVA os MP3 no seletor (bug do iOS).
+                      Sem filtro, o arquivo fica selecionável; o servidor valida que é áudio de verdade. */}
+                  <input type="file" className="hidden" disabled={subindoMusica} onChange={(e) => enviarMusica(e.target.files?.[0])} />
+                </label>
+              </div>
             </div>
 
             {/* Lista pra ESCOLHER: 1ª opção é a do buffet; depois as enviadas (▶️ pra ouvir antes). */}
@@ -624,7 +628,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <audio ref={audioRef} onEnded={() => setTocando("")} className="hidden" />
 
-            <p className="mt-2 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis (ex: <strong className="text-white/70">Pixabay Music</strong>) e toque em <strong className="text-white/70">➕ Enviar música</strong>. Use o <strong className="text-white/70">▶️</strong> pra ouvir antes de escolher — as enviadas ficam guardadas aqui pra reusar.</p>
+            <p className="mt-2 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis em <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#c7b2ff] underline">Pixabay Music</a> (botão <strong className="text-white/70">🔎 Buscar músicas</strong>) e toque em <strong className="text-white/70">➕ Enviar música</strong>. Use o <strong className="text-white/70">▶️</strong> pra ouvir antes de escolher — as enviadas ficam guardadas aqui pra reusar.</p>
           </div>
           )}
 
