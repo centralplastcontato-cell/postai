@@ -113,6 +113,20 @@ const RAMP_S = 0.4; // rampa suave ao abaixar/subir a música na entrada/saída 
 // Assim TODAS as fotos aparecem: a voz vende no começo, a música carrega o meio e a 2ª fala fecha
 // com o convite. `alvoSegundos` = tamanho do vídeo INTEIRO (todas as fotos) — a música estica até lá.
 // A música DUCKA (abaixa) sob as falas e sobe no meio; a soma nunca estoura (a voz cede o espaço dela).
+// Normaliza a música pelo PICO: faixas gravadas baixas ganham volume até usar quase toda a
+// escala (pico ~0,95). Só AUMENTA (nunca abaixa) — assim o slider parte de um nível cheio e o
+// "máximo" fica alto de verdade, independente de como a faixa foi masterizada.
+function normalizarPico(pcm: Int16Array, alvo = 0.95): Int16Array {
+  let pico = 0;
+  for (let i = 0; i < pcm.length; i++) { const a = Math.abs(pcm[i]); if (a > pico) pico = a; }
+  if (pico < 1) return pcm;
+  const ganho = (alvo * 32767) / pico;
+  if (ganho <= 1.02) return pcm; // já está alto o suficiente
+  const out = new Int16Array(pcm.length);
+  for (let i = 0; i < pcm.length; i++) out[i] = Math.max(-32768, Math.min(32767, Math.round(pcm[i] * ganho)));
+  return out;
+}
+
 function montarTrilha(
   voz1: Int16Array,
   voz2: Int16Array | null,
@@ -124,8 +138,8 @@ function montarTrilha(
   // volMusica agora é a FRAÇÃO do slider (0..1). Traduz em ganhos reais e AUDÍVEIS: sob a voz a
   // música é abafada (ducking, pra não competir); no MEIO (sem voz) ela sobe de verdade.
   const g = Math.max(0, Math.min(1, volMusica ?? VOL_JINGLE));
-  const volBaixo = temJingle ? g * 0.35 : 0; // sob a voz (abafada): 0 → 0,35
-  const volMeio = temJingle && g > 0 ? 0.25 + g * 0.65 : volBaixo; // no meio (só música): 0,25 → 0,9
+  const volBaixo = temJingle ? g * 0.45 : 0; // sob a voz (abafada, mas presente): 0 → 0,45
+  const volMeio = temJingle && g > 0 ? 0.3 + g * 0.7 : volBaixo; // no meio (só música): 0,3 → 1,0 (cheio)
   const gap = Math.round(GAP_S * TAXA);
   const ramp = Math.round(RAMP_S * TAXA);
   const tail = Math.round(RABICHO_S * TAXA);
@@ -214,6 +228,7 @@ export async function gerarNarracaoMp3(opts: {
   let jingle: Int16Array | null = null;
   if (opts.musicaWav) jingle = await carregarPcm(opts.musicaWav); // a trilha escolhida
   if (!jingle && JINGLES_PCM[opts.slugMarca]) jingle = await carregarPcm(JINGLES_PCM[opts.slugMarca]); // rede de proteção
+  if (jingle) jingle = normalizarPico(jingle); // faixas baixas ganham volume (pra o slider ter faixa cheia)
 
   const { pcm, segundos } = montarTrilha(voz1, voz2, jingle, opts.volMusica, opts.alvoSegundos);
   const mp3 = encodarMp3(pcm);
