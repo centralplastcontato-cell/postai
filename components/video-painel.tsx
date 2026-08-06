@@ -258,7 +258,7 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
   );
 }
 
-export function VideoPainel({ marcaId, festas, tematicos, corMarca }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string }) {
+export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco = [] }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string; capasBanco?: string[] }) {
   const router = useRouter();
   const [seletor, setSeletor] = useState<FestaView | null>(null);
   // criação/edição de vídeo TEMÁTICO
@@ -391,6 +391,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca }: { marcaId:
           capaEstiloInicial={seletorTema.video.capaEstilo}
           capaIaUrlInicial={seletorTema.video.capaIaUrl}
           capaRecorteUrlInicial={seletorTema.video.capaRecorteUrl}
+          capasBanco={capasBanco}
           musicaInicial={seletorTema.video.videoMusica}
           musicasBanco={musicasBanco}
           corMarca={corMarca}

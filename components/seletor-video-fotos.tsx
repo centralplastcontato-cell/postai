@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
 const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
@@ -132,7 +132,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -153,6 +153,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   capaEstiloInicial?: string; // estilo da capa (temático): "" (clássica) | "impacto" (chamativa) | "ia"
   capaIaUrlInicial?: string; // URL da arte de capa gerada pela IA (quando estilo = "ia")
   capaRecorteUrlInicial?: string; // URL da foto recortada (quando estilo = "recortado")
+  capasBanco?: string[]; // biblioteca de artes de capa (IA) da marca, pra reusar
   corMarca?: string;
   jaTemVideo?: boolean;
   onFechar: () => void;
@@ -186,6 +187,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [capaIaUrl, setCapaIaUrl] = useState<string>(capaIaUrlInicial || ""); // arte de capa gerada pela IA
   const [gerandoCapaIa, setGerandoCapaIa] = useState(false);
   const [erroCapaIa, setErroCapaIa] = useState("");
+  const [bancoCapa, setBancoCapa] = useState<string[]>(capasBanco); // biblioteca de artes de capa (IA) da marca
   const [capaRecorteUrl, setCapaRecorteUrl] = useState<string>(capaRecorteUrlInicial || ""); // foto recortada (sem fundo)
   const [gerandoRecorte, setGerandoRecorte] = useState(false);
   const [erroRecorte, setErroRecorte] = useState("");
@@ -238,6 +240,15 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!r.ok) { setErroCapaIa(r.erro || "Não consegui gerar agora."); return; }
     setCapaIaUrl(r.url);
     setCapaEstilo("ia");
+    if (r.capas) setBancoCapa(r.capas); // atualiza a biblioteca com a nova arte
+  }
+  // Reaproveita uma arte de capa JÁ salva na biblioteca (sem gerar de novo → de graça).
+  async function usarArteSalva(url: string) {
+    if (!tematicoId) return;
+    setCapaIaUrl(url);
+    setCapaEstilo("ia");
+    setErroCapaIa("");
+    aplicarCapaIa(tematicoId, url).catch(() => {});
   }
   // Recorta o assunto da foto da capa (tira o fundo) com IA. Ao terminar, deixa o estilo em "recortado".
   async function gerarRecorte() {
@@ -1137,6 +1148,21 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                         <button type="button" onClick={gerarArteCapa} disabled={gerandoCapaIa} className="mt-2 w-full rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-60">{gerandoCapaIa ? "🎨 criando a arte… (uns 15-30s)" : capaIaUrl ? "🔄 Gerar outra arte" : "✨ Gerar arte com IA"}</button>
                         {erroCapaIa && <p className="mt-1.5 text-[11px] font-semibold text-vermelho">{erroCapaIa}</p>}
                         {!capaIaUrl && !gerandoCapaIa && !erroCapaIa && <p className="mt-1.5 text-[10px] leading-snug text-amber-300/80">Ainda sem arte — toque em ✨ Gerar. Enquanto não gera, a capa usa a sua foto.</p>}
+                        {/* BIBLIOTECA de artes já geradas (reusar sem gastar) */}
+                        {bancoCapa.length > 0 && (
+                          <div className="mt-2.5 border-t border-white/10 pt-2">
+                            <p className="mb-1.5 text-[10px] font-semibold text-white/80">🖼️ Suas artes salvas <span className="font-normal text-muted">— toque pra reusar (de graça)</span></p>
+                            <div className="flex gap-1.5 overflow-x-auto pb-1">
+                              {bancoCapa.map((u) => (
+                                <button key={u} type="button" onClick={() => usarArteSalva(u)} className={`relative shrink-0 overflow-hidden rounded-lg border-2 transition ${capaIaUrl === u ? "border-[#a855f7] ring-2 ring-[#a855f7]/40" : "border-white/10 opacity-80 hover:opacity-100"}`}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={u} alt="" className="h-20 w-[52px] object-cover" />
+                                  {capaIaUrl === u && <span className="absolute bottom-0 right-0 rounded-tl bg-[#a855f7] px-1 text-[9px] font-bold text-white">✓</span>}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

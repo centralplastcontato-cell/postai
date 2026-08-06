@@ -11,6 +11,7 @@ export type MarcaView = {
   nome: string;
   corPrimaria: string;
   corFundo: string;
+  capasArte?: string[]; // biblioteca de artes de capa (IA) da marca, pra reusar
   paleta: string; // JSON array de hex
   logoTexto: string;
   logoUrl: string;

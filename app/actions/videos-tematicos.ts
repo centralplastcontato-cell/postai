@@ -254,6 +254,13 @@ function lerMusicas(json: string | null): MusicaBanco[] {
     return Array.isArray(a) ? a.filter((m): m is MusicaBanco => !!m && typeof m.url === "string" && m.url.startsWith("http")) : [];
   } catch { return []; }
 }
+// Biblioteca de ARTES de capa (JSON de URLs) — pra guardar/reusar as capas geradas pela IA.
+function lerListaUrls(json: string | null): string[] {
+  try {
+    const a = JSON.parse(json || "[]");
+    return Array.isArray(a) ? a.filter((x): x is string => typeof x === "string" && x.startsWith("http")) : [];
+  } catch { return []; }
+}
 // Lista as trilhas da marca + o link do jingle do buffet (recebe o videoId só pra achar a marca).
 export async function listarMusicasDaMarcaTema(videoId: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
@@ -370,15 +377,30 @@ export async function gerarCapaIa(videoId: string) {
     if (!b64) return { ok: false as const, erro: "A IA não devolveu a imagem. Tente de novo." };
     const { put } = await import("@vercel/blob");
     const blob = await put(`${v.marcaId}/capa-ia-${videoId}-${Date.now()}.png`, Buffer.from(b64, "base64"), { access: "public", contentType: "image/png" });
-    const antigo = v.capaIaUrl;
     await prisma.videoTematico.update({ where: { id: videoId }, data: { capaIaUrl: blob.url, capaEstilo: "ia" } });
-    if (antigo && antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
+    // Guarda na BIBLIOTECA de artes da marca pra reusar em outros vídeos (sem repetir, mais novas na frente, máx 24).
+    const m = await prisma.marca.findUnique({ where: { id: v.marcaId }, select: { capasArte: true } });
+    const capas = [blob.url, ...lerListaUrls(m?.capasArte ?? "").filter((u) => u !== blob.url)].slice(0, 24);
+    await prisma.marca.update({ where: { id: v.marcaId }, data: { capasArte: JSON.stringify(capas) } });
     revalidatePath(`/painel/marcas/${v.marcaId}`);
-    return { ok: true as const, url: blob.url };
+    return { ok: true as const, url: blob.url, capas };
   } catch (e) {
     console.error("Erro ao gerar capa IA:", e);
     return { ok: false as const, erro: "Não consegui gerar a capa agora. Tente de novo." };
   }
+}
+
+// Reaproveita uma arte de capa JÁ salva na biblioteca da marca (sem gerar de novo → de graça).
+export async function aplicarCapaIa(videoId: string, url: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const m = await prisma.marca.findUnique({ where: { id: v.marcaId }, select: { capasArte: true } });
+  if (!lerListaUrls(m?.capasArte ?? "").includes(url)) return { ok: false as const, erro: "Arte não está na biblioteca." };
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { capaIaUrl: url, capaEstilo: "ia" } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, url };
 }
 
 // Recorta o ASSUNTO da foto da capa (tira o fundo, deixa transparente) com gpt-image-1 (edits). O

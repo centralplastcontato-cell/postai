@@ -343,6 +343,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     nome: marca.nome,
     corPrimaria: marca.corPrimaria,
     corFundo: marca.corFundo,
+    capasArte: (() => { try { const a = JSON.parse(marca.capasArte || "[]"); return Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string" && x.startsWith("http")) : []; } catch { return []; } })(),
     paleta: marca.paleta,
     logoTexto: marca.logoTexto,
     logoUrl: marca.logoUrl,

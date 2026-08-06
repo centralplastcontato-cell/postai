@@ -22,6 +22,7 @@ model Marca {
   paleta      String   @default("[]") // cores vivas do logo (JSON array de hex) — régua/detalhes multicolor nas artes
   logoTexto   String   @default("") // texto da faixa da marca (ex: "CASTELO DA DIVERSÃO")
   musicas     String   @default("[]") // biblioteca de trilhas do vídeo enviadas pelo dono: JSON [{url,nome}]
+  capasArte   String   @default("[]") // biblioteca de ARTES de capa geradas pela IA (pra reusar): JSON [url,...]
   logoUrl     String   @default("") // logotipo (PNG) — aparece na faixa da arte e a IA lê as cores dele
   site        String   @default("") // aparece no rodapé das artes
   telefone    String   @default("") // aparece no rodapé/CTA
