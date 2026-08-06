@@ -406,17 +406,18 @@ export async function aplicarCapaIa(videoId: string, url: string) {
 // Recorta o ASSUNTO da foto da capa (tira o fundo, deixa transparente) com gpt-image-1 (edits). O
 // recorte preserva a foto real (só remove o fundo) e é montado depois sobre um fundo colorido +
 // texto no /api/quadro-tema. Já marca capaEstilo = "recortado". Custa uns centavos e leva alguns segundos.
-export async function gerarRecorteCapa(videoId: string) {
+export async function gerarRecorteCapa(videoId: string, fotoIdParam?: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoCapa: true, videoFotos: true, capaRecorteUrl: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
-  // a foto da capa (a escolhida, ou a 1ª da sequência) — validada como divulgável (LGPD, igual quadro-tema).
+  // a foto a recortar: a ESCOLHIDA AGORA na tela (fotoIdParam) tem prioridade; senão a capa salva
+  // ou a 1ª da sequência. Sempre validada como divulgável (LGPD, igual quadro-tema).
   let ids: string[] = [];
   try { const a = JSON.parse(v.videoFotos || "[]"); ids = Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string") : []; } catch {}
-  const fotoId = v.videoCapa || ids[0];
+  const fotoId = (fotoIdParam && fotoIdParam.trim()) || v.videoCapa || ids[0];
   if (!fotoId) return { ok: false as const, erro: "Escolha a foto da capa primeiro." };
   const img = await prisma.imagemMarca.findFirst({ where: { id: fotoId, marcaId: v.marcaId, OR: [{ festaId: null }, { festa: { autorizacao: "autorizada" } }] }, select: { url: true } });
   if (!img) return { ok: false as const, erro: "Foto indisponível." };

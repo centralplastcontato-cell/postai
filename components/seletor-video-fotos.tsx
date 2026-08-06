@@ -255,7 +255,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId || gerandoRecorte) return;
     setGerandoRecorte(true);
     setErroRecorte("");
-    const r = await gerarRecorteCapa(tematicoId).catch(() => ({ ok: false as const, erro: "Não consegui recortar agora." }));
+    const r = await gerarRecorteCapa(tematicoId, capaId || undefined).catch(() => ({ ok: false as const, erro: "Não consegui recortar agora." }));
     setGerandoRecorte(false);
     if (!r.ok) { setErroRecorte(r.erro || "Não consegui recortar agora."); return; }
     setCapaRecorteUrl(r.url);
