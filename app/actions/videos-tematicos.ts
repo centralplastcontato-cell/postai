@@ -313,10 +313,48 @@ export async function definirCapaEstilo(videoId: string, estilo: string) {
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const valor = estilo === "impacto" ? "impacto" : ""; // só aceita os dois estilos
+  const valor = estilo === "impacto" ? "impacto" : estilo === "ia" ? "ia" : ""; // só aceita os estilos conhecidos
   await prisma.videoTematico.update({ where: { id: videoId }, data: { capaEstilo: valor } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, estilo: valor };
+}
+
+// Gera uma ARTE de capa festiva com IA (gpt-image-1) e guarda no Blob. É um fundo decorativo
+// (balões, confete, cores da marca) SEM pessoas/rostos/texto — a chamada é escrita por cima depois,
+// no /api/quadro-tema. Já marca capaEstilo = "ia". Custa uns centavos e leva alguns segundos.
+export async function gerarCapaIa(videoId: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, include: { marca: { select: { nome: true, corPrimaria: true } } } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  const cor = v.marca.corPrimaria || "#7C3AED";
+  const tema = (v.titulo || "").trim();
+  // Fundo festivo abstrato — nunca pessoas/rostos/texto (a chamada entra por cima; rosto de IA
+  // ia distorcer). Espaço livre embaixo pra o título. Vertical 9:16.
+  const prompt = `Arte de CAPA vertical (thumbnail) super chamativa e festiva pra um vídeo de rede social de um buffet infantil chamado "${v.marca.nome}"${tema ? `, no clima de "${tema}"` : ""}. Fundo decorativo alegre e vibrante: balões, confete, brilhos, estrelas e formas divertidas, cores fortes com destaque para ${cor}, luz de festa. Deixe um GRANDE espaço mais escuro/limpo na parte de BAIXO pra escrever um título depois. NÃO desenhe pessoas, rostos, crianças, texto, letras, números nem logotipos — apenas a arte de fundo. Formato vertical 9:16.`;
+  try {
+    const resp = await fetch("https://api.openai.com/v1/images/generations", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "gpt-image-1", prompt, n: 1, size: "1024x1536" }),
+    });
+    if (!resp.ok) return { ok: false as const, erro: `A IA não respondeu agora (${resp.status}). Tente de novo.` };
+    const data = await resp.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) return { ok: false as const, erro: "A IA não devolveu a imagem. Tente de novo." };
+    const { put } = await import("@vercel/blob");
+    const blob = await put(`${v.marcaId}/capa-ia-${videoId}-${Date.now()}.png`, Buffer.from(b64, "base64"), { access: "public", contentType: "image/png" });
+    const antigo = v.capaIaUrl;
+    await prisma.videoTematico.update({ where: { id: videoId }, data: { capaIaUrl: blob.url, capaEstilo: "ia" } });
+    if (antigo && antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
+    revalidatePath(`/painel/marcas/${v.marcaId}`);
+    return { ok: true as const, url: blob.url };
+  } catch (e) {
+    console.error("Erro ao gerar capa IA:", e);
+    return { ok: false as const, erro: "Não consegui gerar a capa agora. Tente de novo." };
+  }
 }
 
 // Renomeia o vídeo do buffet (o "titulo" — ex: "Promo agosto 02"). É o nome interno pra organizar.

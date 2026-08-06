@@ -112,12 +112,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     const modo = v.videoFundo === "cheia" ? "cheia" : "desfocada";
     // CAPA CHAMATIVA ("impacto"): só no quadro 0 e quando o dono escolheu esse estilo. Foto na tela
     // toda + texto GIGANTE com contorno (tipo thumbnail de YouTube), seja qual for o fundo dos outros quadros.
-    const capaImpacto = ehCapa && v.capaEstilo === "impacto";
+    // Capa "grande" (fundo na tela toda + texto gigante embaixo): "impacto" usa a SUA foto,
+    // "ia" usa a ARTE festiva gerada pela IA. Layout é o mesmo; muda só a imagem de fundo.
+    const capaGrande = ehCapa && (v.capaEstilo === "impacto" || v.capaEstilo === "ia");
 
     // Fundo borrado (modo padrão): borra a foto com sharp (o next/og não faz blur). Se falhar,
     // cai no degradê das cores da marca.
     let bgBlur = "";
-    if (modo === "desfocada" && !capaImpacto) {
+    if (modo === "desfocada" && !capaGrande) {
       try {
         const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
         const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).blur(30).modulate({ brightness: 0.5 }).jpeg({ quality: 62 }).toBuffer();
@@ -137,15 +139,20 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       <div style={{ display: "flex" }} />
     );
 
-    // Foto em TELA CHEIA (cover-crop) pra capa chamativa. Só quando o estilo é "impacto".
+    // Imagem de fundo da capa grande: arte da IA (se estilo "ia" e já gerada) OU a sua foto em
+    // tela cheia (cover-crop). A arte da IA é remota — o próprio next/og baixa e o objectFit ajusta.
     let bgImp = "";
-    if (capaImpacto) {
-      try {
-        const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
-        const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).jpeg({ quality: 84 }).toBuffer();
-        bgImp = `data:image/jpeg;base64,${b.toString("base64")}`;
-      } catch (e) {
-        console.error("Não consegui preparar a capa chamativa (uso a foto normal):", e);
+    if (capaGrande) {
+      if (v.capaEstilo === "ia" && (v.capaIaUrl || "").startsWith("http")) {
+        bgImp = v.capaIaUrl;
+      } else {
+        try {
+          const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
+          const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).jpeg({ quality: 84 }).toBuffer();
+          bgImp = `data:image/jpeg;base64,${b.toString("base64")}`;
+        } catch (e) {
+          console.error("Não consegui preparar a capa chamativa (uso a foto normal):", e);
+        }
       }
     }
     const upper = (legenda || "").toUpperCase();
@@ -172,7 +179,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       </div>
     );
 
-    const el = capaImpacto ? impactoEl :
+    const el = capaGrande ? impactoEl :
       modo === "cheia" ? (
         // FOTO NA TELA TODA: preenche o 9:16 (corta as beiradas); legenda embaixo, sobre um
         // escurecido pra ler. Sem moldura.

@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
@@ -127,7 +127,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", capaEstiloInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -143,7 +143,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   musicaInicial?: string;
   musicasBanco?: { url: string; nome: string; wav?: string }[];
   fundoInicial?: string; // fundo do quadro do vídeo temático: "" (foto borrada) | "cheia"
-  capaEstiloInicial?: string; // estilo da capa (temático): "" (clássica) | "impacto" (chamativa)
+  capaEstiloInicial?: string; // estilo da capa (temático): "" (clássica) | "impacto" (chamativa) | "ia"
+  capaIaUrlInicial?: string; // URL da arte de capa gerada pela IA (quando estilo = "ia")
   corMarca?: string;
   jaTemVideo?: boolean;
   onFechar: () => void;
@@ -171,7 +172,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [capa, setCapa] = useState<string>(fotos.some((f) => f.id === capaInicial) ? capaInicial : "");
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
   const [fundo, setFundo] = useState<string>(fundoInicial || ""); // fundo do quadro (temático): "" borrada | "cheia"
-  const [capaEstilo, setCapaEstilo] = useState<string>(capaEstiloInicial || ""); // estilo da capa: "" clássica | "impacto"
+  const [capaEstilo, setCapaEstilo] = useState<string>(capaEstiloInicial || ""); // estilo da capa: "" clássica | "impacto" | "ia"
+  const [capaIaUrl, setCapaIaUrl] = useState<string>(capaIaUrlInicial || ""); // arte de capa gerada pela IA
+  const [gerandoCapaIa, setGerandoCapaIa] = useState(false);
+  const [erroCapaIa, setErroCapaIa] = useState("");
   // Nome do vídeo (só o do buffet dá pra renomear aqui; no de festa o nome são os aniversariantes).
   const [nomeVideo, setNomeVideo] = useState(nome);
   const [editandoNome, setEditandoNome] = useState(false);
@@ -191,11 +195,22 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setFundo(novo);
     definirFundoVideo(tematicoId, novo).catch(() => {});
   }
-  // Troca o estilo da CAPA (clássica ↔ impacto/chamativa) — salva na hora; vale no próximo Gerar.
+  // Troca o estilo da CAPA (clássica / impacto / ia) — salva na hora; vale no próximo Gerar.
   function trocarCapaEstilo(novo: string) {
     if (!tematicoId) return;
     setCapaEstilo(novo);
     definirCapaEstilo(tematicoId, novo).catch(() => {});
+  }
+  // Gera a ARTE de capa com IA (festiva, sem rostos). Ao terminar, já deixa o estilo em "ia".
+  async function gerarArteCapa() {
+    if (!tematicoId || gerandoCapaIa) return;
+    setGerandoCapaIa(true);
+    setErroCapaIa("");
+    const r = await gerarCapaIa(tematicoId).catch(() => ({ ok: false as const, erro: "Não consegui gerar agora." }));
+    setGerandoCapaIa(false);
+    if (!r.ok) { setErroCapaIa(r.erro || "Não consegui gerar agora."); return; }
+    setCapaIaUrl(r.url);
+    setCapaEstilo("ia");
   }
   // Salva o novo nome do vídeo do buffet (o campo editável no topo). Volta ao nome antigo se falhar.
   async function salvarNome() {
@@ -620,8 +635,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // Ordem: visual (Fotos+Estilo) → palavras (Textos) → som (Música+Narração, música antes da voz).
   const ABAS: { id: string; ic: string; label: string }[] = [
     { id: "fotos", ic: "📷", label: "Fotos" },
-    { id: "estilo", ic: "🎨", label: "Estilo" },
     ...(tematicoId ? [{ id: "capa", ic: "🎯", label: "Capa" }] : []),
+    { id: "estilo", ic: "🎨", label: "Estilo" },
     { id: "texto", ic: "✍️", label: tematicoId ? "Textos" : "Capa" },
     { id: "musica", ic: "🎵", label: "Música" },
     ...(tematicoId ? [{ id: "narr", ic: "🎙️", label: "Narração" }] : []),
@@ -998,40 +1013,54 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     </div>
 
                     {/* estilo da capa */}
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       {[
-                        { id: "", emoji: "🖼️", nome: "Clássica", desc: "foto emoldurada + frase" },
-                        { id: "impacto", emoji: "🔥", nome: "Impacto", desc: "foto na tela toda + texto GIGANTE" },
+                        { id: "", emoji: "🖼️", nome: "Clássica", desc: "foto + frase" },
+                        { id: "impacto", emoji: "🔥", nome: "Impacto", desc: "foto cheia + texto" },
+                        { id: "ia", emoji: "🤖", nome: "IA", desc: "arte festiva" },
                       ].map((op) => (
-                        <button key={op.id || "classica"} type="button" onClick={() => trocarCapaEstilo(op.id)} className={`rounded-xl border p-2.5 text-left transition ${capaEstilo === op.id ? "border-[#a855f7] bg-[#a855f7]/10 ring-2 ring-[#a855f7]/30" : "border-white/12 bg-white/[0.03] hover:border-white/30"}`}>
-                          <div className="text-sm font-bold text-white">{op.emoji} {op.nome}</div>
+                        <button key={op.id || "classica"} type="button" onClick={() => trocarCapaEstilo(op.id)} className={`rounded-xl border p-2 text-left transition ${capaEstilo === op.id ? "border-[#a855f7] bg-[#a855f7]/10 ring-2 ring-[#a855f7]/30" : "border-white/12 bg-white/[0.03] hover:border-white/30"}`}>
+                          <div className="text-[13px] font-bold text-white">{op.emoji} {op.nome}</div>
                           <div className="mt-0.5 text-[10px] leading-snug text-muted">{op.desc}</div>
                         </button>
                       ))}
                     </div>
 
-                    {/* prévia da capa */}
-                    {capaFoto ? (
-                      <div className="flex flex-col items-center gap-1.5">
-                        <div className="relative aspect-[9/16] w-40 overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={capaFoto.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                          {capaEstilo === "impacto" ? (
-                            <div className="absolute inset-0 flex flex-col justify-end p-2.5" style={{ backgroundImage: "linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 63%, rgba(0,0,0,0.92) 100%)" }}>
-                              <div className="mb-1.5 h-1.5 w-9 rounded-full" style={{ background: corMarca }} />
-                              <span className="font-black uppercase leading-[1.05] text-white" style={{ fontSize: 15, textShadow: "1.5px 1.5px 0 #000,-1.5px 1.5px 0 #000,1.5px -1.5px 0 #000,-1.5px -1.5px 0 #000,0 3px 10px rgba(0,0,0,0.7)" }}>{chamada.toUpperCase() || "SUA CHAMADA AQUI"}</span>
-                            </div>
-                          ) : (
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-2.5 pt-8 text-center">
-                              <span className="text-[12px] font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">{chamada || nome}</span>
-                            </div>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-muted/70">prévia da capa · o logo entra no topo</span>
+                    {/* painel da IA (só quando o estilo é "ia") */}
+                    {capaEstilo === "ia" && (
+                      <div className="rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/[0.06] p-2.5">
+                        <p className="text-[11px] leading-snug text-muted">🤖 A IA cria uma <strong className="text-white/80">arte festiva</strong> (balões, confete, cores do buffet) — <strong className="text-white/80">sem rostos</strong>. Sua chamada entra por cima.</p>
+                        <button type="button" onClick={gerarArteCapa} disabled={gerandoCapaIa} className="mt-2 w-full rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-60">{gerandoCapaIa ? "🎨 criando a arte… (uns 15-30s)" : capaIaUrl ? "🔄 Gerar outra arte" : "✨ Gerar arte com IA"}</button>
+                        {erroCapaIa && <p className="mt-1.5 text-[11px] font-semibold text-vermelho">{erroCapaIa}</p>}
+                        {!capaIaUrl && !gerandoCapaIa && !erroCapaIa && <p className="mt-1.5 text-[10px] leading-snug text-amber-300/80">Ainda sem arte — toque em ✨ Gerar. Enquanto não gera, a capa usa a sua foto.</p>}
                       </div>
-                    ) : (
-                      <p className="rounded-lg border border-dashed border-white/15 py-4 text-center text-[11px] text-muted">Escolha as fotos na aba <strong className="text-white/80">📷 Fotos</strong> primeiro.</p>
                     )}
+
+                    {/* prévia da capa */}
+                    {(() => {
+                      const grande = capaEstilo === "impacto" || capaEstilo === "ia";
+                      const bgPrev = capaEstilo === "ia" && capaIaUrl ? capaIaUrl : capaFoto?.url || "";
+                      if (!bgPrev) return <p className="rounded-lg border border-dashed border-white/15 py-4 text-center text-[11px] text-muted">Escolha as fotos na aba <strong className="text-white/80">📷 Fotos</strong> primeiro.</p>;
+                      return (
+                        <div className="flex flex-col items-center gap-1.5">
+                          <div className="relative aspect-[9/16] w-40 overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={bgPrev} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                            {grande ? (
+                              <div className="absolute inset-0 flex flex-col justify-end p-2.5" style={{ backgroundImage: "linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 63%, rgba(0,0,0,0.92) 100%)" }}>
+                                <div className="mb-1.5 h-1.5 w-9 rounded-full" style={{ background: corMarca }} />
+                                <span className="font-black uppercase leading-[1.05] text-white" style={{ fontSize: 15, textShadow: "1.5px 1.5px 0 #000,-1.5px 1.5px 0 #000,1.5px -1.5px 0 #000,-1.5px -1.5px 0 #000,0 3px 10px rgba(0,0,0,0.7)" }}>{chamada.toUpperCase() || "SUA CHAMADA AQUI"}</span>
+                              </div>
+                            ) : (
+                              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-2.5 pt-8 text-center">
+                                <span className="text-[12px] font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">{chamada || nome}</span>
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-[10px] text-muted/70">prévia da capa · o logo entra no topo</span>
+                        </div>
+                      );
+                    })()}
 
                     {/* a foto da capa (escolher entre as da sequência) */}
                     {escolhidas.length > 0 && (
