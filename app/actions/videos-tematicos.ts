@@ -306,6 +306,19 @@ export async function definirFundoVideo(videoId: string, fundo: string) {
   return { ok: true as const, fundo: valor };
 }
 
+// Estilo da CAPA (1º quadro) do vídeo do buffet: "" (clássica) | "impacto" (capa chamativa, tipo
+// thumbnail — foto na tela toda + texto gigante com contorno). Muda como o /api/quadro-tema desenha o quadro 0.
+export async function definirCapaEstilo(videoId: string, estilo: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const valor = estilo === "impacto" ? "impacto" : ""; // só aceita os dois estilos
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { capaEstilo: valor } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, estilo: valor };
+}
+
 // Renomeia o vídeo do buffet (o "titulo" — ex: "Promo agosto 02"). É o nome interno pra organizar.
 export async function renomearVideoTematico(videoId: string, titulo: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });

@@ -110,11 +110,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     // Estilo do FUNDO do quadro (escolhido pelo dono): "cheia" = a foto preenche a tela toda (sem
     // moldura); senão (padrão) a foto BORRADA e escurecida atrás, com a foto emoldurada por cima.
     const modo = v.videoFundo === "cheia" ? "cheia" : "desfocada";
+    // CAPA CHAMATIVA ("impacto"): só no quadro 0 e quando o dono escolheu esse estilo. Foto na tela
+    // toda + texto GIGANTE com contorno (tipo thumbnail de YouTube), seja qual for o fundo dos outros quadros.
+    const capaImpacto = ehCapa && v.capaEstilo === "impacto";
 
     // Fundo borrado (modo padrão): borra a foto com sharp (o next/og não faz blur). Se falhar,
     // cai no degradê das cores da marca.
     let bgBlur = "";
-    if (modo === "desfocada") {
+    if (modo === "desfocada" && !capaImpacto) {
       try {
         const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
         const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).blur(30).modulate({ brightness: 0.5 }).jpeg({ quality: 62 }).toBuffer();
@@ -134,7 +137,42 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       <div style={{ display: "flex" }} />
     );
 
-    const el =
+    // Foto em TELA CHEIA (cover-crop) pra capa chamativa. Só quando o estilo é "impacto".
+    let bgImp = "";
+    if (capaImpacto) {
+      try {
+        const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
+        const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).jpeg({ quality: 84 }).toBuffer();
+        bgImp = `data:image/jpeg;base64,${b.toString("base64")}`;
+      } catch (e) {
+        console.error("Não consegui preparar a capa chamativa (uso a foto normal):", e);
+      }
+    }
+    const upper = (legenda || "").toUpperCase();
+    const tamImp = upper.length > 44 ? 78 : upper.length > 28 ? 98 : 120;
+    // "contorno" do texto = várias sombras nas 4 direções + uma sombra suave (dá o look de thumbnail).
+    const contornoImp = "3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 8px 26px rgba(0,0,0,0.6)";
+    // CAPA CHAMATIVA: foto preenche a tela, texto gigante embaixo (o motor carimba o logo no TOPO da capa).
+    const impactoEl = (
+      <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative", fontFamily: "Baloo" }}>
+        {bgImp ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={bgImp} width={L} height={A} style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, objectFit: "cover" }} />
+        ) : null}
+        <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", padding: "0 70px 200px", backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.35) 63%, rgba(0,0,0,0.92) 100%)" }}>
+          {upper ? (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", width: 210, height: 20, backgroundColor: cor, borderRadius: 10, marginBottom: 32, boxShadow: "0 6px 18px rgba(0,0,0,0.4)" }} />
+              <div style={{ display: "flex", fontSize: tamImp, fontWeight: 600, color: "#ffffff", lineHeight: 1.04, letterSpacing: -1, textShadow: contornoImp, maxWidth: `${L - 140}px` }}>{upper}</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex" }} />
+          )}
+        </div>
+      </div>
+    );
+
+    const el = capaImpacto ? impactoEl :
       modo === "cheia" ? (
         // FOTO NA TELA TODA: preenche o 9:16 (corta as beiradas); legenda embaixo, sobre um
         // escurecido pra ler. Sem moldura.

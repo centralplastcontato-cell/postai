@@ -21,6 +21,7 @@ export type VideoTematicoView = {
   videoMoldura: string;
   videoTextoFinal: string;
   videoFundo: string; // fundo do quadro: "" (foto borrada) | "cheia" (foto preenche a tela)
+  capaEstilo: string; // estilo da capa: "" (clássica) | "impacto" (capa chamativa)
   videoMusica: string; // trilha escolhida (URL) — "" = jingle do buffet
   videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
   narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
@@ -381,6 +382,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca }: { marcaId:
           textosIniciais={seletorTema.video.videoTextos}
           narracao={seletorTema.video.narracao}
           fundoInicial={seletorTema.video.videoFundo}
+          capaEstiloInicial={seletorTema.video.capaEstilo}
           musicaInicial={seletorTema.video.videoMusica}
           musicasBanco={musicasBanco}
           corMarca={corMarca}

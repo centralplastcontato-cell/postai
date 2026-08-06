@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
@@ -127,7 +127,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", capaEstiloInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -143,6 +143,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   musicaInicial?: string;
   musicasBanco?: { url: string; nome: string; wav?: string }[];
   fundoInicial?: string; // fundo do quadro do vídeo temático: "" (foto borrada) | "cheia"
+  capaEstiloInicial?: string; // estilo da capa (temático): "" (clássica) | "impacto" (chamativa)
   corMarca?: string;
   jaTemVideo?: boolean;
   onFechar: () => void;
@@ -170,6 +171,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [capa, setCapa] = useState<string>(fotos.some((f) => f.id === capaInicial) ? capaInicial : "");
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
   const [fundo, setFundo] = useState<string>(fundoInicial || ""); // fundo do quadro (temático): "" borrada | "cheia"
+  const [capaEstilo, setCapaEstilo] = useState<string>(capaEstiloInicial || ""); // estilo da capa: "" clássica | "impacto"
   // Nome do vídeo (só o do buffet dá pra renomear aqui; no de festa o nome são os aniversariantes).
   const [nomeVideo, setNomeVideo] = useState(nome);
   const [editandoNome, setEditandoNome] = useState(false);
@@ -188,6 +190,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId) return;
     setFundo(novo);
     definirFundoVideo(tematicoId, novo).catch(() => {});
+  }
+  // Troca o estilo da CAPA (clássica ↔ impacto/chamativa) — salva na hora; vale no próximo Gerar.
+  function trocarCapaEstilo(novo: string) {
+    if (!tematicoId) return;
+    setCapaEstilo(novo);
+    definirCapaEstilo(tematicoId, novo).catch(() => {});
   }
   // Salva o novo nome do vídeo do buffet (o campo editável no topo). Volta ao nome antigo se falhar.
   async function salvarNome() {
@@ -613,6 +621,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const ABAS: { id: string; ic: string; label: string }[] = [
     { id: "fotos", ic: "📷", label: "Fotos" },
     { id: "estilo", ic: "🎨", label: "Estilo" },
+    ...(tematicoId ? [{ id: "capa", ic: "🎯", label: "Capa" }] : []),
     { id: "texto", ic: "✍️", label: tematicoId ? "Textos" : "Capa" },
     { id: "musica", ic: "🎵", label: "Música" },
     ...(tematicoId ? [{ id: "narr", ic: "🎙️", label: "Narração" }] : []),
@@ -976,6 +985,92 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   )}
                 </div>
               )}
+
+              {/* ============ ABA CAPA (só buffet) — a capa chamativa ============ */}
+              {aba === "capa" && tematicoId && (() => {
+                const capaFoto = escolhidas.find((f) => f.id === capaId) || escolhidas[0] || null;
+                const chamada = (textos[capaId] || "").trim();
+                return (
+                  <div className="flex flex-col gap-3">
+                    <div>
+                      <h4 className="m-0 text-sm font-semibold text-white">🎯 Capa do vídeo</h4>
+                      <p className="mt-0.5 text-[11px] leading-snug text-muted">A capa é o <strong className="text-white/80">1º quadro</strong> — o que segura o dedo de quem rola o feed. Uma capa chamativa traz <strong className="text-white/80">bem mais visualizações</strong>.</p>
+                    </div>
+
+                    {/* estilo da capa */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: "", emoji: "🖼️", nome: "Clássica", desc: "foto emoldurada + frase" },
+                        { id: "impacto", emoji: "🔥", nome: "Impacto", desc: "foto na tela toda + texto GIGANTE" },
+                      ].map((op) => (
+                        <button key={op.id || "classica"} type="button" onClick={() => trocarCapaEstilo(op.id)} className={`rounded-xl border p-2.5 text-left transition ${capaEstilo === op.id ? "border-[#a855f7] bg-[#a855f7]/10 ring-2 ring-[#a855f7]/30" : "border-white/12 bg-white/[0.03] hover:border-white/30"}`}>
+                          <div className="text-sm font-bold text-white">{op.emoji} {op.nome}</div>
+                          <div className="mt-0.5 text-[10px] leading-snug text-muted">{op.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* prévia da capa */}
+                    {capaFoto ? (
+                      <div className="flex flex-col items-center gap-1.5">
+                        <div className="relative aspect-[9/16] w-40 overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={capaFoto.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                          {capaEstilo === "impacto" ? (
+                            <div className="absolute inset-0 flex flex-col justify-end p-2.5" style={{ backgroundImage: "linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 63%, rgba(0,0,0,0.92) 100%)" }}>
+                              <div className="mb-1.5 h-1.5 w-9 rounded-full" style={{ background: corMarca }} />
+                              <span className="font-black uppercase leading-[1.05] text-white" style={{ fontSize: 15, textShadow: "1.5px 1.5px 0 #000,-1.5px 1.5px 0 #000,1.5px -1.5px 0 #000,-1.5px -1.5px 0 #000,0 3px 10px rgba(0,0,0,0.7)" }}>{chamada.toUpperCase() || "SUA CHAMADA AQUI"}</span>
+                            </div>
+                          ) : (
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-2.5 pt-8 text-center">
+                              <span className="text-[12px] font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">{chamada || nome}</span>
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-muted/70">prévia da capa · o logo entra no topo</span>
+                      </div>
+                    ) : (
+                      <p className="rounded-lg border border-dashed border-white/15 py-4 text-center text-[11px] text-muted">Escolha as fotos na aba <strong className="text-white/80">📷 Fotos</strong> primeiro.</p>
+                    )}
+
+                    {/* a foto da capa (escolher entre as da sequência) */}
+                    {escolhidas.length > 0 && (
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-semibold text-white">Foto da capa <span className="font-normal text-muted">(toque pra trocar)</span></p>
+                        <div className="flex gap-1.5 overflow-x-auto pb-1">
+                          {escolhidas.map((f) => (
+                            <button key={f.id} type="button" onClick={() => { if (f.id !== capaId) definirCapa(f.id); }} className={`relative shrink-0 overflow-hidden rounded-lg border-2 transition ${f.id === capaId ? "border-amber-400 ring-2 ring-amber-400/40" : "border-white/10 opacity-70 hover:opacity-100"}`}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={f.url} alt="" className="h-16 w-11 object-cover" />
+                              {f.id === capaId && <span className="absolute bottom-0 right-0 rounded-tl bg-amber-400 px-0.5 text-[9px]">⭐</span>}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* a chamada (frase da capa) */}
+                    {capaId && (
+                      <div>
+                        <p className="mb-1.5 text-[11px] font-semibold text-white">Chamada da capa <span className="font-normal text-muted">(a frase que aparece grande)</span></p>
+                        <div className="flex items-stretch gap-1.5">
+                          <input
+                            type="text"
+                            value={textos[capaId] ?? ""}
+                            onChange={(e) => mudarTexto(capaId, e.target.value)}
+                            onBlur={() => salvarTextoFoto(capaId)}
+                            maxLength={48}
+                            placeholder="Ex: O DIA MAIS FELIZ! 🎉"
+                            className="min-w-0 flex-1 rounded-lg border border-amber-400/40 bg-preto px-3 py-2 text-sm text-white placeholder:text-muted/40 focus:border-amber-400 focus:outline-none"
+                          />
+                          <button type="button" onClick={() => biaEscreveNaFoto(capaId)} disabled={biaNaFoto !== null} title="A Bia escreve uma chamada de impacto pra capa" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-3 text-sm font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/30 disabled:opacity-40">{biaNaFoto === capaId ? "…" : "✨"}</button>
+                        </div>
+                        <p className="mt-1 text-[10px] leading-snug text-muted/70">Curta e forte (até ~48 letras). No estilo <strong className="text-white/70">🔥 Impacto</strong> ela entra <strong className="text-white/70">GIGANTE</strong>, com contorno, sobre a foto.</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* ============ ABA NARRAÇÃO (só buffet) ============ */}
               {aba === "narr" && tematicoId && (
