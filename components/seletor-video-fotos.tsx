@@ -1,9 +1,11 @@
 "use client";
 
-// Modal pra ESCOLHER as fotos do vídeo da festa, NA ORDEM, em DUAS grades de fotos GRANDES:
-//  1) "Sua sequência" — as escolhidas, numeradas, ARRASTÁVEIS pra reordenar (× pra tirar);
-//  2) "Adicionar" — as disponíveis, toque na ordem que quiser e elas sobem pra sequência.
-// Arrastar acontece nas próprias fotos grandes (não numa tira pequena). Vazio = automático.
+// CRIADOR DE VÍDEO em formato "player" (não é mais um formulário rolável):
+//  • no CENTRO, uma prévia 9:16 do vídeo (a foto da cena com a moldura/fundo escolhidos);
+//  • embaixo, a LINHA DO TEMPO clicável (as fotos na ordem) — toque numa cena pra vê-la na prévia;
+//  • ao lado, as opções em ABAS: 📷 Fotos · 🎵 Música · 🎨 Estilo · 🎙️ Narração (buffet) · ✍️ Textos.
+// Mesma máquina por baixo (salvar/gerar/narração/música/detector de repetidas) — só a casca mudou.
+// Vale pros DOIS tipos de vídeo: festa (fotos) e buffet/temático (acervo).
 
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
@@ -168,6 +170,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [capa, setCapa] = useState<string>(fotos.some((f) => f.id === capaInicial) ? capaInicial : "");
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
   const [fundo, setFundo] = useState<string>(fundoInicial || ""); // fundo do quadro (temático): "" borrada | "cheia"
+  // ABA aberta no painel lateral + qual CENA está na prévia central + se a prévia está "tocando".
+  const [aba, setAba] = useState<string>("fotos");
+  const [cena, setCena] = useState(0);
+  const [tocandoPrev, setTocandoPrev] = useState(false);
   // Troca o estilo de fundo do vídeo temático (salva na hora; o vídeo usa no próximo "Gerar").
   function trocarFundo(novo: string) {
     if (!tematicoId) return;
@@ -513,20 +519,51 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const fotoPrevFV = escolhidas.find((f) => f.id !== capa) || escolhidas[0] || galeria[0];
   const fotoPrev = fotoPrevFV?.url;
 
+  // ---- PRÉVIA central (o "player"): qual cena aparece + o texto sobre ela ----
+  const capaId = capa || escolhidas[0]?.id || "";
+  const cenaIdx = escolhidas.length ? Math.min(cena, escolhidas.length - 1) : 0;
+  const cenaFoto = escolhidas[cenaIdx] || null;
+  const ehCapaCena = !!cenaFoto && cenaFoto.id === capaId;
+  // o que aparece escrito na prévia: no buffet, a legenda da foto (ou o tema na capa); na festa, o
+  // título só na capa. É só uma aproximação do vídeo — o motor é quem manda de verdade.
+  const legendaCena = cenaFoto
+    ? tematicoId
+      ? (textos[cenaFoto.id] || (ehCapaCena ? nome : ""))
+      : (ehCapaCena ? (tituloCapa.trim() || tituloCapaAuto || nome) : "")
+    : "";
+  const fundoCheia = !!tematicoId && fundo === "cheia";
+  // Auto-avanço da prévia (dá a sensação de "tocar" o vídeo). Pausa sozinho ao trocar de cena na mão.
+  useEffect(() => {
+    if (!tocandoPrev || escolhidas.length < 2) return;
+    const t = setInterval(() => setCena((c) => (c + 1) % escolhidas.length), 1400);
+    return () => clearInterval(t);
+  }, [tocandoPrev, escolhidas.length]);
+  function irCena(d: number) {
+    setTocandoPrev(false);
+    if (!escolhidas.length) return;
+    setCena((c) => (Math.min(c, escolhidas.length - 1) + d + escolhidas.length) % escolhidas.length);
+  }
+
+  // as abas do painel lateral — Narração só no vídeo do buffet
+  const ABAS: { id: string; ic: string; label: string }[] = [
+    { id: "fotos", ic: "📷", label: "Fotos" },
+    { id: "musica", ic: "🎵", label: "Música" },
+    { id: "estilo", ic: "🎨", label: "Estilo" },
+    ...(tematicoId ? [{ id: "narr", ic: "🎙️", label: "Narração" }] : []),
+    { id: "texto", ic: "✍️", label: tematicoId ? "Textos" : "Capa" },
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/92 backdrop-blur-sm" onClick={onFechar}>
       <div className="flex flex-1 flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
-        {/* header */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-linha px-4 py-3">
-          <p className="text-sm font-bold text-white">🎬 Fotos do vídeo — {nome}</p>
-          <span className="text-xs text-muted">
+        {/* ---------- BARRA DE CIMA: título + ações principais ---------- */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-linha px-4 py-2.5">
+          <p className="text-sm font-bold text-white">🎬 Criar vídeo <span className="font-normal text-muted">— {nome}</span></p>
+          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-muted">
             {sel.length} {sel.length === 1 ? "foto" : "fotos"}{segs > 0 ? ` · ≈ ${segs}s` : ""}
             {segs > 90 && <span className="ml-1 font-semibold text-vermelho">(passa de 90s!)</span>}
           </span>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={sugerir} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">✨ Sugerir</button>
-            {sel.length > 1 && <button onClick={reorganizar} title="Reencaixa as fotos que você adicionou na mão no lugar certo (na ordem dos momentos)" className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho">🔀 Reorganizar</button>}
-            {sel.length > 0 && <button onClick={() => setSel([])} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-muted transition hover:text-white">Limpar</button>}
             <button onClick={salvar} disabled={salvando} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho disabled:opacity-60">{salvando ? "…" : "Salvar"}</button>
             <button onClick={salvarEGerar} disabled={salvando || sel.length === 0} title={sel.length === 0 ? "Escolha as fotos primeiro" : "Salvar a seleção e gerar o vídeo"} className="rounded-lg bg-[#7c3aed] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{jaTemVideo ? "🔄 Refazer vídeo" : "⚡ Gerar vídeo"}</button>
             <button onClick={onFechar} aria-label="Fechar" className="rounded-lg border border-linha px-3 py-1.5 text-xs text-muted transition hover:text-white">✕</button>
@@ -534,449 +571,554 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         </div>
 
         {erroGerar && <p className="border-b border-linha bg-vermelho/10 px-4 py-1.5 text-center text-xs text-vermelho">{erroGerar}</p>}
-        {dupGrupo.size > 0 && (
-          <p className="border-b border-linha bg-amber-400/10 px-4 py-1.5 text-center text-[11px] text-amber-300">
-            <span className="rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black text-black">🔁</span> = fotos <strong className="text-amber-200">parecidas</strong> entre si (mesmo número = mesma "família"). Evite pôr muitas iguais no vídeo.
-          </p>
-        )}
 
-        <div className="flex-1 overflow-y-auto px-4 pb-6">
-          <p className="pt-3 text-[11px] leading-relaxed text-amber-300/90">⭐ Toque na <strong className="text-amber-200">estrela</strong> de uma foto pra ela virar a <strong className="text-amber-200">capa</strong> do vídeo (entra nítida, com o título por cima). Sem escolher, a 1ª foto vira a capa.{capa && (<button type="button" onClick={() => setCapa("")} className="ml-1.5 rounded bg-white/10 px-2 py-0.5 font-semibold text-white transition hover:bg-vermelho">✕ tirar capa</button>)}</p>
-          {/* TÍTULO DA CAPA (só no vídeo de FESTA — no temático a abertura é a frase da foto-capa).
-              Vazio = usa o automático ("Fulano fez X aninhos"). O texto quebra linha sozinho. */}
-          {!tematicoId && (
-            <div className="mt-2.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-white">✍️ Título da capa <span className="font-normal text-muted">(a frase grande na 1ª tela do vídeo)</span></span>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {tituloCapa.trim() && (
-                    <button type="button" onClick={() => setTituloCapa("")} title="Voltar pro título automático" className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white transition hover:bg-vermelho">✕ usar o automático</button>
+        {/* ---------- MIOLO: prévia (player) à esquerda + abas à direita ---------- */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+          {/* PLAYER — a prévia 9:16 da cena atual, do jeito que vai ficar no vídeo */}
+          <div className="flex shrink-0 flex-col items-center justify-center gap-2 bg-black/50 p-3 lg:flex-1">
+            <div className="relative aspect-[9/16] h-[30vh] max-w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl lg:h-[62vh]">
+              {cenaFoto ? (
+                <>
+                  {fundoCheia ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  ) : (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                      <div className="absolute inset-0 flex items-center justify-center p-4">
+                        <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corMarca, 2)}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={cenaFoto.url} alt="" className="block max-h-[52vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
+                        </span>
+                      </div>
+                    </>
                   )}
-                  <button type="button" onClick={biaEscreveTitulo} disabled={gerandoTitulo} title="A Bia sugere um título pra capa (usa os nomes, a idade e o tema)" className="rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-60">{gerandoTitulo ? "✍️ escrevendo…" : "✨ Bia escreve"}</button>
+                  {/* texto sobre a cena (aproximação): título na capa / legenda nas outras */}
+                  {legendaCena && (
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-10 text-center">
+                      <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${ehCapaCena ? "text-lg" : "text-sm"}`}>{legendaCena}</span>
+                    </div>
+                  )}
+                  {/* selo do momento + nº da cena */}
+                  <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
+                    Cena {cenaIdx + 1}/{escolhidas.length}{ehCapaCena ? " · ⭐ capa" : ""}
+                  </span>
+                  {dupGrupo.get(cenaFoto.id) && (
+                    <span className="absolute right-2 top-2 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-black">🔁{dupGrupo.get(cenaFoto.id)}</span>
+                  )}
+                </>
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
+                  <span className="text-4xl">🎬</span>
+                  <p className="text-sm font-semibold text-white">Seu vídeo aparece aqui</p>
+                  <p className="text-[11px] text-muted">Escolha as fotos na aba <strong className="text-white/80">📷 Fotos</strong> pra montar as cenas.</p>
                 </div>
-              </div>
-              <input
-                type="text"
-                value={tituloCapa}
-                onChange={(e) => setTituloCapa(e.target.value)}
-                maxLength={60}
-                placeholder={tituloCapaAuto ? `Em branco = "${tituloCapaAuto}"` : "Escreva o título da capa"}
-                className="mt-2 w-full rounded-lg border border-linha bg-preto px-3 py-2.5 text-sm text-white placeholder:text-muted/50 focus:border-amber-400 focus:outline-none"
-              />
-              <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Aparece <strong className="text-white/70">grande na capa</strong>. Deixe em branco pra usar o automático{tituloCapaAuto ? <> (<span className="text-white/70">{tituloCapaAuto}</span>)</> : ""}. Pode escrever à vontade — o texto <strong className="text-white/70">quebra a linha sozinho</strong>, não precisa caber numa linha só.</p>
+              )}
             </div>
-          )}
 
-          {/* FUNDO do vídeo (só no vídeo do buffet/temático): foto borrada atrás OU foto na tela toda. */}
-          {tematicoId && (
-            <div className="flex flex-wrap items-center gap-1.5 pt-2">
-              <span className="text-[11px] font-semibold text-muted">🎬 Fundo do vídeo:</span>
-              {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }].map((f) => (
-                <button key={f.id || "borrada"} type="button" onClick={() => trocarFundo(f.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${fundo === f.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
-                  {f.emoji} {f.label}
+            {/* controles do player: cena anterior · tocar/pausar · próxima cena */}
+            {escolhidas.length > 0 && (
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-9 w-9 items-center justify-center rounded-full border border-linha bg-preto text-white transition hover:border-white/40">◀</button>
+                <button type="button" onClick={() => setTocandoPrev((p) => !p)} disabled={escolhidas.length < 2} aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"} title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas automaticamente"} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#7c3aed] text-lg text-white transition hover:bg-[#6d28d9] disabled:opacity-40">{tocandoPrev ? "❚❚" : "▶"}</button>
+                <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="flex h-9 w-9 items-center justify-center rounded-full border border-linha bg-preto text-white transition hover:border-white/40">▶</button>
+              </div>
+            )}
+            <p className="text-center text-[10px] text-muted/70">Prévia aproximada · formato 9:16 (Reels) · com movimento (Ken Burns) no vídeo final</p>
+          </div>
+
+          {/* PAINEL LATERAL — abas com todas as opções */}
+          <div className="flex min-h-0 flex-1 flex-col border-t border-linha lg:w-[400px] lg:flex-none lg:border-l lg:border-t-0">
+            {/* as abas */}
+            <div className="flex shrink-0 overflow-x-auto border-b border-linha bg-preto/40">
+              {ABAS.map((a) => (
+                <button key={a.id} type="button" onClick={() => setAba(a.id)} className={`flex min-w-[64px] flex-1 flex-col items-center gap-0.5 px-2 py-2 text-[11px] font-semibold transition ${aba === a.id ? "border-b-2 border-[#7c3aed] text-white" : "border-b-2 border-transparent text-muted hover:text-white"}`}>
+                  <span className="text-base leading-none">{a.ic}</span>{a.label}
                 </button>
               ))}
-              <span className="w-full text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta um pouco as beiradas). Vale no próximo <strong className="text-white/70">Gerar</strong>.</span>
             </div>
-          )}
 
-          <div className="flex flex-wrap items-center gap-1.5 pt-2">
-            <span className="text-[11px] font-semibold text-muted">🖼️ Moldura das fotos:</span>
-            {MOLDURAS_UI.map((m) => (
-              <button key={m.id} type="button" onClick={() => setMoldura(m.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${moldura === m.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
-                {m.id === "marca" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corMarca }} />}
-                {m.label}
-              </button>
-            ))}
-            {/* preview AO VIVO: como a foto fica com a moldura escolhida (atualiza no clique) — clica pra ampliar */}
-            {fotoPrevFV && (
-              <button type="button" onClick={() => setAmpliada(fotoPrevFV)} title="Clique pra ampliar a prévia" className="group/p ml-auto flex items-center gap-2">
-                <span className="text-right text-[10px] leading-tight text-muted">como fica<br /><span className="text-[#c7b2ff] group-hover/p:underline">🔍 ampliar</span></span>
-                <span className="flex items-center justify-center rounded-md bg-zinc-700/50 p-2 transition group-hover/p:bg-zinc-600/70">
-                  <span className="block" style={estiloMoldura(moldura, corMarca)}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={fotoPrev} alt="" className="block h-20 w-20 object-cover" style={{ borderRadius: moldura === "nenhuma" ? 2 : 0 }} />
-                  </span>
-                </span>
-              </button>
-            )}
-          </div>
+            {/* o conteúdo da aba escolhida (rola só aqui dentro) */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
 
-          {/* NARRAÇÃO (só no vídeo do buffet): a VOZ que fala no vídeo, com o jingle por baixo.
-              Fluxo: você diz o que quer anunciar → a Bia escreve o roteiro → escolhe a voz →
-              OUVE aqui mesmo → só então gera o vídeo. */}
-          {tematicoId && (
-            <div className="mt-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-white">🎙️ Narração <span className="font-normal text-muted">(uma voz falando no vídeo)</span></span>
-                {audioUrl && (
-                  <button type="button" onClick={tirarNarracao} disabled={gerandoVoz} className="shrink-0 rounded-md border border-red-900/60 px-2 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕ tirar a voz</button>
-                )}
-              </div>
-
-              {/* 1) o que você quer anunciar */}
-              <div className="mt-2 flex flex-wrap items-end gap-1.5">
-                <div className="min-w-[200px] flex-1">
-                  <label className="block text-[10px] font-semibold text-muted">O que você quer anunciar?</label>
-                  <input
-                    type="text"
-                    value={briefing}
-                    onChange={(e) => setBriefing(e.target.value)}
-                    placeholder="Ex: promoção de julho — fechou até dia 20, ganha 10 pessoas grátis"
-                    className="mt-1 w-full rounded-md border border-linha bg-preto px-2 py-2 text-[11px] text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
-                  />
-                </div>
-                <button type="button" onClick={biaEscreveRoteiro} disabled={escrevendoRoteiro || gerandoVoz} title="A Bia escreve o roteiro da locução (texto feito pra ser FALADO)" className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50">
-                  {escrevendoRoteiro ? "✍️ escrevendo…" : "✨ Bia escreve o roteiro"}
-                </button>
-              </div>
-
-              {/* 2) o roteiro (editável) — a 1ª FALA, do começo do vídeo */}
-              <textarea
-                value={roteiro}
-                onChange={(e) => setRoteiro(e.target.value)}
-                rows={4}
-                maxLength={1200}
-                placeholder="O roteiro da fala aparece aqui — dá pra editar cada palavra."
-                className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
-              />
-
-              {/* 2b) a 2ª FALA (CTA no fim) — opcional. Com ela, TODAS as fotos entram: a voz fala no
-                   começo, a música carrega o meio, e a voz VOLTA no fim pra o convite. */}
-              <div className="mt-2.5 rounded-md border border-emerald-500/25 bg-emerald-500/[0.04] px-2.5 py-2">
-                <div className="flex flex-wrap items-center justify-between gap-1.5">
-                  <span className="text-[11px] font-semibold text-white">🔁 Fala do final <span className="font-normal text-muted">(o convite — a voz volta no fim)</span></span>
-                  <button type="button" onClick={biaEscreveCta} disabled={escrevendoCta || gerandoVoz} title="A Bia escreve a fala final (CTA) — ex: acesse o site e faça seu orçamento" className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50">
-                    {escrevendoCta ? "✍️ escrevendo…" : "✨ Bia escreve o final"}
-                  </button>
-                </div>
-                <textarea
-                  value={roteiro2}
-                  onChange={(e) => setRoteiro2(e.target.value)}
-                  rows={2}
-                  maxLength={400}
-                  placeholder="Ex: Acesse www.castelodadiversao.com.br e faça seu orçamento agora mesmo!"
-                  className="mt-1.5 w-full rounded-md border border-linha bg-preto px-2 py-1.5 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
-                />
-                <p className="mt-1 text-[10px] leading-snug text-muted/70">Deixe em branco = a voz fala só no começo e a música leva até o fim. Com uma fala aqui, a voz <strong className="text-white/70">volta no fim</strong> pra o convite — e <strong className="text-white/70">todas as fotos aparecem</strong>.</p>
-              </div>
-
-              {/* 3) COMO A VOZ FALA (a direção) — é isso que tira o tom robótico: a voz obedece
-                  esse briefing de verdade. Os botões preenchem, mas dá pra escrever o que quiser. */}
-              <div className="mt-2.5 rounded-md border border-linha bg-preto/40 px-2.5 py-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-semibold text-white">🎭 Como a voz deve falar</span>
-                  {ESTILOS.map((e) => (
-                    <button
-                      key={e.nome}
-                      type="button"
-                      onClick={() => setEstilo(e.direcao)}
-                      title={e.direcao}
-                      className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${estilo === e.direcao ? "border-emerald-400 bg-emerald-500/20 text-emerald-200" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}
-                    >
-                      {e.emoji} {e.nome}
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  value={estilo}
-                  onChange={(e) => setEstilo(e.target.value)}
-                  rows={3}
-                  maxLength={900}
-                  placeholder="Descreva o jeito de falar: quem é a pessoa, a energia, o sotaque, o que NÃO quer…"
-                  className="mt-1.5 w-full rounded-md border border-linha bg-preto px-2 py-1.5 text-[10px] leading-relaxed text-white/90 placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
-                />
-                <p className="mt-1 text-[10px] leading-snug text-muted/70">Escreva como se estivesse dirigindo um locutor no estúdio — <strong className="text-white/70">a voz obedece de verdade</strong>. Ex: “paulista descontraído, energia de showman de circo, abertura explosiva, sem gritaria forçada”.</p>
-              </div>
-
-              {/* 4) VOLUME da música de fundo (entra por baixo da voz). 0 = voz limpa; 50 = padrão. */}
-              <div className="mt-2.5 rounded-md border border-linha bg-preto/40 px-2.5 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-semibold text-white">🎵 Volume da música de fundo</span>
-                  <span className="text-[10px] font-semibold text-emerald-300">{volMusica === 0 ? "sem música" : volMusica === 50 ? "padrão" : `${volMusica}%`}</span>
-                </div>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <span className="text-[10px] text-muted">🔈</span>
-                  <input type="range" min={0} max={100} step={5} value={volMusica} onChange={(e) => setVolMusica(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-emerald-500" aria-label="Volume da música de fundo" />
-                  <span className="text-[10px] text-muted">🔊</span>
-                </div>
-                <p className="mt-1 text-[10px] leading-snug text-muted/70">Arraste pra deixar a <strong className="text-white/70">música mais baixa ou mais alta</strong> por trás da voz. Tudo à esquerda = <strong className="text-white/70">só a voz</strong>, sem música. Vale ao clicar em <strong className="text-white/70">🔊 Ouvir</strong>.</p>
-              </div>
-
-              {/* 5) voz + ouvir */}
-              <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <select value={voz} onChange={(e) => setVoz(e.target.value)} className="input-base flex-1 py-1.5 text-[11px]" aria-label="Voz da narração">
-                  <optgroup label="⭐ As que você aprovou">
-                    {VOZES.filter((v) => v.favorita).map((v) => (
-                      <option key={v.id} value={v.id}>⭐ {v.nome} — {v.sexo === "f" ? "feminina" : "masculina"}, {v.nota}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Outras vozes">
-                    {VOZES.filter((v) => !v.favorita).map((v) => (
-                      <option key={v.id} value={v.id}>{v.nome} — {v.sexo === "f" ? "feminina" : "masculina"}, {v.nota}</option>
-                    ))}
-                  </optgroup>
-                </select>
-                <button type="button" onClick={ouvirNarracao} disabled={gerandoVoz || roteiro.trim().length < 20} title={roteiro.trim().length < 20 ? "Escreva o roteiro primeiro" : "Gera a voz com o jingle por baixo e toca aqui"} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
-                  {gerandoVoz ? "🎙️ gerando…" : audioUrl ? "🔊 Ouvir de novo" : "🔊 Ouvir"}
-                </button>
-              </div>
-
-              {/* 4) o player + o aviso de quantas fotos o vídeo vai usar */}
-              {audioUrl && (() => {
-                const precisa = fotosParaDuracao(audioSeg);
-                const temFotos = sel.length; // a capa sai da sequência, então sobra 1 a menos
-                const faltam = precisa - (temFotos - 1);
-                return (
-                  <div className="mt-2">
-                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                    <audio src={audioUrl} controls className="h-8 w-full" />
-                    {faltam > 0 ? (
-                      <p className="mt-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug font-semibold text-amber-300">
-                        ⚠️ As falas somam <strong>{audioSeg}s</strong> e não cabem nas fotos escolhidas — faltam <strong>{faltam}</strong>. Adicione mais fotos (ou encurte as falas), senão o convite do fim é cortado.
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-[10px] leading-snug text-emerald-300/90">
-                        🎵 Trilha de <strong>{audioSeg}s</strong> pronta — <strong>todas as suas fotos entram</strong> no vídeo (a voz fala no começo{roteiro2.trim() ? " e volta no fim pro convite" : ""}, e a música leva o meio). As com legenda entram na frente.
-                      </p>
-                    )}
+              {/* ============ ABA FOTOS ============ */}
+              {aba === "fotos" && (
+                <div>
+                  {/* atalhos rápidos */}
+                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                    <button onClick={sugerir} className="rounded-lg border border-linha px-2.5 py-1 text-[11px] font-semibold text-white transition hover:border-vermelho">✨ Sugerir</button>
+                    {sel.length > 1 && <button onClick={reorganizar} title="Reencaixa as fotos que você adicionou na mão no lugar certo (na ordem dos momentos)" className="rounded-lg border border-linha px-2.5 py-1 text-[11px] font-semibold text-white transition hover:border-vermelho">🔀 Reorganizar</button>}
+                    {sel.length > 0 && <button onClick={() => setSel([])} className="rounded-lg border border-linha px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:text-white">🧹 Limpar</button>}
                   </div>
-                );
-              })()}
-              {msgVoz && <p className={`mt-1.5 text-[11px] font-semibold ${msgVoz.tipo === "ok" ? "text-emerald-400" : "text-vermelho"}`}>{msgVoz.txt}</p>}
-              {!audioUrl && !msgVoz && <p className="mt-1.5 text-[10px] leading-snug text-muted/80">Sem narração, o vídeo sai com o <strong className="text-white/70">jingle do buffet</strong> como hoje. Com narração, a voz entra por cima do jingle.</p>}
-            </div>
-          )}
+                  <p className="mb-2 text-[11px] leading-relaxed text-amber-300/90">⭐ Toque na <strong className="text-amber-200">estrela</strong> de uma foto pra ela virar a <strong className="text-amber-200">capa</strong>. Sem escolher, a 1ª foto vira a capa.{capa && (<button type="button" onClick={() => setCapa("")} className="ml-1.5 rounded bg-white/10 px-2 py-0.5 font-semibold text-white transition hover:bg-vermelho">✕ tirar capa</button>)}</p>
+                  {dupGrupo.size > 0 && (
+                    <p className="mb-2 rounded-md border border-amber-500/30 bg-amber-400/10 px-2 py-1 text-[10px] leading-snug text-amber-300">
+                      <span className="rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black text-black">🔁</span> = fotos <strong className="text-amber-200">parecidas</strong> (mesmo número = mesma "família"). Evite pôr muitas iguais.
+                    </p>
+                  )}
 
-          {/* COPY DO VÍDEO (só no vídeo do buffet): frases que aparecem embaixo das fotos */}
-          {tematicoId && (
-            <div className="mt-2.5 rounded-lg border border-[#7c3aed]/30 bg-[#7c3aed]/5 px-3 py-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-white">💬 Legendas nas fotos <span className="font-normal text-muted">(a copy que aparece no vídeo)</span></span>
-                <button type="button" onClick={biaEscreveCopy} disabled={escrevendoCopy || sel.length < 2} title={sel.length < 2 ? "Escolha as fotos primeiro" : "A Bia escreve uma copy com começo, meio e fim — frases em algumas fotos-chave"} className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-50">{escrevendoCopy ? "✍️ escrevendo…" : "✨ Bia escreve a copy"}</button>
-              </div>
-              <p className="mt-1.5 text-[10px] leading-snug text-muted/80">
-                O botão acima escreve o vídeo INTEIRO de uma vez: a <strong className="text-amber-200">frase de abertura</strong> (campo ⭐ da capa — o gancho que segura o dedo de quem rola o feed) + legendas em <strong className="text-white/70">algumas fotos-chave</strong> (as outras passam limpas).<br />
-                Em cada foto você ainda pode <strong className="text-white/70">digitar na mão</strong> ou clicar no <strong className="text-[#d6c6ff]">✨</strong> ao lado do campo pra a <strong className="text-white/70">Bia escrever só daquela foto</strong> — clique de novo e ela traz outra opção. <strong className="text-white/70">Apagar o texto tira a legenda</strong> dali.
-              </p>
-              {msgCopy && <p className={`mt-1.5 text-[11px] font-semibold ${msgCopy.startsWith("✓") ? "text-green-400" : "text-vermelho"}`}>{msgCopy}</p>}
-            </div>
-          )}
-
-          {/* mensagem do SLIDE FINAL (último quadro do vídeo) — o dono escreve ou a Bia gera */}
-          <div className="mt-2.5 rounded-lg border border-linha bg-preto/40 px-3 py-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-white">✍️ Texto do final do vídeo</span>
-              <button type="button" onClick={biaEscreve} disabled={gerandoTexto} title="A Bia cria uma frase carinhosa de encerramento (usa o nome, a idade e o tema)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-60">{gerandoTexto ? "✍️ escrevendo…" : "✨ Bia escreve"}</button>
-            </div>
-            <input type="text" value={textoFinal} onChange={(e) => setTextoFinal(e.target.value)} maxLength={48} placeholder='Em branco = "Muito obrigado!"' className="mt-2 w-full rounded-lg border border-linha bg-preto px-3 py-2.5 text-sm text-white placeholder:text-muted/50 focus:border-vermelho focus:outline-none" />
-            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Essa frase aparece no <strong className="text-white/70">último quadro</strong> do vídeo, com o logo. Curtinha (até ~48 letras).</p>
-          </div>
-
-          {/* MÚSICA do vídeo (festa E buffet) — o dono envia o MP3, OUVE (▶️) e ESCOLHE numa lista.
-              As trilhas enviadas ficam na BIBLIOTECA da marca pra reusar em qualquer vídeo. */}
-          {(
-          <div className="mt-2.5 rounded-lg border border-linha bg-preto/40 px-3 py-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-white">🎵 Música do vídeo</span>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {/* Baixar mais trilhas grátis (Pixabay Music) — abre em aba nova; depois é só Enviar. */}
-                <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" title="Abrir o Pixabay Music (trilhas grátis e liberadas) numa aba nova" className="rounded-lg border border-linha px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:border-white/30 hover:text-white">🔎 Buscar músicas</a>
-                <label className={`rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 ${subindoMusica ? "opacity-60" : "cursor-pointer"}`}>
-                  {subindoMusica ? "🎵 enviando…" : "➕ Enviar música"}
-                  {/* SEM accept="audio/*": no iPad esse filtro TRAVA os MP3 no seletor (bug do iOS).
-                      Sem filtro, o arquivo fica selecionável; o servidor valida que é áudio de verdade. */}
-                  <input type="file" className="hidden" disabled={subindoMusica} onChange={(e) => enviarMusica(e.target.files?.[0])} />
-                </label>
-              </div>
-            </div>
-
-            {/* Lista pra ESCOLHER: 1ª opção é a do buffet; depois as enviadas (▶️ pra ouvir antes). */}
-            <div className="mt-2 flex flex-col gap-1.5">
-              <div className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 transition ${!musica ? "border-[#7c3aed] bg-[#7c3aed]/15" : "border-linha"}`}>
-                {buffetUrl ? (
-                  <button type="button" onClick={() => ouvir(buffetUrl)} aria-label={tocando === buffetUrl ? "Pausar" : "Ouvir"} title={tocando === buffetUrl ? "Pausar" : "Ouvir a música do buffet"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/50 text-sm text-white transition hover:bg-[#7c3aed]">{tocando === buffetUrl ? "⏸" : "▶️"}</button>
-                ) : (
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center text-base">🏰</span>
-                )}
-                <button type="button" onClick={() => setMusica("")} className="min-w-0 flex-1 truncate text-left text-[12px] font-semibold text-white">🏰 Música padrão do buffet</button>
-                {!musica && <span className="shrink-0 text-[10px] font-bold text-[#c7b2ff]">✓ escolhida</span>}
-              </div>
-              {banco.map((m) => {
-                const escolhida = musica === m.url;
-                const play = tocando === m.url;
-                return (
-                  <div key={m.url} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 transition ${escolhida ? "border-[#7c3aed] bg-[#7c3aed]/15" : "border-linha"}`}>
-                    <button type="button" onClick={() => ouvir(m.url)} aria-label={play ? "Pausar" : "Ouvir"} title={play ? "Pausar" : "Ouvir esta música"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/50 text-sm text-white transition hover:bg-[#7c3aed]">{play ? "⏸" : "▶️"}</button>
-                    <button type="button" onClick={() => setMusica(m.url)} className="min-w-0 flex-1 truncate text-left text-[12px] font-semibold text-white">🎵 {m.nome}</button>
-                    {/* Só no buffet: mostra se a trilha já está pronta pra entrar SOB A VOZ (narração). */}
-                    {tematicoId && (m.wav
-                      ? <span title="Pronta pra entrar sob a voz na narração" className="shrink-0 text-[10px] font-semibold text-green-400">🎙️✓</span>
-                      : <span title="Preparando pra narração… (deixe a tela aberta um instante)" className="shrink-0 animate-pulse text-[10px] text-amber-300/80">🎙️⏳</span>)}
-                    {escolhida && <span className="shrink-0 text-[10px] font-bold text-[#c7b2ff]">✓ escolhida</span>}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* player ÚNICO (escondido) que o ▶️/⏸ de cada trilha controla */}
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <audio ref={audioRef} onEnded={() => setTocando("")} className="hidden" />
-
-            <p className="mt-2 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis em <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#c7b2ff] underline">Pixabay Music</a> (botão <strong className="text-white/70">🔎 Buscar músicas</strong>) e toque em <strong className="text-white/70">➕ Enviar música</strong>. Use o <strong className="text-white/70">▶️</strong> pra ouvir antes de escolher — as enviadas ficam guardadas aqui pra reusar.</p>
-            {tematicoId && (
-              <p className="mt-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-300/90">⚠️ No vídeo do buffet, a música escolhida vale quando o vídeo <strong>não tem narração (voz)</strong>. Com narração, o fundo é o jingle por baixo da voz.</p>
-            )}
-          </div>
-          )}
-
-          {/* 1) SUA SEQUÊNCIA — fotos grandes, arraste pra reordenar, × pra tirar */}
-          {escolhidas.length > 0 && (
-            <div className="pt-3">
-              <p className="mb-2 text-[11px] text-muted">
-                🎞️ <strong className="text-white/80">Sua sequência</strong> — segure a <strong className="text-white/80">alcinha ⠿</strong> da foto e arraste pra mudar a ordem (no celular também!), <strong className="text-white/80">×</strong> pra tirar.
-              </p>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
-                {escolhidas.map((f, i) => {
-                  const ehCapa = capa === f.id;
-                  return (
-                  <div key={f.id}>
-                  <div
-                    data-id={f.id}
-                    draggable
-                    onDragStart={() => setDragId(f.id)}
-                    onDragEnter={() => { if (dragId && dragId !== f.id) moverFoto(dragId, f.id); }}
-                    onDragEnd={() => setDragId(null)}
-                    onDragOver={(e) => e.preventDefault()}
-                    className={`relative select-none overflow-hidden rounded-lg border-2 transition-transform ${dragId === f.id ? "z-30 scale-105 border-[#c7b2ff] opacity-90 shadow-xl" : ehCapa ? "border-amber-400" : "border-vermelho"}`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={f.url} alt="" draggable={false} className="aspect-square w-full select-none object-cover" />
-                    {/* ALÇA de arrastar — segure aqui pra reordenar (no celular, sem rolar a tela) */}
-                    <div
-                      onTouchStart={(e) => { e.stopPropagation(); setDragId(f.id); if (typeof navigator !== "undefined" && navigator.vibrate) { try { navigator.vibrate(15); } catch {} } }}
-                      onTouchMove={alcaMove}
-                      onTouchEnd={() => setDragId(null)}
-                      onTouchCancel={() => setDragId(null)}
-                      onContextMenu={(e) => e.preventDefault()}
-                      style={{ touchAction: "none" }}
-                      aria-label="Segure e arraste pra mudar a ordem"
-                      className="absolute left-1/2 top-1/2 z-20 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full bg-black/55 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-vermelho"
-                    >
-                      <span className="grid grid-cols-2 gap-[2.5px]">
-                        {Array.from({ length: 6 }).map((_, k) => <span key={k} className="h-1 w-1 rounded-full bg-white/95" />)}
-                      </span>
-                    </div>
-                    <span className="absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-vermelho text-xs font-bold text-white shadow">{i + 1}</span>
-                    <button type="button" onClick={() => toggle(f.id)} aria-label="Tirar" className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl bg-black/75 text-sm leading-none text-white transition hover:bg-vermelho">×</button>
-                    {dupGrupo.get(f.id) && (
-                      <span title="Foto PARECIDA com outra(s) da lista — evite repetir no vídeo" className="absolute right-1 top-8 z-10 rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black leading-none text-black shadow">🔁{dupGrupo.get(f.id)}</span>
-                    )}
-                    <button type="button" onClick={(e) => { e.stopPropagation(); definirCapa(f.id); }} aria-label={ehCapa ? "Tirar capa" : "Definir como capa"} title={ehCapa ? "Tirar como capa (clique pra remover)" : "Usar esta foto como capa do vídeo"} className={`absolute bottom-1 left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition ${ehCapa ? "bg-black/80 text-amber-300 ring-2 ring-amber-300 hover:bg-vermelho hover:text-white hover:ring-vermelho" : "bg-black/70 text-white hover:bg-black"}`}>⭐</button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
-                    <span className={`absolute bottom-0 left-0 right-0 px-8 py-0.5 text-center text-[9px] font-bold ${ehCapa ? "bg-amber-400/90 text-black" : "bg-black/65 font-semibold text-white/90"}`}>{ehCapa ? "⭐ CAPA" : (LABEL[f.momento] || f.momento)}</span>
-                    </div>
-                    {/* TEXTO da foto no vídeo. Na CAPA é a FRASE DE ABERTURA (o gancho que
-                        segura o dedo de quem rola o feed); nas outras, a legenda embaixo da
-                        imagem. Vazio = a foto passa limpa (na capa, cai no nome do tema). */}
-                    {tematicoId && (
-                      <div className="mt-1 flex items-stretch gap-1">
-                        <input
-                          type="text"
-                          value={textos[f.id] ?? ""}
-                          onChange={(e) => mudarTexto(f.id, e.target.value)}
-                          onBlur={() => salvarTextoFoto(f.id)}
-                          maxLength={ehCapa ? 48 : 80}
-                          placeholder={ehCapa ? "⭐ frase de abertura do vídeo" : "sem legenda"}
-                          title={ehCapa ? "Frase que ABRE o vídeo, sobre a foto de capa (curta e forte). Vazia = entra o nome do tema." : "Frase que aparece embaixo desta foto no vídeo (vazio = sem texto)"}
-                          className={`min-w-0 flex-1 rounded-md border bg-preto px-2 py-1.5 text-[11px] text-white placeholder:text-muted/40 focus:outline-none ${ehCapa ? (textos[f.id]?.trim() ? "border-amber-400" : "border-amber-400/40") : textos[f.id]?.trim() ? "border-[#7c3aed]/60" : "border-linha"}`}
-                        />
-                        {/* ✨ a Bia escreve SÓ desta foto (ou troca a frase que está aí).
-                            Clicar de novo traz outra opção — ela evita repetir as outras. */}
-                        <button
-                          type="button"
-                          onClick={() => biaEscreveNaFoto(f.id)}
-                          disabled={biaNaFoto !== null}
-                          title={textos[f.id]?.trim() ? "A Bia escreve OUTRA frase pra esta foto" : ehCapa ? "A Bia escreve a frase de abertura" : "A Bia escreve a legenda desta foto"}
-                          className="shrink-0 rounded-md border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/30 disabled:opacity-40"
-                        >
-                          {biaNaFoto === f.id ? "…" : "✨"}
-                        </button>
+                  {/* SUA SEQUÊNCIA — fotos grandes, arraste pra reordenar, × pra tirar */}
+                  {escolhidas.length > 0 && (
+                    <div className="mb-4">
+                      <p className="mb-2 text-[11px] text-muted">🎞️ <strong className="text-white/80">Sua sequência</strong> — segure a <strong className="text-white/80">alcinha ⠿</strong> e arraste pra mudar a ordem, <strong className="text-white/80">×</strong> pra tirar. Toque na foto pra <strong className="text-white/80">vê-la na prévia</strong>.</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {escolhidas.map((f, i) => {
+                          const ehCapa = capa === f.id;
+                          return (
+                          <div key={f.id}>
+                          <div
+                            data-id={f.id}
+                            draggable
+                            onClick={() => { setCena(i); setTocandoPrev(false); }}
+                            onDragStart={() => setDragId(f.id)}
+                            onDragEnter={() => { if (dragId && dragId !== f.id) moverFoto(dragId, f.id); }}
+                            onDragEnd={() => setDragId(null)}
+                            onDragOver={(e) => e.preventDefault()}
+                            className={`relative cursor-pointer select-none overflow-hidden rounded-lg border-2 transition-transform ${dragId === f.id ? "z-30 scale-105 border-[#c7b2ff] opacity-90 shadow-xl" : i === cenaIdx ? "border-[#c7b2ff] ring-2 ring-[#7c3aed]" : ehCapa ? "border-amber-400" : "border-vermelho"}`}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={f.url} alt="" draggable={false} className="aspect-square w-full select-none object-cover" />
+                            {/* ALÇA de arrastar — segure aqui pra reordenar (no celular, sem rolar a tela) */}
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              onTouchStart={(e) => { e.stopPropagation(); setDragId(f.id); if (typeof navigator !== "undefined" && navigator.vibrate) { try { navigator.vibrate(15); } catch {} } }}
+                              onTouchMove={alcaMove}
+                              onTouchEnd={() => setDragId(null)}
+                              onTouchCancel={() => setDragId(null)}
+                              onContextMenu={(e) => e.preventDefault()}
+                              style={{ touchAction: "none" }}
+                              aria-label="Segure e arraste pra mudar a ordem"
+                              className="absolute left-1/2 top-1/2 z-20 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full bg-black/55 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-vermelho"
+                            >
+                              <span className="grid grid-cols-2 gap-[2.5px]">
+                                {Array.from({ length: 6 }).map((_, k) => <span key={k} className="h-1 w-1 rounded-full bg-white/95" />)}
+                              </span>
+                            </div>
+                            <span className="absolute left-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-vermelho text-xs font-bold text-white shadow">{i + 1}</span>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); toggle(f.id); }} aria-label="Tirar" className="absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-bl bg-black/75 text-sm leading-none text-white transition hover:bg-vermelho">×</button>
+                            {dupGrupo.get(f.id) && (
+                              <span title="Foto PARECIDA com outra(s) da lista — evite repetir no vídeo" className="absolute right-1 top-8 z-10 rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black leading-none text-black shadow">🔁{dupGrupo.get(f.id)}</span>
+                            )}
+                            <button type="button" onClick={(e) => { e.stopPropagation(); definirCapa(f.id); }} aria-label={ehCapa ? "Tirar capa" : "Definir como capa"} title={ehCapa ? "Tirar como capa (clique pra remover)" : "Usar esta foto como capa do vídeo"} className={`absolute bottom-1 left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition ${ehCapa ? "bg-black/80 text-amber-300 ring-2 ring-amber-300 hover:bg-vermelho hover:text-white hover:ring-vermelho" : "bg-black/70 text-white hover:bg-black"}`}>⭐</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute bottom-1 right-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
+                            <span className={`absolute bottom-0 left-0 right-0 px-8 py-0.5 text-center text-[9px] font-bold ${ehCapa ? "bg-amber-400/90 text-black" : "bg-black/65 font-semibold text-white/90"}`}>{ehCapa ? "⭐ CAPA" : (LABEL[f.momento] || f.momento)}</span>
+                            </div>
+                            {/* TEXTO da foto no vídeo (buffet). Na CAPA é a FRASE DE ABERTURA; nas outras, a legenda. */}
+                            {tematicoId && (
+                              <div className="mt-1 flex items-stretch gap-1">
+                                <input
+                                  type="text"
+                                  value={textos[f.id] ?? ""}
+                                  onChange={(e) => mudarTexto(f.id, e.target.value)}
+                                  onBlur={() => salvarTextoFoto(f.id)}
+                                  maxLength={ehCapa ? 48 : 80}
+                                  placeholder={ehCapa ? "⭐ abertura" : "sem legenda"}
+                                  title={ehCapa ? "Frase que ABRE o vídeo, sobre a foto de capa (curta e forte). Vazia = entra o nome do tema." : "Frase que aparece embaixo desta foto no vídeo (vazio = sem texto)"}
+                                  className={`min-w-0 flex-1 rounded-md border bg-preto px-1.5 py-1 text-[10px] text-white placeholder:text-muted/40 focus:outline-none ${ehCapa ? (textos[f.id]?.trim() ? "border-amber-400" : "border-amber-400/40") : textos[f.id]?.trim() ? "border-[#7c3aed]/60" : "border-linha"}`}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => biaEscreveNaFoto(f.id)}
+                                  disabled={biaNaFoto !== null}
+                                  title={textos[f.id]?.trim() ? "A Bia escreve OUTRA frase pra esta foto" : ehCapa ? "A Bia escreve a frase de abertura" : "A Bia escreve a legenda desta foto"}
+                                  className="shrink-0 rounded-md border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-1.5 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/30 disabled:opacity-40"
+                                >
+                                  {biaNaFoto === f.id ? "…" : "✨"}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          );
+                        })}
                       </div>
-                    )}
-                  </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                    </div>
+                  )}
 
-          {/* 2) ADICIONAR — toque na ordem que quiser e a foto sobe pra sequência */}
-          {disponiveis.length > 0 && (
-            <div className="pt-4">
-              <p className="mb-2 text-[11px] text-muted">
-                {escolhidas.length > 0 ? "➕ Mais fotos" : "👆 Toque nas fotos na ordem que você quer"} — cada toque adiciona ao fim da sequência. Pra ~65s, escolha umas <strong className="text-white/80">25-28</strong>.
-              </p>
-
-              {/* FILTRO por tipo de foto (Festa, Espaço, Comida…) — só aparece se houver 2+ tipos. */}
-              {catsDisponiveis.length >= 2 && (
-                <div className="mb-3 flex flex-wrap items-center gap-1.5">
-                  <span className="text-[11px] font-semibold text-muted">🔎 Mostrar:</span>
-                  <button type="button" onClick={() => setFiltroCat("")} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${filtroCat === "" ? "border-[#7c3aed] bg-[#7c3aed] text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
-                    Todas ({disponiveis.length})
-                  </button>
-                  {catsDisponiveis.map((c) => (
-                    <button key={c} type="button" onClick={() => setFiltroCat(c)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${filtroCat === c ? "border-[#7c3aed] bg-[#7c3aed] text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
-                      {LABEL[c] || c} ({contagemCat.get(c)})
-                    </button>
-                  ))}
+                  {/* ADICIONAR — toque na ordem que quiser e a foto sobe pra sequência */}
+                  {disponiveis.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-[11px] text-muted">
+                        {escolhidas.length > 0 ? "➕ Mais fotos" : "👆 Toque nas fotos na ordem que você quer"} — cada toque adiciona ao fim. Pra ~65s, escolha umas <strong className="text-white/80">25-28</strong>.
+                      </p>
+                      {/* FILTRO por tipo de foto — só aparece se houver 2+ tipos. */}
+                      {catsDisponiveis.length >= 2 && (
+                        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] font-semibold text-muted">🔎 Mostrar:</span>
+                          <button type="button" onClick={() => setFiltroCat("")} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${filtroCat === "" ? "border-[#7c3aed] bg-[#7c3aed] text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+                            Todas ({disponiveis.length})
+                          </button>
+                          {catsDisponiveis.map((c) => (
+                            <button key={c} type="button" onClick={() => setFiltroCat(c)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${filtroCat === c ? "border-[#7c3aed] bg-[#7c3aed] text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+                              {LABEL[c] || c} ({contagemCat.get(c)})
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <div className="grid grid-cols-3 gap-2">
+                        {disponiveisFiltradas.map((f) => {
+                          const ehCapa = capa === f.id;
+                          return (
+                          <div key={f.id} onClick={() => toggle(f.id)} title="Tocar pra adicionar" className={`group relative cursor-pointer overflow-hidden rounded-lg border-2 transition ${ehCapa ? "border-amber-400" : "border-transparent hover:border-white/30"}`}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={f.url} alt="" className={`aspect-square w-full object-cover transition ${ehCapa ? "" : "opacity-60 group-hover:opacity-100"}`} />
+                            {dupGrupo.get(f.id) && (
+                              <span title="Foto PARECIDA com outra(s) da lista — evite repetir no vídeo" className="absolute left-1 top-1 z-10 rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black leading-none text-black shadow">🔁{dupGrupo.get(f.id)}</span>
+                            )}
+                            <button type="button" onClick={(e) => { e.stopPropagation(); definirCapa(f.id); }} aria-label={ehCapa ? "Tirar capa" : "Definir como capa"} title={ehCapa ? "Tirar como capa (clique pra remover)" : "Usar esta foto como capa do vídeo"} className={`absolute bottom-1 left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition ${ehCapa ? "bg-black/80 text-amber-300 ring-2 ring-amber-300 hover:bg-vermelho hover:text-white hover:ring-vermelho" : "bg-black/70 text-white hover:bg-black"}`}>⭐</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
+                            <span className={`absolute bottom-0 left-0 right-0 px-8 py-0.5 text-center text-[9px] font-bold ${ehCapa ? "bg-amber-400/90 text-black" : "bg-black/65 font-semibold text-white/90"}`}>{ehCapa ? "⭐ CAPA" : (LABEL[f.momento] || f.momento)}</span>
+                          </div>
+                          );
+                        })}
+                      </div>
+                      {filtroCat && disponiveisFiltradas.length === 0 && (
+                        <p className="py-4 text-center text-[11px] text-muted">Todas as fotos de <strong className="text-white/80">{LABEL[filtroCat] || filtroCat}</strong> já entraram na sequência. <button type="button" onClick={() => setFiltroCat("")} className="font-semibold text-[#c7b2ff] underline">Ver todas</button></p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
-                {disponiveisFiltradas.map((f) => {
-                  const ehCapa = capa === f.id;
-                  return (
-                  <div key={f.id} onClick={() => toggle(f.id)} title="Tocar pra adicionar" className={`group relative cursor-pointer overflow-hidden rounded-lg border-2 transition ${ehCapa ? "border-amber-400" : "border-transparent hover:border-white/30"}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={f.url} alt="" className={`aspect-square w-full object-cover transition ${ehCapa ? "" : "opacity-60 group-hover:opacity-100"}`} />
-                    {dupGrupo.get(f.id) && (
-                      <span title="Foto PARECIDA com outra(s) da lista — evite repetir no vídeo" className="absolute left-1 top-1 z-10 rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black leading-none text-black shadow">🔁{dupGrupo.get(f.id)}</span>
-                    )}
-                    <button type="button" onClick={(e) => { e.stopPropagation(); definirCapa(f.id); }} aria-label={ehCapa ? "Tirar capa" : "Definir como capa"} title={ehCapa ? "Tirar como capa (clique pra remover)" : "Usar esta foto como capa do vídeo"} className={`absolute bottom-1 left-1 z-10 flex h-6 w-6 items-center justify-center rounded-full text-[11px] transition ${ehCapa ? "bg-black/80 text-amber-300 ring-2 ring-amber-300 hover:bg-vermelho hover:text-white hover:ring-vermelho" : "bg-black/70 text-white hover:bg-black"}`}>⭐</button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setAmpliada(f); }} aria-label="Ampliar" className="absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-[11px] text-white transition hover:bg-black">🔍</button>
-                    <span className={`absolute bottom-0 left-0 right-0 px-8 py-0.5 text-center text-[9px] font-bold ${ehCapa ? "bg-amber-400/90 text-black" : "bg-black/65 font-semibold text-white/90"}`}>{ehCapa ? "⭐ CAPA" : (LABEL[f.momento] || f.momento)}</span>
+              {/* ============ ABA MÚSICA ============ */}
+              {aba === "musica" && (
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-white">🎵 Música do vídeo</span>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" title="Abrir o Pixabay Music (trilhas grátis e liberadas) numa aba nova" className="rounded-lg border border-linha px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:border-white/30 hover:text-white">🔎 Buscar</a>
+                      <label className={`rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 ${subindoMusica ? "opacity-60" : "cursor-pointer"}`}>
+                        {subindoMusica ? "🎵 enviando…" : "➕ Enviar"}
+                        {/* SEM accept="audio/*": no iPad esse filtro TRAVA os MP3 no seletor (bug do iOS). */}
+                        <input type="file" className="hidden" disabled={subindoMusica} onChange={(e) => enviarMusica(e.target.files?.[0])} />
+                      </label>
+                    </div>
                   </div>
-                  );
-                })}
-              </div>
-              {filtroCat && disponiveisFiltradas.length === 0 && (
-                <p className="py-4 text-center text-[11px] text-muted">Todas as fotos de <strong className="text-white/80">{LABEL[filtroCat] || filtroCat}</strong> já entraram na sequência. <button type="button" onClick={() => setFiltroCat("")} className="font-semibold text-[#c7b2ff] underline">Ver todas</button></p>
+
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    <div className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 transition ${!musica ? "border-[#7c3aed] bg-[#7c3aed]/15" : "border-linha"}`}>
+                      {buffetUrl ? (
+                        <button type="button" onClick={() => ouvir(buffetUrl)} aria-label={tocando === buffetUrl ? "Pausar" : "Ouvir"} title={tocando === buffetUrl ? "Pausar" : "Ouvir a música do buffet"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/50 text-sm text-white transition hover:bg-[#7c3aed]">{tocando === buffetUrl ? "⏸" : "▶️"}</button>
+                      ) : (
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center text-base">🏰</span>
+                      )}
+                      <button type="button" onClick={() => setMusica("")} className="min-w-0 flex-1 truncate text-left text-[12px] font-semibold text-white">🏰 Música padrão do buffet</button>
+                      {!musica && <span className="shrink-0 text-[10px] font-bold text-[#c7b2ff]">✓ escolhida</span>}
+                    </div>
+                    {banco.map((m) => {
+                      const escolhida = musica === m.url;
+                      const play = tocando === m.url;
+                      return (
+                        <div key={m.url} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 transition ${escolhida ? "border-[#7c3aed] bg-[#7c3aed]/15" : "border-linha"}`}>
+                          <button type="button" onClick={() => ouvir(m.url)} aria-label={play ? "Pausar" : "Ouvir"} title={play ? "Pausar" : "Ouvir esta música"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/50 text-sm text-white transition hover:bg-[#7c3aed]">{play ? "⏸" : "▶️"}</button>
+                          <button type="button" onClick={() => setMusica(m.url)} className="min-w-0 flex-1 truncate text-left text-[12px] font-semibold text-white">🎵 {m.nome}</button>
+                          {tematicoId && (m.wav
+                            ? <span title="Pronta pra entrar sob a voz na narração" className="shrink-0 text-[10px] font-semibold text-green-400">🎙️✓</span>
+                            : <span title="Preparando pra narração… (deixe a tela aberta um instante)" className="shrink-0 animate-pulse text-[10px] text-amber-300/80">🎙️⏳</span>)}
+                          {escolhida && <span className="shrink-0 text-[10px] font-bold text-[#c7b2ff]">✓ escolhida</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p className="mt-2 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis em <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#c7b2ff] underline">Pixabay Music</a> (botão <strong className="text-white/70">🔎 Buscar</strong>) e toque em <strong className="text-white/70">➕ Enviar</strong>. Use o <strong className="text-white/70">▶️</strong> pra ouvir antes — as enviadas ficam guardadas aqui pra reusar.</p>
+                  {tematicoId && (
+                    <p className="mt-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-300/90">⚠️ No vídeo do buffet, a música escolhida vale quando o vídeo <strong>não tem narração (voz)</strong>. Com narração, ela entra <strong>por baixo da voz</strong> (aba 🎙️ Narração).</p>
+                  )}
+                </div>
               )}
+
+              {/* ============ ABA ESTILO ============ */}
+              {aba === "estilo" && (
+                <div className="flex flex-col gap-3">
+                  {/* FUNDO do vídeo (só no buffet/temático) */}
+                  {tematicoId && (
+                    <div>
+                      <span className="text-[11px] font-semibold text-white">🎬 Fundo do vídeo</span>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }].map((f) => (
+                          <button key={f.id || "borrada"} type="button" onClick={() => trocarFundo(f.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${fundo === f.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+                            {f.emoji} {f.label}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta um pouco as beiradas). Veja na prévia ao lado. Vale no próximo <strong className="text-white/70">Gerar</strong>.</p>
+                    </div>
+                  )}
+
+                  {/* MOLDURA das fotos */}
+                  <div>
+                    <span className="text-[11px] font-semibold text-white">🖼️ Moldura das fotos</span>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {MOLDURAS_UI.map((m) => (
+                        <button key={m.id} type="button" onClick={() => setMoldura(m.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${moldura === m.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+                          {m.id === "marca" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corMarca }} />}
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                    {fundoCheia && <p className="mt-1 text-[10px] leading-snug text-amber-300/80">Com o fundo <strong>🔳 na tela toda</strong>, a foto preenche a tela e a moldura não aparece.</p>}
+                  </div>
+
+                  {/* mini-preview "como fica" — clica pra ampliar */}
+                  {fotoPrevFV && !fundoCheia && (
+                    <button type="button" onClick={() => setAmpliada(fotoPrevFV)} title="Clique pra ampliar a prévia" className="group/p flex items-center gap-2 self-start rounded-lg border border-linha bg-preto/40 p-2">
+                      <span className="flex items-center justify-center rounded-md bg-zinc-700/50 p-2 transition group-hover/p:bg-zinc-600/70">
+                        <span className="block" style={estiloMoldura(moldura, corMarca)}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={fotoPrev} alt="" className="block h-16 w-16 object-cover" style={{ borderRadius: moldura === "nenhuma" ? 2 : 0 }} />
+                        </span>
+                      </span>
+                      <span className="text-left text-[10px] leading-tight text-muted">como a moldura fica<br /><span className="text-[#c7b2ff] group-hover/p:underline">🔍 ampliar</span></span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* ============ ABA NARRAÇÃO (só buffet) ============ */}
+              {aba === "narr" && tematicoId && (
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-white">🎙️ Narração <span className="font-normal text-muted">(uma voz falando no vídeo)</span></span>
+                    {audioUrl && (
+                      <button type="button" onClick={tirarNarracao} disabled={gerandoVoz} className="shrink-0 rounded-md border border-red-900/60 px-2 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕ tirar a voz</button>
+                    )}
+                  </div>
+
+                  {/* 1) o que você quer anunciar */}
+                  <div className="mt-2">
+                    <label className="block text-[10px] font-semibold text-muted">O que você quer anunciar?</label>
+                    <input
+                      type="text"
+                      value={briefing}
+                      onChange={(e) => setBriefing(e.target.value)}
+                      placeholder="Ex: promoção de julho — fechou até dia 20, ganha 10 pessoas grátis"
+                      className="mt-1 w-full rounded-md border border-linha bg-preto px-2 py-2 text-[11px] text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+                    />
+                    <button type="button" onClick={biaEscreveRoteiro} disabled={escrevendoRoteiro || gerandoVoz} title="A Bia escreve o roteiro da locução (texto feito pra ser FALADO)" className="mt-1.5 w-full rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50">
+                      {escrevendoRoteiro ? "✍️ escrevendo…" : "✨ Bia escreve o roteiro"}
+                    </button>
+                  </div>
+
+                  {/* 2) o roteiro (editável) — a 1ª FALA */}
+                  <textarea
+                    value={roteiro}
+                    onChange={(e) => setRoteiro(e.target.value)}
+                    rows={4}
+                    maxLength={1200}
+                    placeholder="O roteiro da fala aparece aqui — dá pra editar cada palavra."
+                    className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+                  />
+
+                  {/* 2b) a 2ª FALA (CTA no fim) — opcional */}
+                  <div className="mt-2.5 rounded-md border border-emerald-500/25 bg-emerald-500/[0.04] px-2.5 py-2">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5">
+                      <span className="text-[11px] font-semibold text-white">🔁 Fala do final <span className="font-normal text-muted">(o convite)</span></span>
+                      <button type="button" onClick={biaEscreveCta} disabled={escrevendoCta || gerandoVoz} title="A Bia escreve a fala final (CTA) — ex: acesse o site e faça seu orçamento" className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50">
+                        {escrevendoCta ? "✍️ escrevendo…" : "✨ Bia escreve o final"}
+                      </button>
+                    </div>
+                    <textarea
+                      value={roteiro2}
+                      onChange={(e) => setRoteiro2(e.target.value)}
+                      rows={2}
+                      maxLength={400}
+                      placeholder="Ex: Acesse www.castelodadiversao.com.br e faça seu orçamento agora mesmo!"
+                      className="mt-1.5 w-full rounded-md border border-linha bg-preto px-2 py-1.5 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+                    />
+                    <p className="mt-1 text-[10px] leading-snug text-muted/70">Em branco = a voz fala só no começo e a música leva até o fim. Com uma fala aqui, a voz <strong className="text-white/70">volta no fim</strong> — e <strong className="text-white/70">todas as fotos aparecem</strong>.</p>
+                  </div>
+
+                  {/* 3) COMO A VOZ FALA (a direção) */}
+                  <div className="mt-2.5 rounded-md border border-linha bg-preto/40 px-2.5 py-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-white">🎭 Como a voz deve falar</span>
+                      {ESTILOS.map((e) => (
+                        <button
+                          key={e.nome}
+                          type="button"
+                          onClick={() => setEstilo(e.direcao)}
+                          title={e.direcao}
+                          className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${estilo === e.direcao ? "border-emerald-400 bg-emerald-500/20 text-emerald-200" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}
+                        >
+                          {e.emoji} {e.nome}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={estilo}
+                      onChange={(e) => setEstilo(e.target.value)}
+                      rows={3}
+                      maxLength={900}
+                      placeholder="Descreva o jeito de falar: quem é a pessoa, a energia, o sotaque, o que NÃO quer…"
+                      className="mt-1.5 w-full rounded-md border border-linha bg-preto px-2 py-1.5 text-[10px] leading-relaxed text-white/90 placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+                    />
+                    <p className="mt-1 text-[10px] leading-snug text-muted/70">Escreva como se estivesse dirigindo um locutor no estúdio — <strong className="text-white/70">a voz obedece de verdade</strong>. Ex: “paulista descontraído, energia de showman de circo, abertura explosiva, sem gritaria forçada”.</p>
+                  </div>
+
+                  {/* 4) VOLUME da música de fundo */}
+                  <div className="mt-2.5 rounded-md border border-linha bg-preto/40 px-2.5 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold text-white">🎵 Volume da música de fundo</span>
+                      <span className="text-[10px] font-semibold text-emerald-300">{volMusica === 0 ? "sem música" : volMusica === 50 ? "padrão" : `${volMusica}%`}</span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <span className="text-[10px] text-muted">🔈</span>
+                      <input type="range" min={0} max={100} step={5} value={volMusica} onChange={(e) => setVolMusica(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-emerald-500" aria-label="Volume da música de fundo" />
+                      <span className="text-[10px] text-muted">🔊</span>
+                    </div>
+                    <p className="mt-1 text-[10px] leading-snug text-muted/70">Arraste pra deixar a <strong className="text-white/70">música mais baixa ou mais alta</strong> por trás da voz. Tudo à esquerda = <strong className="text-white/70">só a voz</strong>. A música é a que você escolheu na aba <strong className="text-white/70">🎵 Música</strong>.</p>
+                  </div>
+
+                  {/* 5) voz + ouvir */}
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <select value={voz} onChange={(e) => setVoz(e.target.value)} className="input-base flex-1 py-1.5 text-[11px]" aria-label="Voz da narração">
+                      <optgroup label="⭐ As que você aprovou">
+                        {VOZES.filter((v) => v.favorita).map((v) => (
+                          <option key={v.id} value={v.id}>⭐ {v.nome} — {v.sexo === "f" ? "feminina" : "masculina"}, {v.nota}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Outras vozes">
+                        {VOZES.filter((v) => !v.favorita).map((v) => (
+                          <option key={v.id} value={v.id}>{v.nome} — {v.sexo === "f" ? "feminina" : "masculina"}, {v.nota}</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                    <button type="button" onClick={ouvirNarracao} disabled={gerandoVoz || roteiro.trim().length < 20} title={roteiro.trim().length < 20 ? "Escreva o roteiro primeiro" : "Gera a voz com a música por baixo e toca aqui"} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
+                      {gerandoVoz ? "🎙️ gerando…" : audioUrl ? "🔊 Ouvir de novo" : "🔊 Ouvir"}
+                    </button>
+                  </div>
+
+                  {/* player + aviso de quantas fotos o vídeo vai usar */}
+                  {audioUrl && (() => {
+                    const precisa = fotosParaDuracao(audioSeg);
+                    const temFotos = sel.length;
+                    const faltam = precisa - (temFotos - 1);
+                    return (
+                      <div className="mt-2">
+                        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                        <audio src={audioUrl} controls className="h-8 w-full" />
+                        {faltam > 0 ? (
+                          <p className="mt-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug font-semibold text-amber-300">
+                            ⚠️ As falas somam <strong>{audioSeg}s</strong> e não cabem nas fotos escolhidas — faltam <strong>{faltam}</strong>. Adicione mais fotos (ou encurte as falas), senão o convite do fim é cortado.
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[10px] leading-snug text-emerald-300/90">
+                            🎵 Trilha de <strong>{audioSeg}s</strong> pronta — <strong>todas as suas fotos entram</strong> no vídeo (a voz fala no começo{roteiro2.trim() ? " e volta no fim pro convite" : ""}, e a música leva o meio). As com legenda entram na frente.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {msgVoz && <p className={`mt-1.5 text-[11px] font-semibold ${msgVoz.tipo === "ok" ? "text-emerald-400" : "text-vermelho"}`}>{msgVoz.txt}</p>}
+                  {!audioUrl && !msgVoz && <p className="mt-1.5 text-[10px] leading-snug text-muted/80">Sem narração, o vídeo sai com o <strong className="text-white/70">jingle do buffet</strong> como hoje. Com narração, a voz entra por cima da música.</p>}
+                </div>
+              )}
+
+              {/* ============ ABA TEXTOS ============ */}
+              {aba === "texto" && (
+                <div className="flex flex-col gap-3">
+                  {/* TÍTULO DA CAPA (só festa) */}
+                  {!tematicoId && (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-white">✍️ Título da capa</span>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {tituloCapa.trim() && (
+                            <button type="button" onClick={() => setTituloCapa("")} title="Voltar pro título automático" className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white transition hover:bg-vermelho">✕ automático</button>
+                          )}
+                          <button type="button" onClick={biaEscreveTitulo} disabled={gerandoTitulo} title="A Bia sugere um título pra capa (usa os nomes, a idade e o tema)" className="rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-60">{gerandoTitulo ? "✍️ escrevendo…" : "✨ Bia escreve"}</button>
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={tituloCapa}
+                        onChange={(e) => setTituloCapa(e.target.value)}
+                        maxLength={60}
+                        placeholder={tituloCapaAuto ? `Em branco = "${tituloCapaAuto}"` : "Escreva o título da capa"}
+                        className="mt-2 w-full rounded-lg border border-linha bg-preto px-3 py-2.5 text-sm text-white placeholder:text-muted/50 focus:border-amber-400 focus:outline-none"
+                      />
+                      <p className="mt-1.5 text-[10px] leading-snug text-muted/70">A frase grande na <strong className="text-white/70">1ª tela</strong>. Em branco = usa o automático{tituloCapaAuto ? <> (<span className="text-white/70">{tituloCapaAuto}</span>)</> : ""}. O texto <strong className="text-white/70">quebra a linha sozinho</strong>.</p>
+                    </div>
+                  )}
+
+                  {/* COPY DO VÍDEO (só buffet): escreve a abertura + legendas de uma vez */}
+                  {tematicoId && (
+                    <div className="rounded-lg border border-[#7c3aed]/30 bg-[#7c3aed]/5 px-3 py-2.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-white">💬 Legendas nas fotos</span>
+                        <button type="button" onClick={biaEscreveCopy} disabled={escrevendoCopy || sel.length < 2} title={sel.length < 2 ? "Escolha as fotos primeiro" : "A Bia escreve uma copy com começo, meio e fim — frases em algumas fotos-chave"} className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-50">{escrevendoCopy ? "✍️ escrevendo…" : "✨ Bia escreve a copy"}</button>
+                      </div>
+                      <p className="mt-1.5 text-[10px] leading-snug text-muted/80">
+                        Escreve o vídeo INTEIRO de uma vez: a <strong className="text-amber-200">frase de abertura</strong> (na capa) + legendas em <strong className="text-white/70">algumas fotos-chave</strong>. Depois dá pra editar cada uma na aba <strong className="text-white/70">📷 Fotos</strong> (campo embaixo de cada foto, ou o <strong className="text-[#d6c6ff]">✨</strong> ao lado). Apagar o texto tira a legenda.
+                      </p>
+                      {msgCopy && <p className={`mt-1.5 text-[11px] font-semibold ${msgCopy.startsWith("✓") ? "text-green-400" : "text-vermelho"}`}>{msgCopy}</p>}
+                    </div>
+                  )}
+
+                  {/* TEXTO DO FINAL (os dois tipos) */}
+                  <div className="rounded-lg border border-linha bg-preto/40 px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-white">✍️ Texto do final do vídeo</span>
+                      <button type="button" onClick={biaEscreve} disabled={gerandoTexto} title="A Bia cria uma frase carinhosa de encerramento (usa o nome, a idade e o tema)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-60">{gerandoTexto ? "✍️ escrevendo…" : "✨ Bia escreve"}</button>
+                    </div>
+                    <input type="text" value={textoFinal} onChange={(e) => setTextoFinal(e.target.value)} maxLength={48} placeholder='Em branco = "Muito obrigado!"' className="mt-2 w-full rounded-lg border border-linha bg-preto px-3 py-2.5 text-sm text-white placeholder:text-muted/50 focus:border-vermelho focus:outline-none" />
+                    <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Aparece no <strong className="text-white/70">último quadro</strong> do vídeo, com o logo. Curtinha (até ~48 letras).</p>
+                  </div>
+                </div>
+              )}
+
             </div>
-          )}
+          </div>
         </div>
 
-        {/* foto ampliada — mostra COM a moldura escolhida (fundo borrado), igual vai ficar no vídeo.
-            Abre pelo 🔍 de qualquer foto OU pelo mini-preview "como fica". */}
-        {ampliada && (
-          <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/90 p-4" onClick={() => setAmpliada(null)}>
-            <p className="text-center text-xs font-semibold text-white/80">👇 Assim essa foto vai aparecer no vídeo{moldura !== "nenhuma" ? " (com a moldura)" : ""}</p>
-            <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[76vh] max-w-full overflow-hidden rounded-2xl border-[6px] border-zinc-800 bg-black shadow-2xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ampliada.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-md brightness-50" />
-              <div className="absolute inset-0 flex items-center justify-center p-5">
-                <span className="block" style={estiloMoldura(moldura, corMarca, 4)}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={ampliada.url} alt="" className="block max-h-[58vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 4 : 0 }} />
-                </span>
-              </div>
-              <span className="absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">{LABEL[ampliada.momento] || ampliada.momento}</span>
-            </div>
-            <button onClick={() => setAmpliada(null)} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">Fechar</button>
+        {/* ---------- LINHA DO TEMPO (embaixo): as cenas na ordem — toque pra ver na prévia ---------- */}
+        <div className="shrink-0 border-t border-linha bg-preto/60 px-3 py-2">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-muted">🎞️ Linha do tempo · {sel.length} {sel.length === 1 ? "cena" : "cenas"}{segs ? ` · ≈ ${segs}s` : ""}</span>
+            {segs > 90 && <span className="text-[10px] font-bold text-vermelho">passa de 90s</span>}
           </div>
-        )}
+          {escolhidas.length > 0 ? (
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {escolhidas.map((f, i) => (
+                <button key={f.id} type="button" onClick={() => { setCena(i); setTocandoPrev(false); }} title={`Cena ${i + 1}`} className={`relative shrink-0 overflow-hidden rounded-md border-2 transition ${i === cenaIdx ? "border-[#c7b2ff] ring-2 ring-[#7c3aed]" : capaId === f.id ? "border-amber-400" : "border-transparent opacity-70 hover:opacity-100"}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={f.url} alt="" className="h-14 w-10 object-cover" />
+                  <span className="absolute left-0 top-0 rounded-br bg-black/70 px-1 text-[9px] font-bold text-white">{i + 1}</span>
+                  {capaId === f.id && <span className="absolute bottom-0 right-0 bg-amber-400 px-0.5 text-[8px]">⭐</span>}
+                  {dupGrupo.get(f.id) && <span className="absolute right-0 top-0 bg-amber-400 px-0.5 text-[8px] font-black text-black">🔁</span>}
+                </button>
+              ))}
+              <button type="button" onClick={() => setAba("fotos")} title="Adicionar fotos" className="flex h-14 w-10 shrink-0 flex-col items-center justify-center rounded-md border-2 border-dashed border-linha text-lg text-muted transition hover:border-[#7c3aed] hover:text-white">＋</button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setAba("fotos")} className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-linha py-3 text-[11px] font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">📷 Escolher as fotos do vídeo →</button>
+          )}
+        </div>
       </div>
+
+      {/* player ÚNICO (escondido) que o ▶️/⏸ de cada trilha da aba Música controla */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <audio ref={audioRef} onEnded={() => setTocando("")} className="hidden" />
+
+      {/* foto ampliada — mostra COM a moldura escolhida (fundo borrado), igual vai ficar no vídeo. */}
+      {ampliada && (
+        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/90 p-4" onClick={() => setAmpliada(null)}>
+          <p className="text-center text-xs font-semibold text-white/80">👇 Assim essa foto vai aparecer no vídeo{moldura !== "nenhuma" ? " (com a moldura)" : ""}</p>
+          <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[76vh] max-w-full overflow-hidden rounded-2xl border-[6px] border-zinc-800 bg-black shadow-2xl">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={ampliada.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-md brightness-50" />
+            <div className="absolute inset-0 flex items-center justify-center p-5">
+              <span className="block" style={estiloMoldura(moldura, corMarca, 4)}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={ampliada.url} alt="" className="block max-h-[58vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 4 : 0 }} />
+              </span>
+            </div>
+            <span className="absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">{LABEL[ampliada.momento] || ampliada.momento}</span>
+          </div>
+          <button onClick={() => setAmpliada(null)} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">Fechar</button>
+        </div>
+      )}
     </div>
   );
 }
