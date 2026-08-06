@@ -1160,7 +1160,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
 
       {/* foto ampliada — mostra COM a moldura escolhida (fundo borrado), igual vai ficar no vídeo. */}
       {ampliada && (
-        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/90 p-4" onClick={() => setAmpliada(null)}>
+        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/90 p-4" onClick={(e) => { e.stopPropagation(); setAmpliada(null); }}>
           <p className="text-center text-xs font-semibold text-white/80">👇 Assim essa foto vai aparecer no vídeo{moldura !== "nenhuma" ? " (com a moldura)" : ""}</p>
           <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[76vh] max-w-full overflow-hidden rounded-2xl border-[6px] border-zinc-800 bg-black shadow-2xl">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1173,7 +1173,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             </div>
             <span className="absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">{LABEL[ampliada.momento] || ampliada.momento}</span>
           </div>
-          <button onClick={() => setAmpliada(null)} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">Fechar</button>
+          <button onClick={(e) => { e.stopPropagation(); setAmpliada(null); }} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">Fechar</button>
         </div>
       )}
     </div>
