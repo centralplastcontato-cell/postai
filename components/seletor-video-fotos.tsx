@@ -1187,9 +1187,14 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                           <button type="button" onClick={() => setCapaCheia(true)} title="Ver a capa maior" className="relative aspect-[9/16] w-40 overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
                             {ehRecorte ? (
                               <>
-                                <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
+                                {capaIaUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={capaIaUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                                ) : (
+                                  <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
+                                )}
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={capaRecorteUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
+                                <img src={capaRecorteUrl} alt="" className="absolute inset-0 h-full w-full object-contain object-bottom" />
                               </>
                             ) : (
                               // eslint-disable-next-line @next/next/no-img-element
@@ -1537,9 +1542,14 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 <>
                   {ehRecorte ? (
                     <>
-                      <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
+                      {capaIaUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={capaIaUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                      ) : (
+                        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
+                      )}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={capaRecorteUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
+                      <img src={capaRecorteUrl} alt="" className="absolute inset-0 h-full w-full object-contain object-bottom" />
                     </>
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element

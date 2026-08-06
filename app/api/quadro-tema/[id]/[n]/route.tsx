@@ -187,16 +187,23 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       </div>
     );
 
-    // CAPA RECORTADA: assunto sem fundo (PNG transparente) sobre um degradê de cor + texto gigante.
+    // CAPA RECORTADA: assunto sem fundo (PNG transparente) COLADO EMBAIXO sobre um fundo festivo
+    // (a arte da IA, se houver) ou um degradê de cor + texto gigante.
     const corRecorte = /^#[0-9a-fA-F]{6}$/.test(v.videoFundoCor || "") ? v.videoFundoCor : cor;
+    const recorteBg = /^https?:/.test(v.capaIaUrl || "") ? v.capaIaUrl : "";
     const recorteEl = (
       <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative", fontFamily: "Baloo" }}>
-        <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, backgroundImage: `linear-gradient(160deg, ${corRecorte} 0%, #101018 100%)` }} />
+        {recorteBg ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={recorteBg} width={L} height={A} style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, objectFit: "cover" }} />
+        ) : (
+          <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, backgroundImage: `linear-gradient(160deg, ${corRecorte} 0%, #101018 100%)` }} />
+        )}
         {capaRecorte ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={v.capaRecorteUrl} width={L} height={A} style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, objectFit: "contain" }} />
+          <img src={v.capaRecorteUrl} width={L} height={A} style={{ position: "absolute", left: 0, bottom: 0, width: `${L}px`, height: `${A}px`, objectFit: "contain", objectPosition: "bottom" }} />
         ) : null}
-        <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", padding: "0 60px 200px", backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0) 46%, rgba(0,0,0,0.15) 64%, rgba(0,0,0,0.85) 100%)" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", padding: "0 60px 200px", backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0) 52%, rgba(0,0,0,0.5) 76%, rgba(0,0,0,0.9) 100%)" }}>
           {upper ? (
             <div style={{ display: "flex", flexDirection: "column" }}>
               <div style={{ display: "flex", width: 250, height: 26, backgroundColor: cor, borderRadius: 13, marginBottom: 34, boxShadow: "0 6px 18px rgba(0,0,0,0.45)" }} />

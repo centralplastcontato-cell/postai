@@ -436,8 +436,11 @@ export async function gerarRecorteCapa(videoId: string, fotoIdParam?: string) {
     const data = await resp.json();
     const b64 = data.data?.[0]?.b64_json;
     if (!b64) return { ok: false as const, erro: "A IA não devolveu o recorte. Tente de novo." };
+    // Corta as bordas transparentes (deixa o assunto "justo") pra ele preencher melhor a capa.
+    let png = Buffer.from(b64, "base64");
+    try { const sharp = (await import("sharp")).default; png = Buffer.from(await sharp(png).trim({ threshold: 10 }).png().toBuffer()); } catch (e) { console.error("Não consegui aparar o recorte:", e); }
     const { put } = await import("@vercel/blob");
-    const blob = await put(`${v.marcaId}/capa-recorte-${videoId}-${Date.now()}.png`, Buffer.from(b64, "base64"), { access: "public", contentType: "image/png" });
+    const blob = await put(`${v.marcaId}/capa-recorte-${videoId}-${Date.now()}.png`, png, { access: "public", contentType: "image/png" });
     const antigo = v.capaRecorteUrl;
     await prisma.videoTematico.update({ where: { id: videoId }, data: { capaRecorteUrl: blob.url, capaEstilo: "recortado" } });
     if (antigo && antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
