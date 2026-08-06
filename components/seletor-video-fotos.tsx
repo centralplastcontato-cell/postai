@@ -1137,7 +1137,17 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                         <p className="text-[11px] leading-snug text-muted">✂️ A IA <strong className="text-white/80">recorta o assunto</strong> da sua foto (tira o fundo) e monta sobre uma <strong className="text-white/80">cor forte</strong> + seu texto — tipo thumbnail de YouTube. Os rostos ficam <strong className="text-white/80">como na foto</strong>.</p>
                         <button type="button" onClick={gerarRecorte} disabled={gerandoRecorte} className="mt-2 w-full rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-60">{gerandoRecorte ? "✂️ recortando… (uns 15-30s)" : capaRecorteUrl ? "🔄 Recortar de novo" : "✂️ Recortar minha foto"}</button>
                         {erroRecorte && <p className="mt-1.5 text-[11px] font-semibold text-vermelho">{erroRecorte}</p>}
-                        {!capaRecorteUrl && !gerandoRecorte && !erroRecorte && <p className="mt-1.5 text-[10px] leading-snug text-amber-300/80">Recorta a <strong className="text-white/70">foto da capa</strong> (a de ⭐ abaixo). A <strong className="text-white/70">cor do fundo</strong> vem da paleta na aba 🎨 Estilo.</p>}
+                        {!capaRecorteUrl && !gerandoRecorte && !erroRecorte && <p className="mt-1.5 text-[10px] leading-snug text-amber-300/80">Recorta a <strong className="text-white/70">foto da capa</strong> (a de ⭐ abaixo).</p>}
+                        {/* COR do fundo do recorte — paleta aqui mesmo (a prévia atualiza na hora) */}
+                        <div className="mt-2.5 border-t border-white/10 pt-2">
+                          <p className="mb-1.5 text-[10px] font-semibold text-white/80">🎨 Cor do fundo</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button type="button" onClick={() => trocarCorFundo("")} aria-label="Cor da marca" title="Cor da marca (padrão)" className={`h-7 w-7 rounded-full border-2 transition ${!corFundo ? "border-white ring-2 ring-white/40" : "border-white/20 hover:border-white/50"}`} style={{ background: corMarca }} />
+                            {CORES_FUNDO.map((c) => (
+                              <button key={c} type="button" onClick={() => trocarCorFundo(c)} aria-label={`Cor ${c}`} title={c} className={`h-7 w-7 rounded-full border-2 transition ${corFundo.toUpperCase() === c ? "border-white ring-2 ring-white/40" : "border-white/20 hover:border-white/50"}`} style={{ background: c }} />
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     )}
 
