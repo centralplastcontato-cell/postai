@@ -554,7 +554,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#0b0a12]/96 backdrop-blur-md" onClick={onFechar}>
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden overscroll-none bg-[#0b0a12]/96 backdrop-blur-md" onClick={onFechar}>
       <div className="flex flex-1 flex-col overflow-hidden bg-[#0f0e18]" onClick={(e) => e.stopPropagation()}>
         {/* ---------- BARRA DE CIMA: título + ações principais ---------- */}
         <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3">
@@ -575,8 +575,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         {/* ---------- MIOLO: prévia (player) à esquerda + abas à direita ---------- */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* PLAYER — a prévia 9:16 da cena atual, do jeito que vai ficar no vídeo */}
-          <div className="flex shrink-0 flex-col items-center justify-center gap-3 p-4 lg:flex-1" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
-            <div className="relative aspect-[9/16] h-[31vh] max-w-full overflow-hidden rounded-[22px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[63vh]">
+          <div className="flex shrink-0 flex-col items-center justify-center gap-2 p-3 lg:gap-3 lg:p-4 lg:flex-1" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
+            <div className="relative aspect-[9/16] h-[25vh] max-w-full overflow-hidden rounded-[22px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[63vh]">
               {cenaFoto ? (
                 <>
                   {fundoCheia ? (
@@ -586,10 +586,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
-                      <div className="absolute inset-0 flex items-center justify-center p-4">
+                      <div className="absolute inset-0 flex items-center justify-center p-3 lg:p-4">
                         <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corMarca, 2)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={cenaFoto.url} alt="" className="block max-h-[52vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
+                          <img src={cenaFoto.url} alt="" className="block max-h-[21vh] w-auto max-w-full object-contain lg:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
                         </span>
                       </div>
                     </>
@@ -641,7 +641,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             </div>
 
             {/* o conteúdo da aba escolhida (rola só aqui dentro) */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4" style={{ WebkitOverflowScrolling: "touch" }}>
 
               {/* ============ ABA FOTOS ============ */}
               {aba === "fotos" && (
