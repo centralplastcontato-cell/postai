@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
 const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
@@ -132,7 +132,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -152,6 +152,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   molduraCorInicial?: string; // cor da moldura "marca" (hex); "" = cor da marca
   capaEstiloInicial?: string; // estilo da capa (temático): "" (clássica) | "impacto" (chamativa) | "ia"
   capaIaUrlInicial?: string; // URL da arte de capa gerada pela IA (quando estilo = "ia")
+  capaRecorteUrlInicial?: string; // URL da foto recortada (quando estilo = "recortado")
   corMarca?: string;
   jaTemVideo?: boolean;
   onFechar: () => void;
@@ -185,6 +186,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [capaIaUrl, setCapaIaUrl] = useState<string>(capaIaUrlInicial || ""); // arte de capa gerada pela IA
   const [gerandoCapaIa, setGerandoCapaIa] = useState(false);
   const [erroCapaIa, setErroCapaIa] = useState("");
+  const [capaRecorteUrl, setCapaRecorteUrl] = useState<string>(capaRecorteUrlInicial || ""); // foto recortada (sem fundo)
+  const [gerandoRecorte, setGerandoRecorte] = useState(false);
+  const [erroRecorte, setErroRecorte] = useState("");
   // Nome do vídeo (só o do buffet dá pra renomear aqui; no de festa o nome são os aniversariantes).
   const [nomeVideo, setNomeVideo] = useState(nome);
   const [editandoNome, setEditandoNome] = useState(false);
@@ -234,6 +238,17 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!r.ok) { setErroCapaIa(r.erro || "Não consegui gerar agora."); return; }
     setCapaIaUrl(r.url);
     setCapaEstilo("ia");
+  }
+  // Recorta o assunto da foto da capa (tira o fundo) com IA. Ao terminar, deixa o estilo em "recortado".
+  async function gerarRecorte() {
+    if (!tematicoId || gerandoRecorte) return;
+    setGerandoRecorte(true);
+    setErroRecorte("");
+    const r = await gerarRecorteCapa(tematicoId).catch(() => ({ ok: false as const, erro: "Não consegui recortar agora." }));
+    setGerandoRecorte(false);
+    if (!r.ok) { setErroRecorte(r.erro || "Não consegui recortar agora."); return; }
+    setCapaRecorteUrl(r.url);
+    setCapaEstilo("recortado");
   }
   // Salva o novo nome do vídeo do buffet (o campo editável no topo). Volta ao nome antigo se falhar.
   async function salvarNome() {
@@ -1091,11 +1106,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     </div>
 
                     {/* estilo da capa */}
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {[
                         { id: "", emoji: "🖼️", nome: "Clássica", desc: "foto + frase" },
                         { id: "impacto", emoji: "🔥", nome: "Impacto", desc: "foto cheia + texto" },
                         { id: "ia", emoji: "🤖", nome: "IA", desc: "arte festiva" },
+                        { id: "recortado", emoji: "✂️", nome: "Recortado", desc: "assunto recortado + cor (tipo YouTube)" },
                       ].map((op) => (
                         <button key={op.id || "classica"} type="button" onClick={() => trocarCapaEstilo(op.id)} className={`rounded-xl border p-2 text-left transition ${capaEstilo === op.id ? "border-[#a855f7] bg-[#a855f7]/10 ring-2 ring-[#a855f7]/30" : "border-white/12 bg-white/[0.03] hover:border-white/30"}`}>
                           <div className="text-[13px] font-bold text-white">{op.emoji} {op.nome}</div>
@@ -1103,6 +1119,16 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                         </button>
                       ))}
                     </div>
+
+                    {/* painel do RECORTE (só quando o estilo é "recortado") */}
+                    {capaEstilo === "recortado" && (
+                      <div className="rounded-xl border border-[#a855f7]/30 bg-[#a855f7]/[0.06] p-2.5">
+                        <p className="text-[11px] leading-snug text-muted">✂️ A IA <strong className="text-white/80">recorta o assunto</strong> da sua foto (tira o fundo) e monta sobre uma <strong className="text-white/80">cor forte</strong> + seu texto — tipo thumbnail de YouTube. Os rostos ficam <strong className="text-white/80">como na foto</strong>.</p>
+                        <button type="button" onClick={gerarRecorte} disabled={gerandoRecorte} className="mt-2 w-full rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-60">{gerandoRecorte ? "✂️ recortando… (uns 15-30s)" : capaRecorteUrl ? "🔄 Recortar de novo" : "✂️ Recortar minha foto"}</button>
+                        {erroRecorte && <p className="mt-1.5 text-[11px] font-semibold text-vermelho">{erroRecorte}</p>}
+                        {!capaRecorteUrl && !gerandoRecorte && !erroRecorte && <p className="mt-1.5 text-[10px] leading-snug text-amber-300/80">Recorta a <strong className="text-white/70">foto da capa</strong> (a de ⭐ abaixo). A <strong className="text-white/70">cor do fundo</strong> vem da paleta na aba 🎨 Estilo.</p>}
+                      </div>
+                    )}
 
                     {/* painel da IA (só quando o estilo é "ia") */}
                     {capaEstilo === "ia" && (
@@ -1116,14 +1142,23 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
 
                     {/* prévia da capa */}
                     {(() => {
-                      const grande = capaEstilo === "impacto" || capaEstilo === "ia";
+                      const grande = capaEstilo === "impacto" || capaEstilo === "ia" || capaEstilo === "recortado";
+                      const ehRecorte = capaEstilo === "recortado" && !!capaRecorteUrl;
                       const bgPrev = capaEstilo === "ia" && capaIaUrl ? capaIaUrl : capaFoto?.url || "";
-                      if (!bgPrev) return <p className="rounded-lg border border-dashed border-white/15 py-4 text-center text-[11px] text-muted">Escolha as fotos na aba <strong className="text-white/80">📷 Fotos</strong> primeiro.</p>;
+                      if (!bgPrev && !ehRecorte) return <p className="rounded-lg border border-dashed border-white/15 py-4 text-center text-[11px] text-muted">Escolha as fotos na aba <strong className="text-white/80">📷 Fotos</strong> primeiro.</p>;
                       return (
                         <div className="flex flex-col items-center gap-1.5">
                           <button type="button" onClick={() => setCapaCheia(true)} title="Ver a capa maior" className="relative aspect-[9/16] w-40 overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={bgPrev} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                            {ehRecorte ? (
+                              <>
+                                <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={capaRecorteUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
+                              </>
+                            ) : (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={bgPrev} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                            )}
                             <span className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-xs text-white backdrop-blur">🔍</span>
                             {grande ? (
                               <div className="absolute inset-0 flex flex-col justify-end p-2.5" style={{ backgroundImage: "linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 63%, rgba(0,0,0,0.92) 100%)" }}>
@@ -1454,17 +1489,26 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       {/* CAPA em tela cheia — vê a capa grande, do jeito do estilo escolhido (impacto/ia/clássica). */}
       {capaCheia && (() => {
         const cf = escolhidas.find((f) => f.id === capaId) || escolhidas[0] || null;
+        const ehRecorte = capaEstilo === "recortado" && !!capaRecorteUrl;
         const bg = capaEstilo === "ia" && capaIaUrl ? capaIaUrl : cf?.url || "";
         const ch = (textos[capaId] || "").trim();
-        const grande = capaEstilo === "impacto" || capaEstilo === "ia";
+        const grande = capaEstilo === "impacto" || capaEstilo === "ia" || capaEstilo === "recortado";
         return (
           <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/95 p-4" onClick={(e) => { e.stopPropagation(); setCapaCheia(false); }}>
             <p className="text-center text-xs font-semibold text-white/80">👇 Assim a capa vai aparecer (o logo entra no topo)</p>
             <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[72vh] max-w-full overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-white/15">
-              {bg ? (
+              {(bg || ehRecorte) ? (
                 <>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={bg} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  {ehRecorte ? (
+                    <>
+                      <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={capaRecorteUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
+                    </>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={bg} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  )}
                   {grande ? (
                     <div className="absolute inset-0 flex flex-col justify-end p-6" style={{ backgroundImage: "linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 63%, rgba(0,0,0,0.92) 100%)" }}>
                       <div className="mb-3 h-2.5 w-20 rounded-full" style={{ background: corMarca }} />

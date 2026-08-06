@@ -337,7 +337,7 @@ export async function definirCapaEstilo(videoId: string, estilo: string) {
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const valor = estilo === "impacto" ? "impacto" : estilo === "ia" ? "ia" : ""; // só aceita os estilos conhecidos
+  const valor = estilo === "impacto" ? "impacto" : estilo === "ia" ? "ia" : estilo === "recortado" ? "recortado" : ""; // estilos conhecidos
   await prisma.videoTematico.update({ where: { id: videoId }, data: { capaEstilo: valor } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, estilo: valor };
@@ -378,6 +378,51 @@ export async function gerarCapaIa(videoId: string) {
   } catch (e) {
     console.error("Erro ao gerar capa IA:", e);
     return { ok: false as const, erro: "Não consegui gerar a capa agora. Tente de novo." };
+  }
+}
+
+// Recorta o ASSUNTO da foto da capa (tira o fundo, deixa transparente) com gpt-image-1 (edits). O
+// recorte preserva a foto real (só remove o fundo) e é montado depois sobre um fundo colorido +
+// texto no /api/quadro-tema. Já marca capaEstilo = "recortado". Custa uns centavos e leva alguns segundos.
+export async function gerarRecorteCapa(videoId: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoCapa: true, videoFotos: true, capaRecorteUrl: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  // a foto da capa (a escolhida, ou a 1ª da sequência) — validada como divulgável (LGPD, igual quadro-tema).
+  let ids: string[] = [];
+  try { const a = JSON.parse(v.videoFotos || "[]"); ids = Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string") : []; } catch {}
+  const fotoId = v.videoCapa || ids[0];
+  if (!fotoId) return { ok: false as const, erro: "Escolha a foto da capa primeiro." };
+  const img = await prisma.imagemMarca.findFirst({ where: { id: fotoId, marcaId: v.marcaId, OR: [{ festaId: null }, { festa: { autorizacao: "autorizada" } }] }, select: { url: true } });
+  if (!img) return { ok: false as const, erro: "Foto indisponível." };
+  try {
+    const fResp = await fetch(img.url, { signal: AbortSignal.timeout(20000) });
+    if (!fResp.ok) return { ok: false as const, erro: "Não consegui baixar a foto." };
+    const buf = Buffer.from(await fResp.arrayBuffer());
+    const form = new FormData();
+    form.append("model", "gpt-image-1");
+    form.append("prompt", "Recorte APENAS o assunto principal em primeiro plano (as pessoas, o bolo ou a decoração central) e remova COMPLETAMENTE o fundo, deixando o fundo 100% transparente. Mantenha o assunto fiel à foto original, com bordas limpas e nítidas. NÃO invente nem altere rostos; não adicione nada novo.");
+    form.append("size", "1024x1536");
+    form.append("background", "transparent");
+    form.append("image", new Blob([buf], { type: "image/jpeg" }), "foto.jpg");
+    const resp = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form });
+    if (!resp.ok) return { ok: false as const, erro: `A IA não respondeu agora (${resp.status}). Tente de novo.` };
+    const data = await resp.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) return { ok: false as const, erro: "A IA não devolveu o recorte. Tente de novo." };
+    const { put } = await import("@vercel/blob");
+    const blob = await put(`${v.marcaId}/capa-recorte-${videoId}-${Date.now()}.png`, Buffer.from(b64, "base64"), { access: "public", contentType: "image/png" });
+    const antigo = v.capaRecorteUrl;
+    await prisma.videoTematico.update({ where: { id: videoId }, data: { capaRecorteUrl: blob.url, capaEstilo: "recortado" } });
+    if (antigo && antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
+    revalidatePath(`/painel/marcas/${v.marcaId}`);
+    return { ok: true as const, url: blob.url };
+  } catch (e) {
+    console.error("Erro no recorte da capa:", e);
+    return { ok: false as const, erro: "Não consegui recortar agora. Tente de novo." };
   }
 }
 

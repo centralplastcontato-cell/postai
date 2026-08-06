@@ -116,12 +116,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     // toda + texto GIGANTE com contorno (tipo thumbnail de YouTube), seja qual for o fundo dos outros quadros.
     // Capa "grande" (fundo na tela toda + texto gigante embaixo): "impacto" usa a SUA foto,
     // "ia" usa a ARTE festiva gerada pela IA. Layout é o mesmo; muda só a imagem de fundo.
-    const capaGrande = ehCapa && (v.capaEstilo === "impacto" || v.capaEstilo === "ia");
+    // Recorte pronto → capa "recortada" (assunto sem fundo sobre cor + texto). Sem recorte → cai no impacto.
+    const capaRecorte = ehCapa && v.capaEstilo === "recortado" && /^https?:/.test(v.capaRecorteUrl || "");
+    const capaGrande = ehCapa && (v.capaEstilo === "impacto" || v.capaEstilo === "ia" || (v.capaEstilo === "recortado" && !capaRecorte));
 
     // Fundo borrado (modo padrão): borra a foto com sharp (o next/og não faz blur). Se falhar,
     // cai no degradê das cores da marca.
     let bgBlur = "";
-    if (modo === "desfocada" && !capaGrande && !fundoCor) {
+    if (modo === "desfocada" && !capaGrande && !fundoCor && !capaRecorte) {
       try {
         const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
         const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).blur(30).modulate({ brightness: 0.5 }).jpeg({ quality: 62 }).toBuffer();
@@ -185,13 +187,35 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       </div>
     );
 
+    // CAPA RECORTADA: assunto sem fundo (PNG transparente) sobre um degradê de cor + texto gigante.
+    const corRecorte = /^#[0-9a-fA-F]{6}$/.test(v.videoFundoCor || "") ? v.videoFundoCor : cor;
+    const recorteEl = (
+      <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative", fontFamily: "Baloo" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, backgroundImage: `linear-gradient(160deg, ${corRecorte} 0%, #101018 100%)` }} />
+        {capaRecorte ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={v.capaRecorteUrl} width={L} height={A} style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, objectFit: "contain" }} />
+        ) : null}
+        <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", padding: "0 60px 200px", backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0) 46%, rgba(0,0,0,0.15) 64%, rgba(0,0,0,0.85) 100%)" }}>
+          {upper ? (
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", width: 250, height: 26, backgroundColor: cor, borderRadius: 13, marginBottom: 34, boxShadow: "0 6px 18px rgba(0,0,0,0.45)" }} />
+              <div style={{ display: "flex", fontSize: tamImp, fontWeight: 600, color: "#ffffff", lineHeight: 1.0, letterSpacing: -2, textShadow: contornoImp, maxWidth: `${L - 120}px` }}>{upper}</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex" }} />
+          )}
+        </div>
+      </div>
+    );
+
     // MOLDURA da foto (agora respeitada no vídeo do buffet): cor e espessura da borda ao redor da foto.
     const mol = v.videoMoldura || "branca";
     const molCorMarca = /^#[0-9a-fA-F]{6}$/.test(v.videoMolduraCor || "") ? v.videoMolduraCor : cor;
     const molCor = mol === "preta" ? "#141414" : mol === "marca" ? molCorMarca : "#ffffff";
     const molPad = mol === "nenhuma" ? 0 : mol === "grossa" ? 30 : BORDA;
 
-    const el = capaGrande ? impactoEl :
+    const el = capaRecorte ? recorteEl : capaGrande ? impactoEl :
       modo === "cheia" ? (
         // FOTO NA TELA TODA: preenche o 9:16 (corta as beiradas); legenda embaixo, sobre um
         // escurecido pra ler. Sem moldura.

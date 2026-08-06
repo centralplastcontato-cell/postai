@@ -25,6 +25,7 @@ export type VideoTematicoView = {
   videoMolduraCor: string; // cor da moldura "marca" (hex); "" = cor da marca
   capaEstilo: string; // estilo da capa: "" (clássica) | "impacto" (foto na tela toda) | "ia" (arte da IA)
   capaIaUrl: string; // URL da arte de capa gerada pela IA (quando capaEstilo = "ia")
+  capaRecorteUrl: string; // URL da foto recortada (quando capaEstilo = "recortado")
   videoMusica: string; // trilha escolhida (URL) — "" = jingle do buffet
   videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
   narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
@@ -389,6 +390,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca }: { marcaId:
           molduraCorInicial={seletorTema.video.videoMolduraCor}
           capaEstiloInicial={seletorTema.video.capaEstilo}
           capaIaUrlInicial={seletorTema.video.capaIaUrl}
+          capaRecorteUrlInicial={seletorTema.video.capaRecorteUrl}
           musicaInicial={seletorTema.video.videoMusica}
           musicasBanco={musicasBanco}
           corMarca={corMarca}
