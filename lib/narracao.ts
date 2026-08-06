@@ -17,7 +17,7 @@ const TAXA = 24000; // 24 kHz mono — o que o Google devolve e o que o jingle j
 // A voz é ATENUADA na mesma medida em que a música entra (a soma nunca passa de 1,0). Sem isso a
 // soma estoura o teto nos picos da locução e o corte vira crepitação — justo nas palavras que a
 // voz enfatiza, que são as que vendem. `montarTrilha` calcula essa cessão amostra a amostra.
-const VOL_JINGLE = 0.16; // volume PADRÃO da música por baixo da voz (o slider muda isso)
+const VOL_JINGLE = 0.5; // FRAÇÃO padrão do slider (0..1) quando não vier valor — o slider muda isso
 const RABICHO_S = 1.2; // um tiquinho de jingle depois que a voz termina (não corta seco)
 const FADE_S = 1.5; // o jingle some suave no final
 
@@ -121,8 +121,11 @@ function montarTrilha(
   alvoSegundos?: number,
 ): { pcm: Int16Array; segundos: number } {
   const temJingle = !!jingle && jingle.length > 0;
-  const volBaixo = temJingle ? Math.max(0, Math.min(0.4, volMusica ?? VOL_JINGLE)) : 0; // sob a voz
-  const volMeio = temJingle && volBaixo > 0 ? Math.min(0.5, Math.max(volBaixo, 0.3)) : volBaixo; // no meio (sem voz)
+  // volMusica agora é a FRAÇÃO do slider (0..1). Traduz em ganhos reais e AUDÍVEIS: sob a voz a
+  // música é abafada (ducking, pra não competir); no MEIO (sem voz) ela sobe de verdade.
+  const g = Math.max(0, Math.min(1, volMusica ?? VOL_JINGLE));
+  const volBaixo = temJingle ? g * 0.35 : 0; // sob a voz (abafada): 0 → 0,35
+  const volMeio = temJingle && g > 0 ? 0.25 + g * 0.65 : volBaixo; // no meio (só música): 0,25 → 0,9
   const gap = Math.round(GAP_S * TAXA);
   const ramp = Math.round(RAMP_S * TAXA);
   const tail = Math.round(RABICHO_S * TAXA);

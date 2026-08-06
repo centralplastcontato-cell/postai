@@ -836,8 +836,8 @@ export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: 
   const estilo = (direcao ?? v.narracaoEstilo ?? "").trim().slice(0, 900);
   const antigo = v.narracaoUrl;
   try {
-    // volMusica: 0 = sem música | ~0,16 = padrão | maior = música mais alta. Clampa por segurança.
-    const vm = typeof volMusica === "number" && isFinite(volMusica) ? Math.max(0, Math.min(0.4, volMusica)) : undefined;
+    // volMusica: FRAÇÃO do slider (0..1) — 0 = sem música | 0,5 = padrão | 1 = bem alta. Clampa por segurança.
+    const vm = typeof volMusica === "number" && isFinite(volMusica) ? Math.max(0, Math.min(1, volMusica)) : undefined;
     // 2ª fala (CTA no fim, opcional) e a duração ALVO do vídeo com TODAS as fotos — a música
     // estica até lá pra nenhuma foto ficar de fora. Clampa a duração num intervalo são.
     const t2 = (texto2 || "").trim().slice(0, 400);

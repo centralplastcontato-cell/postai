@@ -492,8 +492,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId) return;
     setGerandoVoz(true);
     setMsgVoz(null);
-    // slider 0-100 → volume do jingle na mistura (50 = 0,16 padrão; 100 = 0,32; 0 = sem música).
-    const musicaVol = Math.round((volMusica / 100) * 0.32 * 100) / 100;
+    // slider 0-100 → FRAÇÃO (0..1); o motor traduz em ganho audível (0 = sem música; 100 = bem alta).
+    const musicaVol = volMusica / 100;
     // duração ALVO = o vídeo com TODAS as fotos (uma vira a capa) — a música estica até lá, e
     // com a 2ª fala a voz volta no fim. ~2,3s por foto + 6s fixos (capa + slide final).
     const nSlide = Math.max(1, sel.length - 1);
