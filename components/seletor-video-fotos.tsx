@@ -245,30 +245,38 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   }, [festaId, tematicoId]);
   // Prepara o WAV (no navegador) de UMA trilha e registra na biblioteca — pra ela poder entrar sob
   // a voz na narração. Só faz sentido no vídeo do buffet (temático). Best-effort e sem repetir.
-  const preparandoWav = useRef<Set<string>>(new Set());
-  async function garantirWav(mp3Url: string) {
-    if (!tematicoId || !mp3Url.startsWith("http") || preparandoWav.current.has(mp3Url)) return;
-    preparandoWav.current.add(mp3Url);
-    try {
-      const wavBlob = await prepararWavDaMusica(mp3Url);
-      if (!wavBlob) return;
-      const form = new FormData();
-      form.append("file", new File([wavBlob], "trilha.wav", { type: "audio/wav" }));
-      const resp = await fetch("/api/marketing/upload?tipo=musica", { method: "POST", body: form });
-      const data = await resp.json();
-      if (!data.ok || !data.url) return;
-      const r = await definirWavMusicaTema(tematicoId, mp3Url, data.url).catch(() => null);
-      if (r?.ok) setBanco(r.musicas);
-      else setBanco((b) => b.map((m) => (m.url === mp3Url ? { ...m, wav: data.url } : m)));
-    } finally {
-      preparandoWav.current.delete(mp3Url);
-    }
+  const wavPromises = useRef<Map<string, Promise<string | null>>>(new Map());
+  // Garante o WAV (24kHz mono) de UMA trilha e DEVOLVE a URL dele (ou null). Já pronto → na hora;
+  // em preparo → aguarda o mesmo trabalho (dedup); senão prepara no navegador + envia + registra.
+  function garantirWav(mp3Url: string): Promise<string | null> {
+    const jaTem = banco.find((m) => m.url === mp3Url)?.wav;
+    if (jaTem) return Promise.resolve(jaTem);
+    if (!tematicoId || !mp3Url.startsWith("http")) return Promise.resolve(null);
+    const emAndamento = wavPromises.current.get(mp3Url);
+    if (emAndamento) return emAndamento;
+    const p = (async (): Promise<string | null> => {
+      try {
+        const wavBlob = await prepararWavDaMusica(mp3Url);
+        if (!wavBlob) return null;
+        const form = new FormData();
+        form.append("file", new File([wavBlob], "trilha.wav", { type: "audio/wav" }));
+        const resp = await fetch("/api/marketing/upload?tipo=musica", { method: "POST", body: form });
+        const data = await resp.json();
+        if (!data.ok || !data.url) return null;
+        definirWavMusicaTema(tematicoId, mp3Url, data.url).then((r) => { if (r?.ok) setBanco(r.musicas); }).catch(() => {});
+        setBanco((b) => b.map((m) => (m.url === mp3Url ? { ...m, wav: data.url } : m)));
+        return data.url as string;
+      } catch { return null; }
+      finally { wavPromises.current.delete(mp3Url); }
+    })();
+    wavPromises.current.set(mp3Url, p);
+    return p;
   }
   // BACKFILL automático: no vídeo do buffet, prepara o WAV das trilhas que ainda não têm (uma de
   // cada vez pra não pesar). Assim as músicas já existentes passam a funcionar sob a voz, sem reenvio.
   useEffect(() => {
     if (!tematicoId) return;
-    const pendente = banco.find((m) => !m.wav && !preparandoWav.current.has(m.url));
+    const pendente = banco.find((m) => !m.wav && !wavPromises.current.has(m.url));
     if (pendente) garantirWav(pendente.url);
   }, [tematicoId, banco]); // eslint-disable-line react-hooks/exhaustive-deps
   // Toca/pausa uma trilha pra ouvir antes de escolher (um player só; tocar outra troca a fonte).
@@ -420,7 +428,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     // com a 2ª fala a voz volta no fim. ~2,3s por foto + 6s fixos (capa + slide final).
     const nSlide = Math.max(1, sel.length - 1);
     const alvoSegundos = Math.round(nSlide * 2.3 + 6);
-    const r = await gerarNarracaoVideo(tematicoId, roteiro, voz, estilo, musicaVol, roteiro2, alvoSegundos).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
+    // A trilha ESCOLHIDA entra sob a voz: prepara/pega o WAV dela AGORA e passa direto (não depende
+    // de ter salvo antes). Sem trilha escolhida, ou se falhar, a narração usa o jingle do buffet.
+    const wavUrl = musica ? await garantirWav(musica).catch(() => null) : null;
+    const r = await gerarNarracaoVideo(tematicoId, roteiro, voz, estilo, musicaVol, roteiro2, alvoSegundos, wavUrl || undefined).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
     setGerandoVoz(false);
     if (!r.ok) { setMsgVoz({ tipo: "erro", txt: r.erro || "Não consegui gerar a voz." }); return; }
     setAudioUrl(r.url);
@@ -798,6 +809,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   <div key={m.url} className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 transition ${escolhida ? "border-[#7c3aed] bg-[#7c3aed]/15" : "border-linha"}`}>
                     <button type="button" onClick={() => ouvir(m.url)} aria-label={play ? "Pausar" : "Ouvir"} title={play ? "Pausar" : "Ouvir esta música"} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/50 text-sm text-white transition hover:bg-[#7c3aed]">{play ? "⏸" : "▶️"}</button>
                     <button type="button" onClick={() => setMusica(m.url)} className="min-w-0 flex-1 truncate text-left text-[12px] font-semibold text-white">🎵 {m.nome}</button>
+                    {/* Só no buffet: mostra se a trilha já está pronta pra entrar SOB A VOZ (narração). */}
+                    {tematicoId && (m.wav
+                      ? <span title="Pronta pra entrar sob a voz na narração" className="shrink-0 text-[10px] font-semibold text-green-400">🎙️✓</span>
+                      : <span title="Preparando pra narração… (deixe a tela aberta um instante)" className="shrink-0 animate-pulse text-[10px] text-amber-300/80">🎙️⏳</span>)}
                     {escolhida && <span className="shrink-0 text-[10px] font-bold text-[#c7b2ff]">✓ escolhida</span>}
                   </div>
                 );

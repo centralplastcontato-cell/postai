@@ -729,7 +729,7 @@ ${site ? `- Cite o site no fim: ${site} (deixe a URL na fala pra a voz ler).` : 
 
 // Gera a VOZ (Google Chirp3-HD) já misturada com o jingle e guarda no Blob. O dono OUVE antes
 // de mandar montar o vídeo — trocar a voz e ouvir de novo custa centavos e leva 2 segundos.
-export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string, direcao?: string, volMusica?: number, texto2?: string, alvoSegundos?: number) {
+export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string, direcao?: string, volMusica?: number, texto2?: string, alvoSegundos?: number, musicaWavUrl?: string) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
     include: { marca: { select: { slug: true, musicas: true } } },
@@ -754,11 +754,13 @@ export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: 
     // estica até lá pra nenhuma foto ficar de fora. Clampa a duração num intervalo são.
     const t2 = (texto2 || "").trim().slice(0, 400);
     const alvo = typeof alvoSegundos === "number" && isFinite(alvoSegundos) ? Math.max(10, Math.min(120, alvoSegundos)) : undefined;
-    // Fundo da narração: se o dono escolheu uma TRILHA (videoMusica) e ela já tem o WAV preparado,
-    // usa ela no lugar do jingle. Sem trilha (ou sem WAV pronto) → jingle do buffet (como antes).
-    const musicaWav = v.videoMusica?.startsWith("http")
-      ? lerMusicas(v.marca.musicas).find((m) => m.url === v.videoMusica)?.wav
-      : undefined;
+    // Fundo da narração: o WAV passado direto pelo "Ouvir" (a trilha escolhida na tela AGORA) tem
+    // prioridade; senão, o WAV da trilha salva (videoMusica). Sem nada disso → jingle do buffet.
+    const musicaWav = (musicaWavUrl && musicaWavUrl.startsWith("http"))
+      ? musicaWavUrl
+      : v.videoMusica?.startsWith("http")
+        ? lerMusicas(v.marca.musicas).find((m) => m.url === v.videoMusica)?.wav
+        : undefined;
     const { url, segundos } = await gerarNarracaoMp3({ texto: t, texto2: t2 || undefined, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), volMusica: vm, alvoSegundos: alvo, musicaWav: musicaWav || undefined });
     await prisma.videoTematico.update({
       where: { id: videoId },
