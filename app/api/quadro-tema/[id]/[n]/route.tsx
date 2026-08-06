@@ -158,9 +158,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       }
     }
     const upper = (legenda || "").toUpperCase();
-    const tamImp = upper.length > 44 ? 78 : upper.length > 28 ? 98 : 120;
-    // "contorno" do texto = várias sombras nas 4 direções + uma sombra suave (dá o look de thumbnail).
-    const contornoImp = "3px 3px 0 #000,-3px 3px 0 #000,3px -3px 0 #000,-3px -3px 0 #000,0 8px 26px rgba(0,0,0,0.6)";
+    const tamImp = upper.length > 44 ? 92 : upper.length > 28 ? 116 : 142;
+    // CONTORNO GROSSO estilo thumbnail: anel de sombras pretas nas 8 direções + uma sombra suave.
+    const ow = 6;
+    const contornoImp = [
+      `${ow}px ${ow}px 0 #000`, `-${ow}px ${ow}px 0 #000`, `${ow}px -${ow}px 0 #000`, `-${ow}px -${ow}px 0 #000`,
+      `${ow}px 0 0 #000`, `-${ow}px 0 0 #000`, `0 ${ow}px 0 #000`, `0 -${ow}px 0 #000`, `0 12px 32px rgba(0,0,0,0.55)`,
+    ].join(",");
     // CAPA CHAMATIVA: foto preenche a tela, texto gigante embaixo (o motor carimba o logo no TOPO da capa).
     const impactoEl = (
       <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative", fontFamily: "Baloo" }}>
@@ -171,8 +175,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
         <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", padding: "0 70px 200px", backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.35) 63%, rgba(0,0,0,0.92) 100%)" }}>
           {upper ? (
             <div style={{ display: "flex", flexDirection: "column" }}>
-              <div style={{ display: "flex", width: 210, height: 20, backgroundColor: cor, borderRadius: 10, marginBottom: 32, boxShadow: "0 6px 18px rgba(0,0,0,0.4)" }} />
-              <div style={{ display: "flex", fontSize: tamImp, fontWeight: 600, color: "#ffffff", lineHeight: 1.04, letterSpacing: -1, textShadow: contornoImp, maxWidth: `${L - 140}px` }}>{upper}</div>
+              <div style={{ display: "flex", width: 250, height: 26, backgroundColor: cor, borderRadius: 13, marginBottom: 34, boxShadow: "0 6px 18px rgba(0,0,0,0.45)" }} />
+              <div style={{ display: "flex", fontSize: tamImp, fontWeight: 600, color: "#ffffff", lineHeight: 1.0, letterSpacing: -2, textShadow: contornoImp, maxWidth: `${L - 120}px` }}>{upper}</div>
             </div>
           ) : (
             <div style={{ display: "flex" }} />

@@ -357,7 +357,7 @@ export async function gerarCapaIa(videoId: string) {
   const tema = (v.titulo || "").trim();
   // Fundo festivo abstrato — nunca pessoas/rostos/texto (a chamada entra por cima; rosto de IA
   // ia distorcer). Espaço livre embaixo pra o título. Vertical 9:16.
-  const prompt = `Arte de CAPA vertical (thumbnail) super chamativa e festiva pra um vídeo de rede social de um buffet infantil chamado "${v.marca.nome}"${tema ? `, no clima de "${tema}"` : ""}. Fundo decorativo alegre e vibrante: balões, confete, brilhos, estrelas e formas divertidas, cores fortes com destaque para ${cor}, luz de festa. Deixe um GRANDE espaço mais escuro/limpo na parte de BAIXO pra escrever um título depois. NÃO desenhe pessoas, rostos, crianças, texto, letras, números nem logotipos — apenas a arte de fundo. Formato vertical 9:16.`;
+  const prompt = `Arte de CAPA vertical estilo THUMBNAIL de YouTube, MUITO chamativa e clickbait, pra um vídeo de rede social de um buffet infantil chamado "${v.marca.nome}"${tema ? `, no clima de "${tema}"` : ""}. Cores SUPER saturadas e alto contraste, energia explosiva de festa: balões, confete, brilhos, estrelas, raios de luz e formas divertidas, com destaque forte para a cor ${cor}. Composição ousada, iluminação dramática. Deixe um GRANDE espaço mais escuro/limpo na parte de BAIXO (uns 40% da altura) pra escrever um título GIGANTE depois. NÃO desenhe pessoas, rostos, crianças, texto, letras, números nem logotipos — apenas a arte de fundo. Formato vertical 9:16.`;
   try {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
