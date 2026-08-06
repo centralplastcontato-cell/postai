@@ -173,6 +173,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // Nome do vídeo (só o do buffet dá pra renomear aqui; no de festa o nome são os aniversariantes).
   const [nomeVideo, setNomeVideo] = useState(nome);
   const [editandoNome, setEditandoNome] = useState(false);
+  const [salvoOk, setSalvoOk] = useState(false); // mostra "✓ Salvo!" por uns segundos
+  const salvoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // ABA aberta no painel lateral + qual CENA está na prévia central + se a prévia está "tocando".
   const [aba, setAba] = useState<string>("fotos");
   const [cena, setCena] = useState(0);
@@ -495,12 +497,17 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     } catch { setErroGerar("Não consegui enviar a música."); }
     setSubindoMusica(false);
   }
+  // Salva a seleção e FICA na tela (não fecha) — mostra "✓ Salvo!" por uns segundos como confirmação.
   async function salvar() {
     setSalvando(true);
-    try { await salvarSelecao(); } catch {}
+    try {
+      await salvarSelecao();
+      setSalvoOk(true);
+      if (salvoTimer.current) clearTimeout(salvoTimer.current);
+      salvoTimer.current = setTimeout(() => setSalvoOk(false), 2500);
+    } catch {}
     setSalvando(false);
     router.refresh();
-    onFechar();
   }
   // Salva a seleção E dispara o motor de vídeo (o "Gerar" agora passa por aqui, depois de escolher).
   async function salvarEGerar() {
@@ -646,7 +653,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             {segs > 90 && <span className="ml-1 font-semibold text-vermelho">(passa de 90s!)</span>}
           </span>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={salvar} disabled={salvando} className="rounded-xl border border-white/15 px-3.5 py-2 text-xs font-semibold text-white transition hover:border-white/40 disabled:opacity-60">{salvando ? "…" : "Salvar"}</button>
+            <button onClick={salvar} disabled={salvando} className={`rounded-xl border px-3.5 py-2 text-xs font-semibold transition disabled:opacity-60 ${salvoOk ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300" : "border-white/15 text-white hover:border-white/40"}`}>{salvando ? "…" : salvoOk ? "✓ Salvo!" : "Salvar"}</button>
             <button onClick={salvarEGerar} disabled={salvando || sel.length === 0} title={sel.length === 0 ? "Escolha as fotos primeiro" : "Salvar a seleção e gerar o vídeo"} className="rounded-xl bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-50">{jaTemVideo ? "🔄 Refazer vídeo" : "⚡ Gerar vídeo"}</button>
             <button onClick={onFechar} aria-label="Fechar" className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 text-sm text-muted transition hover:text-white">✕</button>
           </div>
