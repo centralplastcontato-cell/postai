@@ -554,29 +554,29 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/92 backdrop-blur-sm" onClick={onFechar}>
-      <div className="flex flex-1 flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#0b0a12]/96 backdrop-blur-md" onClick={onFechar}>
+      <div className="flex flex-1 flex-col overflow-hidden bg-[#0f0e18]" onClick={(e) => e.stopPropagation()}>
         {/* ---------- BARRA DE CIMA: título + ações principais ---------- */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-linha px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3">
           <p className="text-sm font-bold text-white">🎬 Criar vídeo <span className="font-normal text-muted">— {nome}</span></p>
-          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-muted">
+          <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-[11px] text-muted">
             {sel.length} {sel.length === 1 ? "foto" : "fotos"}{segs > 0 ? ` · ≈ ${segs}s` : ""}
             {segs > 90 && <span className="ml-1 font-semibold text-vermelho">(passa de 90s!)</span>}
           </span>
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={salvar} disabled={salvando} className="rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white transition hover:border-vermelho disabled:opacity-60">{salvando ? "…" : "Salvar"}</button>
-            <button onClick={salvarEGerar} disabled={salvando || sel.length === 0} title={sel.length === 0 ? "Escolha as fotos primeiro" : "Salvar a seleção e gerar o vídeo"} className="rounded-lg bg-[#7c3aed] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{jaTemVideo ? "🔄 Refazer vídeo" : "⚡ Gerar vídeo"}</button>
-            <button onClick={onFechar} aria-label="Fechar" className="rounded-lg border border-linha px-3 py-1.5 text-xs text-muted transition hover:text-white">✕</button>
+            <button onClick={salvar} disabled={salvando} className="rounded-xl border border-white/15 px-3.5 py-2 text-xs font-semibold text-white transition hover:border-white/40 disabled:opacity-60">{salvando ? "…" : "Salvar"}</button>
+            <button onClick={salvarEGerar} disabled={salvando || sel.length === 0} title={sel.length === 0 ? "Escolha as fotos primeiro" : "Salvar a seleção e gerar o vídeo"} className="rounded-xl bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-50">{jaTemVideo ? "🔄 Refazer vídeo" : "⚡ Gerar vídeo"}</button>
+            <button onClick={onFechar} aria-label="Fechar" className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 text-sm text-muted transition hover:text-white">✕</button>
           </div>
         </div>
 
-        {erroGerar && <p className="border-b border-linha bg-vermelho/10 px-4 py-1.5 text-center text-xs text-vermelho">{erroGerar}</p>}
+        {erroGerar && <p className="border-b border-white/10 bg-vermelho/10 px-4 py-1.5 text-center text-xs text-vermelho">{erroGerar}</p>}
 
         {/* ---------- MIOLO: prévia (player) à esquerda + abas à direita ---------- */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* PLAYER — a prévia 9:16 da cena atual, do jeito que vai ficar no vídeo */}
-          <div className="flex shrink-0 flex-col items-center justify-center gap-2 bg-black/50 p-3 lg:flex-1">
-            <div className="relative aspect-[9/16] h-[30vh] max-w-full overflow-hidden rounded-xl border border-white/10 bg-black shadow-2xl lg:h-[62vh]">
+          <div className="flex shrink-0 flex-col items-center justify-center gap-3 p-4 lg:flex-1" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
+            <div className="relative aspect-[9/16] h-[31vh] max-w-full overflow-hidden rounded-[22px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[63vh]">
               {cenaFoto ? (
                 <>
                   {fundoCheia ? (
@@ -601,11 +601,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     </div>
                   )}
                   {/* selo do momento + nº da cena */}
-                  <span className="absolute left-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
-                    Cena {cenaIdx + 1}/{escolhidas.length}{ehCapaCena ? " · ⭐ capa" : ""}
+                  <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[10px] font-semibold text-white backdrop-blur">
+                    {cenaIdx + 1}/{escolhidas.length}{ehCapaCena && <span className="text-amber-300">⭐</span>}
                   </span>
                   {dupGrupo.get(cenaFoto.id) && (
-                    <span className="absolute right-2 top-2 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-black">🔁{dupGrupo.get(cenaFoto.id)}</span>
+                    <span className="absolute right-2 top-2 rounded-md bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-black">🔁{dupGrupo.get(cenaFoto.id)}</span>
                   )}
                 </>
               ) : (
@@ -619,49 +619,48 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
 
             {/* controles do player: cena anterior · tocar/pausar · próxima cena */}
             {escolhidas.length > 0 && (
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-9 w-9 items-center justify-center rounded-full border border-linha bg-preto text-white transition hover:border-white/40">◀</button>
-                <button type="button" onClick={() => setTocandoPrev((p) => !p)} disabled={escolhidas.length < 2} aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"} title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas automaticamente"} className="flex h-11 w-11 items-center justify-center rounded-full bg-[#7c3aed] text-lg text-white transition hover:bg-[#6d28d9] disabled:opacity-40">{tocandoPrev ? "❚❚" : "▶"}</button>
-                <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="flex h-9 w-9 items-center justify-center rounded-full border border-linha bg-preto text-white transition hover:border-white/40">▶</button>
+              <div className="flex items-center gap-4">
+                <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-white/40 hover:bg-white/10">◀</button>
+                <button type="button" onClick={() => setTocandoPrev((p) => !p)} disabled={escolhidas.length < 2} aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"} title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas automaticamente"} className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#ec4899] to-[#a855f7] text-lg text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-40">{tocandoPrev ? "❚❚" : "▶"}</button>
+                <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-white/40 hover:bg-white/10">▶</button>
               </div>
             )}
             <p className="text-center text-[10px] text-muted/70">Prévia aproximada · formato 9:16 (Reels) · com movimento (Ken Burns) no vídeo final</p>
           </div>
 
           {/* PAINEL LATERAL — abas com todas as opções */}
-          <div className="flex min-h-0 flex-1 flex-col border-t border-linha lg:w-[400px] lg:flex-none lg:border-l lg:border-t-0">
+          <div className="flex min-h-0 flex-1 flex-col border-t border-white/10 bg-[#12111c] lg:w-[400px] lg:flex-none lg:border-l lg:border-t-0">
             {/* as abas */}
-            <div className="flex shrink-0 overflow-x-auto border-b border-linha bg-preto/40">
+            <div className="flex shrink-0 overflow-x-auto border-b border-white/10 bg-black/20">
               {ABAS.map((a) => (
-                <button key={a.id} type="button" onClick={() => setAba(a.id)} className={`flex min-w-[64px] flex-1 flex-col items-center gap-0.5 px-2 py-2 text-[11px] font-semibold transition ${aba === a.id ? "border-b-2 border-[#7c3aed] text-white" : "border-b-2 border-transparent text-muted hover:text-white"}`}>
+                <button key={a.id} type="button" onClick={() => setAba(a.id)} className={`relative flex min-w-[64px] flex-1 flex-col items-center gap-1 px-2 py-2.5 text-[11px] font-semibold transition ${aba === a.id ? "text-white" : "text-muted hover:text-white"}`}>
                   <span className="text-base leading-none">{a.ic}</span>{a.label}
+                  {aba === a.id && <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-gradient-to-r from-[#ec4899] to-[#a855f7]" />}
                 </button>
               ))}
             </div>
 
             {/* o conteúdo da aba escolhida (rola só aqui dentro) */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
 
               {/* ============ ABA FOTOS ============ */}
               {aba === "fotos" && (
                 <div>
                   {/* atalhos rápidos */}
-                  <div className="mb-2 flex flex-wrap items-center gap-1.5">
-                    <button onClick={sugerir} className="rounded-lg border border-linha px-2.5 py-1 text-[11px] font-semibold text-white transition hover:border-vermelho">✨ Sugerir</button>
-                    {sel.length > 1 && <button onClick={reorganizar} title="Reencaixa as fotos que você adicionou na mão no lugar certo (na ordem dos momentos)" className="rounded-lg border border-linha px-2.5 py-1 text-[11px] font-semibold text-white transition hover:border-vermelho">🔀 Reorganizar</button>}
-                    {sel.length > 0 && <button onClick={() => setSel([])} className="rounded-lg border border-linha px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:text-white">🧹 Limpar</button>}
+                  <div className="mb-3 flex flex-wrap items-center gap-2">
+                    <button onClick={sugerir} className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-white/40">✨ Sugerir</button>
+                    {sel.length > 1 && <button onClick={reorganizar} title="Reencaixa as fotos que você adicionou na mão no lugar certo (na ordem dos momentos)" className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-white/40">🔀 Reorganizar</button>}
+                    {sel.length > 0 && <button onClick={() => setSel([])} className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-muted transition hover:text-white">🧹 Limpar</button>}
                   </div>
-                  <p className="mb-2 text-[11px] leading-relaxed text-amber-300/90">⭐ Toque na <strong className="text-amber-200">estrela</strong> de uma foto pra ela virar a <strong className="text-amber-200">capa</strong>. Sem escolher, a 1ª foto vira a capa.{capa && (<button type="button" onClick={() => setCapa("")} className="ml-1.5 rounded bg-white/10 px-2 py-0.5 font-semibold text-white transition hover:bg-vermelho">✕ tirar capa</button>)}</p>
-                  {dupGrupo.size > 0 && (
-                    <p className="mb-2 rounded-md border border-amber-500/30 bg-amber-400/10 px-2 py-1 text-[10px] leading-snug text-amber-300">
-                      <span className="rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black text-black">🔁</span> = fotos <strong className="text-amber-200">parecidas</strong> (mesmo número = mesma "família"). Evite pôr muitas iguais.
-                    </p>
-                  )}
+                  <p className="mb-3 text-[11px] leading-relaxed text-muted">
+                    <span className="text-amber-300">⭐</span> estrela = capa · <span className="text-white/80">⠿</span> arraste pra ordenar{dupGrupo.size > 0 && <> · <span className="rounded bg-amber-400 px-1 text-[9px] font-black text-black">🔁</span> = parecidas</>}
+                    {capa && (<button type="button" onClick={() => setCapa("")} className="ml-1.5 rounded bg-white/10 px-2 py-0.5 font-semibold text-white transition hover:bg-vermelho">✕ tirar capa</button>)}
+                  </p>
 
                   {/* SUA SEQUÊNCIA — fotos grandes, arraste pra reordenar, × pra tirar */}
                   {escolhidas.length > 0 && (
                     <div className="mb-4">
-                      <p className="mb-2 text-[11px] text-muted">🎞️ <strong className="text-white/80">Sua sequência</strong> — segure a <strong className="text-white/80">alcinha ⠿</strong> e arraste pra mudar a ordem, <strong className="text-white/80">×</strong> pra tirar. Toque na foto pra <strong className="text-white/80">vê-la na prévia</strong>.</p>
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted/80">🎞️ Sua sequência</p>
                       <div className="grid grid-cols-3 gap-2">
                         {escolhidas.map((f, i) => {
                           const ehCapa = capa === f.id;
@@ -1073,26 +1072,26 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         </div>
 
         {/* ---------- LINHA DO TEMPO (embaixo): as cenas na ordem — toque pra ver na prévia ---------- */}
-        <div className="shrink-0 border-t border-linha bg-preto/60 px-3 py-2">
-          <div className="mb-1 flex items-center justify-between">
+        <div className="shrink-0 border-t border-white/10 bg-black/30 px-3 py-2.5">
+          <div className="mb-1.5 flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wide text-muted">🎞️ Linha do tempo · {sel.length} {sel.length === 1 ? "cena" : "cenas"}{segs ? ` · ≈ ${segs}s` : ""}</span>
-            {segs > 90 && <span className="text-[10px] font-bold text-vermelho">passa de 90s</span>}
+            {segs > 90 ? <span className="text-[10px] font-bold text-vermelho">● passa de 90s</span> : escolhidas.length > 0 && <span className="text-[10px] font-bold text-emerald-400">● pronto pra gerar</span>}
           </div>
           {escolhidas.length > 0 ? (
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
+            <div className="flex gap-2 overflow-x-auto pb-1">
               {escolhidas.map((f, i) => (
-                <button key={f.id} type="button" onClick={() => { setCena(i); setTocandoPrev(false); }} title={`Cena ${i + 1}`} className={`relative shrink-0 overflow-hidden rounded-md border-2 transition ${i === cenaIdx ? "border-[#c7b2ff] ring-2 ring-[#7c3aed]" : capaId === f.id ? "border-amber-400" : "border-transparent opacity-70 hover:opacity-100"}`}>
+                <button key={f.id} type="button" onClick={() => { setCena(i); setTocandoPrev(false); }} title={`Cena ${i + 1}`} className={`relative shrink-0 overflow-hidden rounded-lg border-2 transition ${i === cenaIdx ? "border-[#c7b2ff] ring-2 ring-[#a855f7]" : capaId === f.id ? "border-amber-400" : "border-white/10 opacity-70 hover:opacity-100"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt="" className="h-14 w-10 object-cover" />
-                  <span className="absolute left-0 top-0 rounded-br bg-black/70 px-1 text-[9px] font-bold text-white">{i + 1}</span>
-                  {capaId === f.id && <span className="absolute bottom-0 right-0 bg-amber-400 px-0.5 text-[8px]">⭐</span>}
-                  {dupGrupo.get(f.id) && <span className="absolute right-0 top-0 bg-amber-400 px-0.5 text-[8px] font-black text-black">🔁</span>}
+                  <img src={f.url} alt="" className="h-16 w-11 object-cover" />
+                  <span className="absolute left-0 top-0 rounded-br-md bg-black/70 px-1 text-[9px] font-bold text-white">{i + 1}</span>
+                  {capaId === f.id && <span className="absolute bottom-0 right-0 rounded-tl bg-amber-400 px-0.5 text-[8px]">⭐</span>}
+                  {dupGrupo.get(f.id) && <span className="absolute right-0 top-0 rounded-bl bg-amber-400 px-0.5 text-[8px] font-black text-black">🔁</span>}
                 </button>
               ))}
-              <button type="button" onClick={() => setAba("fotos")} title="Adicionar fotos" className="flex h-14 w-10 shrink-0 flex-col items-center justify-center rounded-md border-2 border-dashed border-linha text-lg text-muted transition hover:border-[#7c3aed] hover:text-white">＋</button>
+              <button type="button" onClick={() => setAba("fotos")} title="Adicionar fotos" className="flex h-16 w-11 shrink-0 flex-col items-center justify-center rounded-lg border-2 border-dashed border-white/15 text-lg text-muted transition hover:border-[#a855f7] hover:text-white">＋</button>
             </div>
           ) : (
-            <button type="button" onClick={() => setAba("fotos")} className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-linha py-3 text-[11px] font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">📷 Escolher as fotos do vídeo →</button>
+            <button type="button" onClick={() => setAba("fotos")} className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-white/15 py-3 text-[11px] font-semibold text-muted transition hover:border-[#a855f7] hover:text-white">📷 Escolher as fotos do vídeo →</button>
           )}
         </div>
       </div>
