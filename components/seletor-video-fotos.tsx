@@ -174,6 +174,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [aba, setAba] = useState<string>("fotos");
   const [cena, setCena] = useState(0);
   const [tocandoPrev, setTocandoPrev] = useState(false);
+  // Divisória AJUSTÁVEL entre o vídeo e o painel de abas (só no layout lado-a-lado das telas grandes).
+  const [larguraPainel, setLarguraPainel] = useState(400); // largura do painel da direita, em px
+  const [ehLg, setEhLg] = useState<boolean>(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches);
+  const larguraRef = useRef(400);
   // Troca o estilo de fundo do vídeo temático (salva na hora; o vídeo usa no próximo "Gerar").
   function trocarFundo(novo: string) {
     if (!tematicoId) return;
@@ -549,6 +553,38 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!escolhidas.length) return;
     setCena((c) => (Math.min(c, escolhidas.length - 1) + d + escolhidas.length) % escolhidas.length);
   }
+  // Sabe se está no layout lado-a-lado (telas grandes) e lembra a largura que o dono deixou.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const upd = () => setEhLg(mq.matches);
+    upd();
+    mq.addEventListener("change", upd);
+    try { const v = Number(localStorage.getItem("postai_painel_larg")); if (v >= 320 && v <= 1000) { larguraRef.current = v; setLarguraPainel(v); } } catch {}
+    return () => mq.removeEventListener("change", upd);
+  }, []);
+  // Arrasta a divisória: a largura do painel da direita = distância da borda direita até o dedo/cursor
+  // (com limites pra nenhum lado sumir). Guarda no navegador pra lembrar da próxima vez.
+  function iniciarArrasto(e: React.PointerEvent) {
+    e.preventDefault();
+    const onMove = (ev: PointerEvent) => {
+      const w = window.innerWidth - ev.clientX;
+      const clamp = Math.max(320, Math.min(Math.round(window.innerWidth * 0.62), w));
+      larguraRef.current = clamp;
+      setLarguraPainel(clamp);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      try { localStorage.setItem("postai_painel_larg", String(larguraRef.current)); } catch {}
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
 
   // as abas do painel lateral — Narração só no vídeo do buffet
   const ABAS: { id: string; ic: string; label: string }[] = [
@@ -581,7 +617,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         {/* ---------- MIOLO: prévia (player) à esquerda + abas à direita ---------- */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* PLAYER — a prévia 9:16 da cena atual, do jeito que vai ficar no vídeo */}
-          <div className="flex shrink-0 flex-col items-center justify-center gap-2 p-3 lg:gap-3 lg:p-4 lg:flex-1" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
+          <div className="flex shrink-0 flex-col items-center justify-center gap-2 p-3 lg:min-w-0 lg:flex-1 lg:gap-3 lg:p-4" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
             <div className="flex items-center gap-2 lg:gap-4">
               {escolhidas.length > 1 && (
                 <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-white/40 hover:bg-white/10 lg:h-12 lg:w-12">◀</button>
@@ -644,8 +680,13 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             <p className="text-center text-[10px] text-muted/70"><span className="lg:hidden">Prévia aproximada · 9:16 (Reels)</span><span className="hidden lg:inline">Prévia aproximada · formato 9:16 (Reels) · com movimento (Ken Burns) no vídeo final</span></p>
           </div>
 
+          {/* DIVISÓRIA ajustável (só nas telas grandes): arraste pra dar mais espaço pra um lado */}
+          <div onPointerDown={iniciarArrasto} role="separator" aria-label="Arraste pra ajustar o tamanho do painel" title="Arraste pra ajustar o tamanho dos dois lados" className="hidden shrink-0 cursor-col-resize touch-none select-none items-center justify-center border-x border-white/10 bg-black/20 transition hover:bg-[#a855f7]/40 lg:flex lg:w-2.5">
+            <span className="h-10 w-0.5 rounded-full bg-white/40" />
+          </div>
+
           {/* PAINEL LATERAL — abas com todas as opções */}
-          <div className="flex min-h-0 flex-1 flex-col border-t border-white/10 bg-[#12111c] lg:w-[400px] lg:flex-none lg:border-l lg:border-t-0">
+          <div style={ehLg ? { width: larguraPainel } : undefined} className="flex min-h-0 flex-1 flex-col border-t border-white/10 bg-[#12111c] lg:flex-none lg:border-t-0">
             {/* as abas */}
             <div className="flex shrink-0 overflow-x-auto border-b border-white/10 bg-black/20">
               {ABAS.map((a) => (
