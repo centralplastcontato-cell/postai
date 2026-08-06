@@ -727,15 +727,15 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     disabled={escolhidas.length < 2}
                     aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"}
                     title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas automaticamente"}
-                    className={`absolute left-1/2 top-1/2 z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-lg text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] backdrop-blur transition disabled:opacity-30 lg:h-16 lg:w-16 lg:text-2xl ${tocandoPrev ? "bg-black/40 opacity-60 hover:opacity-100" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}
+                    className={`absolute bottom-2 right-2 z-10 flex h-10 w-10 items-center justify-center rounded-full text-base text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] backdrop-blur transition disabled:opacity-30 lg:bottom-auto lg:right-auto lg:left-1/2 lg:top-1/2 lg:h-16 lg:w-16 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:text-2xl ${tocandoPrev ? "bg-black/45 opacity-70 hover:opacity-100" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}
                   >
                     {tocandoPrev ? "❚❚" : "▶"}
                   </button>
                   {/* setas SOBRE a imagem (nas laterais) — não roubam altura embaixo nem espremem o vídeo */}
                   {escolhidas.length > 1 && (
                     <>
-                      <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="absolute left-1.5 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 lg:h-11 lg:w-11">◀</button>
-                      <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="absolute right-1.5 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 lg:h-11 lg:w-11">▶</button>
+                      <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="absolute left-1.5 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 lg:flex lg:h-11 lg:w-11">◀</button>
+                      <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="absolute right-1.5 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 lg:flex lg:h-11 lg:w-11">▶</button>
                     </>
                   )}
                 </>
