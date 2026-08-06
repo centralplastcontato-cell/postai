@@ -589,12 +589,13 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   }
 
   // as abas do painel lateral — Narração só no vídeo do buffet
+  // Ordem: visual (Fotos+Estilo) → palavras (Textos) → som (Música+Narração, música antes da voz).
   const ABAS: { id: string; ic: string; label: string }[] = [
     { id: "fotos", ic: "📷", label: "Fotos" },
-    { id: "musica", ic: "🎵", label: "Música" },
     { id: "estilo", ic: "🎨", label: "Estilo" },
-    ...(tematicoId ? [{ id: "narr", ic: "🎙️", label: "Narração" }] : []),
     { id: "texto", ic: "✍️", label: tematicoId ? "Textos" : "Capa" },
+    { id: "musica", ic: "🎵", label: "Música" },
+    ...(tematicoId ? [{ id: "narr", ic: "🎙️", label: "Narração" }] : []),
   ];
 
   return (
