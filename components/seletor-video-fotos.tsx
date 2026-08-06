@@ -576,7 +576,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* PLAYER — a prévia 9:16 da cena atual, do jeito que vai ficar no vídeo */}
           <div className="flex shrink-0 flex-col items-center justify-center gap-2 p-3 lg:gap-3 lg:p-4 lg:flex-1" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
-            <div className="relative aspect-[9/16] h-[20vh] max-w-full overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[63vh] lg:rounded-[22px]">
+            <div className="flex items-center gap-2 lg:gap-4">
+              {escolhidas.length > 1 && (
+                <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-white/40 hover:bg-white/10 lg:h-12 lg:w-12">◀</button>
+              )}
+            <div className="relative aspect-[9/16] h-[26vh] max-w-full overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[63vh] lg:rounded-[22px]">
               {cenaFoto ? (
                 <>
                   {fundoCheia ? (
@@ -589,15 +593,15 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       <div className="absolute inset-0 flex items-center justify-center p-3 lg:p-4">
                         <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corMarca, 2)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={cenaFoto.url} alt="" className="block max-h-[16vh] w-auto max-w-full object-contain lg:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
+                          <img src={cenaFoto.url} alt="" className="block max-h-[21vh] w-auto max-w-full object-contain lg:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
                         </span>
                       </div>
                     </>
                   )}
                   {/* texto sobre a cena (aproximação): título na capa / legenda nas outras */}
                   {legendaCena && (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-10 text-center">
-                      <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${ehCapaCena ? "text-lg" : "text-sm"}`}>{legendaCena}</span>
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 text-center lg:px-4 lg:pb-4">
+                      <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${ehCapaCena ? "text-sm lg:text-lg" : "text-[11px] lg:text-sm"}`}>{legendaCena}</span>
                     </div>
                   )}
                   {/* selo do momento + nº da cena */}
@@ -607,6 +611,17 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   {dupGrupo.get(cenaFoto.id) && (
                     <span className="absolute right-2 top-2 rounded-md bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-black">🔁{dupGrupo.get(cenaFoto.id)}</span>
                   )}
+                  {/* play/pausar NO CENTRO da imagem (igual player de vídeo) — não rouba altura embaixo */}
+                  <button
+                    type="button"
+                    onClick={() => setTocandoPrev((p) => !p)}
+                    disabled={escolhidas.length < 2}
+                    aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"}
+                    title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas automaticamente"}
+                    className={`absolute left-1/2 top-1/2 z-10 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-lg text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] backdrop-blur transition disabled:opacity-30 lg:h-16 lg:w-16 lg:text-2xl ${tocandoPrev ? "bg-black/40 opacity-60 hover:opacity-100" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}
+                  >
+                    {tocandoPrev ? "❚❚" : "▶"}
+                  </button>
                 </>
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -616,15 +631,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 </div>
               )}
             </div>
-
-            {/* controles do player: cena anterior · tocar/pausar · próxima cena */}
-            {escolhidas.length > 0 && (
-              <div className="flex items-center gap-3 lg:gap-4">
-                <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-white/40 hover:bg-white/10 lg:h-9 lg:w-9">◀</button>
-                <button type="button" onClick={() => setTocandoPrev((p) => !p)} disabled={escolhidas.length < 2} aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"} title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas automaticamente"} className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-[#ec4899] to-[#a855f7] text-lg text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-40 lg:h-12 lg:w-12">{tocandoPrev ? "❚❚" : "▶"}</button>
-                <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-white/40 hover:bg-white/10 lg:h-9 lg:w-9">▶</button>
-              </div>
-            )}
+              {escolhidas.length > 1 && (
+                <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-white/40 hover:bg-white/10 lg:h-12 lg:w-12">▶</button>
+              )}
+            </div>
             <p className="text-center text-[10px] text-muted/70"><span className="lg:hidden">Prévia aproximada · 9:16 (Reels)</span><span className="hidden lg:inline">Prévia aproximada · formato 9:16 (Reels) · com movimento (Ken Burns) no vídeo final</span></p>
           </div>
 
