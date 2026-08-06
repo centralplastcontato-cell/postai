@@ -543,10 +543,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     return () => clearInterval(t);
   }, [tocandoPrev, escolhidas.length]);
   // Pré-carrega as fotos da sequência (deixa no cache do navegador) pra a prévia trocar de cena NA
-  // HORA, sem aquele preto esperando a foto baixar. Roda quando a seleção muda.
+  // HORA, sem aquele preto esperando a foto baixar. Guarda as referências (preloadRef) pra o
+  // navegador não cancelar o download no meio. Roda quando a seleção muda.
+  const preloadRef = useRef<HTMLImageElement[]>([]);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    for (const f of escolhidas) { const im = new Image(); im.src = f.url; }
+    preloadRef.current = escolhidas.map((f) => { const im = new Image(); im.src = f.url; return im; });
   }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   function irCena(d: number) {
     setTocandoPrev(false);
@@ -618,11 +620,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* PLAYER — a prévia 9:16 da cena atual, do jeito que vai ficar no vídeo */}
           <div className="flex shrink-0 flex-col items-center justify-center gap-2 p-3 lg:min-w-0 lg:flex-1 lg:gap-3 lg:p-4" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
-            <div className="flex items-center gap-2 lg:gap-4">
-              {escolhidas.length > 1 && (
-                <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-white/40 hover:bg-white/10 lg:h-12 lg:w-12">◀</button>
-              )}
-            <div className="relative aspect-[9/16] h-[26vh] max-w-full overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[63vh] lg:rounded-[22px]">
+            <div className="relative aspect-[9/16] h-[26vh] max-w-full overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[62vh] lg:rounded-[22px]">
               {cenaFoto ? (
                 <>
                   {fundoCheia ? (
@@ -664,6 +662,13 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   >
                     {tocandoPrev ? "❚❚" : "▶"}
                   </button>
+                  {/* setas SOBRE a imagem (nas laterais) — não roubam altura embaixo nem espremem o vídeo */}
+                  {escolhidas.length > 1 && (
+                    <>
+                      <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="absolute left-1.5 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 lg:h-11 lg:w-11">◀</button>
+                      <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="absolute right-1.5 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 lg:h-11 lg:w-11">▶</button>
+                    </>
+                  )}
                 </>
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
@@ -673,11 +678,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 </div>
               )}
             </div>
-              {escolhidas.length > 1 && (
-                <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition hover:border-white/40 hover:bg-white/10 lg:h-12 lg:w-12">▶</button>
-              )}
-            </div>
-            <p className="text-center text-[10px] text-muted/70"><span className="lg:hidden">Prévia aproximada · 9:16 (Reels)</span><span className="hidden lg:inline">Prévia aproximada · formato 9:16 (Reels) · com movimento (Ken Burns) no vídeo final</span></p>
+            <p className="text-center text-[10px] text-muted/70">Prévia aproximada · formato 9:16 (Reels)</p>
           </div>
 
           {/* DIVISÓRIA ajustável (só nas telas grandes): arraste pra dar mais espaço pra um lado */}
