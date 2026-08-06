@@ -795,18 +795,19 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                           <div key={f.id}>
                           <div
                             data-id={f.id}
-                            draggable
                             onClick={() => { setCena(i); setTocandoPrev(false); }}
-                            onDragStart={() => setDragId(f.id)}
                             onDragEnter={() => { if (dragId && dragId !== f.id) moverFoto(dragId, f.id); }}
-                            onDragEnd={() => setDragId(null)}
                             onDragOver={(e) => e.preventDefault()}
                             className={`relative cursor-pointer select-none overflow-hidden rounded-lg border-2 transition-transform ${dragId === f.id ? "z-30 scale-105 border-[#c7b2ff] opacity-90 shadow-xl" : i === cenaIdx ? "border-[#c7b2ff] ring-2 ring-[#7c3aed]" : ehCapa ? "border-amber-400" : "border-vermelho"}`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={f.url} alt="" draggable={false} className="aspect-square w-full select-none object-cover" />
-                            {/* ALÇA de arrastar — segure aqui pra reordenar (no celular, sem rolar a tela) */}
+                            {/* ALÇA de arrastar — SÓ ela é arrastável (o resto do card rola a lista no celular).
+                                Fica no TOPO pra não tapar a foto. Segure e arraste pra reordenar (PC e celular). */}
                             <div
+                              draggable
+                              onDragStart={(e) => { e.stopPropagation(); setDragId(f.id); }}
+                              onDragEnd={() => setDragId(null)}
                               onClick={(e) => e.stopPropagation()}
                               onTouchStart={(e) => { e.stopPropagation(); setDragId(f.id); if (typeof navigator !== "undefined" && navigator.vibrate) { try { navigator.vibrate(15); } catch {} } }}
                               onTouchMove={alcaMove}
@@ -815,9 +816,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                               onContextMenu={(e) => e.preventDefault()}
                               style={{ touchAction: "none" }}
                               aria-label="Segure e arraste pra mudar a ordem"
-                              className="absolute left-1/2 top-1/2 z-20 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 cursor-grab touch-none items-center justify-center rounded-full bg-black/55 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-vermelho"
+                              className="absolute left-1/2 top-1 z-20 flex h-7 w-9 -translate-x-1/2 cursor-grab touch-none items-center justify-center rounded-full bg-black/60 shadow-lg backdrop-blur-sm transition active:scale-95 active:bg-vermelho"
                             >
-                              <span className="grid grid-cols-2 gap-[2.5px]">
+                              <span className="grid grid-cols-3 gap-[2.5px]">
                                 {Array.from({ length: 6 }).map((_, k) => <span key={k} className="h-1 w-1 rounded-full bg-white/95" />)}
                               </span>
                             </div>
