@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
@@ -170,6 +170,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [capa, setCapa] = useState<string>(fotos.some((f) => f.id === capaInicial) ? capaInicial : "");
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
   const [fundo, setFundo] = useState<string>(fundoInicial || ""); // fundo do quadro (temático): "" borrada | "cheia"
+  // Nome do vídeo (só o do buffet dá pra renomear aqui; no de festa o nome são os aniversariantes).
+  const [nomeVideo, setNomeVideo] = useState(nome);
+  const [editandoNome, setEditandoNome] = useState(false);
   // ABA aberta no painel lateral + qual CENA está na prévia central + se a prévia está "tocando".
   const [aba, setAba] = useState<string>("fotos");
   const [cena, setCena] = useState(0);
@@ -183,6 +186,16 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId) return;
     setFundo(novo);
     definirFundoVideo(tematicoId, novo).catch(() => {});
+  }
+  // Salva o novo nome do vídeo do buffet (o campo editável no topo). Volta ao nome antigo se falhar.
+  async function salvarNome() {
+    setEditandoNome(false);
+    const t = nomeVideo.trim();
+    if (!tematicoId) return;
+    if (!t || t === nome) { setNomeVideo(nome); return; }
+    const r = await renomearVideoTematico(tematicoId, t).catch(() => null);
+    if (r?.ok) { setNomeVideo(r.titulo); router.refresh(); }
+    else setNomeVideo(nome);
   }
   // FOTOS PARECIDAS: mapa fotoId → nº do grupo (só fotos que têm alguma parecida entram). Calculado
   // no navegador ao abrir; sinaliza com o selo 🔁 pra o dono evitar repetir fotos quase iguais.
@@ -603,7 +616,31 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       <div className="flex flex-1 flex-col overflow-hidden bg-[#0f0e18]" onClick={(e) => e.stopPropagation()}>
         {/* ---------- BARRA DE CIMA: título + ações principais ---------- */}
         <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-4 py-3">
-          <p className="text-sm font-bold text-white">🎬 Criar vídeo <span className="font-normal text-muted">— {nome}</span></p>
+          <div className="flex min-w-0 items-center gap-1.5 text-sm font-bold text-white">
+            <span className="shrink-0">🎬 Criar vídeo</span>
+            <span className="shrink-0 font-normal text-muted">—</span>
+            {tematicoId ? (
+              editandoNome ? (
+                <input
+                  autoFocus
+                  value={nomeVideo}
+                  onChange={(e) => setNomeVideo(e.target.value)}
+                  onBlur={salvarNome}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } else if (e.key === "Escape") { setNomeVideo(nome); setEditandoNome(false); } }}
+                  maxLength={80}
+                  aria-label="Nome do vídeo"
+                  className="min-w-0 max-w-[46vw] rounded-md border border-[#7c3aed]/60 bg-preto px-2 py-0.5 text-sm font-semibold text-white focus:border-[#7c3aed] focus:outline-none"
+                />
+              ) : (
+                <button type="button" onClick={() => setEditandoNome(true)} title="Toque pra renomear o vídeo" className="group inline-flex min-w-0 items-center gap-1 font-normal text-muted transition hover:text-white">
+                  <span className="truncate">{nomeVideo}</span>
+                  <span className="shrink-0 text-[11px] opacity-50 transition group-hover:opacity-100">✏️</span>
+                </button>
+              )
+            ) : (
+              <span className="truncate font-normal text-muted">{nome}</span>
+            )}
+          </div>
           <span className="rounded-full bg-white/5 px-2.5 py-0.5 text-[11px] text-muted">
             {sel.length} {sel.length === 1 ? "foto" : "fotos"}{segs > 0 ? ` · ≈ ${segs}s` : ""}
             {segs > 90 && <span className="ml-1 font-semibold text-vermelho">(passa de 90s!)</span>}

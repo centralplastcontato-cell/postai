@@ -306,6 +306,19 @@ export async function definirFundoVideo(videoId: string, fundo: string) {
   return { ok: true as const, fundo: valor };
 }
 
+// Renomeia o vídeo do buffet (o "titulo" — ex: "Promo agosto 02"). É o nome interno pra organizar.
+export async function renomearVideoTematico(videoId: string, titulo: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const t = (titulo || "").trim().slice(0, 80);
+  if (t.length < 2) return { ok: false as const, erro: "Dê um nome com pelo menos 2 letras." };
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { titulo: t } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, titulo: t };
+}
+
 // Dispara o MOTOR pra montar o vídeo temático (mesmo motor do Reels de festa). O texto da capa
 // é o TEMA. O callback /api/video-pronto reconhece o id e salva a URL aqui.
 export async function gerarVideoTematico(videoId: string) {
