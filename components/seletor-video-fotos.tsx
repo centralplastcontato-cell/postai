@@ -195,6 +195,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [cena, setCena] = useState(0);
   const [tocandoPrev, setTocandoPrev] = useState(false);
   const [previaCheia, setPreviaCheia] = useState(false); // prévia em TELA CHEIA (pra ver a sequência no celular)
+  const [capaCheia, setCapaCheia] = useState(false); // a CAPA em tela cheia (aba Capa)
   // Divisória AJUSTÁVEL entre o vídeo e o painel de abas (só no layout lado-a-lado das telas grandes).
   const [larguraPainel, setLarguraPainel] = useState(400); // largura do painel da direita, em px
   const [ehLg, setEhLg] = useState<boolean>(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches);
@@ -1120,9 +1121,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       if (!bgPrev) return <p className="rounded-lg border border-dashed border-white/15 py-4 text-center text-[11px] text-muted">Escolha as fotos na aba <strong className="text-white/80">📷 Fotos</strong> primeiro.</p>;
                       return (
                         <div className="flex flex-col items-center gap-1.5">
-                          <div className="relative aspect-[9/16] w-40 overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
+                          <button type="button" onClick={() => setCapaCheia(true)} title="Ver a capa maior" className="relative aspect-[9/16] w-40 overflow-hidden rounded-xl bg-black ring-1 ring-white/10">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={bgPrev} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                            <span className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-xs text-white backdrop-blur">🔍</span>
                             {grande ? (
                               <div className="absolute inset-0 flex flex-col justify-end p-2.5" style={{ backgroundImage: "linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 63%, rgba(0,0,0,0.92) 100%)" }}>
                                 <div className="mb-1.5 h-1.5 w-9 rounded-full" style={{ background: corMarca }} />
@@ -1133,8 +1135,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                                 <span className="text-[12px] font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">{chamada || nome}</span>
                               </div>
                             )}
-                          </div>
-                          <span className="text-[10px] text-muted/70">prévia da capa · o logo entra no topo</span>
+                          </button>
+                          <button type="button" onClick={() => setCapaCheia(true)} className="text-[10px] font-semibold text-[#c7b2ff] underline">🔍 ver a capa maior</button>
+                          <span className="text-[10px] text-muted/70">o logo entra no topo</span>
                         </div>
                       );
                     })()}
@@ -1447,6 +1450,38 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
           <button type="button" onClick={() => { setPreviaCheia(false); setTocandoPrev(false); }} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition active:bg-white/10">Fechar</button>
         </div>
       )}
+
+      {/* CAPA em tela cheia — vê a capa grande, do jeito do estilo escolhido (impacto/ia/clássica). */}
+      {capaCheia && (() => {
+        const cf = escolhidas.find((f) => f.id === capaId) || escolhidas[0] || null;
+        const bg = capaEstilo === "ia" && capaIaUrl ? capaIaUrl : cf?.url || "";
+        const ch = (textos[capaId] || "").trim();
+        const grande = capaEstilo === "impacto" || capaEstilo === "ia";
+        return (
+          <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/95 p-4" onClick={(e) => { e.stopPropagation(); setCapaCheia(false); }}>
+            <p className="text-center text-xs font-semibold text-white/80">👇 Assim a capa vai aparecer (o logo entra no topo)</p>
+            <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[72vh] max-w-full overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-white/15">
+              {bg ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={bg} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  {grande ? (
+                    <div className="absolute inset-0 flex flex-col justify-end p-6" style={{ backgroundImage: "linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 63%, rgba(0,0,0,0.92) 100%)" }}>
+                      <div className="mb-3 h-2.5 w-20 rounded-full" style={{ background: corMarca }} />
+                      <span className="font-black uppercase leading-[1.04] text-white" style={{ fontSize: 34, textShadow: "2px 2px 0 #000,-2px 2px 0 #000,2px -2px 0 #000,-2px -2px 0 #000,0 4px 16px rgba(0,0,0,0.7)" }}>{ch.toUpperCase() || "SUA CHAMADA AQUI"}</span>
+                    </div>
+                  ) : (
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-6 pt-20 text-center">
+                      <span className="text-2xl font-bold text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]">{ch || nome}</span>
+                    </div>
+                  )}
+                </>
+              ) : null}
+            </div>
+            <button type="button" onClick={() => setCapaCheia(false)} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition active:bg-white/10">Fechar</button>
+          </div>
+        );
+      })()}
 
       {/* foto ampliada — mostra COM a moldura escolhida (fundo borrado), igual vai ficar no vídeo. */}
       {ampliada && (
