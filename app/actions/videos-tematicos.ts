@@ -246,7 +246,8 @@ export async function salvarFotosVideoTematico(videoId: string, fotoIds: string[
 }
 
 // --- Biblioteca de músicas da marca, no contexto do vídeo do BUFFET (mesma lib compartilhada) ---
-type MusicaBanco = { url: string; nome: string };
+// wav = versão 24kHz mono (preparada no navegador) que a NARRAÇÃO usa como fundo sob a voz.
+type MusicaBanco = { url: string; nome: string; wav?: string };
 function lerMusicas(json: string | null): MusicaBanco[] {
   try {
     const a = JSON.parse(json || "[]");
@@ -272,6 +273,21 @@ export async function adicionarMusicaAoBancoTema(videoId: string, url: string, n
   const marca = await prisma.marca.findUnique({ where: { id: v.marcaId }, select: { musicas: true } });
   const atuais = lerMusicas(marca?.musicas ?? "[]").filter((m) => m.url !== url);
   const lista = [{ url, nome: (nome || "música").slice(0, 80) }, ...atuais].slice(0, 40);
+  await prisma.marca.update({ where: { id: v.marcaId }, data: { musicas: JSON.stringify(lista) } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, musicas: lista };
+}
+
+// Guarda o WAV (24kHz mono, preparado no navegador) de uma trilha da biblioteca — pra ela poder
+// entrar como fundo da NARRAÇÃO (sob a voz). Casa pela URL do MP3.
+export async function definirWavMusicaTema(videoId: string, url: string, wav: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (!url.startsWith("http") || !wav.startsWith("http")) return { ok: false as const, erro: "URL inválida." };
+  const marca = await prisma.marca.findUnique({ where: { id: v.marcaId }, select: { musicas: true } });
+  const lista = lerMusicas(marca?.musicas ?? "[]").map((m) => (m.url === url ? { ...m, wav } : m));
   await prisma.marca.update({ where: { id: v.marcaId }, data: { musicas: JSON.stringify(lista) } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, musicas: lista };
@@ -716,7 +732,7 @@ ${site ? `- Cite o site no fim: ${site} (deixe a URL na fala pra a voz ler).` : 
 export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: string, direcao?: string, volMusica?: number, texto2?: string, alvoSegundos?: number) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
-    include: { marca: { select: { slug: true } } },
+    include: { marca: { select: { slug: true, musicas: true } } },
   });
   // (videoUrl entra no select pelo include padrão — usado logo abaixo pra barrar a corrida)
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
@@ -738,7 +754,12 @@ export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: 
     // estica até lá pra nenhuma foto ficar de fora. Clampa a duração num intervalo são.
     const t2 = (texto2 || "").trim().slice(0, 400);
     const alvo = typeof alvoSegundos === "number" && isFinite(alvoSegundos) ? Math.max(10, Math.min(120, alvoSegundos)) : undefined;
-    const { url, segundos } = await gerarNarracaoMp3({ texto: t, texto2: t2 || undefined, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), volMusica: vm, alvoSegundos: alvo });
+    // Fundo da narração: se o dono escolheu uma TRILHA (videoMusica) e ela já tem o WAV preparado,
+    // usa ela no lugar do jingle. Sem trilha (ou sem WAV pronto) → jingle do buffet (como antes).
+    const musicaWav = v.videoMusica?.startsWith("http")
+      ? lerMusicas(v.marca.musicas).find((m) => m.url === v.videoMusica)?.wav
+      : undefined;
+    const { url, segundos } = await gerarNarracaoMp3({ texto: t, texto2: t2 || undefined, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), volMusica: vm, alvoSegundos: alvo, musicaWav: musicaWav || undefined });
     await prisma.videoTematico.update({
       where: { id: videoId },
       data: { narracaoTexto: t, narracaoVoz: voz, narracaoEstilo: estilo, narracaoUrl: url, narracaoSeg: Math.round(segundos) },

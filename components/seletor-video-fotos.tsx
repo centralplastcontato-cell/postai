@@ -8,7 +8,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema } from "@/app/actions/videos-tematicos";
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
@@ -80,6 +80,51 @@ function dHashFoto(url: string): Promise<number[] | null> {
   });
 }
 
+// Prepara a versão WAV (24kHz mono) de uma trilha MP3 — NO NAVEGADOR (que sabe ler MP3; o servidor
+// não tem ffmpeg). É o que a NARRAÇÃO usa como fundo sob a voz. Devolve um Blob WAV, ou null se não der.
+async function prepararWavDaMusica(mp3Url: string): Promise<Blob | null> {
+  try {
+    if (typeof window === "undefined") return null;
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const OAC = window.OfflineAudioContext || (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext;
+    if (!AC || !OAC) return null;
+    const resp = await fetch(mp3Url);
+    if (!resp.ok) return null;
+    const arr = await resp.arrayBuffer();
+    const ac = new AC();
+    const decoded = await ac.decodeAudioData(arr.slice(0));
+    ac.close();
+    const TAXA = 24000;
+    const MAX_S = 90; // a música dá loop na narração; 90s bastam e seguram o tamanho do arquivo
+    const durS = Math.min(decoded.duration || 0, MAX_S);
+    const frames = Math.max(1, Math.floor(durS * TAXA));
+    const oac = new OAC(1, frames, TAXA); // 1 canal (mono) @ 24kHz — resample + downmix de uma vez
+    const src = oac.createBufferSource();
+    src.buffer = decoded;
+    src.connect(oac.destination);
+    src.start(0);
+    const rendered = await oac.startRendering();
+    return floatParaWavBlob(rendered.getChannelData(0), TAXA);
+  } catch (e) {
+    console.error("Não consegui preparar o WAV da música:", e);
+    return null;
+  }
+}
+// Float32 [-1,1] → Blob WAV PCM 16 bits (o formato que o servidor lê pra misturar com a voz).
+function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
+  const n = data.length;
+  const buf = new ArrayBuffer(44 + n * 2);
+  const dv = new DataView(buf);
+  const escrever = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  escrever(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); escrever(8, "WAVE");
+  escrever(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, taxa, true); dv.setUint32(28, taxa * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  escrever(36, "data"); dv.setUint32(40, n * 2, true);
+  let o = 44;
+  for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, data[i])); dv.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+  return new Blob([buf], { type: "audio/wav" });
+}
+
 export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
@@ -94,7 +139,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   textosIniciais?: Record<string, string>; // legendas por foto (só no modo temático)
   narracao?: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz do vídeo
   musicaInicial?: string;
-  musicasBanco?: { url: string; nome: string }[];
+  musicasBanco?: { url: string; nome: string; wav?: string }[];
   fundoInicial?: string; // fundo do quadro do vídeo temático: "" (foto borrada) | "cheia"
   corMarca?: string;
   jaTemVideo?: boolean;
@@ -189,7 +234,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [msgVoz, setMsgVoz] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
   const [musica, setMusica] = useState<string>(musicaInicial || ""); // trilha da festa ("" = música do buffet)
   const [subindoMusica, setSubindoMusica] = useState(false); // enviando o MP3
-  const [banco, setBanco] = useState<{ url: string; nome: string }[]>(musicasBanco); // biblioteca de trilhas da marca
+  const [banco, setBanco] = useState<{ url: string; nome: string; wav?: string }[]>(musicasBanco); // biblioteca de trilhas da marca
   const [tocando, setTocando] = useState<string>(""); // URL da música tocando agora ("" = nenhuma)
   const [buffetUrl, setBuffetUrl] = useState<string>(""); // link da música padrão do buffet (pra dar play)
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -198,6 +243,34 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     const p = tematicoId ? listarMusicasDaMarcaTema(tematicoId) : listarMusicasDaMarca(festaId);
     p.then((r) => { if (r.ok) { if (r.musicas.length) setBanco(r.musicas); setBuffetUrl(r.buffetUrl || ""); } }).catch(() => {});
   }, [festaId, tematicoId]);
+  // Prepara o WAV (no navegador) de UMA trilha e registra na biblioteca — pra ela poder entrar sob
+  // a voz na narração. Só faz sentido no vídeo do buffet (temático). Best-effort e sem repetir.
+  const preparandoWav = useRef<Set<string>>(new Set());
+  async function garantirWav(mp3Url: string) {
+    if (!tematicoId || !mp3Url.startsWith("http") || preparandoWav.current.has(mp3Url)) return;
+    preparandoWav.current.add(mp3Url);
+    try {
+      const wavBlob = await prepararWavDaMusica(mp3Url);
+      if (!wavBlob) return;
+      const form = new FormData();
+      form.append("file", new File([wavBlob], "trilha.wav", { type: "audio/wav" }));
+      const resp = await fetch("/api/marketing/upload?tipo=musica", { method: "POST", body: form });
+      const data = await resp.json();
+      if (!data.ok || !data.url) return;
+      const r = await definirWavMusicaTema(tematicoId, mp3Url, data.url).catch(() => null);
+      if (r?.ok) setBanco(r.musicas);
+      else setBanco((b) => b.map((m) => (m.url === mp3Url ? { ...m, wav: data.url } : m)));
+    } finally {
+      preparandoWav.current.delete(mp3Url);
+    }
+  }
+  // BACKFILL automático: no vídeo do buffet, prepara o WAV das trilhas que ainda não têm (uma de
+  // cada vez pra não pesar). Assim as músicas já existentes passam a funcionar sob a voz, sem reenvio.
+  useEffect(() => {
+    if (!tematicoId) return;
+    const pendente = banco.find((m) => !m.wav && !preparandoWav.current.has(m.url));
+    if (pendente) garantirWav(pendente.url);
+  }, [tematicoId, banco]); // eslint-disable-line react-hooks/exhaustive-deps
   // Toca/pausa uma trilha pra ouvir antes de escolher (um player só; tocar outra troca a fonte).
   function ouvir(url: string) {
     const a = audioRef.current;

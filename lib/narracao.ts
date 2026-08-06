@@ -187,6 +187,7 @@ export async function gerarNarracaoMp3(opts: {
   ref: string;
   volMusica?: number;
   alvoSegundos?: number;
+  musicaWav?: string; // WAV (24kHz mono) da trilha ESCOLHIDA pelo dono — entra no lugar do jingle
 }): Promise<{ url: string; segundos: number }> {
   const texto = opts.texto.trim();
   if (!texto) throw new Error("Sem texto pra narrar.");
@@ -195,16 +196,21 @@ export async function gerarNarracaoMp3(opts: {
   const t2 = (opts.texto2 || "").trim();
   const voz2 = t2 ? await falar(t2, opts.vozId, opts.direcao || "") : null;
 
-  let jingle: Int16Array | null = null;
-  const urlJingle = JINGLES_PCM[opts.slugMarca];
-  if (urlJingle) {
+  // Música de fundo: a TRILHA do dono (musicaWav) tem prioridade; senão o jingle da marca. Tudo
+  // best-effort — se a trilha do dono falhar (formato/rede), cai no jingle; se o jingle falhar,
+  // a narração sai só com a voz. Nada aqui derruba a geração.
+  async function carregarPcm(url: string): Promise<Int16Array | null> {
     try {
-      const r = await fetch(urlJingle, { cache: "no-store", signal: AbortSignal.timeout(15000) });
-      if (r.ok) jingle = pcmDoWav(Buffer.from(await r.arrayBuffer()));
+      const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(15000) });
+      if (r.ok) return pcmDoWav(Buffer.from(await r.arrayBuffer()));
     } catch (e) {
-      console.error("Jingle indisponível — a narração sai sem música:", e);
+      console.error("Fundo indisponível:", url, e);
     }
+    return null;
   }
+  let jingle: Int16Array | null = null;
+  if (opts.musicaWav) jingle = await carregarPcm(opts.musicaWav); // a trilha escolhida
+  if (!jingle && JINGLES_PCM[opts.slugMarca]) jingle = await carregarPcm(JINGLES_PCM[opts.slugMarca]); // rede de proteção
 
   const { pcm, segundos } = montarTrilha(voz1, voz2, jingle, opts.volMusica, opts.alvoSegundos);
   const mp3 = encodarMp3(pcm);
