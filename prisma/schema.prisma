@@ -83,7 +83,8 @@ model VideoTematico {
   // A Bia escreve uma copy com começo-meio-fim nas fotos-chave; o dono edita no seletor.
   videoTextos     String   @default("{}")
   videoCapa       String   @default("") // ID da foto da capa ("" = 1ª da sequência)
-  videoMoldura    String   @default("branca") // nenhuma | branca | grossa | marca
+  videoMoldura    String   @default("branca") // nenhuma | branca | grossa | preta | marca
+  videoMolduraCor String   @default("") // cor da moldura quando videoMoldura = "marca" (hex); "" = cor da marca
   videoTextoFinal String   @default("") // frase do último quadro ("" = padrão do motor)
   videoFundo      String   @default("") // fundo do quadro: "" (foto borrada, padrão) | "cheia" (foto preenche a tela) | "cor" (degradê de cor)
   videoFundoCor   String   @default("") // cor do fundo quando videoFundo = "cor" (hex); "" = cor da marca

@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
 const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
@@ -35,7 +35,7 @@ const MOLDURAS_UI = [
   { id: "branca", label: "Branca" },
   { id: "grossa", label: "Branca grossa" },
   { id: "preta", label: "Preta" }, // só no vídeo do buffet (o motor da festa não conhece)
-  { id: "marca", label: "Cor da marca" },
+  { id: "marca", label: "Cor" }, // cor escolhida na paleta (padrão = cor da marca)
 ];
 
 // Estilo da moldura no PREVIEW (aproxima o que o motor faz: borda colorida ao redor da foto).
@@ -132,7 +132,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -149,6 +149,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   musicasBanco?: { url: string; nome: string; wav?: string }[];
   fundoInicial?: string; // fundo do quadro do vídeo temático: "" (foto borrada) | "cheia" | "cor"
   fundoCorInicial?: string; // cor do fundo "cor" (hex); "" = cor da marca
+  molduraCorInicial?: string; // cor da moldura "marca" (hex); "" = cor da marca
   capaEstiloInicial?: string; // estilo da capa (temático): "" (clássica) | "impacto" (chamativa) | "ia"
   capaIaUrlInicial?: string; // URL da arte de capa gerada pela IA (quando estilo = "ia")
   corMarca?: string;
@@ -179,6 +180,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
   const [fundo, setFundo] = useState<string>(fundoInicial || ""); // fundo do quadro (temático): "" borrada | "cheia" | "cor"
   const [corFundo, setCorFundo] = useState<string>(fundoCorInicial || ""); // cor do fundo "cor" (hex); "" = cor da marca
+  const [corMoldura, setCorMoldura] = useState<string>(molduraCorInicial || ""); // cor da moldura "marca" (hex); "" = cor da marca
   const [capaEstilo, setCapaEstilo] = useState<string>(capaEstiloInicial || ""); // estilo da capa: "" clássica | "impacto" | "ia"
   const [capaIaUrl, setCapaIaUrl] = useState<string>(capaIaUrlInicial || ""); // arte de capa gerada pela IA
   const [gerandoCapaIa, setGerandoCapaIa] = useState(false);
@@ -208,6 +210,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId) return;
     setCorFundo(nova);
     definirFundoCorVideo(tematicoId, nova).catch(() => {});
+  }
+  // Troca a COR da moldura "Cor" (paleta) — salva na hora; vale no próximo Gerar.
+  function trocarCorMoldura(nova: string) {
+    if (!tematicoId) return;
+    setCorMoldura(nova);
+    definirMolduraCorVideo(tematicoId, nova).catch(() => {});
   }
   // Troca o estilo da CAPA (clássica / impacto / ia) — salva na hora; vale no próximo Gerar.
   function trocarCapaEstilo(novo: string) {
@@ -595,6 +603,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const fundoCheia = !!tematicoId && fundo === "cheia";
   const fundoCor = !!tematicoId && fundo === "cor"; // fundo em degradê de cor
   const corDoFundo = corFundo || corMarca; // a cor escolhida (ou a da marca, se nenhuma)
+  const corDaMoldura = corMoldura || corMarca; // cor da moldura "Cor" (ou a da marca)
   // Auto-avanço da prévia (dá a sensação de "tocar" o vídeo). Pausa sozinho ao trocar de cena na mão.
   useEffect(() => {
     if (!tocandoPrev || escolhidas.length < 2) return;
@@ -729,7 +738,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                         <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
                       )}
                       <div className="absolute inset-0 flex items-center justify-center p-3 lg:p-4">
-                        <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corMarca, 2)}>
+                        <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corDaMoldura, 2)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={cenaFoto.url} alt="" className="block max-h-[21vh] w-auto max-w-full object-contain lg:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
                         </span>
@@ -1003,9 +1012,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <div>
                       <span className="text-[11px] font-semibold text-white">🎬 Fundo do vídeo</span>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }, { id: "cor", emoji: "🎨", label: "Cor da marca" }].map((f) => (
+                        {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }, { id: "cor", emoji: "🎨", label: "Cor" }].map((f) => (
                           <button key={f.id || "borrada"} type="button" onClick={() => trocarFundo(f.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${fundo === f.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
-                            {f.id === "cor" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corMarca }} />}
+                            {f.id === "cor" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corDoFundo }} />}
                             {f.id !== "cor" && f.emoji} {f.label}
                           </button>
                         ))}
@@ -1033,11 +1042,24 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       {MOLDURAS_UI.filter((m) => tematicoId || m.id !== "preta").map((m) => (
                         <button key={m.id} type="button" onClick={() => setMoldura(m.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${moldura === m.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
-                          {m.id === "marca" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corMarca }} />}
+                          {m.id === "marca" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corDaMoldura }} />}
                           {m.label}
                         </button>
                       ))}
                     </div>
+                    {/* PALETA da moldura (só no buffet, quando a moldura é "Cor") — mesmo padrão do fundo */}
+                    {tematicoId && moldura === "marca" && (
+                      <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+                        <p className="mb-1.5 text-[11px] font-semibold text-white">🎨 Cor da moldura</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button type="button" onClick={() => trocarCorMoldura("")} aria-label="Cor da marca" title="Cor da marca (padrão)" className={`h-8 w-8 rounded-full border-2 transition ${!corMoldura ? "border-white ring-2 ring-white/40" : "border-white/20 hover:border-white/50"}`} style={{ background: corMarca }} />
+                          {CORES_FUNDO.map((c) => (
+                            <button key={c} type="button" onClick={() => trocarCorMoldura(c)} aria-label={`Cor ${c}`} title={c} className={`h-8 w-8 rounded-full border-2 transition ${corMoldura.toUpperCase() === c ? "border-white ring-2 ring-white/40" : "border-white/20 hover:border-white/50"}`} style={{ background: c }} />
+                          ))}
+                        </div>
+                        <p className="mt-1.5 text-[10px] leading-snug text-muted/70">A 1ª bolinha é a <strong className="text-white/70">cor da marca</strong>. Toque numa cor pra a borda da foto usar ela.</p>
+                      </div>
+                    )}
                     {fundoCheia && <p className="mt-1 text-[10px] leading-snug text-amber-300/80">Com o fundo <strong>🔳 na tela toda</strong>, a foto preenche a tela e a moldura não aparece.</p>}
                   </div>
 
@@ -1045,7 +1067,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   {fotoPrevFV && !fundoCheia && (
                     <button type="button" onClick={() => setAmpliada(fotoPrevFV)} title="Clique pra ampliar a prévia" className="group/p flex items-center gap-2 self-start rounded-lg border border-linha bg-preto/40 p-2">
                       <span className="flex items-center justify-center rounded-md bg-zinc-700/50 p-2 transition group-hover/p:bg-zinc-600/70">
-                        <span className="block" style={estiloMoldura(moldura, corMarca)}>
+                        <span className="block" style={estiloMoldura(moldura, corDaMoldura)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img src={fotoPrev} alt="" className="block h-16 w-16 object-cover" style={{ borderRadius: moldura === "nenhuma" ? 2 : 0 }} />
                         </span>
@@ -1401,7 +1423,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
                     )}
                     <div className="absolute inset-0 flex items-center justify-center p-4">
-                      <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corMarca, 3)}>
+                      <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corDaMoldura, 3)}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={cenaFoto.url} alt="" className="block max-h-[62vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
                       </span>
@@ -1434,7 +1456,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={ampliada.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-md brightness-50" />
             <div className="absolute inset-0 flex items-center justify-center p-5">
-              <span className="block" style={estiloMoldura(moldura, corMarca, 4)}>
+              <span className="block" style={estiloMoldura(moldura, corDaMoldura, 4)}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={ampliada.url} alt="" className="block max-h-[58vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 4 : 0 }} />
               </span>

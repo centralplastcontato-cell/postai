@@ -183,7 +183,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
 
     // MOLDURA da foto (agora respeitada no vídeo do buffet): cor e espessura da borda ao redor da foto.
     const mol = v.videoMoldura || "branca";
-    const molCor = mol === "preta" ? "#141414" : mol === "marca" ? cor : "#ffffff";
+    const molCorMarca = /^#[0-9a-fA-F]{6}$/.test(v.videoMolduraCor || "") ? v.videoMolduraCor : cor;
+    const molCor = mol === "preta" ? "#141414" : mol === "marca" ? molCorMarca : "#ffffff";
     const molPad = mol === "nenhuma" ? 0 : mol === "grossa" ? 30 : BORDA;
 
     const el = capaGrande ? impactoEl :
