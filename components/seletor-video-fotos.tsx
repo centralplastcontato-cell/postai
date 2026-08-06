@@ -689,6 +689,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* PLAYER — a prévia 9:16 da cena atual, do jeito que vai ficar no vídeo */}
           <div className="flex shrink-0 flex-col items-center justify-center gap-2 p-3 lg:min-w-0 lg:flex-1 lg:gap-3 lg:p-4" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
+            <div className="flex items-center gap-3">
+              {/* espaçador (só celular) pra o card ficar centralizado, com o play do lado direito */}
+              {escolhidas.length > 0 && <div className="w-11 shrink-0 lg:hidden" />}
             <div className="relative aspect-[9/16] h-[26vh] max-w-full overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[62vh] lg:rounded-[22px]">
               {cenaFoto ? (
                 <>
@@ -727,7 +730,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     disabled={escolhidas.length < 2}
                     aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"}
                     title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas automaticamente"}
-                    className={`absolute bottom-2 right-2 z-10 flex h-10 w-10 items-center justify-center rounded-full text-base text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] backdrop-blur transition disabled:opacity-30 lg:bottom-auto lg:right-auto lg:left-1/2 lg:top-1/2 lg:h-16 lg:w-16 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:text-2xl ${tocandoPrev ? "bg-black/45 opacity-70 hover:opacity-100" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}
+                    className={`absolute left-1/2 top-1/2 z-10 hidden h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-2xl text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] backdrop-blur transition disabled:opacity-30 lg:flex ${tocandoPrev ? "bg-black/45 opacity-70 hover:opacity-100" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}
                   >
                     {tocandoPrev ? "❚❚" : "▶"}
                   </button>
@@ -745,6 +748,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   <p className="text-sm font-semibold text-white">Seu vídeo aparece aqui</p>
                   <p className="text-[11px] text-muted">Escolha as fotos na aba <strong className="text-white/80">📷 Fotos</strong> pra montar as cenas.</p>
                 </div>
+              )}
+            </div>
+              {/* PLAY ao LADO da imagem (só no celular) — não cobre a foto */}
+              {escolhidas.length > 0 && (
+                <button type="button" onClick={() => setTocandoPrev((p) => !p)} disabled={escolhidas.length < 2} aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"} title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas"} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] transition disabled:opacity-30 lg:hidden ${tocandoPrev ? "bg-black/50" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}>{tocandoPrev ? "❚❚" : "▶"}</button>
               )}
             </div>
             <p className="text-center text-[10px] text-muted/70">Prévia aproximada · formato 9:16 (Reels)</p>
