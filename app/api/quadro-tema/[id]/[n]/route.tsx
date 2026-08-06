@@ -219,7 +219,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
               padding: ehCapa ? "215px 60px 150px" : "60px 60px 210px",
               backgroundImage: bgBlur
                 ? "linear-gradient(180deg, rgba(0,0,0,0.30) 0%, rgba(0,0,0,0.12) 45%, rgba(0,0,0,0.60) 100%)"
-                : `linear-gradient(160deg, ${cor} 0%, ${fundo} 100%)`,
+                : `linear-gradient(160deg, ${fundoCor && /^#[0-9a-fA-F]{6}$/.test(v.videoFundoCor) ? v.videoFundoCor : cor} 0%, ${fundoCor ? "#101018" : fundo} 100%)`,
             }}
           >
             {/* a FOTO, com a moldura branca justa nela */}

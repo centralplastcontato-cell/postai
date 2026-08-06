@@ -306,6 +306,18 @@ export async function definirFundoVideo(videoId: string, fundo: string) {
   return { ok: true as const, fundo: valor };
 }
 
+// Cor do fundo "cor" (degradê): guarda um hex (#RRGGBB). "" volta pra cor da marca.
+export async function definirFundoCorVideo(videoId: string, cor: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const valor = /^#[0-9a-fA-F]{6}$/.test(cor) ? cor.toUpperCase() : ""; // só aceita hex válido; senão volta pra cor da marca
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { videoFundoCor: valor } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, cor: valor };
+}
+
 // Estilo da CAPA (1º quadro) do vídeo do buffet: "" (clássica) | "impacto" (capa chamativa, tipo
 // thumbnail — foto na tela toda + texto gigante com contorno). Muda como o /api/quadro-tema desenha o quadro 0.
 export async function definirCapaEstilo(videoId: string, estilo: string) {

@@ -278,6 +278,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoMoldura: v.videoMoldura,
       videoTextoFinal: v.videoTextoFinal,
       videoFundo: v.videoFundo || "",
+      videoFundoCor: v.videoFundoCor || "",
       capaEstilo: v.capaEstilo || "",
       capaIaUrl: v.capaIaUrl || "",
       videoMusica: v.videoMusica || "",

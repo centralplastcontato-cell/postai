@@ -85,7 +85,8 @@ model VideoTematico {
   videoCapa       String   @default("") // ID da foto da capa ("" = 1ª da sequência)
   videoMoldura    String   @default("branca") // nenhuma | branca | grossa | marca
   videoTextoFinal String   @default("") // frase do último quadro ("" = padrão do motor)
-  videoFundo      String   @default("") // fundo do quadro: "" (foto borrada, padrão) | "cheia" (foto preenche a tela)
+  videoFundo      String   @default("") // fundo do quadro: "" (foto borrada, padrão) | "cheia" (foto preenche a tela) | "cor" (degradê de cor)
+  videoFundoCor   String   @default("") // cor do fundo quando videoFundo = "cor" (hex); "" = cor da marca
   capaEstilo      String   @default("") // estilo da CAPA (1º quadro): "" (clássica) | "impacto" (foto na tela toda + texto) | "ia" (arte festiva da IA + texto)
   capaIaUrl       String   @default("") // URL (Blob) da arte de capa gerada pela IA — usada quando capaEstilo = "ia"
   videoMusica     String   @default("") // trilha escolhida (URL do MP3); "" = jingle do buffet. Vale quando NÃO há narração.

@@ -10,7 +10,10 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo } from "@/app/actions/videos-tematicos";
+
+// Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
+const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
@@ -129,7 +132,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -144,7 +147,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   narracao?: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz do vídeo
   musicaInicial?: string;
   musicasBanco?: { url: string; nome: string; wav?: string }[];
-  fundoInicial?: string; // fundo do quadro do vídeo temático: "" (foto borrada) | "cheia"
+  fundoInicial?: string; // fundo do quadro do vídeo temático: "" (foto borrada) | "cheia" | "cor"
+  fundoCorInicial?: string; // cor do fundo "cor" (hex); "" = cor da marca
   capaEstiloInicial?: string; // estilo da capa (temático): "" (clássica) | "impacto" (chamativa) | "ia"
   capaIaUrlInicial?: string; // URL da arte de capa gerada pela IA (quando estilo = "ia")
   corMarca?: string;
@@ -173,7 +177,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // foto escolhida pra CAPA (fotoId). "" = a 1ª foto vira capa automaticamente.
   const [capa, setCapa] = useState<string>(fotos.some((f) => f.id === capaInicial) ? capaInicial : "");
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
-  const [fundo, setFundo] = useState<string>(fundoInicial || ""); // fundo do quadro (temático): "" borrada | "cheia"
+  const [fundo, setFundo] = useState<string>(fundoInicial || ""); // fundo do quadro (temático): "" borrada | "cheia" | "cor"
+  const [corFundo, setCorFundo] = useState<string>(fundoCorInicial || ""); // cor do fundo "cor" (hex); "" = cor da marca
   const [capaEstilo, setCapaEstilo] = useState<string>(capaEstiloInicial || ""); // estilo da capa: "" clássica | "impacto" | "ia"
   const [capaIaUrl, setCapaIaUrl] = useState<string>(capaIaUrlInicial || ""); // arte de capa gerada pela IA
   const [gerandoCapaIa, setGerandoCapaIa] = useState(false);
@@ -197,6 +202,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId) return;
     setFundo(novo);
     definirFundoVideo(tematicoId, novo).catch(() => {});
+  }
+  // Troca a COR do fundo "cor" (paleta) — salva na hora; vale no próximo Gerar.
+  function trocarCorFundo(nova: string) {
+    if (!tematicoId) return;
+    setCorFundo(nova);
+    definirFundoCorVideo(tematicoId, nova).catch(() => {});
   }
   // Troca o estilo da CAPA (clássica / impacto / ia) — salva na hora; vale no próximo Gerar.
   function trocarCapaEstilo(novo: string) {
@@ -582,7 +593,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       : (ehCapaCena ? (tituloCapa.trim() || tituloCapaAuto || nome) : "")
     : "";
   const fundoCheia = !!tematicoId && fundo === "cheia";
-  const fundoCor = !!tematicoId && fundo === "cor"; // fundo em degradê das cores da marca
+  const fundoCor = !!tematicoId && fundo === "cor"; // fundo em degradê de cor
+  const corDoFundo = corFundo || corMarca; // a cor escolhida (ou a da marca, se nenhuma)
   // Auto-avanço da prévia (dá a sensação de "tocar" o vídeo). Pausa sozinho ao trocar de cena na mão.
   useEffect(() => {
     if (!tocandoPrev || escolhidas.length < 2) return;
@@ -711,7 +723,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   ) : (
                     <>
                       {fundoCor ? (
-                        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corMarca}, #0e0e0e)` }} />
+                        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
@@ -998,7 +1010,20 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                           </button>
                         ))}
                       </div>
-                      <p className="mt-1 text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta as beiradas). 🎨 <strong className="text-white/70">Cor da marca</strong>: a foto emoldurada sobre um degradê das cores do buffet. Veja na prévia. Vale no próximo <strong className="text-white/70">Gerar</strong>.</p>
+                      <p className="mt-1 text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta as beiradas). 🎨 <strong className="text-white/70">Cor</strong>: a foto emoldurada sobre um degradê de cor. Veja na prévia. Vale no próximo <strong className="text-white/70">Gerar</strong>.</p>
+                      {/* PALETA de cores do fundo (só quando o fundo é "cor") */}
+                      {fundo === "cor" && (
+                        <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+                          <p className="mb-1.5 text-[11px] font-semibold text-white">🎨 Cor do fundo</p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <button type="button" onClick={() => trocarCorFundo("")} aria-label="Cor da marca" title="Cor da marca (padrão)" className={`h-8 w-8 rounded-full border-2 transition ${!corFundo ? "border-white ring-2 ring-white/40" : "border-white/20 hover:border-white/50"}`} style={{ background: corMarca }} />
+                            {CORES_FUNDO.map((c) => (
+                              <button key={c} type="button" onClick={() => trocarCorFundo(c)} aria-label={`Cor ${c}`} title={c} className={`h-8 w-8 rounded-full border-2 transition ${corFundo.toUpperCase() === c ? "border-white ring-2 ring-white/40" : "border-white/20 hover:border-white/50"}`} style={{ background: c }} />
+                            ))}
+                          </div>
+                          <p className="mt-1.5 text-[10px] leading-snug text-muted/70">A 1ª bolinha é a <strong className="text-white/70">cor da marca</strong>. Toque numa cor pra o fundo usar ela (num degradê pra escuro).</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1370,7 +1395,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 ) : (
                   <>
                     {fundoCor ? (
-                      <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corMarca}, #0e0e0e)` }} />
+                      <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
