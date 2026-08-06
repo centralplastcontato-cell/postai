@@ -535,9 +535,15 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // Auto-avanço da prévia (dá a sensação de "tocar" o vídeo). Pausa sozinho ao trocar de cena na mão.
   useEffect(() => {
     if (!tocandoPrev || escolhidas.length < 2) return;
-    const t = setInterval(() => setCena((c) => (c + 1) % escolhidas.length), 1400);
+    const t = setInterval(() => setCena((c) => (c + 1) % escolhidas.length), 1100);
     return () => clearInterval(t);
   }, [tocandoPrev, escolhidas.length]);
+  // Pré-carrega as fotos da sequência (deixa no cache do navegador) pra a prévia trocar de cena NA
+  // HORA, sem aquele preto esperando a foto baixar. Roda quando a seleção muda.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    for (const f of escolhidas) { const im = new Image(); im.src = f.url; }
+  }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   function irCena(d: number) {
     setTocandoPrev(false);
     if (!escolhidas.length) return;
