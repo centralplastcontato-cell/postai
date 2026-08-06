@@ -185,6 +185,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [aba, setAba] = useState<string>("fotos");
   const [cena, setCena] = useState(0);
   const [tocandoPrev, setTocandoPrev] = useState(false);
+  const [previaCheia, setPreviaCheia] = useState(false); // prévia em TELA CHEIA (pra ver a sequência no celular)
   // Divisória AJUSTÁVEL entre o vídeo e o painel de abas (só no layout lado-a-lado das telas grandes).
   const [larguraPainel, setLarguraPainel] = useState(400); // largura do painel da direita, em px
   const [ehLg, setEhLg] = useState<boolean>(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches);
@@ -690,8 +691,14 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
           {/* PLAYER — a prévia 9:16 da cena atual, do jeito que vai ficar no vídeo */}
           <div className="flex shrink-0 flex-col items-center justify-center gap-2 p-3 lg:min-w-0 lg:flex-1 lg:gap-3 lg:p-4" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
             <div className="flex items-center gap-3">
-              {/* espaçador (só celular) pra o card ficar centralizado, com o play do lado direito */}
-              {escolhidas.length > 0 && <div className="w-11 shrink-0 lg:hidden" />}
+              {/* controles À ESQUERDA da imagem (só celular): voltar */}
+              {escolhidas.length > 0 && (
+                <div className="flex w-11 shrink-0 flex-col items-center gap-2 lg:hidden">
+                  {escolhidas.length > 1 && (
+                    <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition active:bg-white/15">◀</button>
+                  )}
+                </div>
+              )}
             <div className="relative aspect-[9/16] h-[26vh] max-w-full overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[62vh] lg:rounded-[22px]">
               {cenaFoto ? (
                 <>
@@ -750,9 +757,15 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 </div>
               )}
             </div>
-              {/* PLAY ao LADO da imagem (só no celular) — não cobre a foto */}
+              {/* controles À DIREITA da imagem (só celular): tocar · avançar · ampliar */}
               {escolhidas.length > 0 && (
-                <button type="button" onClick={() => setTocandoPrev((p) => !p)} disabled={escolhidas.length < 2} aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"} title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas"} className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] transition disabled:opacity-30 lg:hidden ${tocandoPrev ? "bg-black/50" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}>{tocandoPrev ? "❚❚" : "▶"}</button>
+                <div className="flex w-11 shrink-0 flex-col items-center gap-2 lg:hidden">
+                  <button type="button" onClick={() => setTocandoPrev((p) => !p)} disabled={escolhidas.length < 2} aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"} title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas"} className={`flex h-11 w-11 items-center justify-center rounded-full text-base text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] transition disabled:opacity-30 ${tocandoPrev ? "bg-black/50" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}>{tocandoPrev ? "❚❚" : "▶"}</button>
+                  {escolhidas.length > 1 && (
+                    <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition active:bg-white/15">▶</button>
+                  )}
+                  <button type="button" onClick={() => setPreviaCheia(true)} aria-label="Ver em tela cheia" title="Ver a sequência em tela cheia" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition active:bg-white/15">🔍</button>
+                </div>
               )}
             </div>
             <p className="text-center text-[10px] text-muted/70">Prévia aproximada · formato 9:16 (Reels)</p>
@@ -1335,6 +1348,46 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       {/* player ÚNICO (escondido) que o ▶️/⏸ de cada trilha da aba Música controla */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} onEnded={() => setTocando("")} className="hidden" />
+
+      {/* PRÉVIA EM TELA CHEIA — pra ver a sequência de perto (principalmente no celular). Usa a
+          MESMA cena/estado da prévia pequena; ◀ ▶ trocam a cena e ▶ passa sozinho. */}
+      {previaCheia && (
+        <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/95 p-4" onClick={(e) => { e.stopPropagation(); setPreviaCheia(false); setTocandoPrev(false); }}>
+          <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[72vh] max-w-full overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-white/15">
+            {cenaFoto ? (
+              <>
+                {fundoCheia ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                ) : (
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                    <div className="absolute inset-0 flex items-center justify-center p-4">
+                      <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corMarca, 3)}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={cenaFoto.url} alt="" className="block max-h-[62vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
+                      </span>
+                    </div>
+                  </>
+                )}
+                {legendaCena && (
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-5 pt-12 text-center">
+                    <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${ehCapaCena ? "text-2xl" : "text-lg"}`}>{legendaCena}</span>
+                  </div>
+                )}
+                <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">{cenaIdx + 1}/{escolhidas.length}{ehCapaCena && <span className="text-amber-300">⭐</span>}</span>
+              </>
+            ) : null}
+          </div>
+          <div className="flex items-center gap-5" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition active:bg-white/15">◀</button>
+            <button type="button" onClick={() => setTocandoPrev((p) => !p)} disabled={escolhidas.length < 2} aria-label={tocandoPrev ? "Pausar" : "Tocar"} className={`flex h-14 w-14 items-center justify-center rounded-full text-xl text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] transition disabled:opacity-40 ${tocandoPrev ? "bg-black/50" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}>{tocandoPrev ? "❚❚" : "▶"}</button>
+            <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/5 text-white transition active:bg-white/15">▶</button>
+          </div>
+          <button type="button" onClick={() => { setPreviaCheia(false); setTocandoPrev(false); }} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition active:bg-white/10">Fechar</button>
+        </div>
+      )}
 
       {/* foto ampliada — mostra COM a moldura escolhida (fundo borrado), igual vai ficar no vídeo. */}
       {ampliada && (
