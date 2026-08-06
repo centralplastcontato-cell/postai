@@ -110,6 +110,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     // Estilo do FUNDO do quadro (escolhido pelo dono): "cheia" = a foto preenche a tela toda (sem
     // moldura); senão (padrão) a foto BORRADA e escurecida atrás, com a foto emoldurada por cima.
     const modo = v.videoFundo === "cheia" ? "cheia" : "desfocada";
+    // "cor" = a foto emoldurada sobre um DEGRADÊ das cores da marca (sem a foto borrada atrás).
+    const fundoCor = v.videoFundo === "cor";
     // CAPA CHAMATIVA ("impacto"): só no quadro 0 e quando o dono escolheu esse estilo. Foto na tela
     // toda + texto GIGANTE com contorno (tipo thumbnail de YouTube), seja qual for o fundo dos outros quadros.
     // Capa "grande" (fundo na tela toda + texto gigante embaixo): "impacto" usa a SUA foto,
@@ -119,7 +121,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     // Fundo borrado (modo padrão): borra a foto com sharp (o next/og não faz blur). Se falhar,
     // cai no degradê das cores da marca.
     let bgBlur = "";
-    if (modo === "desfocada" && !capaGrande) {
+    if (modo === "desfocada" && !capaGrande && !fundoCor) {
       try {
         const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
         const b = await sharp(raw).resize(L, A, { fit: "cover", position: "attention" }).blur(30).modulate({ brightness: 0.5 }).jpeg({ quality: 62 }).toBuffer();
@@ -179,6 +181,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       </div>
     );
 
+    // MOLDURA da foto (agora respeitada no vídeo do buffet): cor e espessura da borda ao redor da foto.
+    const mol = v.videoMoldura || "branca";
+    const molCor = mol === "preta" ? "#141414" : mol === "marca" ? cor : "#ffffff";
+    const molPad = mol === "nenhuma" ? 0 : mol === "grossa" ? 30 : BORDA;
+
     const el = capaGrande ? impactoEl :
       modo === "cheia" ? (
         // FOTO NA TELA TODA: preenche o 9:16 (corta as beiradas); legenda embaixo, sobre um
@@ -217,9 +224,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
           >
             {/* a FOTO, com a moldura branca justa nela */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: `${areaH}px` }}>
-              <div style={{ display: "flex", padding: `${BORDA}px`, backgroundColor: "#ffffff", borderRadius: 8, boxShadow: "0 18px 50px rgba(0,0,0,0.45)" }}>
+              <div style={{ display: "flex", padding: `${molPad}px`, backgroundColor: mol === "nenhuma" ? "transparent" : molCor, borderRadius: 8, boxShadow: mol === "nenhuma" ? "none" : "0 18px 50px rgba(0,0,0,0.45)" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={foto.src} width={fw} height={fh} style={{ width: `${fw}px`, height: `${fh}px`, objectFit: "cover", borderRadius: 2 }} />
+                <img src={foto.src} width={fw} height={fh} style={{ width: `${fw}px`, height: `${fh}px`, objectFit: "cover", borderRadius: mol === "nenhuma" ? 8 : 2 }} />
               </div>
             </div>
             {/* O TEXTO (gancho na capa; legenda estreita nos demais, o logo do motor mora à direita). */}

@@ -31,6 +31,7 @@ const MOLDURAS_UI = [
   { id: "nenhuma", label: "Sem moldura" },
   { id: "branca", label: "Branca" },
   { id: "grossa", label: "Branca grossa" },
+  { id: "preta", label: "Preta" }, // só no vídeo do buffet (o motor da festa não conhece)
   { id: "marca", label: "Cor da marca" },
 ];
 
@@ -39,6 +40,7 @@ const MOLDURAS_UI = [
 function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   if (m === "branca") return { padding: 3 * esc, background: "#ffffff", borderRadius: 2 };
   if (m === "grossa") return { padding: 6 * esc, background: "#ffffff", borderRadius: 2 };
+  if (m === "preta") return { padding: 3 * esc, background: "#141414", borderRadius: 2 };
   if (m === "marca") return { padding: 3 * esc, background: cor, borderRadius: 2 };
   return {};
 }
@@ -580,6 +582,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       : (ehCapaCena ? (tituloCapa.trim() || tituloCapaAuto || nome) : "")
     : "";
   const fundoCheia = !!tematicoId && fundo === "cheia";
+  const fundoCor = !!tematicoId && fundo === "cor"; // fundo em degradê das cores da marca
   // Auto-avanço da prévia (dá a sensação de "tocar" o vídeo). Pausa sozinho ao trocar de cena na mão.
   useEffect(() => {
     if (!tocandoPrev || escolhidas.length < 2) return;
@@ -707,8 +710,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
                   ) : (
                     <>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                      {fundoCor ? (
+                        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corMarca}, #0e0e0e)` }} />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                      )}
                       <div className="absolute inset-0 flex items-center justify-center p-3 lg:p-4">
                         <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corMarca, 2)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -984,13 +991,14 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <div>
                       <span className="text-[11px] font-semibold text-white">🎬 Fundo do vídeo</span>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }].map((f) => (
+                        {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }, { id: "cor", emoji: "🎨", label: "Cor da marca" }].map((f) => (
                           <button key={f.id || "borrada"} type="button" onClick={() => trocarFundo(f.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${fundo === f.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
-                            {f.emoji} {f.label}
+                            {f.id === "cor" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corMarca }} />}
+                            {f.id !== "cor" && f.emoji} {f.label}
                           </button>
                         ))}
                       </div>
-                      <p className="mt-1 text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta um pouco as beiradas). Veja na prévia ao lado. Vale no próximo <strong className="text-white/70">Gerar</strong>.</p>
+                      <p className="mt-1 text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta as beiradas). 🎨 <strong className="text-white/70">Cor da marca</strong>: a foto emoldurada sobre um degradê das cores do buffet. Veja na prévia. Vale no próximo <strong className="text-white/70">Gerar</strong>.</p>
                     </div>
                   )}
 
@@ -998,7 +1006,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   <div>
                     <span className="text-[11px] font-semibold text-white">🖼️ Moldura das fotos</span>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      {MOLDURAS_UI.map((m) => (
+                      {MOLDURAS_UI.filter((m) => tematicoId || m.id !== "preta").map((m) => (
                         <button key={m.id} type="button" onClick={() => setMoldura(m.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${moldura === m.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
                           {m.id === "marca" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corMarca }} />}
                           {m.label}
@@ -1361,8 +1369,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
                 ) : (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                    {fundoCor ? (
+                      <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corMarca}, #0e0e0e)` }} />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                    )}
                     <div className="absolute inset-0 flex items-center justify-center p-4">
                       <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corMarca, 3)}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}

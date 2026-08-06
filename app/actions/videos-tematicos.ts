@@ -300,7 +300,7 @@ export async function definirFundoVideo(videoId: string, fundo: string) {
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const valor = fundo === "cheia" ? "cheia" : ""; // só aceita os dois estilos
+  const valor = fundo === "cheia" ? "cheia" : fundo === "cor" ? "cor" : ""; // borrada (padrão) | cheia | cor
   await prisma.videoTematico.update({ where: { id: videoId }, data: { videoFundo: valor } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, fundo: valor };
