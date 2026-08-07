@@ -553,7 +553,7 @@ export async function gerarVideoTematico(videoId: string) {
   // "q2" = VERSÃO do desenho do quadro (fundo virou foto BORRADA). Bumpar isso quando o visual do
   // quadro muda força a CDN a redesenhar (o ?v= só depende de dados; sem isso, serviria o antigo).
   const versao = hashCurto(
-    ["q2", v.videoFundo, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
+    ["q3", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
 
   let fotosMotor: string[];

@@ -89,10 +89,6 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     // E deixa uma faixa livre no TOPO: na capa, o motor carimba o logo da marca ali no meio
     // (nos outros quadros ele carimba embaixo à direita — testado).
     const areaH = ehCapa ? 1120 : AREA_FOTO_H;
-    // Moldura justa: escala a foto pra caber na área, mantendo a proporção dela.
-    const escala = Math.min(AREA_FOTO_L / foto.largura, areaH / foto.altura);
-    const fw = Math.round(foto.largura * escala);
-    const fh = Math.round(foto.altura * escala);
     // Frase longa = fonte menor (cabe sem estourar). A capa é maior e forte (é o gancho), e
     // pode ocupar a largura toda — o logo do motor fica embaixo dela, não do lado.
     const tam = ehCapa
@@ -216,6 +212,26 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       </div>
     );
 
+    // Fotos MUITO horizontais viram uma tira fininha no Reels (em pé). Corta um pouco as laterais
+    // (corte INTELIGENTE, mantendo o assunto) pra a foto ficar MAIOR no quadro emoldurado. Retrato
+    // não muda; não vale na capa nem no fundo "tela toda".
+    let fSrc = foto.src, fLarg = foto.largura;
+    const fAlt = foto.altura;
+    const ASPECT_MAX = 1.45;
+    if (!capaGrande && !capaRecorte && modo !== "cheia" && fLarg / fAlt > ASPECT_MAX) {
+      try {
+        const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
+        const novaL = Math.round(fAlt * ASPECT_MAX);
+        const b = await sharp(raw).resize(novaL, fAlt, { fit: "cover", position: "attention" }).jpeg({ quality: 88 }).toBuffer();
+        fSrc = `data:image/jpeg;base64,${b.toString("base64")}`;
+        fLarg = novaL;
+      } catch (e) { console.error("Não consegui recortar a foto horizontal:", e); }
+    }
+    // Moldura justa: escala a foto pra caber na área, mantendo a proporção dela.
+    const escala = Math.min(AREA_FOTO_L / fLarg, areaH / fAlt);
+    const fw = Math.round(fLarg * escala);
+    const fh = Math.round(fAlt * escala);
+
     // MOLDURA da foto (agora respeitada no vídeo do buffet): cor e espessura da borda ao redor da foto.
     const mol = v.videoMoldura || "branca";
     const molCorMarca = /^#[0-9a-fA-F]{6}$/.test(v.videoMolduraCor || "") ? v.videoMolduraCor : cor;
@@ -262,7 +278,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: `${areaH}px` }}>
               <div style={{ display: "flex", padding: `${molPad}px`, backgroundColor: mol === "nenhuma" ? "transparent" : molCor, borderRadius: 8, boxShadow: mol === "nenhuma" ? "none" : "0 18px 50px rgba(0,0,0,0.45)" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={foto.src} width={fw} height={fh} style={{ width: `${fw}px`, height: `${fh}px`, objectFit: "cover", borderRadius: mol === "nenhuma" ? 8 : 2 }} />
+                <img src={fSrc} width={fw} height={fh} style={{ width: `${fw}px`, height: `${fh}px`, objectFit: "cover", borderRadius: mol === "nenhuma" ? 8 : 2 }} />
               </div>
             </div>
             {/* O TEXTO (gancho na capa; legenda estreita nos demais, o logo do motor mora à direita). */}
