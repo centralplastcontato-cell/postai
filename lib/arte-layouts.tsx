@@ -278,8 +278,11 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string; layo
 
   const comPainel = temFoto && formato !== "limpo";
   const just = formato === "topo" ? "flex-start" : formato === "rodape" ? "flex-end" : "center";
-  const padTop = formato === "topo" ? 150 : 96;
-  const padBottom = formato === "rodape" ? 420 : 96;
+  // Reserva embaixo pro rodapé (logo + WhatsApp + site): o texto SEMPRE fica acima dessa
+  // faixa, então nunca encavala no logo (o bug do "Sem moldura" com apoio comprido).
+  const rodapeReserva = 400;
+  const areaAltura = 1350 - rodapeReserva;
+  const padTopArea = formato === "topo" ? 70 : 0;
 
   // Vinheta: escurece SÓ o lado onde o texto fica, deixando o resto da ilustração à mostra.
   const vinheta =
@@ -337,8 +340,9 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string; layo
         </div>
       ) : null}
 
-      {/* Bloco de texto posicionado conforme o formato (centro / topo / rodapé). */}
-      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: just, paddingTop: padTop, paddingBottom: padBottom, paddingLeft: 80, paddingRight: 80 }}>
+      {/* Bloco de texto posicionado conforme o formato (centro / topo / rodapé). A área NÃO
+          alcança o rodapé (reserva), então o texto nunca sobrepõe o logo/WhatsApp. */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: `${areaAltura}px`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: just, paddingTop: padTopArea, paddingLeft: 80, paddingRight: 80 }}>
         {blocoTexto}
       </div>
 

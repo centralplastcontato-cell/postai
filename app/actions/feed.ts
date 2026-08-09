@@ -13,8 +13,17 @@ import { planoTemStory, rotuloPlano, ehTrial, MSG_TRIAL_POSTAR } from "@/lib/pla
 import { planoDaMarca, checarLimiteFeed, checarCreditoTrial } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto, escolherImagensPorTema, sortearFotoComDescricao } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
-import { seloDataComemorativa } from "@/lib/datas-comemorativas";
+import { seloDataComemorativa, dataComemorativaDe } from "@/lib/datas-comemorativas";
 import type { Marca } from "@prisma/client";
+
+// Feriado REAL da data (do calendário) — trava a data comemorativa pra a IA não trocar
+// de comemoração (ex: escrever "Dia das Crianças" num post de Dia dos Pais). undefined
+// quando o dia não é uma data conhecida (aí vale o tema que o usuário digitou).
+function feriadoDaData(data: Date): string | undefined {
+  const chaveIso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(data);
+  const dc = dataComemorativaDe(chaveIso);
+  return dc ? (dc.sugestao || dc.nome) : undefined;
+}
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
 // `inclui`/`regras` são SEMPRE manuais (a IA não inventa o que a festa inclui nem condições).
@@ -491,9 +500,12 @@ async function chatOpenAI(key: string, body: object, tentativas = 3): Promise<st
   throw new ErroOpenAI("A OpenAI está instável agora. Tente de novo em instantes.");
 }
 
-async function gerarTexto(marca: Marca, template: Template, tema?: string, travas?: Travas, fotoDesc?: string): Promise<Gerado> {
+async function gerarTexto(marca: Marca, template: Template, tema?: string, travas?: Travas, fotoDesc?: string, feriadoLock?: string): Promise<Gerado> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new ErroOpenAI("A chave da OpenAI não está configurada (OPENAI_API_KEY).");
+  // Data comemorativa: trava no feriado REAL da data (do calendário) pra a IA não escrever
+  // outra comemoração (bug do "Dia das Crianças" num post de Dia dos Pais).
+  if (template === "data-comemorativa" && feriadoLock) tema = feriadoLock;
   let pedido: string;
   if (template === "dica" && fotoDesc?.trim()) {
     // FOTO-PRIMEIRO: a dica NASCE da foto que a acompanha — assim a imagem SEMPRE conversa com o
@@ -508,6 +520,10 @@ async function gerarTexto(marca: Marca, template: Template, tema?: string, trava
     pedido = `${GUIA.dica} O ASSUNTO desta dica é: "${ang}". Fique NESSE assunto e dê uma dica concreta e específica. NÃO fale de decoração nem de festa temática, a menos que o próprio assunto peça.`;
   } else {
     pedido = `${GUIA[template]} Escolha um ângulo novo e útil.`;
+  }
+  // Trava dura da data comemorativa: a saudação tem que ser EXATAMENTE dessa data.
+  if (template === "data-comemorativa" && feriadoLock) {
+    pedido += ` A DATA COMEMORATIVA é EXATAMENTE "${feriadoLock}". Escreva o "titulo" (saudação) e a mensagem SÓ pra essa data. É PROIBIDO citar, trocar ou misturar com qualquer outra comemoração (ex: NÃO escreva "Dia das Crianças" se a data é "Dia dos Pais").`;
   }
   // A oferta/validade digitadas pelo usuário são FIXAS — a IA não pode inventar outras.
   const fixos: string[] = [];
@@ -674,7 +690,9 @@ export async function gerarPublicacao(input: {
   let gerado: Gerado;
   try {
     // A dica nasce da DESCRIÇÃO da foto (foto-primeiro) — a imagem sempre conversa com o texto.
-    gerado = await gerarTexto(marca, template, input.tema, travas, fotoDica?.descricao);
+    // Data comemorativa: trava no feriado real da data escolhida (a IA não troca de comemoração).
+    const feriadoLock = template === "data-comemorativa" ? feriadoDaData(data) : undefined;
+    gerado = await gerarTexto(marca, template, input.tema, travas, fotoDica?.descricao, feriadoLock);
   } catch (e) {
     console.error("Erro ao gerar publicação:", e);
     const msg = e instanceof ErroOpenAI ? e.message : "Não consegui gerar agora. Tente de novo em instantes.";
@@ -922,7 +940,9 @@ export async function regerarPublicacao(id: string) {
     // O texto nasce da foto nova (fotoDicaRe.descricao); sem foto no banco, cai num assunto
     // sorteado (fundo colorido). Os outros templates preservam o tema (promoção/preço/depoimento).
     const temaRegerar = template === "dica" ? undefined : (p.tema ?? undefined);
-    gerado = await gerarTexto(p.marca, template, temaRegerar, travas, fotoDicaRe?.descricao);
+    // Data comemorativa: trava no feriado real da data do post (a IA não troca de comemoração).
+    const feriadoLock = template === "data-comemorativa" ? feriadoDaData(p.data) : undefined;
+    gerado = await gerarTexto(p.marca, template, temaRegerar, travas, fotoDicaRe?.descricao, feriadoLock);
   } catch (e) {
     console.error("Erro ao regerar publicação:", e);
     return { ok: false as const, erro: "Não consegui regerar agora." };
