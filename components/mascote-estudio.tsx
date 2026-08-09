@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote } from "@/app/actions/mascote";
 
 // 🦸 ESTÚDIO DO MASCOTE (Fase 1): o dono gera opções em 3D fofo, escolhe uma e ela vira o
 // mascote OFICIAL da marca. Depois (Fases 2/3) esse MESMO mascote é colado nos posts/vídeos.
@@ -85,6 +85,17 @@ export function MascoteEstudio({
       setProc(null);
     });
   }
+  function handleRemoverFundo() {
+    if (!mascoteUrl) return;
+    setErro(null);
+    setProc("fundo");
+    startTransition(async () => {
+      const r = await removerFundoMascote(marcaId, mascoteUrl);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
   function handleExcluir(url: string) {
     setErro(null);
     setProc(url);
@@ -137,6 +148,7 @@ export function MascoteEstudio({
             </button>
             <div className="flex flex-col gap-2">
               <span className="rounded-full border border-green-500/30 bg-green-500/15 px-3 py-1 text-xs font-semibold text-green-400">✓ Esse é o mascote ativo</span>
+              <button type="button" onClick={handleRemoverFundo} disabled={isPending} title="Tira o fundo (deixa transparente) pra colar limpo nos posts" className="rounded-md bg-[#7c3aed] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50">{proc === "fundo" ? "🪄 Tirando o fundo…" : "🪄 Deixar fundo transparente"}</button>
               <button type="button" onClick={handleRemover} disabled={isPending} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">Tirar mascote ativo</button>
             </div>
           </div>

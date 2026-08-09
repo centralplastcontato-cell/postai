@@ -141,6 +141,47 @@ export async function usarImagemComoMascote(marcaId: string, url: string) {
   return { ok: true as const, url, mascotes };
 }
 
+// Tira o FUNDO da imagem do mascote (deixa transparente), mantendo o personagem fiel — pra ele
+// colar limpo nos posts/vídeos (sem o quadradão branco). Usa /images/edits com background
+// transparent + apara as bordas. Salva a versão nova e ja marca como oficial.
+export async function removerFundoMascote(marcaId: string, url: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (!/^https?:\/\//.test(url)) return { ok: false as const, erro: "Imagem inválida." };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascotesArte: true } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  try {
+    const rr = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (!rr.ok) return { ok: false as const, erro: "Não consegui baixar a imagem." };
+    const ctype = rr.headers.get("content-type") || "image/png";
+    const buf = Buffer.from(await rr.arrayBuffer());
+    const form = new FormData();
+    form.append("model", "gpt-image-1");
+    form.append("prompt", "Deixe o FUNDO 100% TRANSPARENTE, removendo qualquer fundo (branco ou colorido) atrás do personagem. MANTENHA o personagem/mascote EXATAMENTE como está — as MESMAS cores, o mesmo formato, a mesma bandeira, as mesmas letras e todos os detalhes idênticos. Não redesenhe, não altere, não invente nada; APENAS remova o fundo.");
+    form.append("size", "1024x1536");
+    form.append("quality", "high");
+    form.append("background", "transparent");
+    form.append("image", new Blob([buf], { type: ctype }), "mascote.png");
+    const resp = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(55000) });
+    if (!resp.ok) return { ok: false as const, erro: `A IA não respondeu agora (${resp.status}). Tente de novo.` };
+    const data = await resp.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) return { ok: false as const, erro: "A IA não devolveu a imagem. Tente de novo." };
+    let png = Buffer.from(b64, "base64");
+    try { const sharp = (await import("sharp")).default; png = Buffer.from(await sharp(png).trim({ threshold: 10 }).png().toBuffer()); } catch (e) { console.error("Não consegui aparar o mascote:", e); }
+    const blob = await put(`${marcaId}/mascote-transp-${Date.now()}.png`, png, { access: "public", contentType: "image/png" });
+    const mascotes = [blob.url, ...lerListaUrls(marca.mascotesArte).filter((u) => u !== blob.url)].slice(0, 60);
+    await prisma.marca.update({ where: { id: marcaId }, data: { mascotesArte: JSON.stringify(mascotes), mascoteUrl: blob.url } });
+    revalidatePath(`/painel/marcas/${marcaId}`);
+    return { ok: true as const, url: blob.url, mascotes };
+  } catch (e) {
+    console.error("Erro ao remover fundo do mascote:", e);
+    return { ok: false as const, erro: "Não consegui remover o fundo agora. Tente de novo." };
+  }
+}
+
 // Define o mascote OFICIAL da marca (tem que estar na biblioteca de opções geradas).
 export async function definirMascote(marcaId: string, url: string) {
   const g = await guardaMarca(marcaId);
