@@ -10,6 +10,7 @@ import { CalendarioRedes, type SelecaoRede } from "./calendario-redes";
 import { ResumoDoDia } from "./resumo-dia";
 import { AniversariantesForm } from "./aniversariantes-form";
 import { PreencherAgenda, MAX_DIAS_SELECAO } from "./preencher-agenda";
+import { PilotoResumo } from "./piloto-resumo";
 
 function parseDias(s: string): number[] {
   return s.split(",").map((n) => parseInt(n, 10)).filter((n) => !isNaN(n));
@@ -94,6 +95,9 @@ export function RedesSociais({
 
   return (
     <div>
+      {/* 🤖 O que o piloto vai postar sozinho — visibilidade pra não ter surpresa. */}
+      <PilotoResumo posts={posts} publicacoes={publicacoes} stories={stories} reels={reels} />
+
       <div className="mb-3 flex justify-end">
         <PreencherAgenda
           marcaId={marcaId}
