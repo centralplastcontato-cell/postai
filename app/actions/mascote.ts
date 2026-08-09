@@ -89,7 +89,9 @@ export async function gerarMascote(marcaId: string, descricao?: string) {
   }
   if (!urls.length) return { ok: false as const, erro: "A IA não conseguiu gerar o mascote agora. Tente de novo." };
 
-  const mascotes = [...urls, ...lerListaUrls(marca.mascotesArte).filter((u) => !urls.includes(u))].slice(0, 24);
+  // Acumula na biblioteca (novas na frente, sem repetir). Limite alto (60) pra o dono poder
+  // experimentar bastante sem perder as primeiras opções que gostou.
+  const mascotes = [...urls, ...lerListaUrls(marca.mascotesArte).filter((u) => !urls.includes(u))].slice(0, 60);
   await prisma.marca.update({ where: { id: marcaId }, data: { mascotesArte: JSON.stringify(mascotes) } });
   revalidatePath(`/painel/marcas/${marcaId}`);
   return { ok: true as const, urls, mascotes };
