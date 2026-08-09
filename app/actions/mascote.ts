@@ -73,7 +73,7 @@ export async function gerarMascote(marcaId: string, descricao?: string, referenc
       const ctype = rr.headers.get("content-type") || "image/png";
       const buf = Buffer.from(await rr.arrayBuffer());
       const promptRef = (pose: string) =>
-        `Crie um MASCOTE de personagem em estilo 3D FOFO (render 3D caprichado estilo Pixar), redondinho e carismático, para o buffet infantil "${nome}", INSPIRADO na imagem de referência enviada: preserve as características principais dela (formato, cores, elementos marcantes), mas transforme num mascote fofo e simpático.${custom ? ` Detalhes desejados: ${custom}.` : ""} Harmonize com a cor ${cor}. CORPO INTEIRO, de frente, ${pose}, expressão feliz. FUNDO TOTALMENTE TRANSPARENTE (sem cenário, sem chão, sem sombra projetada). SEM texto, letras, números, logotipos ou molduras.`;
+        `Crie um MASCOTE 3D FOFO (render 3D caprichado estilo Pixar), redondinho e carismático, para o buffet infantil "${nome}", FIEL à imagem de referência enviada: MANTENHA o MESMO esquema de CORES, o mesmo formato e os elementos marcantes dela (NÃO troque as cores da referência). Apenas dê um acabamento 3D bem fofo e simpático.${custom ? ` Ajustes pedidos: ${custom}.` : ""} CORPO INTEIRO, de frente, ${pose}, expressão feliz. FUNDO TOTALMENTE TRANSPARENTE (sem cenário, sem chão, sem sombra projetada). SEM texto, letras, números, logotipos ou molduras.`;
       const gerarUmRef = async (pose: string): Promise<string> => {
         const form = new FormData();
         form.append("model", "gpt-image-1");
