@@ -312,8 +312,9 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
           </div>
         ) : <div style={{ display: "flex" }} />}
 
-        {/* Saudação grande centralizada + selo + apoio */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {/* Saudação grande centralizada + selo + apoio — sobre um painel escuro suave pra o texto
+            ficar LEGÍVEL e separado do desenho (não "solto" em cima da ilustração). */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", backgroundColor: d.imagemUrl ? "rgba(8,6,14,0.5)" : "transparent", borderRadius: 44, padding: d.imagemUrl ? "40px 52px" : "0", boxShadow: d.imagemUrl ? "0 18px 60px rgba(0,0,0,0.4)" : "none", maxWidth: 940 }}>
           {d.selo ? (
             <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 38, color: PRETO, backgroundColor: c3, padding: "10px 30px", borderRadius: 999, marginBottom: 30, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.22)" }}>
               {d.selo}

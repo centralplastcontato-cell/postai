@@ -1209,7 +1209,7 @@ export function PublicacoesAba({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visiveis.map((p) => {
-            const v = hashCurto(`a2|${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`);
+            const v = hashCurto(`a3|${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`);
             const arte = `/api/feed/${p.id}?v=${v}`;
             const postado = p.status === "postado";
             const ocupado = proc === p.id;
