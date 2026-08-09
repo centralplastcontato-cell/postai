@@ -264,10 +264,60 @@ export function LayoutFoto(d: DadosArte & { imagemUrl?: string }) {
 
 // 🎄 Data Comemorativa — saudação temática GRANDE centralizada sobre foto de IA,
 // com selo da data, confete festivo e logo no topo. Tom de celebração.
-export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
+// Formatos da arte de DATA COMEMORATIVA — mudam ONDE o texto fica e quanto ele cobre a
+// ilustração, pra a imagem se sobressair. "painel" (clássico, texto no centro num cartão
+// escuro), "rodape" (imagem livre em cima, texto embaixo), "topo" (texto em cima, imagem
+// livre embaixo) e "limpo" (sem cartão, texto só com contorno → imagem 100% à mostra).
+export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string; layoutData?: string }) {
   const [c1, c2, c3, c5] = [d.paleta[0], d.paleta[1] || d.paleta[0], d.paleta[2] || d.paleta[0], d.paleta[4] || d.paleta[0]];
   const fundo = d.corFundo || escolherFundoFesta(d.paleta);
   const logoW = Math.round(96 * 1.76);
+  const temFoto = Boolean(d.imagemUrl);
+  // Sem ilustração de fundo, só o clássico faz sentido (cor sólida).
+  const formato = temFoto ? (d.layoutData || "painel") : "painel";
+
+  const comPainel = temFoto && formato !== "limpo";
+  const just = formato === "topo" ? "flex-start" : formato === "rodape" ? "flex-end" : "center";
+  const padTop = formato === "topo" ? 150 : 96;
+  const padBottom = formato === "rodape" ? 420 : 96;
+
+  // Vinheta: escurece SÓ o lado onde o texto fica, deixando o resto da ilustração à mostra.
+  const vinheta =
+    formato === "topo"
+      ? "linear-gradient(to bottom, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.14) 40%, rgba(0,0,0,0.08) 70%, rgba(0,0,0,0.72) 100%)"
+      : formato === "rodape"
+      ? "linear-gradient(to bottom, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0.06) 22%, rgba(0,0,0,0.22) 55%, rgba(0,0,0,0.9) 100%)"
+      : formato === "limpo"
+      ? "linear-gradient(to bottom, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.28) 38%, rgba(0,0,0,0.3) 62%, rgba(0,0,0,0.82) 100%)"
+      : "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.12) 26%, rgba(0,0,0,0.12) 60%, rgba(0,0,0,0.78) 100%)";
+
+  // No formato "limpo" (sem cartão) o texto ganha contorno + brilho extra pra ler sobre a foto.
+  const sombraTitulo = comPainel ? contorno() : `${contorno()}, 0 6px 26px rgba(0,0,0,0.85)`;
+
+  const blocoTexto = (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", backgroundColor: comPainel ? "rgba(8,6,14,0.5)" : "transparent", borderRadius: 44, padding: comPainel ? "40px 52px" : "0", boxShadow: comPainel ? "0 18px 60px rgba(0,0,0,0.4)" : "none", maxWidth: 940 }}>
+      {d.selo ? (
+        <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 38, color: PRETO, backgroundColor: c3, padding: "10px 30px", borderRadius: 999, marginBottom: 30, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.22)" }}>
+          {d.selo}
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Kaushan" }}>
+        {d.titulo.map((l, i) => (
+          <div key={i} style={{ display: "flex", fontSize: d.titulo.length >= 3 ? 112 : 138, color: corContraste(l.c, temFoto ? undefined : fundo), lineHeight: 1.14, textShadow: sombraTitulo, letterSpacing: 0, textAlign: "center" }}>
+            {l.t}
+          </div>
+        ))}
+      </div>
+
+      {d.textoApoio ? (
+        <div style={{ display: "flex", marginTop: 30, fontSize: 40, color: "rgba(255,255,255,0.95)", lineHeight: 1.28, textShadow: "0 2px 12px rgba(0,0,0,0.85)", maxWidth: 820, textAlign: "center" }}>
+          {d.textoApoio}
+        </div>
+      ) : null}
+    </div>
+  );
+
   return (
     <div style={{ width: "1080px", height: "1350px", display: "flex", position: "relative", backgroundColor: fundo, fontFamily: "Baloo" }}>
       {d.imagemUrl ? (
@@ -275,80 +325,34 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
         <img src={d.imagemUrl} width={1080} height={1350} style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", objectFit: "cover" }} />
       ) : null}
 
-      {/* Vinheta: escurece topo e base pra leitura, deixa o miolo respirando a foto */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "1080px",
-          height: "1350px",
-          display: "flex",
-          backgroundImage: "linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.12) 26%, rgba(0,0,0,0.12) 60%, rgba(0,0,0,0.78) 100%)",
-        }}
-      />
+      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", backgroundImage: vinheta }} />
 
       <Confete cores={[c2, c3, c5, c1]} />
 
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "1080px",
-          height: "1350px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "96px 80px",
-        }}
-      >
-        {/* Logo no topo (só quando NÃO há ilustração de fundo — senão cai em cima do personagem;
-            com ilustração o logo vai pro rodapé). */}
-        {d.logoSrc && !d.imagemUrl ? (
-          <div style={{ display: "flex" }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={d.logoSrc} width={logoW} height={96} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.5))" }} />
-          </div>
-        ) : <div style={{ display: "flex" }} />}
-
-        {/* Saudação grande centralizada + selo + apoio — sobre um painel escuro suave pra o texto
-            ficar LEGÍVEL e separado do desenho (não "solto" em cima da ilustração). */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", backgroundColor: d.imagemUrl ? "rgba(8,6,14,0.5)" : "transparent", borderRadius: 44, padding: d.imagemUrl ? "40px 52px" : "0", boxShadow: d.imagemUrl ? "0 18px 60px rgba(0,0,0,0.4)" : "none", maxWidth: 940 }}>
-          {d.selo ? (
-            <div style={{ display: "flex", fontFamily: "Fredoka", fontSize: 38, color: PRETO, backgroundColor: c3, padding: "10px 30px", borderRadius: 999, marginBottom: 30, transform: "rotate(-2deg)", boxShadow: "0 6px 0 rgba(0,0,0,0.22)" }}>
-              {d.selo}
-            </div>
-          ) : null}
-
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Kaushan" }}>
-            {d.titulo.map((l, i) => (
-              <div key={i} style={{ display: "flex", fontSize: d.titulo.length >= 3 ? 112 : 138, color: corContraste(l.c, d.imagemUrl ? undefined : fundo), lineHeight: 1.14, textShadow: contorno(), letterSpacing: 0, textAlign: "center" }}>
-                {l.t}
-              </div>
-            ))}
-          </div>
-
-          {d.textoApoio ? (
-            <div style={{ display: "flex", marginTop: 30, fontSize: 40, color: "rgba(255,255,255,0.95)", lineHeight: 1.28, textShadow: "0 2px 10px rgba(0,0,0,0.7)", maxWidth: 820, textAlign: "center" }}>
-              {d.textoApoio}
-            </div>
-          ) : null}
+      {/* Logo no topo só quando NÃO há ilustração (senão cai em cima do personagem → vai pro rodapé) */}
+      {d.logoSrc && !temFoto ? (
+        <div style={{ position: "absolute", top: 96, left: 0, width: "1080px", display: "flex", justifyContent: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={d.logoSrc} width={logoW} height={96} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.5))" }} />
         </div>
+      ) : null}
 
-        {/* Rodapé: logo (quando há ilustração) + WhatsApp + site */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-          {d.logoSrc && d.imagemUrl ? (
-            <div style={{ display: "flex", marginBottom: 26 }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={d.logoSrc} width={Math.round(logoW * 0.85)} height={82} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.7))" }} />
-            </div>
-          ) : null}
-          {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
-          <div style={{ display: "flex", marginTop: d.telefone ? 22 : 0, fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>
-            {d.site}
+      {/* Bloco de texto posicionado conforme o formato (centro / topo / rodapé). */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: "1080px", height: "1350px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: just, paddingTop: padTop, paddingBottom: padBottom, paddingLeft: 80, paddingRight: 80 }}>
+        {blocoTexto}
+      </div>
+
+      {/* Rodapé fixo: logo (quando há ilustração) + WhatsApp + site */}
+      <div style={{ position: "absolute", bottom: 96, left: 0, width: "1080px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+        {d.logoSrc && temFoto ? (
+          <div style={{ display: "flex", marginBottom: 26 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={d.logoSrc} width={Math.round(logoW * 0.85)} height={82} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.7))" }} />
           </div>
+        ) : null}
+        {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
+        <div style={{ display: "flex", marginTop: d.telefone ? 22 : 0, fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>
+          {d.site}
         </div>
       </div>
     </div>

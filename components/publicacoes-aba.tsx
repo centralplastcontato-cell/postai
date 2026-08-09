@@ -12,6 +12,7 @@ import {
   gerarImagemPublicacao,
   definirImagemPublicacao,
   aplicarArteFeed,
+  definirLayoutData,
   removerImagemPublicacao,
   sugerirDiferenciais,
   sugerirPromocao,
@@ -594,6 +595,17 @@ export function PublicacoesAba({
     setProc(id);
     startTransition(async () => {
       const r = await aplicarArteFeed({ id, url });
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  // Troca o FORMATO do layout da data comemorativa (posição do texto sobre a ilustração).
+  function handleLayoutData(id: string, formato: string) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await definirLayoutData(id, formato);
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
@@ -1230,6 +1242,9 @@ export function PublicacoesAba({
             const arte = `/api/feed/${p.id}?v=${v}`;
             const postado = p.status === "postado";
             const ocupado = proc === p.id;
+            // Formato atual do layout da data comemorativa (pro seletor de formato).
+            let fmtData = "painel";
+            try { const ex = JSON.parse(p.extra || "{}"); if (typeof ex.layoutData === "string") fmtData = ex.layoutData; } catch {}
             return (
               <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${destacarId === p.id ? "border-sky-500 ring-2 ring-sky-500/50" : "border-linha"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -1292,6 +1307,14 @@ export function PublicacoesAba({
                         </select>
                       )}
                       <button onClick={() => handleGerarImagem(p.id, estiloArte[p.id])} disabled={ocupado} title={p.template === "data-comemorativa" ? "Gera a arte com IA no ESTILO escolhido ao lado" : "Gera um FUNDO artístico com IA, no clima do post (fundo abstrato — não é foto do seu espaço)"} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🤖 Fundo IA</button>
+                      {p.template === "data-comemorativa" && p.imagemUrl && (
+                        <select value={fmtData} onChange={(e) => handleLayoutData(p.id, e.target.value)} disabled={ocupado} title="Formato do texto sobre a imagem — muda na hora, sem gerar de novo" className="rounded-md border border-linha bg-preto px-2 py-1 text-xs text-muted focus:border-vermelho focus:outline-none disabled:opacity-40">
+                          <option value="painel">🖼️ Texto no centro</option>
+                          <option value="rodape">⬇️ Texto embaixo (imagem em destaque)</option>
+                          <option value="topo">⬆️ Texto em cima</option>
+                          <option value="limpo">✨ Sem moldura (imagem inteira)</option>
+                        </select>
+                      )}
                       {artesSalvas.length > 0 && (
                         <button onClick={() => setBancoArteId((c) => (c === p.id ? null : p.id))} disabled={ocupado} title="Reaproveitar uma arte de IA que você já gerou antes (sem gastar geração)" className={`rounded-md border px-2 py-1 text-xs font-semibold transition disabled:opacity-40 ${bancoArteId === p.id ? "border-[#7c3aed] bg-[#7c3aed]/15 text-[#d6c6ff]" : "border-linha text-muted hover:border-vermelho hover:text-white"}`}>🖼️ Artes salvas ({artesSalvas.length})</button>
                       )}

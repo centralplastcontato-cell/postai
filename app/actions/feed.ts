@@ -814,6 +814,8 @@ export async function editarPublicacao(input: {
   // Preserva o estilo do Story (foto/faixa/colorida) — montarExtra não o conhece, então
   // sem isso editar o texto faria um Story "faixa" voltar a renderizar como "colorida".
   if (typeof exAntigo.estiloStory === "string") exNovo.estiloStory = exAntigo.estiloStory;
+  // Preserva o formato do layout da data comemorativa (montarExtra não o conhece).
+  if (typeof exAntigo.layoutData === "string") exNovo.layoutData = exAntigo.layoutData;
 
   await prisma.publicacao.update({
     where: { id: input.id },
@@ -873,8 +875,10 @@ export async function regerarPublicacao(id: string) {
   let travas: Travas = {};
   let categoria: string | undefined;
   let estiloStory: string | undefined; // foto/faixa/colorida — preservado no regerar
+  let layoutData: string | undefined; // formato da data comemorativa — preservado no regerar
   try {
     const ex = JSON.parse(p.extra || "{}");
+    layoutData = typeof ex.layoutData === "string" ? ex.layoutData : undefined;
     estiloStory = typeof ex.estiloStory === "string" ? ex.estiloStory : undefined;
     travas = {
       oferta: ex.ofertaTravada || undefined,
@@ -927,8 +931,13 @@ export async function regerarPublicacao(id: string) {
   // Remonta o extra e reinjeta o estiloStory (montarExtra não o conhece) — senão regerar
   // o texto faria um Story "foto"/"faixa" voltar a renderizar como "colorida".
   let extraNovo = montarExtra(p.marca, template, gerado, seed, travas, categoria, p.data);
-  if (estiloStory) {
-    try { const o = JSON.parse(extraNovo || "{}"); o.estiloStory = estiloStory; extraNovo = JSON.stringify(o); } catch {}
+  if (estiloStory || layoutData) {
+    try {
+      const o = JSON.parse(extraNovo || "{}");
+      if (estiloStory) o.estiloStory = estiloStory;
+      if (layoutData) o.layoutData = layoutData; // preserva o formato da data comemorativa
+      extraNovo = JSON.stringify(o);
+    } catch {}
   }
   await prisma.publicacao.update({
     where: { id },
@@ -1243,6 +1252,22 @@ export async function definirImagemPublicacao(input: { id: string; url: string }
   await prisma.publicacao.update({ where: { id: input.id }, data: { imagemUrl: input.url } });
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const };
+}
+
+// Formato do layout da DATA COMEMORATIVA (painel | rodape | topo | limpo) — muda só a
+// disposição do texto sobre a MESMA ilustração (não gera nada, é instantâneo e de graça).
+export async function definirLayoutData(id: string, formato: string) {
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const p = await prisma.publicacao.findUnique({ where: { id }, select: { extra: true, marcaId: true } });
+  if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  const ok = ["painel", "rodape", "topo", "limpo"].includes(formato) ? formato : "painel";
+  let ex: Record<string, unknown> = {};
+  try { ex = JSON.parse(p.extra || "{}"); } catch {}
+  ex.layoutData = ok;
+  await prisma.publicacao.update({ where: { id }, data: { extra: JSON.stringify(ex) } });
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const, formato: ok };
 }
 
 export async function removerImagemPublicacao(id: string) {
