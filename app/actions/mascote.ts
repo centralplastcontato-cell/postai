@@ -109,6 +109,22 @@ export async function definirMascote(marcaId: string, url: string) {
   return { ok: true as const, url };
 }
 
+// Exclui UMA opção da biblioteca de mascotes (a que o dono não gostou). Se for a oficial,
+// também desativa o mascote oficial. Apaga o arquivo do Blob pra liberar espaço (best-effort).
+export async function excluirMascoteArte(marcaId: string, url: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascotesArte: true, mascoteUrl: true } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  const restantes = lerListaUrls(marca.mascotesArte).filter((u) => u !== url);
+  const data: { mascotesArte: string; mascoteUrl?: string } = { mascotesArte: JSON.stringify(restantes) };
+  if (marca.mascoteUrl === url) data.mascoteUrl = ""; // era a oficial → desativa
+  await prisma.marca.update({ where: { id: marcaId }, data });
+  try { const { del } = await import("@vercel/blob"); await del(url); } catch {} // libera espaço
+  revalidatePath(`/painel/marcas/${marcaId}`);
+  return { ok: true as const, mascotes: restantes };
+}
+
 // Tira o mascote oficial (deixa a marca sem mascote ativo) — a biblioteca de opções fica salva.
 export async function removerMascote(marcaId: string) {
   const g = await guardaMarca(marcaId);

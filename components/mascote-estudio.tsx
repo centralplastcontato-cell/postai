@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte } from "@/app/actions/mascote";
 
 // 🦸 ESTÚDIO DO MASCOTE (Fase 1): o dono gera opções em 3D fofo, escolhe uma e ela vira o
 // mascote OFICIAL da marca. Depois (Fases 2/3) esse MESMO mascote é colado nos posts/vídeos.
@@ -49,6 +49,16 @@ export function MascoteEstudio({
     setProc("remover");
     startTransition(async () => {
       const r = await removerMascote(marcaId);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  function handleExcluir(url: string) {
+    setErro(null);
+    setProc(url);
+    startTransition(async () => {
+      const r = await excluirMascoteArte(marcaId, url);
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
@@ -138,7 +148,8 @@ export function MascoteEstudio({
             {mascotes.map((url) => {
               const ativo = url === mascoteUrl;
               return (
-                <div key={url} className={`flex flex-col overflow-hidden rounded-xl border ${ativo ? "border-[#7c3aed] ring-2 ring-[#7c3aed]/50" : "border-linha"}`}>
+                <div key={url} className={`relative flex flex-col overflow-hidden rounded-xl border ${ativo ? "border-[#7c3aed] ring-2 ring-[#7c3aed]/50" : "border-linha"}`}>
+                  <button type="button" onClick={() => handleExcluir(url)} disabled={isPending} title="Excluir esta opção" className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/55 px-2 py-0.5 text-sm font-bold text-red-300 transition hover:bg-red-900/70 hover:text-white disabled:opacity-40">✕</button>
                   <button type="button" onClick={() => setAmpliada(url)} style={xadrez} className="block" title="Ampliar">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={url} alt="Opção de mascote" className="h-44 w-full object-contain" />
