@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
 import { fotoSegura, fotosSeguras } from "@/lib/foto-arte";
 import { seloDataComemorativa } from "@/lib/datas-comemorativas";
+import type { ReactElement } from "react";
 import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, LayoutCapaMoldura, LayoutCapaFaixa, LayoutFeedback, LayoutPreco, LayoutEnquete, LayoutVitrine, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
@@ -31,7 +32,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean; parcelamento?: string; layoutData?: string } = {};
+  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean; parcelamento?: string; layoutData?: string; mascoteCanto?: string } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -49,84 +50,56 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   // do banco quebram o render. Feito uma vez e reusado pelos templates com foto.
   const fotoUrl = await fotoSegura(p.imagemUrl);
 
+  let arte: ReactElement;
   if (p.template === "promocao") {
-    return new ImageResponse(
-      LayoutPromocao({ ...base, oferta: extra.oferta, validade: extra.validade, inclui: extra.inclui, regras: extra.regras, corFundo: extra.corFundo, imagemUrl: fotoUrl }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
-  }
-
-  if (p.template === "data-comemorativa") {
+    arte = LayoutPromocao({ ...base, oferta: extra.oferta, validade: extra.validade, inclui: extra.inclui, regras: extra.regras, corFundo: extra.corFundo, imagemUrl: fotoUrl });
+  } else if (p.template === "data-comemorativa") {
     // A DATA do selo vem sempre do CALENDÁRIO quando o post cai num dia comemorativo
     // conhecido — corrige na hora posts antigos onde a IA chutou a data errada (ex: Dia
     // dos Pais é o 2º domingo de agosto, móvel). Fora de data conhecida, usa o selo salvo.
     const seloReal = seloDataComemorativa(p.data) || extra.selo;
-    return new ImageResponse(
-      LayoutDataComemorativa({ ...base, selo: seloReal, corFundo: extra.corFundo, imagemUrl: fotoUrl, layoutData: extra.layoutData }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
-  }
-
-  if (p.template === "divulgacao") {
-    return new ImageResponse(
-      LayoutDivulgacao({ ...base, diferenciais: extra.diferenciais, corFundo: extra.corFundo, parcelamento: extra.parcelamento, imagemUrl: fotoUrl }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
-  }
-
-  if (p.template === "mosaico") {
-    return new ImageResponse(
-      LayoutMosaico({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, fotos: await fotosSeguras(extra.fotos) }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
-  }
-
-  if (p.template === "moldura") {
-    return new ImageResponse(
-      LayoutCapaMoldura({ ...base, corFundo: extra.corFundo }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
-  }
-
-  if (p.template === "faixa") {
-    return new ImageResponse(
-      LayoutCapaFaixa({ ...base, corFundo: extra.corFundo, imagemUrl: fotoUrl }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
-  }
-
-  if (p.template === "feedback") {
+    arte = LayoutDataComemorativa({ ...base, selo: seloReal, corFundo: extra.corFundo, imagemUrl: fotoUrl, layoutData: extra.layoutData });
+  } else if (p.template === "divulgacao") {
+    arte = LayoutDivulgacao({ ...base, diferenciais: extra.diferenciais, corFundo: extra.corFundo, parcelamento: extra.parcelamento, imagemUrl: fotoUrl });
+  } else if (p.template === "mosaico") {
+    arte = LayoutMosaico({ ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, fotos: await fotosSeguras(extra.fotos) });
+  } else if (p.template === "moldura") {
+    arte = LayoutCapaMoldura({ ...base, corFundo: extra.corFundo });
+  } else if (p.template === "faixa") {
+    arte = LayoutCapaFaixa({ ...base, corFundo: extra.corFundo, imagemUrl: fotoUrl });
+  } else if (p.template === "feedback") {
     const fotoAutorUrl = extra.fotoAutor ? await fotoSegura(extra.fotoAutor) : undefined;
-    return new ImageResponse(
-      LayoutFeedback({ ...base, titulo: [], imagemUrl: fotoUrl, depoimento: extra.depoimento, autor: extra.autor, estrelas: extra.estrelas, destaque: extra.destaque, corCard: extra.corCard, fotoAutor: fotoAutorUrl, google: extra.google }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
+    arte = LayoutFeedback({ ...base, titulo: [], imagemUrl: fotoUrl, depoimento: extra.depoimento, autor: extra.autor, estrelas: extra.estrelas, destaque: extra.destaque, corCard: extra.corCard, fotoAutor: fotoAutorUrl, google: extra.google });
+  } else if (p.template === "preco") {
+    arte = LayoutPreco({ ...base, modoPreco: extra.modoPreco, precoDe: extra.precoDe, precoPor: extra.precoPor, labelPor: extra.labelPor, parcelas: extra.parcelas, economia: extra.economia, condicoes: extra.condicoes, validade: extra.validade, corFundo: extra.corFundo, imagemUrl: fotoUrl });
+  } else if (p.template === "enquete") {
+    arte = LayoutEnquete({ ...base, imagemUrl: fotoUrl, ladoA: extra.ladoA, ladoB: extra.ladoB, corFundo: extra.corFundo });
+  } else if (p.template === "vitrine") {
+    arte = LayoutVitrine({ ...base, corFundo: extra.corFundo, fotos: await fotosSeguras(extra.fotos) });
+  } else {
+    // dica e templates legados: foto de IA (ou cor sólida se ainda não tem foto)
+    arte = LayoutFoto({ ...base, imagemUrl: fotoUrl });
   }
 
-  if (p.template === "preco") {
-    return new ImageResponse(
-      LayoutPreco({ ...base, modoPreco: extra.modoPreco, precoDe: extra.precoDe, precoPor: extra.precoPor, labelPor: extra.labelPor, parcelas: extra.parcelas, economia: extra.economia, condicoes: extra.condicoes, validade: extra.validade, corFundo: extra.corFundo, imagemUrl: fotoUrl }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
-  }
-
-  if (p.template === "enquete") {
-    return new ImageResponse(
-      LayoutEnquete({ ...base, imagemUrl: fotoUrl, ladoA: extra.ladoA, ladoB: extra.ladoB, corFundo: extra.corFundo }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
-  }
-
-  if (p.template === "vitrine") {
-    return new ImageResponse(
-      LayoutVitrine({ ...base, corFundo: extra.corFundo, fotos: await fotosSeguras(extra.fotos) }),
-      { width: 1080, height: 1350, fonts, headers: CACHE }
-    );
-  }
-
-  // dica e templates legados: foto de IA (ou cor sólida se ainda não tem foto)
-  return new ImageResponse(
-    LayoutFoto({ ...base, imagemUrl: fotoUrl }),
-    { width: 1080, height: 1350, fonts, headers: CACHE }
+  // MASCOTE (Fase 2): cola o mascote oficial (PNG transparente) no canto escolhido pelo dono
+  // por post ("dir"/"esq"; vazio = não mostra). Sempre a MESMA imagem → o mascote é idêntico
+  // em todo post. Sobreposto por cima da arte, sem cobrir o miolo (fica num canto de baixo).
+  const canto = extra.mascoteCanto;
+  const usaMascote = Boolean(marca.mascoteUrl) && (canto === "dir" || canto === "esq");
+  const conteudo: ReactElement = usaMascote ? (
+    <div style={{ position: "relative", display: "flex", width: "1080px", height: "1350px" }}>
+      {arte}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={marca.mascoteUrl}
+        width={340}
+        height={430}
+        style={{ position: "absolute", bottom: 18, ...(canto === "dir" ? { right: 18 } : { left: 18 }), width: "340px", height: "430px", objectFit: "contain", filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.4))" }}
+      />
+    </div>
+  ) : (
+    arte
   );
+
+  return new ImageResponse(conteudo, { width: 1080, height: 1350, fonts, headers: CACHE });
 }

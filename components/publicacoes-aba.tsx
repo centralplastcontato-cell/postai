@@ -14,6 +14,7 @@ import {
   definirImagemPublicacao,
   aplicarArteFeed,
   definirLayoutData,
+  definirMascoteCanto,
   removerImagemPublicacao,
   sugerirDiferenciais,
   sugerirPromocao,
@@ -190,6 +191,7 @@ export function PublicacoesAba({
   espelharStoryPadrao,
   sugestao,
   feedArtes,
+  temMascote,
 }: {
   marcaId: string;
   publicacoes: PublicacaoView[];
@@ -203,6 +205,7 @@ export function PublicacoesAba({
   espelharStoryPadrao?: boolean; // padrão da marca pra espelhar o feed no Story
   sugestao?: SugestaoBia | null; // sugestão da Bia pro próximo post (banner no gerador)
   feedArtes?: string[]; // biblioteca de artes de fundo (IA) já geradas pra marca, pra reusar
+  temMascote?: boolean; // a marca tem um mascote oficial → mostra o controle de mascote no card
 }) {
   const router = useRouter();
   // Gerador colapsável CONTEXTUAL: vem RECOLHIDO quando o dia (ou a lista) já tem publicação —
@@ -626,6 +629,17 @@ export function PublicacoesAba({
     setProc(id);
     startTransition(async () => {
       const r = await definirLayoutData(id, formato);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  // Mostra/esconde o mascote neste post e escolhe o canto ("" | "dir" | "esq").
+  function handleMascoteCanto(id: string, canto: string) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await definirMascoteCanto(id, canto);
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
@@ -1264,7 +1278,8 @@ export function PublicacoesAba({
             const ocupado = proc === p.id;
             // Formato atual do layout da data comemorativa (pro seletor de formato).
             let fmtData = "painel";
-            try { const ex = JSON.parse(p.extra || "{}"); if (typeof ex.layoutData === "string") fmtData = ex.layoutData; } catch {}
+            let mascoteCanto = "";
+            try { const ex = JSON.parse(p.extra || "{}"); if (typeof ex.layoutData === "string") fmtData = ex.layoutData; if (typeof ex.mascoteCanto === "string") mascoteCanto = ex.mascoteCanto; } catch {}
             return (
               <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${destacarId === p.id ? "border-sky-500 ring-2 ring-sky-500/50" : "border-linha"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -1364,6 +1379,17 @@ export function PublicacoesAba({
                         );
                       })}
                     </div>
+                  </div>
+                )}
+
+                {/* Mascote da marca neste post (liga/desliga + canto). Só aparece se a marca tem mascote. */}
+                {!postado && temMascote && (
+                  <div className="mt-2">
+                    <select value={mascoteCanto} onChange={(e) => handleMascoteCanto(p.id, e.target.value)} disabled={ocupado} title="Mostrar o mascote da marca neste post e escolher o canto" className="rounded-md border border-linha bg-preto px-2 py-1 text-xs text-muted focus:border-vermelho focus:outline-none disabled:opacity-40">
+                      <option value="">🦸 Mascote: não</option>
+                      <option value="dir">🦸 Mascote: canto direito ↘</option>
+                      <option value="esq">🦸 Mascote: canto esquerdo ↙</option>
+                    </select>
                   </div>
                 )}
 
