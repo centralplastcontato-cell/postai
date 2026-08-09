@@ -320,9 +320,9 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
             </div>
           ) : null}
 
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Fredoka" }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", fontFamily: "Kaushan" }}>
             {d.titulo.map((l, i) => (
-              <div key={i} style={{ display: "flex", fontSize: d.titulo.length >= 3 ? 104 : 124, color: corContraste(l.c, d.imagemUrl ? undefined : fundo), lineHeight: 1.0, textShadow: contorno(), letterSpacing: 1, textAlign: "center" }}>
+              <div key={i} style={{ display: "flex", fontSize: d.titulo.length >= 3 ? 112 : 138, color: corContraste(l.c, d.imagemUrl ? undefined : fundo), lineHeight: 1.14, textShadow: contorno(), letterSpacing: 0, textAlign: "center" }}>
                 {l.t}
               </div>
             ))}

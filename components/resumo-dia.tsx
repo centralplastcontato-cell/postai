@@ -61,7 +61,7 @@ export function ResumoDoDia({
   reels: PublicacaoView[];
   onAbrir: (tipo: Tipo, id: string) => void;
 }) {
-  const v = (p: PublicacaoView) => hashCurto(`${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`);
+  const v = (p: PublicacaoView) => hashCurto(`a2|${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`);
 
   const itens: ItemDia[] = [
     ...posts

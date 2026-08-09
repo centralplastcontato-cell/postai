@@ -1155,8 +1155,14 @@ export async function gerarImagemPublicacao(input: { id: string; descricao?: str
   // O tema (título/tema do post) guia o CLIMA e as CORES, e harmoniza com a cor da marca —
   // assim o fundo "conversa" com o conteúdo, mas segue abstrato.
   const tema = (input.descricao || p.tema || p.titulo || "").toString().trim().slice(0, 200);
-  const contexto = tema ? ` O post é sobre: "${tema}". Deixe o CLIMA e as CORES do fundo combinarem com esse tema.` : "";
-  const prompt = `Fundo decorativo abstrato para um post de rede social do buffet infantil "${p.marca.nome}".${contexto} Harmonize a paleta com a cor ${p.marca.corPrimaria || "#7C3AED"}, de forma alegre e festiva. Estilo: textura/padrão abstrato — bokeh, confete, balões, formas geométricas suaves, gradiente. É APENAS um fundo artístico abstrato: NÃO é fotografia de ambiente, lugar, espaço, comida, objetos ou pessoas reais. Formato vertical. SEM texto, letras, números, logotipos, pessoas, rostos ou cenários reconhecíveis.`;
+  // DATA COMEMORATIVA: gera uma CENA temática (com pessoas) que representa a data — como as artes
+  // profissionais (ex: pai e filho no Dia dos Pais). Não é o espaço real do buffet (é uma cena
+  // genérica/ilustrativa da data), então não "finge" ser o lugar. Demais posts: fundo abstrato.
+  const ehData = p.template === "data-comemorativa";
+  const cor = p.marca.corPrimaria || "#7C3AED";
+  const prompt = ehData
+    ? `Foto cinematográfica e calorosa para um post de DATA COMEMORATIVA de um buffet infantil, representando a data: "${tema}". Mostre uma cena emocional e alegre coerente com a data (ex.: Dia dos Pais = um pai feliz brincando com o filho; Dia das Mães = mãe e filho; Natal = clima natalino em família; Páscoa = criança feliz com ovos de páscoa). Pessoas reais, expressões felizes, luz bonita e aconchegante, cores harmonizando com ${cor}. Composição vertical com o assunto na METADE DE CIMA e a metade de BAIXO mais limpa/escura (sobra espaço pra escrever um título depois). Alta qualidade, realista. SEM texto, letras, números, logotipos ou marcas.`
+    : `Fundo decorativo abstrato para um post de rede social do buffet infantil "${p.marca.nome}".${tema ? ` O post é sobre: "${tema}". Deixe o CLIMA e as CORES do fundo combinarem com esse tema.` : ""} Harmonize a paleta com a cor ${cor}, de forma alegre e festiva. Estilo: textura/padrão abstrato — bokeh, confete, balões, formas geométricas suaves, gradiente. É APENAS um fundo artístico abstrato: NÃO é fotografia de ambiente, lugar, espaço, comida, objetos ou pessoas reais. Formato vertical. SEM texto, letras, números, logotipos, pessoas, rostos ou cenários reconhecíveis.`;
   let b64: string | undefined;
   try {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {

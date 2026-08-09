@@ -14,6 +14,7 @@ export function carregarFontes(): Fonte[] {
   _fontes = [
     { name: "Fredoka", data: fs.readFileSync(path.join(dir, "fredoka.woff")), weight: 400, style: "normal" },
     { name: "Baloo", data: fs.readFileSync(path.join(dir, "baloo-sb.woff")), weight: 600, style: "normal" },
+    { name: "Kaushan", data: fs.readFileSync(path.join(dir, "kaushan.ttf")), weight: 400, style: "normal" }, // script elegante (títulos de datas)
   ];
   return _fontes;
 }
