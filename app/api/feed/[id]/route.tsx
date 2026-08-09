@@ -32,14 +32,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean; parcelamento?: string; layoutData?: string; mascoteCanto?: string; mascoteTam?: string } = {};
+  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean; parcelamento?: string; layoutData?: string; mascoteCanto?: string; mascoteTam?: string; logoCanto?: string; logoTam?: string } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
 
+  // LOGO com posição personalizada: quando o dono escolhe um canto, escondemos o logo PADRÃO
+  // do modelo (logoSrc vazio) e colamos o logo no canto/tamanho escolhidos (overlay, igual ao
+  // mascote). Canto vazio = comportamento padrão (o modelo desenha o logo onde sempre desenhou).
+  const logoCustom = Boolean(logoSrc) && ["dir", "esq", "cima-dir", "cima-esq"].includes(extra.logoCanto || "");
+
   const base: DadosArte = {
     paleta,
-    logoSrc,
+    logoSrc: logoCustom ? "" : logoSrc,
     site: marca.site || "",
     telefone: marca.telefone || "",
     titulo: montarTituloColorido(p.titulo, paleta),
@@ -91,16 +96,44 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const naDireita = canto === "dir" || canto === "cima-dir";
   // Tamanho do mascote: pequeno | médio (padrão) | grande.
   const dim = extra.mascoteTam === "p" ? { w: 250, h: 315 } : extra.mascoteTam === "g" ? { w: 460, h: 580 } : { w: 340, h: 430 };
-  const conteudo: ReactElement = usaMascote ? (
-    <div style={{ position: "relative", display: "flex", width: "1080px", height: "1350px" }}>
-      {arte}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
+
+  // LOGO overlay (quando o dono escolheu um canto): posição + tamanho como o mascote. O logo é
+  // "paisagem" (mais largo que alto), então a caixa é mais achatada. Sombrinha pra destacar.
+  const logoCanto = extra.logoCanto;
+  const logoEmCima = logoCanto === "cima-dir" || logoCanto === "cima-esq";
+  const logoNaDireita = logoCanto === "dir" || logoCanto === "cima-dir";
+  const logoDim = extra.logoTam === "p" ? { w: 210, h: 92 } : extra.logoTam === "g" ? { w: 400, h: 172 } : { w: 300, h: 128 };
+
+  const overlays: ReactElement[] = [];
+  if (usaMascote && marca.mascoteUrl) {
+    overlays.push(
+      // eslint-disable-next-line @next/next/no-img-element
       <img
+        key="mascote"
         src={marca.mascoteUrl}
         width={dim.w}
         height={dim.h}
         style={{ position: "absolute", ...(emCima ? { top: 18 } : { bottom: 18 }), ...(naDireita ? { right: 18 } : { left: 18 }), width: `${dim.w}px`, height: `${dim.h}px`, objectFit: "contain", filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.4))" }}
       />
+    );
+  }
+  if (logoCustom) {
+    overlays.push(
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        key="logo"
+        src={logoSrc}
+        width={logoDim.w}
+        height={logoDim.h}
+        style={{ position: "absolute", ...(logoEmCima ? { top: 30 } : { bottom: 30 }), ...(logoNaDireita ? { right: 30 } : { left: 30 }), width: `${logoDim.w}px`, height: `${logoDim.h}px`, objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))" }}
+      />
+    );
+  }
+
+  const conteudo: ReactElement = overlays.length ? (
+    <div style={{ position: "relative", display: "flex", width: "1080px", height: "1350px" }}>
+      {arte}
+      {overlays}
     </div>
   ) : (
     arte

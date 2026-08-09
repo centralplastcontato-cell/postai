@@ -33,6 +33,7 @@ export function RedesSociais({
   sugestao,
   feedArtes,
   temMascote,
+  temLogo,
 }: {
   marcaId: string;
   posts: Post[];
@@ -50,6 +51,7 @@ export function RedesSociais({
   sugestao?: SugestaoBia | null; // sugestão da Bia pro próximo post (gerador de feed)
   feedArtes?: string[]; // biblioteca de artes de fundo (IA) da marca, pra reusar nos posts
   temMascote?: boolean; // a marca tem mascote oficial → habilita o controle nos posts
+  temLogo?: boolean; // a marca tem logo → habilita o controle de posição/tamanho do logo
 }) {
   const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes" | "story" | "reels">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
@@ -189,6 +191,7 @@ export function RedesSociais({
           sugestao={sugestao}
           feedArtes={feedArtes}
           temMascote={temMascote}
+          temLogo={temLogo}
         />
       )}
 

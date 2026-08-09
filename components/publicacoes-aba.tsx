@@ -16,6 +16,8 @@ import {
   definirLayoutData,
   definirMascoteCanto,
   definirMascoteTam,
+  definirLogoCanto,
+  definirLogoTam,
   removerImagemPublicacao,
   sugerirDiferenciais,
   sugerirPromocao,
@@ -193,6 +195,7 @@ export function PublicacoesAba({
   sugestao,
   feedArtes,
   temMascote,
+  temLogo,
 }: {
   marcaId: string;
   publicacoes: PublicacaoView[];
@@ -207,6 +210,7 @@ export function PublicacoesAba({
   sugestao?: SugestaoBia | null; // sugestão da Bia pro próximo post (banner no gerador)
   feedArtes?: string[]; // biblioteca de artes de fundo (IA) já geradas pra marca, pra reusar
   temMascote?: boolean; // a marca tem um mascote oficial → mostra o controle de mascote no card
+  temLogo?: boolean; // a marca tem logo → mostra o controle de posição/tamanho do logo no card
 }) {
   const router = useRouter();
   // Gerador colapsável CONTEXTUAL: vem RECOLHIDO quando o dia (ou a lista) já tem publicação —
@@ -652,6 +656,28 @@ export function PublicacoesAba({
     setProc(id);
     startTransition(async () => {
       const r = await definirMascoteTam(id, tam);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  // Posição do logo neste post ("" = padrão | canto).
+  function handleLogoCanto(id: string, canto: string) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await definirLogoCanto(id, canto);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  // Tamanho do logo neste post ("p" | "m" | "g").
+  function handleLogoTam(id: string, tam: string) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await definirLogoTam(id, tam);
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
@@ -1292,7 +1318,9 @@ export function PublicacoesAba({
             let fmtData = "painel";
             let mascoteCanto = "";
             let mascoteTam = "m";
-            try { const ex = JSON.parse(p.extra || "{}"); if (typeof ex.layoutData === "string") fmtData = ex.layoutData; if (typeof ex.mascoteCanto === "string") mascoteCanto = ex.mascoteCanto; if (typeof ex.mascoteTam === "string") mascoteTam = ex.mascoteTam; } catch {}
+            let logoCanto = "";
+            let logoTam = "m";
+            try { const ex = JSON.parse(p.extra || "{}"); if (typeof ex.layoutData === "string") fmtData = ex.layoutData; if (typeof ex.mascoteCanto === "string") mascoteCanto = ex.mascoteCanto; if (typeof ex.mascoteTam === "string") mascoteTam = ex.mascoteTam; if (typeof ex.logoCanto === "string") logoCanto = ex.logoCanto; if (typeof ex.logoTam === "string") logoTam = ex.logoTam; } catch {}
             return (
               <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${destacarId === p.id ? "border-sky-500 ring-2 ring-sky-500/50" : "border-linha"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -1407,6 +1435,26 @@ export function PublicacoesAba({
                     </select>
                     {mascoteCanto && (
                       <select value={mascoteTam} onChange={(e) => handleMascoteTam(p.id, e.target.value)} disabled={ocupado} title="Tamanho do mascote" className="rounded-md border border-linha bg-preto px-2 py-1 text-xs text-muted focus:border-vermelho focus:outline-none disabled:opacity-40">
+                        <option value="p">🔎 Pequeno</option>
+                        <option value="m">📏 Médio</option>
+                        <option value="g">🔍 Grande</option>
+                      </select>
+                    )}
+                  </div>
+                )}
+
+                {/* Logo da marca neste post: posição (padrão do modelo ou um canto) + tamanho. */}
+                {!postado && temLogo && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <select value={logoCanto} onChange={(e) => handleLogoCanto(p.id, e.target.value)} disabled={ocupado} title="Posição do logotipo neste post" className="rounded-md border border-linha bg-preto px-2 py-1 text-xs text-muted focus:border-vermelho focus:outline-none disabled:opacity-40">
+                      <option value="">🏷️ Logo: padrão do modelo</option>
+                      <option value="cima-dir">🏷️ Logo: em cima à direita ↗</option>
+                      <option value="cima-esq">🏷️ Logo: em cima à esquerda ↖</option>
+                      <option value="dir">🏷️ Logo: embaixo à direita ↘</option>
+                      <option value="esq">🏷️ Logo: embaixo à esquerda ↙</option>
+                    </select>
+                    {logoCanto && (
+                      <select value={logoTam} onChange={(e) => handleLogoTam(p.id, e.target.value)} disabled={ocupado} title="Tamanho do logotipo" className="rounded-md border border-linha bg-preto px-2 py-1 text-xs text-muted focus:border-vermelho focus:outline-none disabled:opacity-40">
                         <option value="p">🔎 Pequeno</option>
                         <option value="m">📏 Médio</option>
                         <option value="g">🔍 Grande</option>
