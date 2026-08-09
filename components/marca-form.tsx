@@ -13,6 +13,8 @@ export type MarcaView = {
   corFundo: string;
   capasArte?: string[]; // biblioteca de artes de capa (IA) da marca, pra reusar
   feedArtes?: string[]; // biblioteca de artes de fundo de feed (IA) da marca, pra reusar
+  mascoteUrl?: string; // mascote oficial da marca (PNG transparente)
+  mascotesArte?: string[]; // biblioteca de opções de mascote geradas pela IA
   paleta: string; // JSON array de hex
   logoTexto: string;
   logoUrl: string;

@@ -24,6 +24,8 @@ model Marca {
   musicas     String   @default("[]") // biblioteca de trilhas do vídeo enviadas pelo dono: JSON [{url,nome}]
   capasArte   String   @default("[]") // biblioteca de ARTES de capa geradas pela IA (pra reusar): JSON [url,...]
   feedArtes   String   @default("[]") // biblioteca de ARTES de fundo de feed geradas pela IA (pra reusar): JSON [url,...]
+  mascoteUrl  String   @default("") // MASCOTE oficial da marca (PNG transparente) — colado nos posts/vídeos pra ficar sempre igual
+  mascotesArte String  @default("[]") // biblioteca de opções de mascote geradas pela IA (pra escolher/trocar): JSON [url,...]
   logoUrl     String   @default("") // logotipo (PNG) — aparece na faixa da arte e a IA lê as cores dele
   site        String   @default("") // aparece no rodapé das artes
   telefone    String   @default("") // aparece no rodapé/CTA
