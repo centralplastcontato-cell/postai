@@ -11,6 +11,7 @@ import {
   excluirPublicacao,
   gerarImagemPublicacao,
   definirImagemPublicacao,
+  aplicarArteFeed,
   removerImagemPublicacao,
   sugerirDiferenciais,
   sugerirPromocao,
@@ -191,6 +192,7 @@ export function PublicacoesAba({
   temFacebook,
   espelharStoryPadrao,
   sugestao,
+  feedArtes,
 }: {
   marcaId: string;
   publicacoes: PublicacaoView[];
@@ -203,6 +205,7 @@ export function PublicacoesAba({
   temFacebook?: boolean; // posta também no Facebook → reflete na caixinha "Estamos postando"
   espelharStoryPadrao?: boolean; // padrão da marca pra espelhar o feed no Story
   sugestao?: SugestaoBia | null; // sugestão da Bia pro próximo post (banner no gerador)
+  feedArtes?: string[]; // biblioteca de artes de fundo (IA) já geradas pra marca, pra reusar
 }) {
   const router = useRouter();
   // Gerador colapsável CONTEXTUAL: vem RECOLHIDO quando o dia (ou a lista) já tem publicação —
@@ -542,6 +545,8 @@ export function PublicacoesAba({
     });
   }
   const [seletorImg, setSeletorImg] = useState<PublicacaoView | null>(null);
+  const [bancoArteId, setBancoArteId] = useState<string | null>(null); // card com a galeria "artes salvas" aberta
+  const artesSalvas = feedArtes ?? [];
   // Foto de fundo escolhida JÁ no formulário (antes de gerar) — pros templates que usam foto.
   const [imagemFundo, setImagemFundo] = useState("");
   const [seletorFundo, setSeletorFundo] = useState(false);
@@ -578,6 +583,17 @@ export function PublicacoesAba({
     setProc(id);
     startTransition(async () => {
       const r = await gerarImagemPublicacao({ id, estilo });
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  // Reaproveita uma arte de fundo JÁ gerada (da biblioteca da marca) — sem gastar IA de novo.
+  function handleAplicarArte(id: string, url: string) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await aplicarArteFeed({ id, url });
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
@@ -1276,6 +1292,9 @@ export function PublicacoesAba({
                         </select>
                       )}
                       <button onClick={() => handleGerarImagem(p.id, estiloArte[p.id])} disabled={ocupado} title={p.template === "data-comemorativa" ? "Gera a arte com IA no ESTILO escolhido ao lado" : "Gera um FUNDO artístico com IA, no clima do post (fundo abstrato — não é foto do seu espaço)"} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🤖 Fundo IA</button>
+                      {artesSalvas.length > 0 && (
+                        <button onClick={() => setBancoArteId((c) => (c === p.id ? null : p.id))} disabled={ocupado} title="Reaproveitar uma arte de IA que você já gerou antes (sem gastar geração)" className={`rounded-md border px-2 py-1 text-xs font-semibold transition disabled:opacity-40 ${bancoArteId === p.id ? "border-[#7c3aed] bg-[#7c3aed]/15 text-[#d6c6ff]" : "border-linha text-muted hover:border-vermelho hover:text-white"}`}>🖼️ Artes salvas ({artesSalvas.length})</button>
+                      )}
                       <label className="cursor-pointer rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
                         📤 Foto
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUpload(p.id, e.target.files?.[0])} />
@@ -1286,6 +1305,24 @@ export function PublicacoesAba({
                     </>
                   )}
                 </div>
+
+                {/* Biblioteca de artes de IA já geradas — reusar sem gastar geração nova. */}
+                {!postado && templateUsaFotoFundo(p.template) && bancoArteId === p.id && artesSalvas.length > 0 && (
+                  <div className="mt-2 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/5 p-2">
+                    <p className="mb-1.5 text-[11px] font-semibold text-[#d6c6ff]">🖼️ Suas artes de IA salvas — toque pra usar nesta publicação</p>
+                    <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
+                      {artesSalvas.map((url) => {
+                        const escolhida = p.imagemUrl === url;
+                        return (
+                          <button key={url} type="button" onClick={() => handleAplicarArte(p.id, url)} disabled={ocupado} title="Usar esta arte como fundo" className={`overflow-hidden rounded-md border transition disabled:opacity-40 ${escolhida ? "border-vermelho ring-2 ring-vermelho/50" : "border-linha hover:border-vermelho"}`}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={url} alt="Arte salva" className="aspect-[4/5] w-full object-cover" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <button onClick={() => handleAprovar(p.id)} disabled={ocupado} title={p.aprovado ? "Você já revisou — clique pra desmarcar" : "Marcar como revisado (interno, não vai pra rede)"} className={`rounded-md px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${p.aprovado ? "bg-green-600 text-white hover:bg-green-500" : "border border-linha text-muted hover:border-green-500 hover:text-white"}`}>{p.aprovado ? "✓ Aprovado" : "Aprovar"}</button>

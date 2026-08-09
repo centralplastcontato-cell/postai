@@ -1203,8 +1203,32 @@ export async function gerarImagemPublicacao(input: { id: string; descricao?: str
     return { ok: false as const, erro: "Imagem gerada, mas não consegui salvar (Vercel Blob)." };
   }
   await prisma.publicacao.update({ where: { id: input.id }, data: { imagemUrl: url } });
+  // Guarda na BIBLIOTECA de artes de feed da marca pra reusar em outros posts (sem gerar de
+  // novo → de graça). Sem repetir, mais novas na frente, máx 24.
+  const artes = [url, ...lerListaUrls(p.marca.feedArtes ?? "").filter((u) => u !== url)].slice(0, 24);
+  await prisma.marca.update({ where: { id: p.marcaId }, data: { feedArtes: JSON.stringify(artes) } });
   revalidatePath(`/painel/marcas/${p.marcaId}`);
-  return { ok: true as const, url };
+  return { ok: true as const, url, artes };
+}
+
+// Lê a lista de URLs de uma biblioteca (JSON [url,...]), ignorando lixo.
+function lerListaUrls(json: string | null): string[] {
+  try {
+    const a = JSON.parse(json || "[]");
+    return Array.isArray(a) ? a.filter((x): x is string => typeof x === "string" && x.startsWith("http")) : [];
+  } catch { return []; }
+}
+
+// Reaproveita uma arte de fundo JÁ salva na biblioteca da marca (sem gerar de novo → de graça).
+export async function aplicarArteFeed(input: { id: string; url: string }) {
+  const g = await guardaPublicacao(input.id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const p = await prisma.publicacao.findUnique({ where: { id: input.id }, include: { marca: { select: { feedArtes: true } } } });
+  if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  if (!lerListaUrls(p.marca.feedArtes ?? "").includes(input.url)) return { ok: false as const, erro: "Arte não está na biblioteca." };
+  await prisma.publicacao.update({ where: { id: input.id }, data: { imagemUrl: input.url } });
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const, url: input.url };
 }
 
 export async function definirImagemPublicacao(input: { id: string; url: string }) {

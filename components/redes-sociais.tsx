@@ -30,6 +30,7 @@ export function RedesSociais({
   temFacebook,
   espelharStoryPadrao,
   sugestao,
+  feedArtes,
 }: {
   marcaId: string;
   posts: Post[];
@@ -45,6 +46,7 @@ export function RedesSociais({
   temFacebook: boolean; // marca com Página do Facebook conectada → posta nos dois
   espelharStoryPadrao?: boolean; // padrão da marca pra espelhar o feed no Story
   sugestao?: SugestaoBia | null; // sugestão da Bia pro próximo post (gerador de feed)
+  feedArtes?: string[]; // biblioteca de artes de fundo (IA) da marca, pra reusar nos posts
 }) {
   const [subaba, setSubaba] = useState<"carrosseis" | "publicacoes" | "story" | "reels">("carrosseis");
   const [selecao, setSelecao] = useState<SelecaoRede | null>(null);
@@ -179,6 +181,7 @@ export function RedesSociais({
           temFacebook={temFacebook}
           espelharStoryPadrao={espelharStoryPadrao}
           sugestao={sugestao}
+          feedArtes={feedArtes}
         />
       )}
 
