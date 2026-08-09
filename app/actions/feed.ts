@@ -852,8 +852,9 @@ export async function editarPublicacao(input: {
   if (typeof exAntigo.estiloStory === "string") exNovo.estiloStory = exAntigo.estiloStory;
   // Preserva o formato do layout da data comemorativa (montarExtra não o conhece).
   if (typeof exAntigo.layoutData === "string") exNovo.layoutData = exAntigo.layoutData;
-  // Preserva o canto do mascote (montarExtra não o conhece).
+  // Preserva o canto e o tamanho do mascote (montarExtra não os conhece).
   if (typeof exAntigo.mascoteCanto === "string") exNovo.mascoteCanto = exAntigo.mascoteCanto;
+  if (typeof exAntigo.mascoteTam === "string") exNovo.mascoteTam = exAntigo.mascoteTam;
 
   await prisma.publicacao.update({
     where: { id: input.id },
@@ -915,10 +916,12 @@ export async function regerarPublicacao(id: string) {
   let estiloStory: string | undefined; // foto/faixa/colorida — preservado no regerar
   let layoutData: string | undefined; // formato da data comemorativa — preservado no regerar
   let mascoteCanto: string | undefined; // canto do mascote — preservado no regerar
+  let mascoteTam: string | undefined; // tamanho do mascote — preservado no regerar
   try {
     const ex = JSON.parse(p.extra || "{}");
     layoutData = typeof ex.layoutData === "string" ? ex.layoutData : undefined;
     mascoteCanto = typeof ex.mascoteCanto === "string" ? ex.mascoteCanto : undefined;
+    mascoteTam = typeof ex.mascoteTam === "string" ? ex.mascoteTam : undefined;
     estiloStory = typeof ex.estiloStory === "string" ? ex.estiloStory : undefined;
     travas = {
       oferta: ex.ofertaTravada || undefined,
@@ -973,12 +976,13 @@ export async function regerarPublicacao(id: string) {
   // Remonta o extra e reinjeta o estiloStory (montarExtra não o conhece) — senão regerar
   // o texto faria um Story "foto"/"faixa" voltar a renderizar como "colorida".
   let extraNovo = montarExtra(p.marca, template, gerado, seed, travas, categoria, p.data);
-  if (estiloStory || layoutData || mascoteCanto) {
+  if (estiloStory || layoutData || mascoteCanto || mascoteTam) {
     try {
       const o = JSON.parse(extraNovo || "{}");
       if (estiloStory) o.estiloStory = estiloStory;
       if (layoutData) o.layoutData = layoutData; // preserva o formato da data comemorativa
       if (mascoteCanto) o.mascoteCanto = mascoteCanto; // preserva o canto do mascote
+      if (mascoteTam) o.mascoteTam = mascoteTam; // preserva o tamanho do mascote
       extraNovo = JSON.stringify(o);
     } catch {}
   }
@@ -1327,6 +1331,21 @@ export async function definirMascoteCanto(id: string, canto: string) {
   await prisma.publicacao.update({ where: { id }, data: { extra: JSON.stringify(ex) } });
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const, canto: ok };
+}
+
+// Tamanho do mascote neste post ("p" pequeno | "m" médio | "g" grande). Só a arte muda.
+export async function definirMascoteTam(id: string, tam: string) {
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const p = await prisma.publicacao.findUnique({ where: { id }, select: { extra: true, marcaId: true } });
+  if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  const ok = ["p", "m", "g"].includes(tam) ? tam : "m";
+  let ex: Record<string, unknown> = {};
+  try { ex = JSON.parse(p.extra || "{}"); } catch {}
+  ex.mascoteTam = ok;
+  await prisma.publicacao.update({ where: { id }, data: { extra: JSON.stringify(ex) } });
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const, tam: ok };
 }
 
 export async function removerImagemPublicacao(id: string) {

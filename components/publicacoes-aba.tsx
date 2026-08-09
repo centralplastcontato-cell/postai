@@ -15,6 +15,7 @@ import {
   aplicarArteFeed,
   definirLayoutData,
   definirMascoteCanto,
+  definirMascoteTam,
   removerImagemPublicacao,
   sugerirDiferenciais,
   sugerirPromocao,
@@ -634,12 +635,23 @@ export function PublicacoesAba({
       setProc(null);
     });
   }
-  // Mostra/esconde o mascote neste post e escolhe o canto ("" | "dir" | "esq").
+  // Mostra/esconde o mascote neste post e escolhe o canto ("" | "dir" | "esq" | "cima-*").
   function handleMascoteCanto(id: string, canto: string) {
     setErro(null);
     setProc(id);
     startTransition(async () => {
       const r = await definirMascoteCanto(id, canto);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
+    });
+  }
+  // Tamanho do mascote neste post ("p" | "m" | "g").
+  function handleMascoteTam(id: string, tam: string) {
+    setErro(null);
+    setProc(id);
+    startTransition(async () => {
+      const r = await definirMascoteTam(id, tam);
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
@@ -1279,7 +1291,8 @@ export function PublicacoesAba({
             // Formato atual do layout da data comemorativa (pro seletor de formato).
             let fmtData = "painel";
             let mascoteCanto = "";
-            try { const ex = JSON.parse(p.extra || "{}"); if (typeof ex.layoutData === "string") fmtData = ex.layoutData; if (typeof ex.mascoteCanto === "string") mascoteCanto = ex.mascoteCanto; } catch {}
+            let mascoteTam = "m";
+            try { const ex = JSON.parse(p.extra || "{}"); if (typeof ex.layoutData === "string") fmtData = ex.layoutData; if (typeof ex.mascoteCanto === "string") mascoteCanto = ex.mascoteCanto; if (typeof ex.mascoteTam === "string") mascoteTam = ex.mascoteTam; } catch {}
             return (
               <div key={p.id} className={`flex flex-col rounded-xl border bg-preto-card p-3 ${destacarId === p.id ? "border-sky-500 ring-2 ring-sky-500/50" : "border-linha"}`}>
                 <div className="mb-2 flex items-center justify-between gap-2">
@@ -1384,7 +1397,7 @@ export function PublicacoesAba({
 
                 {/* Mascote da marca neste post (liga/desliga + canto). Só aparece se a marca tem mascote. */}
                 {!postado && temMascote && (
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap gap-1.5">
                     <select value={mascoteCanto} onChange={(e) => handleMascoteCanto(p.id, e.target.value)} disabled={ocupado} title="Mostrar o mascote da marca neste post e escolher o canto" className="rounded-md border border-linha bg-preto px-2 py-1 text-xs text-muted focus:border-vermelho focus:outline-none disabled:opacity-40">
                       <option value="">🦸 Mascote: não</option>
                       <option value="dir">🦸 Mascote: embaixo à direita ↘</option>
@@ -1392,6 +1405,13 @@ export function PublicacoesAba({
                       <option value="cima-dir">🦸 Mascote: em cima à direita ↗</option>
                       <option value="cima-esq">🦸 Mascote: em cima à esquerda ↖</option>
                     </select>
+                    {mascoteCanto && (
+                      <select value={mascoteTam} onChange={(e) => handleMascoteTam(p.id, e.target.value)} disabled={ocupado} title="Tamanho do mascote" className="rounded-md border border-linha bg-preto px-2 py-1 text-xs text-muted focus:border-vermelho focus:outline-none disabled:opacity-40">
+                        <option value="p">🔎 Pequeno</option>
+                        <option value="m">📏 Médio</option>
+                        <option value="g">🔍 Grande</option>
+                      </select>
+                    )}
                   </div>
                 )}
 

@@ -32,7 +32,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
   const logoSrc = marca.logoUrl ? logoUrlMarca(origin, marca.id) : "";
 
-  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean; parcelamento?: string; layoutData?: string; mascoteCanto?: string } = {};
+  let extra: { oferta?: string; validade?: string; inclui?: string[]; regras?: string; selo?: string; diferenciais?: string[]; corFundo?: string; fotos?: string[]; depoimento?: string; autor?: string; estrelas?: number; destaque?: string; corCard?: string; precoDe?: string; precoPor?: string; labelPor?: string; parcelas?: string; economia?: string; condicoes?: string[]; modoPreco?: string; ladoA?: string; ladoB?: string; fotoAutor?: string; google?: boolean; parcelamento?: string; layoutData?: string; mascoteCanto?: string; mascoteTam?: string } = {};
   try {
     extra = JSON.parse(p.extra || "{}");
   } catch {}
@@ -89,15 +89,17 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const usaMascote = Boolean(marca.mascoteUrl) && cantosOk.includes(canto || "");
   const emCima = canto === "cima-dir" || canto === "cima-esq";
   const naDireita = canto === "dir" || canto === "cima-dir";
+  // Tamanho do mascote: pequeno | médio (padrão) | grande.
+  const dim = extra.mascoteTam === "p" ? { w: 250, h: 315 } : extra.mascoteTam === "g" ? { w: 460, h: 580 } : { w: 340, h: 430 };
   const conteudo: ReactElement = usaMascote ? (
     <div style={{ position: "relative", display: "flex", width: "1080px", height: "1350px" }}>
       {arte}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={marca.mascoteUrl}
-        width={340}
-        height={430}
-        style={{ position: "absolute", ...(emCima ? { top: 18 } : { bottom: 18 }), ...(naDireita ? { right: 18 } : { left: 18 }), width: "340px", height: "430px", objectFit: "contain", filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.4))" }}
+        width={dim.w}
+        height={dim.h}
+        style={{ position: "absolute", ...(emCima ? { top: 18 } : { bottom: 18 }), ...(naDireita ? { right: 18 } : { left: 18 }), width: `${dim.w}px`, height: `${dim.h}px`, objectFit: "contain", filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.4))" }}
       />
     </div>
   ) : (
