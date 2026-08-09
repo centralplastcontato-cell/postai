@@ -4,6 +4,7 @@ import { snapshotDeMarca, alertarTokenSeVencendo, coletarInsightsDaMarca } from 
 import { acessoExpirado } from "@/lib/plano";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, AGENTE } from "@/lib/config";
+import { tokenArte } from "@/lib/arte-token";
 import { timingSafeEqual } from "crypto";
 
 export const runtime = "nodejs";
@@ -153,14 +154,14 @@ async function postarFeed(m: { id: string; nome: string; igUserId: string | null
     if (!(await claimPublicacao(p.id))) return;
 
     const legenda = `${p.legenda}\n\n${p.hashtags}`.trim().slice(0, 2200);
-    const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, [`${base}/api/feed/${p.id}`], legenda);
+    const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, [`${base}/api/feed/${p.id}?v=${tokenArte(p)}`], legenda);
     if (r.ig.ok) {
       const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
       await registrarAtividade(AGENTE, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
       await prisma.publicacao.update({ where: { id: p.id }, data: { mediaId: r.ig.mediaId } }).catch(() => {}); // guarda o ID pra coletar o engajamento depois
       // Espelhar no Story (best-effort): ligado na marca ou forçado no post.
       if (p.espelhar ?? m.espelharStory) {
-        const rs = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${p.id}`);
+        const rs = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${p.id}?v=${tokenArte(p)}`);
         await registrarAtividade(AGENTE, rs.ig.ok ? `Espelhei "${p.titulo}" no Story de ${m.nome} (auto).` : `Não consegui espelhar "${p.titulo}" no Story: ${rs.ig.erro}`, m.id).catch(() => {});
       }
     } else {
@@ -179,7 +180,7 @@ async function postarStory(m: { id: string; nome: string; igUserId: string | nul
     if (!st) return;
     if (!(await claimPublicacao(st.id))) return;
 
-    const r = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${st.id}`);
+    const r = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${st.id}?v=${tokenArte(st)}`);
     if (r.ig.ok) {
       await registrarAtividade(AGENTE, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
       await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.ig.mediaId } }).catch(() => {}); // guarda o ID pra coletar as visualizações (dentro de 24h)

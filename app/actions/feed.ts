@@ -14,6 +14,7 @@ import { planoDaMarca, checarLimiteFeed, checarCreditoTrial } from "@/lib/limite
 import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto, escolherImagensPorTema, sortearFotoComDescricao } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
 import { seloDataComemorativa, dataComemorativaDe } from "@/lib/datas-comemorativas";
+import { tokenArte } from "@/lib/arte-token";
 import type { Marca } from "@prisma/client";
 
 // Feriado REAL da data (do calendário) — trava a data comemorativa pra a IA não trocar
@@ -776,7 +777,7 @@ export async function postarStory(id: string) {
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Story não encontrado." };
   if (!marcaConectada(p.marca)) return { ok: false as const, erro: "Conecte o Instagram da marca primeiro." };
-  const r = await publicarStoryNasRedes(p.marca, `${baseUrl()}/api/story/${p.id}`);
+  const r = await publicarStoryNasRedes(p.marca, `${baseUrl()}/api/story/${p.id}?v=${tokenArte(p)}`);
   if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
   await prisma.publicacao.update({ where: { id }, data: { status: "postado", postadoEm: new Date(), mediaId: r.ig.mediaId } });
   await registrarAtividade(AGENTE, `Postei o Story "${p.titulo}" no Instagram de ${p.marca.nome}.`, p.marcaId);
@@ -1322,7 +1323,7 @@ export async function postarPublicacao(id: string) {
     return { ok: false as const, erro: `Conecte o Instagram da marca "${p.marca.nome}" primeiro.` };
   }
   const legenda = `${p.legenda}\n\n${p.hashtags}`.trim().slice(0, 2200);
-  const r = await publicarNasRedes(p.marca, [`${baseUrl()}/api/feed/${id}`], legenda);
+  const r = await publicarNasRedes(p.marca, [`${baseUrl()}/api/feed/${id}?v=${tokenArte(p)}`], legenda);
   if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
   await prisma.publicacao.update({ where: { id }, data: { status: "postado", postadoEm: new Date(), mediaId: r.ig.mediaId } });
   const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";

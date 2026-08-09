@@ -34,6 +34,7 @@ import { ConfirmDialog } from "./confirm-dialog";
 import { CaixaPostando } from "./caixa-postando";
 import { rotuloHora } from "@/lib/horarios";
 import { type SugestaoBia } from "@/lib/inteligencia";
+import { tokenArte } from "@/lib/arte-token";
 
 type Confirmacao = { titulo: string; descricao?: string; textoConfirmar: string; acao: () => void };
 
@@ -157,12 +158,6 @@ function horaSP(iso: string): number {
 // Date ISO → "aaaa-mm-dd" (fuso SP) pro seletor de data (InputDataBR).
 function ymd(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
-}
-
-function hashCurto(s: string): string {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-  return h.toString(36);
 }
 
 function dataBR(iso: string): string {
@@ -1238,7 +1233,7 @@ export function PublicacoesAba({
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visiveis.map((p) => {
-            const v = hashCurto(`a6|${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`);
+            const v = tokenArte(p);
             const arte = `/api/feed/${p.id}?v=${v}`;
             const postado = p.status === "postado";
             const ocupado = proc === p.id;

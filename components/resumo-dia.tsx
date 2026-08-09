@@ -2,16 +2,11 @@
 
 import { type Post } from "./marketing-calendario";
 import { type PublicacaoView } from "./publicacoes-aba";
+import { tokenArte } from "@/lib/arte-token";
 
 // Visão UNIFICADA do dia: ao escolher um dia no calendário, mostra TUDO daquele dia
 // junto — Carrossel + Feed + Story — em vez de obrigar a trocar de aba pra ver cada um.
 // Cada item tem thumbnail, tipo, status e um "Abrir" que leva pra aba certa pra editar.
-
-function hashCurto(s: string): string {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
-  return h.toString(36);
-}
 
 function chaveDiaSP(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
@@ -61,7 +56,7 @@ export function ResumoDoDia({
   reels: PublicacaoView[];
   onAbrir: (tipo: Tipo, id: string) => void;
 }) {
-  const v = (p: PublicacaoView) => hashCurto(`a6|${p.titulo}|${p.texto}|${p.imagemUrl ?? ""}|${p.extra ?? ""}`);
+  const v = (p: PublicacaoView) => tokenArte(p);
 
   const itens: ItemDia[] = [
     ...posts
