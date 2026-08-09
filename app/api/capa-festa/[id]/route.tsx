@@ -45,7 +45,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
         aniversariantes: true,
         videoCapa: true,
         videoTituloCapa: true,
-        marca: { select: { corPrimaria: true, corFundo: true } },
+        mascoteCanto: true,
+        mascoteTam: true,
+        marca: { select: { corPrimaria: true, corFundo: true, mascoteUrl: true } },
         fotos: { select: { id: true, url: true } },
       },
     });
@@ -66,6 +68,15 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     // Fonte encolhe conforme o título cresce — e ainda assim QUEBRA LINHA (largura limitada).
     const n = titulo.length;
     const tam = n <= 20 ? 92 : n <= 30 ? 80 : n <= 44 ? 66 : n <= 60 ? 56 : 48;
+
+    // MASCOTE na capa (Fase 3.5): cola o mascote da marca num canto. O MOTOR carimba o logo no
+    // TOPO da capa e o título fica embaixo à esquerda — cantos livres: baixo à direita ou de cima.
+    const mascUrl = festa.marca.mascoteUrl;
+    const mascCanto = festa.mascoteCanto;
+    const usaMascote = Boolean(mascUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(mascCanto || "");
+    const mascDim = festa.mascoteTam === "p" ? { w: 300, h: 380 } : festa.mascoteTam === "g" ? { w: 560, h: 700 } : { w: 420, h: 530 };
+    const mascEmCima = mascCanto === "cima-dir" || mascCanto === "cima-esq";
+    const mascNaDireita = mascCanto === "dir" || mascCanto === "cima-dir";
 
     const png = await new ImageResponse(
       (
@@ -124,6 +135,17 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
               </div>
             </div>
           </div>
+
+          {/* MASCOTE por cima (canto/tamanho escolhidos) */}
+          {usaMascote ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={mascUrl}
+              width={mascDim.w}
+              height={mascDim.h}
+              style={{ position: "absolute", ...(mascEmCima ? { top: 40 } : { bottom: 40 }), ...(mascNaDireita ? { right: 40 } : { left: 40 }), width: `${mascDim.w}px`, height: `${mascDim.h}px`, objectFit: "contain", filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.45))" }}
+            />
+          ) : null}
         </div>
       ),
       { width: L, height: A, fonts: carregarFontes() },

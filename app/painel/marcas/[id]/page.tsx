@@ -116,6 +116,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoTextoFinal: f.videoTextoFinal || "",
       videoTituloCapa: f.videoTituloCapa || "",
       videoMusica: f.videoMusica || "",
+      mascoteCanto: f.mascoteCanto || "",
+      mascoteTam: f.mascoteTam || "m",
       videoUrl: f.videoUrl || "",
       videoPostado: !!f.videoUrl && urlsReelsPostados.has(f.videoUrl),
       videoAgendadoEm: (agendadoPorId.get(f.id.slice(-6)) ?? agendadoPorNome.get((f.aniversariante || "").trim()))?.toISOString() ?? null,

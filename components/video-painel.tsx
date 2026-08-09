@@ -369,6 +369,9 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           tituloCapaAuto={tituloCapaFesta(seletor.aniversariantes, rotuloAniversariantes(seletor.aniversariantes))}
           musicaInicial={seletor.videoMusica}
           musicasBanco={musicasBanco}
+          mascoteCantoInicial={seletor.mascoteCanto}
+          mascoteTamInicial={seletor.mascoteTam}
+          mascoteUrl={mascoteUrl}
           corMarca={corMarca}
           jaTemVideo={seletor.videoUrl.startsWith("http")}
           onFechar={() => setSeletor(null)}

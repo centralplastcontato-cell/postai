@@ -189,6 +189,9 @@ model Festa {
   videoCapa      String   @default("")
   // Moldura das fotos no vídeo: "nenhuma" | "branca" | "grossa" (polaroid) | "marca" (cor da marca).
   videoMoldura   String   @default("branca")
+  // MASCOTE na CAPA do vídeo da festa: "" (não) | dir | esq | cima-dir | cima-esq + tamanho p|m|g.
+  mascoteCanto   String   @default("")
+  mascoteTam     String   @default("m")
   // Mensagem do SLIDE FINAL do vídeo (o dono escreve ou a Bia gera). "" = usa o padrão do motor.
   videoTextoFinal String  @default("")
   // Título da CAPA do vídeo, escrito à mão pelo dono. "" = usa o automático ("Fulano fez X aninhos",

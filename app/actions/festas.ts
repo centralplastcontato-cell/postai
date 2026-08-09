@@ -327,6 +327,20 @@ export async function salvarFotosVideo(festaId: string, fotoIds: string[], capa?
   return { ok: true as const, total: ordenadas.length };
 }
 
+// MASCOTE na CAPA do vídeo da festa: canto ("" não | dir | esq | cima-dir | cima-esq) + tamanho.
+// Muda como o /api/capa-festa desenha a abertura (cola o mascote da marca no canto escolhido).
+export async function definirMascoteFesta(festaId: string, canto: string, tam: string) {
+  const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const c = ["", "dir", "esq", "cima-dir", "cima-esq"].includes(canto) ? canto : "";
+  const t = ["p", "m", "g"].includes(tam) ? tam : "m";
+  await prisma.festa.update({ where: { id: festaId }, data: { mascoteCanto: c, mascoteTam: t } });
+  revalidatePath(`/painel/marcas/${festa.marcaId}`);
+  return { ok: true as const, canto: c, tam: t };
+}
+
 // Biblioteca de MÚSICAS da marca: as trilhas que o dono já enviou, pra reusar em qualquer vídeo.
 type MusicaBanco = { url: string; nome: string };
 function lerMusicas(json: string | null): MusicaBanco[] {
@@ -596,7 +610,7 @@ export async function postarReelsAgora(pubId: string) {
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoUrl: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true } }, fotos: { select: { id: true, url: true } } },
+    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoUrl: true, mascoteCanto: true, mascoteTam: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true, mascoteUrl: true } }, fotos: { select: { id: true, url: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -633,7 +647,7 @@ export async function gerarVideoDaFesta(festaId: string) {
   base = base.replace(/\/$/, "");
   // ?v= é a única chave de cache da capa: muda quando QUALQUER coisa desenhada muda (título
   // automático OU o escrito à mão, qual foto é a capa, a URL dela e a cor da marca).
-  const versaoCapa = hashCurto([festa.aniversariantes, festa.aniversariante, festa.videoTituloCapa, festa.videoCapa, capaUrl, festa.marca.corPrimaria].join("|"));
+  const versaoCapa = hashCurto([festa.aniversariantes, festa.aniversariante, festa.videoTituloCapa, festa.videoCapa, capaUrl, festa.marca.corPrimaria, festa.mascoteCanto, festa.mascoteTam, festa.marca.mascoteUrl].join("|"));
   const capaDesenhada = `${base}/api/capa-festa/${festaId}.jpg?v=${versaoCapa}`;
 
   await prisma.festa.update({ where: { id: festaId }, data: { videoUrl: "gerando" } });
