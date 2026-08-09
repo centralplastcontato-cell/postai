@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote } from "@/app/actions/mascote";
 
 // 🦸 ESTÚDIO DO MASCOTE (Fase 1): o dono gera opções em 3D fofo, escolhe uma e ela vira o
 // mascote OFICIAL da marca. Depois (Fases 2/3) esse MESMO mascote é colado nos posts/vídeos.
@@ -34,6 +34,18 @@ export function MascoteEstudio({
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setGerando(false);
+    });
+  }
+  function handleUsarReferencia() {
+    if (!referenciaUrl) return;
+    setErro(null);
+    setProc("usar-ref");
+    startTransition(async () => {
+      const r = await usarImagemComoMascote(marcaId, referenciaUrl);
+      if (!r.ok) setErro(r.erro);
+      else setReferenciaUrl("");
+      router.refresh();
+      setProc(null);
     });
   }
   async function handleUploadRef(file: File | undefined) {
@@ -139,11 +151,17 @@ export function MascoteEstudio({
       <div className="mb-3">
         <p className="text-xs text-muted">Imagem de referência <span className="text-muted/70">(opcional — um rascunho ou inspiração; a IA cria o mascote baseado nela)</span></p>
         {referenciaUrl ? (
-          <div className="mt-1 flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={referenciaUrl} alt="Referência" className="h-20 w-20 rounded-lg border border-linha object-cover" />
-            <button type="button" onClick={() => setReferenciaUrl("")} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-vermelho hover:text-white">Remover referência</button>
-          </div>
+          <>
+            <div className="mt-1 flex flex-wrap items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={referenciaUrl} alt="Referência" className="h-20 w-20 rounded-lg border border-linha object-cover" />
+              <div className="flex flex-col gap-2">
+                <button type="button" onClick={handleUsarReferencia} disabled={isPending} className="rounded-md bg-[#7c3aed] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50">✅ Usar esta imagem como mascote</button>
+                <button type="button" onClick={() => setReferenciaUrl("")} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-vermelho hover:text-white">Remover referência</button>
+              </div>
+            </div>
+            <p className="mt-1 text-[10px] text-muted/70">Use direto a sua imagem (sem a IA recriar) — ou gere versões 3D baseadas nela no botão abaixo.</p>
+          </>
         ) : (
           <label className="mt-1 inline-flex cursor-pointer items-center gap-2 rounded-md border border-linha px-3 py-2 text-xs text-muted transition hover:border-[#7c3aed] hover:text-white">
             {subindoRef ? "Enviando…" : "📎 Enviar imagem de referência"}

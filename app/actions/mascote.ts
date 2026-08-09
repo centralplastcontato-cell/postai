@@ -127,6 +127,20 @@ export async function gerarMascote(marcaId: string, descricao?: string, referenc
   return { ok: true as const, urls, mascotes };
 }
 
+// Usa uma IMAGEM ENVIADA pelo dono (upload) direto como mascote — sem a IA recriar. Salva na
+// biblioteca e já marca como oficial. Pro dono que já tem a arte pronta do mascote dele.
+export async function usarImagemComoMascote(marcaId: string, url: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (!/^https?:\/\//.test(url)) return { ok: false as const, erro: "Imagem inválida." };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascotesArte: true } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  const mascotes = [url, ...lerListaUrls(marca.mascotesArte).filter((u) => u !== url)].slice(0, 60);
+  await prisma.marca.update({ where: { id: marcaId }, data: { mascotesArte: JSON.stringify(mascotes), mascoteUrl: url } });
+  revalidatePath(`/painel/marcas/${marcaId}`);
+  return { ok: true as const, url, mascotes };
+}
+
 // Define o mascote OFICIAL da marca (tem que estar na biblioteca de opções geradas).
 export async function definirMascote(marcaId: string, url: string) {
   const g = await guardaMarca(marcaId);
