@@ -304,8 +304,9 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
           padding: "96px 80px",
         }}
       >
-        {/* Logo no topo (centralizado) */}
-        {d.logoSrc ? (
+        {/* Logo no topo (só quando NÃO há ilustração de fundo — senão cai em cima do personagem;
+            com ilustração o logo vai pro rodapé). */}
+        {d.logoSrc && !d.imagemUrl ? (
           <div style={{ display: "flex" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={d.logoSrc} width={logoW} height={96} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.5))" }} />
@@ -336,8 +337,14 @@ export function LayoutDataComemorativa(d: DadosArte & { imagemUrl?: string }) {
           ) : null}
         </div>
 
-        {/* Rodapé: site (+ WhatsApp se houver) */}
+        {/* Rodapé: logo (quando há ilustração) + WhatsApp + site */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+          {d.logoSrc && d.imagemUrl ? (
+            <div style={{ display: "flex", marginBottom: 26 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={d.logoSrc} width={Math.round(logoW * 0.85)} height={82} style={{ objectFit: "contain", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.7))" }} />
+            </div>
+          ) : null}
           {d.telefone ? <CtaWhatsApp telefone={d.telefone} /> : null}
           <div style={{ display: "flex", marginTop: d.telefone ? 22 : 0, fontFamily: "Fredoka", fontSize: 30, color: BRANCO, textShadow: "0 2px 6px rgba(0,0,0,0.6)" }}>
             {d.site}
