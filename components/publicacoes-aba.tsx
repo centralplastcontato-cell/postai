@@ -228,6 +228,7 @@ export function PublicacoesAba({
   const [parcelamento, setParcelamento] = useState(""); // divulgacao: selo "em até 10x sem juros"
   const [categoriaFoto, setCategoriaFoto] = useState("geral");
   const [corFundo, setCorFundo] = useState(""); // "" = automático (sorteia da paleta)
+  const [estiloArte, setEstiloArte] = useState<Record<string, string>>({}); // estilo da arte por post (datas comemorativas)
   const [sugerindo, setSugerindo] = useState(false);
   // Feedback / Depoimento: o texto é REAL (colado pelo dono), nunca inventado pela IA.
   const [depoimento, setDepoimento] = useState("");
@@ -572,11 +573,11 @@ export function PublicacoesAba({
       setProc(null);
     });
   }
-  function handleGerarImagem(id: string) {
+  function handleGerarImagem(id: string, estilo?: string) {
     setErro(null);
     setProc(id);
     startTransition(async () => {
-      const r = await gerarImagemPublicacao({ id });
+      const r = await gerarImagemPublicacao({ id, estilo });
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
@@ -1265,7 +1266,16 @@ export function PublicacoesAba({
                     <>
                       <button onClick={() => setSeletorImg(p)} disabled={ocupado} title="Ver o banco e ESCOLHER a foto (as que mais combinam com o post aparecem primeiro)" className="rounded-md border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-2 py-1 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed] disabled:opacity-40">🖼️ Escolher</button>
                       <button onClick={() => handleBanco(p.id, p.categoria ?? undefined)} disabled={ocupado} title="Sortear uma foto aleatória do banco (rodízio)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🎲 Sortear</button>
-                      <button onClick={() => handleGerarImagem(p.id)} disabled={ocupado} title="Gera um FUNDO artístico com IA, no clima do post (fundo abstrato — não é foto do seu espaço)" className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🤖 Fundo IA</button>
+                      {p.template === "data-comemorativa" && (
+                        <select value={estiloArte[p.id] ?? ""} onChange={(e) => setEstiloArte((s) => ({ ...s, [p.id]: e.target.value }))} disabled={ocupado} title="Escolha o estilo da arte e clique em 🤖 Fundo IA" className="rounded-md border border-linha bg-preto px-2 py-1 text-xs text-muted focus:border-vermelho focus:outline-none disabled:opacity-40">
+                          <option value="">🎨 Cartoon alegre</option>
+                          <option value="adesivos">🎉 Divertido (adesivos)</option>
+                          <option value="aquarela">🖌️ Aquarela</option>
+                          <option value="moderno">✨ Moderno</option>
+                          <option value="3d">🧸 3D fofo</option>
+                        </select>
+                      )}
+                      <button onClick={() => handleGerarImagem(p.id, estiloArte[p.id])} disabled={ocupado} title={p.template === "data-comemorativa" ? "Gera a arte com IA no ESTILO escolhido ao lado" : "Gera um FUNDO artístico com IA, no clima do post (fundo abstrato — não é foto do seu espaço)"} className="rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">🤖 Fundo IA</button>
                       <label className="cursor-pointer rounded-md border border-linha px-2 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
                         📤 Foto
                         <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUpload(p.id, e.target.files?.[0])} />

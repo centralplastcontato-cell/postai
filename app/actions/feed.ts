@@ -1143,7 +1143,7 @@ export async function excluirPublicacao(id: string) {
   return { ok: true as const };
 }
 
-export async function gerarImagemPublicacao(input: { id: string; descricao?: string }) {
+export async function gerarImagemPublicacao(input: { id: string; descricao?: string; estilo?: string }) {
   const g = await guardaPublicacao(input.id);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id: input.id }, include: { marca: true } });
@@ -1160,10 +1160,19 @@ export async function gerarImagemPublicacao(input: { id: string; descricao?: str
   // genérica/ilustrativa da data), então não "finge" ser o lugar. Demais posts: fundo abstrato.
   const ehData = p.template === "data-comemorativa";
   const cor = p.marca.corPrimaria || "#7C3AED";
-  // Datas comemorativas: ILUSTRAÇÃO calorosa (estilo cartoon/vetorial moderno) que representa a
-  // data — rápida de gerar e sem realismo de crianças (a IA bloqueia foto realista de criança).
+  // Estilos de arte pras datas comemorativas — o dono escolhe a "vibe" antes de gerar.
+  const ESTILOS_ARTE: Record<string, string> = {
+    "": "estilo ILUSTRAÇÃO/CARTOON moderno e alegre, personagens amigáveis e estilizados",
+    aquarela: "estilo AQUARELA suave e artística, pinceladas delicadas e cores lavadas",
+    adesivos: "estilo CARTOON DIVERTIDO e bem colorido, com vários elementos/adesivos decorativos espalhados (corações, estrelas, confete, chapéu, bigode), clima animado de festa",
+    moderno: "estilo VETORIAL MODERNO e minimalista, formas limpas e geométricas, elegante",
+    "3d": "estilo 3D FOFO (render 3D cartoon), personagens redondinhos e simpáticos, iluminação suave",
+  };
+  const estiloTxt = ESTILOS_ARTE[input.estilo || ""] || ESTILOS_ARTE[""];
+  // Datas comemorativas: ILUSTRAÇÃO calorosa que representa a data — rápida de gerar e sem realismo
+  // de crianças (a IA bloqueia foto realista de criança). O ESTILO vem da escolha do dono.
   const prompt = ehData
-    ? `Ilustração vetorial moderna, calorosa e festiva para um post de DATA COMEMORATIVA de um buffet infantil, representando a data: "${tema}". Cena emocional e alegre em ESTILO ILUSTRAÇÃO/CARTOON (não fotorrealista) coerente com a data (ex.: Dia dos Pais = pai e filho estilizados felizes; Dia das Mães = mãe e filho; Natal = clima natalino; Páscoa = coelho e ovos). Cores vibrantes harmonizando com ${cor}, luz aconchegante, personagens amigáveis e estilizados. IMPORTANTE na composição: mantenha os personagens/assunto na PARTE DE CIMA (terço superior) e deixe TODO o CENTRO e a METADE DE BAIXO bem mais LIMPOS e vazios (só fundo/cor, sem personagens nem detalhes), porque um título grande será escrito por cima do centro depois. SEM texto, letras, números, logotipos ou marcas.`
+    ? `Ilustração calorosa e festiva para um post de DATA COMEMORATIVA de um buffet infantil, representando a data: "${tema}". ${estiloTxt}. Cena emocional e alegre coerente com a data (ex.: Dia dos Pais = pai e filho estilizados felizes; Dia das Mães = mãe e filho; Natal = clima natalino; Páscoa = coelho e ovos). Cores vibrantes harmonizando com ${cor}, luz aconchegante. IMPORTANTE na composição: mantenha os personagens/assunto na PARTE DE CIMA (terço superior) e deixe TODO o CENTRO e a METADE DE BAIXO bem mais LIMPOS e vazios (só fundo/cor, sem personagens nem detalhes), porque um título grande será escrito por cima do centro depois. Formato vertical. SEM texto, letras, números, logotipos ou marcas.`
     : `Fundo decorativo abstrato para um post de rede social do buffet infantil "${p.marca.nome}".${tema ? ` O post é sobre: "${tema}". Deixe o CLIMA e as CORES do fundo combinarem com esse tema.` : ""} Harmonize a paleta com a cor ${cor}, de forma alegre e festiva. Estilo: textura/padrão abstrato — bokeh, confete, balões, formas geométricas suaves, gradiente. É APENAS um fundo artístico abstrato: NÃO é fotografia de ambiente, lugar, espaço, comida, objetos ou pessoas reais. Formato vertical. SEM texto, letras, números, logotipos, pessoas, rostos ou cenários reconhecíveis.`;
   let b64: string | undefined;
   try {
