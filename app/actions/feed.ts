@@ -1160,15 +1160,19 @@ export async function gerarImagemPublicacao(input: { id: string; descricao?: str
   // genérica/ilustrativa da data), então não "finge" ser o lugar. Demais posts: fundo abstrato.
   const ehData = p.template === "data-comemorativa";
   const cor = p.marca.corPrimaria || "#7C3AED";
+  // Datas comemorativas: ILUSTRAÇÃO calorosa (estilo cartoon/vetorial moderno) que representa a
+  // data — rápida de gerar e sem realismo de crianças (a IA bloqueia foto realista de criança).
   const prompt = ehData
-    ? `Foto cinematográfica e calorosa para um post de DATA COMEMORATIVA de um buffet infantil, representando a data: "${tema}". Mostre uma cena emocional e alegre coerente com a data (ex.: Dia dos Pais = um pai feliz brincando com o filho; Dia das Mães = mãe e filho; Natal = clima natalino em família; Páscoa = criança feliz com ovos de páscoa). Pessoas reais, expressões felizes, luz bonita e aconchegante, cores harmonizando com ${cor}. Composição vertical com o assunto na METADE DE CIMA e a metade de BAIXO mais limpa/escura (sobra espaço pra escrever um título depois). Alta qualidade, realista. SEM texto, letras, números, logotipos ou marcas.`
+    ? `Ilustração vetorial moderna, calorosa e festiva para um post de DATA COMEMORATIVA de um buffet infantil, representando a data: "${tema}". Cena emocional e alegre em ESTILO ILUSTRAÇÃO/CARTOON (não fotorrealista) coerente com a data (ex.: Dia dos Pais = pai e filho estilizados felizes; Dia das Mães = mãe e filho; Natal = clima natalino; Páscoa = coelho e ovos). Cores vibrantes harmonizando com ${cor}, luz aconchegante, personagens amigáveis e estilizados. Composição vertical com o assunto na METADE DE CIMA e a metade de BAIXO mais limpa/escura (espaço pra um título depois). SEM texto, letras, números, logotipos ou marcas.`
     : `Fundo decorativo abstrato para um post de rede social do buffet infantil "${p.marca.nome}".${tema ? ` O post é sobre: "${tema}". Deixe o CLIMA e as CORES do fundo combinarem com esse tema.` : ""} Harmonize a paleta com a cor ${cor}, de forma alegre e festiva. Estilo: textura/padrão abstrato — bokeh, confete, balões, formas geométricas suaves, gradiente. É APENAS um fundo artístico abstrato: NÃO é fotografia de ambiente, lugar, espaço, comida, objetos ou pessoas reais. Formato vertical. SEM texto, letras, números, logotipos, pessoas, rostos ou cenários reconhecíveis.`;
   let b64: string | undefined;
   try {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-image-1", prompt, n: 1, size: "1024x1536" }),
+      // qualidade "medium" = gera bem mais rápido (evita estourar o limite de 60s da função).
+      body: JSON.stringify({ model: "gpt-image-1", prompt, n: 1, size: "1024x1536", quality: "medium" }),
+      signal: AbortSignal.timeout(55000), // corta antes do limite da função (60s) pra falhar com mensagem, não quebrar a página
     });
     if (!resp.ok) throw new Error(`OpenAI ${resp.status}: ${(await resp.text()).slice(0, 200)}`);
     const data = await resp.json();
@@ -1176,7 +1180,7 @@ export async function gerarImagemPublicacao(input: { id: string; descricao?: str
     if (!b64) throw new Error("Resposta sem imagem.");
   } catch (e) {
     console.error("Erro ao gerar imagem da publicação:", e);
-    return { ok: false as const, erro: "Não consegui gerar a imagem agora." };
+    return { ok: false as const, erro: "A imagem demorou demais ou a IA recusou. Tente de novo." };
   }
   let url: string;
   try {
