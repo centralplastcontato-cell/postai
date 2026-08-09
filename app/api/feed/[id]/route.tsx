@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
 import { carregarFontes, paletaDaMarca, logoUrlMarca, montarTituloColorido } from "@/lib/arte";
 import { fotoSegura, fotosSeguras } from "@/lib/foto-arte";
+import { seloDataComemorativa } from "@/lib/datas-comemorativas";
 import { LayoutPromocao, LayoutFoto, LayoutDataComemorativa, LayoutDivulgacao, LayoutMosaico, LayoutCapaMoldura, LayoutCapaFaixa, LayoutFeedback, LayoutPreco, LayoutEnquete, LayoutVitrine, type DadosArte } from "@/lib/arte-layouts";
 
 export const runtime = "nodejs";
@@ -56,8 +57,12 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   }
 
   if (p.template === "data-comemorativa") {
+    // A DATA do selo vem sempre do CALENDÁRIO quando o post cai num dia comemorativo
+    // conhecido — corrige na hora posts antigos onde a IA chutou a data errada (ex: Dia
+    // dos Pais é o 2º domingo de agosto, móvel). Fora de data conhecida, usa o selo salvo.
+    const seloReal = seloDataComemorativa(p.data) || extra.selo;
     return new ImageResponse(
-      LayoutDataComemorativa({ ...base, selo: extra.selo, corFundo: extra.corFundo, imagemUrl: fotoUrl }),
+      LayoutDataComemorativa({ ...base, selo: seloReal, corFundo: extra.corFundo, imagemUrl: fotoUrl }),
       { width: 1080, height: 1350, fonts, headers: CACHE }
     );
   }

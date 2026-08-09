@@ -13,6 +13,7 @@ import { planoTemStory, rotuloPlano, ehTrial, MSG_TRIAL_POSTAR } from "@/lib/pla
 import { planoDaMarca, checarLimiteFeed, checarCreditoTrial } from "@/lib/limites";
 import { sortearImagemBanco, sortearImagensBanco, escolherImagemPorTexto, escolherImagensPorTema, sortearFotoComDescricao } from "@/app/actions/imagens";
 import { paletaDaMarca, escolherFundoFesta } from "@/lib/arte";
+import { seloDataComemorativa } from "@/lib/datas-comemorativas";
 import type { Marca } from "@prisma/client";
 
 // Dados que o usuário fixou manualmente (têm prioridade sobre o que a IA gera).
@@ -52,7 +53,7 @@ function blindarPrecoLegenda(texto: string, travas?: Travas): string {
 
 // Monta o JSON do campo `extra` conforme o template (dados específicos da arte).
 // `travas` são valores digitados pelo usuário — usados exatos e preservados no regerar.
-function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, travas?: Travas, categoria?: string): string | null {
+function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, travas?: Travas, categoria?: string, dataPost?: Date): string | null {
   if (template === "promocao") {
     const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
     const oferta = travas?.oferta || g.oferta?.trim() || "";
@@ -72,8 +73,11 @@ function montarExtra(marca: Marca, template: Template, g: Gerado, seed: number, 
   }
   if (template === "data-comemorativa") {
     const paleta = paletaDaMarca(marca.paleta, marca.corPrimaria);
+    // A DATA do selo vem do calendário (não da IA, que chutava datas erradas). Quando o
+    // post cai num dia comemorativo conhecido, usa a data real; senão, o que a IA sugeriu.
+    const selo = (dataPost && seloDataComemorativa(dataPost)) || g.selo?.trim() || "";
     return JSON.stringify({
-      selo: g.selo?.trim() || "",
+      selo,
       corFundo: travas?.corFundo || escolherFundoFesta(paleta, seed),
       corFundoTravada: travas?.corFundo || undefined,
     });
@@ -687,7 +691,7 @@ export async function gerarPublicacao(input: {
       texto: gerado.texto || "",
       legenda: gerado.legenda || "",
       hashtags: gerado.hashtags || "",
-      extra: montarExtra(marca, template, gerado, Date.now(), travas, input.categoria),
+      extra: montarExtra(marca, template, gerado, Date.now(), travas, input.categoria, data),
       tema: input.tema?.trim() || null,
       // Categoria de intenção (pra inteligência) — vem do template, sem IA. NÃO confundir
       // com `input.categoria`, que é a categoria de FOTO do banco (espaco|comida|…).
@@ -805,7 +809,7 @@ export async function editarPublicacao(input: {
   };
   // Monta o novo extra com os valores editados; preserva o que não é editável (fotos do mosaico).
   let exNovo: Record<string, unknown> = {};
-  try { exNovo = JSON.parse(montarExtra(p.marca, template, geradoFake, seed, travas, categoria) || "{}"); } catch {}
+  try { exNovo = JSON.parse(montarExtra(p.marca, template, geradoFake, seed, travas, categoria, p.data) || "{}"); } catch {}
   if (Array.isArray(exAntigo.fotos)) exNovo.fotos = exAntigo.fotos;
   // Preserva o estilo do Story (foto/faixa/colorida) — montarExtra não o conhece, então
   // sem isso editar o texto faria um Story "faixa" voltar a renderizar como "colorida".
@@ -922,7 +926,7 @@ export async function regerarPublicacao(id: string) {
   const seed = p.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
   // Remonta o extra e reinjeta o estiloStory (montarExtra não o conhece) — senão regerar
   // o texto faria um Story "foto"/"faixa" voltar a renderizar como "colorida".
-  let extraNovo = montarExtra(p.marca, template, gerado, seed, travas, categoria);
+  let extraNovo = montarExtra(p.marca, template, gerado, seed, travas, categoria, p.data);
   if (estiloStory) {
     try { const o = JSON.parse(extraNovo || "{}"); o.estiloStory = estiloStory; extraNovo = JSON.stringify(o); } catch {}
   }

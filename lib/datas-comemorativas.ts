@@ -113,3 +113,14 @@ export function dataComemorativaDe(chaveIso: string): DataComemorativa | undefin
   if (!ano) return undefined;
   return datasDoAnoCache(ano).get(chaveIso);
 }
+
+// Selo de DATA ("9 de Agosto") calculado do CALENDÁRIO, nunca chutado pela IA — que
+// errava datas móveis (ex.: Dia dos Pais = 2º domingo de agosto). Só devolve quando o
+// dia é uma data comemorativa conhecida; senão undefined (aí usa o selo que a IA sugeriu).
+export function seloDataComemorativa(data: Date): string | undefined {
+  const chaveIso = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(data);
+  if (!dataComemorativaDe(chaveIso)) return undefined;
+  const dia = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "numeric" }).format(data);
+  const mes = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", month: "long" }).format(data);
+  return `${dia} de ${mes.charAt(0).toUpperCase()}${mes.slice(1)}`;
+}
