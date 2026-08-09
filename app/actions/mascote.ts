@@ -36,8 +36,17 @@ function sortear3(): string[] {
   return c.slice(0, 3);
 }
 
-// Gera 3 conceitos de mascote em PARALELO (cabe na janela de 60s) e salva na biblioteca da marca.
-export async function gerarMascote(marcaId: string) {
+// Poses pra variar quando o dono descreve o mascote — 3 versões do MESMO personagem.
+const POSES = [
+  "pose amigável acenando com uma das mãos",
+  "com os dois bracinhos abertos, dando boas-vindas",
+  "fazendo joinha (positivo) e piscando o olho",
+];
+
+// Gera 3 opções de mascote em PARALELO (cabe na janela de 60s) e salva na biblioteca da marca.
+// Se o dono DESCREVER o mascote (descricao), gera 3 versões da IDEIA dele (variando a pose);
+// senão, sorteia 3 conceitos temáticos do castelo (a IA "sugere opções").
+export async function gerarMascote(marcaId: string, descricao?: string) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { corPrimaria: true, nome: true, mascotesArte: true } });
@@ -46,9 +55,17 @@ export async function gerarMascote(marcaId: string) {
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
   const cor = marca.corPrimaria || "#7C3AED";
   const nome = marca.nome || "buffet infantil";
+  const custom = (descricao || "").trim().slice(0, 400);
 
-  const gerarUm = async (conceito: string): Promise<string> => {
-    const prompt = `Mascote de personagem em estilo 3D FOFO (render 3D caprichado estilo Pixar), redondinho, simpático e carismático, para um buffet infantil chamado "${nome}". O mascote é: ${conceito}. Cores vibrantes e alegres harmonizando com a cor ${cor}. CORPO INTEIRO, de frente, pose amigável acenando, expressão feliz, olhando para a câmera. Iluminação suave de estúdio. FUNDO TOTALMENTE TRANSPARENTE (sem cenário, sem chão, sem sombra projetada no chão). SEM texto, letras, números, logotipos ou molduras.`;
+  const montarPrompt = (conceito: string, pose: string) =>
+    `Mascote de personagem em estilo 3D FOFO (render 3D caprichado estilo Pixar), redondinho, simpático e carismático, para um buffet infantil chamado "${nome}". O mascote é: ${conceito}. Cores vibrantes e alegres harmonizando com a cor ${cor}. CORPO INTEIRO, de frente, ${pose}, expressão feliz, olhando para a câmera. Iluminação suave de estúdio. FUNDO TOTALMENTE TRANSPARENTE (sem cenário, sem chão, sem sombra projetada no chão). SEM texto, letras, números, logotipos ou molduras.`;
+
+  // Descrição do dono → 3 versões da mesma ideia (varia a pose). Sem descrição → 3 conceitos.
+  const prompts = custom
+    ? POSES.map((pose) => montarPrompt(custom, pose))
+    : sortear3().map((c) => montarPrompt(c, "pose amigável acenando"));
+
+  const gerarUm = async (prompt: string): Promise<string> => {
     const resp = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -65,7 +82,7 @@ export async function gerarMascote(marcaId: string) {
 
   let urls: string[] = [];
   try {
-    const results = await Promise.allSettled(sortear3().map(gerarUm));
+    const results = await Promise.allSettled(prompts.map(gerarUm));
     urls = results.filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled").map((r) => r.value);
   } catch (e) {
     console.error("Erro ao gerar mascote:", e);

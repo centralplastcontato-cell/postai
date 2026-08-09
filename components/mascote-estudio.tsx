@@ -22,12 +22,13 @@ export function MascoteEstudio({
   const [proc, setProc] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [ampliada, setAmpliada] = useState<string | null>(null);
+  const [descricao, setDescricao] = useState("");
 
   function handleGerar() {
     setErro(null);
     setGerando(true);
     startTransition(async () => {
-      const r = await gerarMascote(marcaId);
+      const r = await gerarMascote(marcaId, descricao.trim() || undefined);
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setGerando(false);
@@ -105,6 +106,20 @@ export function MascoteEstudio({
         )}
       </div>
 
+      {/* Descrição do mascote (opcional) */}
+      <label className="mb-3 block text-xs text-muted">
+        Descreva seu mascote <span className="text-muted/70">(opcional — se deixar vazio, a IA sugere conceitos variados)</span>
+        <textarea
+          value={descricao}
+          onChange={(e) => setDescricao(e.target.value)}
+          rows={2}
+          maxLength={400}
+          placeholder="Ex: um dragãozinho verde fofo com uma coroa e capa vermelha, segurando um balão"
+          className="input-base mt-1 resize-y"
+        />
+        <span className="mt-0.5 block text-[10px] text-muted/70">Quando você descreve, a IA cria 3 versões da SUA ideia (variando a pose).</span>
+      </label>
+
       {/* Gerar opções */}
       <button
         type="button"
@@ -112,7 +127,7 @@ export function MascoteEstudio({
         disabled={gerando || isPending}
         className="mb-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#7c3aed] py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50 sm:w-auto sm:px-6"
       >
-        {gerando ? "🎨 Criando opções… (uns segundos)" : mascotes.length ? "✨ Gerar mais opções" : "✨ Gerar opções de mascote"}
+        {gerando ? "🎨 Criando opções… (uns segundos)" : descricao.trim() ? "✨ Gerar meu mascote" : mascotes.length ? "✨ Gerar mais opções" : "✨ Gerar opções de mascote"}
       </button>
 
       {/* Biblioteca de opções */}
