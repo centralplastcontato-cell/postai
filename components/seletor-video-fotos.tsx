@@ -1569,6 +1569,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   </div>
                 )}
                 <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">{cenaIdx + 1}/{escolhidas.length}{ehCapaCena && <span className="text-amber-300">⭐</span>}</span>
+                {/* MASCOTE (prévia) — buffet em todas as cenas; festa só na capa */}
+                {mascoteCanto && mascoteUrl && (tematicoId || ehCapaCena) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={mascoteUrl} alt="" className="pointer-events-none absolute w-auto object-contain" style={{ ...(mascoteCanto.startsWith("cima") ? { top: "6%" } : { bottom: "6%" }), ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }), height: mascoteTam === "p" ? "26%" : mascoteTam === "g" ? "46%" : "36%", filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.5))" }} />
+                )}
               </>
             ) : null}
           </div>
@@ -1641,6 +1646,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
               </span>
             </div>
             <span className="absolute bottom-2 left-2 rounded bg-black/70 px-2 py-1 text-[11px] font-semibold text-white">{LABEL[ampliada.momento] || ampliada.momento}</span>
+            {/* MASCOTE na prévia ampliada (buffet: aparece em todos os quadros) */}
+            {mascoteCanto && mascoteUrl && tematicoId && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={mascoteUrl} alt="" className="pointer-events-none absolute w-auto object-contain" style={{ ...(mascoteCanto.startsWith("cima") ? { top: "5%" } : { bottom: "5%" }), ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }), height: mascoteTam === "p" ? "26%" : mascoteTam === "g" ? "46%" : "36%", filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.5))" }} />
+            )}
           </div>
           <button onClick={(e) => { e.stopPropagation(); setAmpliada(null); }} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">Fechar</button>
         </div>
