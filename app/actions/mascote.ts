@@ -44,9 +44,10 @@ const POSES = [
 ];
 
 // Gera 3 opções de mascote em PARALELO (cabe na janela de 60s) e salva na biblioteca da marca.
-// Se o dono DESCREVER o mascote (descricao), gera 3 versões da IDEIA dele (variando a pose);
-// senão, sorteia 3 conceitos temáticos do castelo (a IA "sugere opções").
-export async function gerarMascote(marcaId: string, descricao?: string) {
+// - Com IMAGEM de referência: a IA cria o mascote BASEADO nela (edição a partir de imagem).
+// - Só com DESCRIÇÃO: 3 versões da ideia do dono (variando a pose).
+// - Sem nada: sorteia 3 conceitos temáticos do castelo (a IA "sugere opções").
+export async function gerarMascote(marcaId: string, descricao?: string, referenciaUrl?: string) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { corPrimaria: true, nome: true, mascotesArte: true } });
@@ -56,34 +57,63 @@ export async function gerarMascote(marcaId: string, descricao?: string) {
   const cor = marca.corPrimaria || "#7C3AED";
   const nome = marca.nome || "buffet infantil";
   const custom = (descricao || "").trim().slice(0, 400);
+  const ref = (referenciaUrl || "").trim();
 
-  const montarPrompt = (conceito: string, pose: string) =>
-    `Mascote de personagem em estilo 3D FOFO (render 3D caprichado estilo Pixar), redondinho, simpático e carismático, para um buffet infantil chamado "${nome}". O mascote é: ${conceito}. Cores vibrantes e alegres harmonizando com a cor ${cor}. CORPO INTEIRO, de frente, ${pose}, expressão feliz, olhando para a câmera. Iluminação suave de estúdio. FUNDO TOTALMENTE TRANSPARENTE (sem cenário, sem chão, sem sombra projetada no chão). SEM texto, letras, números, logotipos ou molduras.`;
-
-  // Descrição do dono → 3 versões da mesma ideia (varia a pose). Sem descrição → 3 conceitos.
-  const prompts = custom
-    ? POSES.map((pose) => montarPrompt(custom, pose))
-    : sortear3().map((c) => montarPrompt(c, "pose amigável acenando"));
-
-  const gerarUm = async (prompt: string): Promise<string> => {
-    const resp = await fetch("https://api.openai.com/v1/images/generations", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-image-1", prompt, n: 1, size: "1024x1536", quality: "medium", background: "transparent" }),
-      signal: AbortSignal.timeout(55000),
-    });
-    if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
-    const data = await resp.json();
-    const b64 = data.data?.[0]?.b64_json;
-    if (!b64) throw new Error("sem imagem");
+  const salvar = async (b64: string): Promise<string> => {
     const blob = await put(`${marcaId}/mascote-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.png`, Buffer.from(b64, "base64"), { access: "public", contentType: "image/png" });
     return blob.url;
   };
 
   let urls: string[] = [];
   try {
-    const results = await Promise.allSettled(prompts.map(gerarUm));
-    urls = results.filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled").map((r) => r.value);
+    if (ref) {
+      // COM REFERÊNCIA: baixa a imagem 1x e gera 3 versões via /images/edits (baseadas nela).
+      const rr = await fetch(ref, { signal: AbortSignal.timeout(20000) });
+      if (!rr.ok) return { ok: false as const, erro: "Não consegui baixar a imagem de referência. Tente enviar de novo." };
+      const ctype = rr.headers.get("content-type") || "image/png";
+      const buf = Buffer.from(await rr.arrayBuffer());
+      const promptRef = (pose: string) =>
+        `Crie um MASCOTE de personagem em estilo 3D FOFO (render 3D caprichado estilo Pixar), redondinho e carismático, para o buffet infantil "${nome}", INSPIRADO na imagem de referência enviada: preserve as características principais dela (formato, cores, elementos marcantes), mas transforme num mascote fofo e simpático.${custom ? ` Detalhes desejados: ${custom}.` : ""} Harmonize com a cor ${cor}. CORPO INTEIRO, de frente, ${pose}, expressão feliz. FUNDO TOTALMENTE TRANSPARENTE (sem cenário, sem chão, sem sombra projetada). SEM texto, letras, números, logotipos ou molduras.`;
+      const gerarUmRef = async (pose: string): Promise<string> => {
+        const form = new FormData();
+        form.append("model", "gpt-image-1");
+        form.append("prompt", promptRef(pose));
+        form.append("size", "1024x1536");
+        form.append("quality", "medium");
+        form.append("background", "transparent");
+        form.append("image", new Blob([buf], { type: ctype }), "referencia.png");
+        const resp = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(55000) });
+        if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+        const data = await resp.json();
+        const b64 = data.data?.[0]?.b64_json;
+        if (!b64) throw new Error("sem imagem");
+        return salvar(b64);
+      };
+      const results = await Promise.allSettled(POSES.map(gerarUmRef));
+      urls = results.filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled").map((r) => r.value);
+    } else {
+      // SEM REFERÊNCIA: geração por texto (descrição do dono ou conceitos sorteados).
+      const montarPrompt = (conceito: string, pose: string) =>
+        `Mascote de personagem em estilo 3D FOFO (render 3D caprichado estilo Pixar), redondinho, simpático e carismático, para um buffet infantil chamado "${nome}". O mascote é: ${conceito}. Cores vibrantes e alegres harmonizando com a cor ${cor}. CORPO INTEIRO, de frente, ${pose}, expressão feliz, olhando para a câmera. Iluminação suave de estúdio. FUNDO TOTALMENTE TRANSPARENTE (sem cenário, sem chão, sem sombra projetada no chão). SEM texto, letras, números, logotipos ou molduras.`;
+      const prompts = custom
+        ? POSES.map((pose) => montarPrompt(custom, pose))
+        : sortear3().map((c) => montarPrompt(c, "pose amigável acenando"));
+      const gerarUm = async (prompt: string): Promise<string> => {
+        const resp = await fetch("https://api.openai.com/v1/images/generations", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "gpt-image-1", prompt, n: 1, size: "1024x1536", quality: "medium", background: "transparent" }),
+          signal: AbortSignal.timeout(55000),
+        });
+        if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+        const data = await resp.json();
+        const b64 = data.data?.[0]?.b64_json;
+        if (!b64) throw new Error("sem imagem");
+        return salvar(b64);
+      };
+      const results = await Promise.allSettled(prompts.map(gerarUm));
+      urls = results.filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled").map((r) => r.value);
+    }
   } catch (e) {
     console.error("Erro ao gerar mascote:", e);
   }

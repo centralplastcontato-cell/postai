@@ -23,16 +23,35 @@ export function MascoteEstudio({
   const [erro, setErro] = useState<string | null>(null);
   const [ampliada, setAmpliada] = useState<string | null>(null);
   const [descricao, setDescricao] = useState("");
+  const [referenciaUrl, setReferenciaUrl] = useState("");
+  const [subindoRef, setSubindoRef] = useState(false);
 
   function handleGerar() {
     setErro(null);
     setGerando(true);
     startTransition(async () => {
-      const r = await gerarMascote(marcaId, descricao.trim() || undefined);
+      const r = await gerarMascote(marcaId, descricao.trim() || undefined, referenciaUrl || undefined);
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setGerando(false);
     });
+  }
+  async function handleUploadRef(file: File | undefined) {
+    if (!file) return;
+    setErro(null);
+    setSubindoRef(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const resp = await fetch("/api/marketing/upload", { method: "POST", body: form });
+      const data = await resp.json();
+      if (data.ok) setReferenciaUrl(data.url);
+      else setErro(data.erro || "Falha ao enviar a imagem de referência.");
+    } catch {
+      setErro("Falha ao enviar a imagem. Tente de novo.");
+    } finally {
+      setSubindoRef(false);
+    }
   }
   function handleEscolher(url: string) {
     setErro(null);
@@ -116,6 +135,23 @@ export function MascoteEstudio({
         )}
       </div>
 
+      {/* Imagem de referência (opcional) — a IA cria o mascote baseado nela */}
+      <div className="mb-3">
+        <p className="text-xs text-muted">Imagem de referência <span className="text-muted/70">(opcional — um rascunho ou inspiração; a IA cria o mascote baseado nela)</span></p>
+        {referenciaUrl ? (
+          <div className="mt-1 flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={referenciaUrl} alt="Referência" className="h-20 w-20 rounded-lg border border-linha object-cover" />
+            <button type="button" onClick={() => setReferenciaUrl("")} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-vermelho hover:text-white">Remover referência</button>
+          </div>
+        ) : (
+          <label className="mt-1 inline-flex cursor-pointer items-center gap-2 rounded-md border border-linha px-3 py-2 text-xs text-muted transition hover:border-[#7c3aed] hover:text-white">
+            {subindoRef ? "Enviando…" : "📎 Enviar imagem de referência"}
+            <input type="file" accept="image/*" className="hidden" disabled={subindoRef} onChange={(e) => handleUploadRef(e.target.files?.[0])} />
+          </label>
+        )}
+      </div>
+
       {/* Descrição do mascote (opcional) */}
       <label className="mb-3 block text-xs text-muted">
         Descreva seu mascote <span className="text-muted/70">(opcional — se deixar vazio, a IA sugere conceitos variados)</span>
@@ -137,7 +173,7 @@ export function MascoteEstudio({
         disabled={gerando || isPending}
         className="mb-5 flex w-full items-center justify-center gap-2 rounded-lg bg-[#7c3aed] py-3 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50 sm:w-auto sm:px-6"
       >
-        {gerando ? "🎨 Criando opções… (uns segundos)" : descricao.trim() ? "✨ Gerar meu mascote" : mascotes.length ? "✨ Gerar mais opções" : "✨ Gerar opções de mascote"}
+        {gerando ? "🎨 Criando opções… (uns segundos)" : descricao.trim() || referenciaUrl ? "✨ Gerar meu mascote" : mascotes.length ? "✨ Gerar mais opções" : "✨ Gerar opções de mascote"}
       </button>
 
       {/* Biblioteca de opções */}
