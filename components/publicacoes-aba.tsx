@@ -1387,8 +1387,10 @@ export function PublicacoesAba({
                   <div className="mt-2">
                     <select value={mascoteCanto} onChange={(e) => handleMascoteCanto(p.id, e.target.value)} disabled={ocupado} title="Mostrar o mascote da marca neste post e escolher o canto" className="rounded-md border border-linha bg-preto px-2 py-1 text-xs text-muted focus:border-vermelho focus:outline-none disabled:opacity-40">
                       <option value="">🦸 Mascote: não</option>
-                      <option value="dir">🦸 Mascote: canto direito ↘</option>
-                      <option value="esq">🦸 Mascote: canto esquerdo ↙</option>
+                      <option value="dir">🦸 Mascote: embaixo à direita ↘</option>
+                      <option value="esq">🦸 Mascote: embaixo à esquerda ↙</option>
+                      <option value="cima-dir">🦸 Mascote: em cima à direita ↗</option>
+                      <option value="cima-esq">🦸 Mascote: em cima à esquerda ↖</option>
                     </select>
                   </div>
                 )}

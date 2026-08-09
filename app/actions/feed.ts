@@ -1320,7 +1320,7 @@ export async function definirMascoteCanto(id: string, canto: string) {
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id }, select: { extra: true, marcaId: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
-  const ok = ["", "dir", "esq"].includes(canto) ? canto : "";
+  const ok = ["", "dir", "esq", "cima-dir", "cima-esq"].includes(canto) ? canto : "";
   let ex: Record<string, unknown> = {};
   try { ex = JSON.parse(p.extra || "{}"); } catch {}
   ex.mascoteCanto = ok;

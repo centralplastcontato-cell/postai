@@ -85,7 +85,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   // por post ("dir"/"esq"; vazio = não mostra). Sempre a MESMA imagem → o mascote é idêntico
   // em todo post. Sobreposto por cima da arte, sem cobrir o miolo (fica num canto de baixo).
   const canto = extra.mascoteCanto;
-  const usaMascote = Boolean(marca.mascoteUrl) && (canto === "dir" || canto === "esq");
+  const cantosOk = ["dir", "esq", "cima-dir", "cima-esq"];
+  const usaMascote = Boolean(marca.mascoteUrl) && cantosOk.includes(canto || "");
+  const emCima = canto === "cima-dir" || canto === "cima-esq";
+  const naDireita = canto === "dir" || canto === "cima-dir";
   const conteudo: ReactElement = usaMascote ? (
     <div style={{ position: "relative", display: "flex", width: "1080px", height: "1350px" }}>
       {arte}
@@ -94,7 +97,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         src={marca.mascoteUrl}
         width={340}
         height={430}
-        style={{ position: "absolute", bottom: 18, ...(canto === "dir" ? { right: 18 } : { left: 18 }), width: "340px", height: "430px", objectFit: "contain", filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.4))" }}
+        style={{ position: "absolute", ...(emCima ? { top: 18 } : { bottom: 18 }), ...(naDireita ? { right: 18 } : { left: 18 }), width: "340px", height: "430px", objectFit: "contain", filter: "drop-shadow(0 6px 14px rgba(0,0,0,0.4))" }}
       />
     </div>
   ) : (
