@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
 const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
@@ -132,7 +132,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -153,6 +153,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   capaEstiloInicial?: string; // estilo da capa (temático): "" (clássica) | "impacto" (chamativa) | "ia"
   capaIaUrlInicial?: string; // URL da arte de capa gerada pela IA (quando estilo = "ia")
   capaRecorteUrlInicial?: string; // URL da foto recortada (quando estilo = "recortado")
+  mascoteCantoInicial?: string; // mascote no vídeo: "" (não) | dir | esq | cima-dir | cima-esq
+  mascoteTamInicial?: string; // tamanho do mascote no vídeo: p | m | g
+  mascoteUrl?: string; // mascote oficial da marca (PNG) — pro preview e pra saber se existe
   capasBanco?: string[]; // biblioteca de artes de capa (IA) da marca, pra reusar
   corMarca?: string;
   jaTemVideo?: boolean;
@@ -191,6 +194,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [capaRecorteUrl, setCapaRecorteUrl] = useState<string>(capaRecorteUrlInicial || ""); // foto recortada (sem fundo)
   const [gerandoRecorte, setGerandoRecorte] = useState(false);
   const [erroRecorte, setErroRecorte] = useState("");
+  // MASCOTE no vídeo: canto ("" = não mostra) + tamanho. Só faz sentido se a marca tem mascote.
+  const [mascoteCanto, setMascoteCanto] = useState<string>(mascoteCantoInicial || "");
+  const [mascoteTam, setMascoteTam] = useState<string>(mascoteTamInicial || "m");
   // Nome do vídeo (só o do buffet dá pra renomear aqui; no de festa o nome são os aniversariantes).
   const [nomeVideo, setNomeVideo] = useState(nome);
   const [editandoNome, setEditandoNome] = useState(false);
@@ -223,6 +229,17 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId) return;
     setCorMoldura(nova);
     definirMolduraCorVideo(tematicoId, nova).catch(() => {});
+  }
+  // Liga/desliga o MASCOTE no vídeo + canto/tamanho — salva na hora; vale no próximo Gerar.
+  function trocarMascoteCanto(canto: string) {
+    if (!tematicoId) return;
+    setMascoteCanto(canto);
+    definirMascoteVideo(tematicoId, canto, mascoteTam).catch(() => {});
+  }
+  function trocarMascoteTam(tam: string) {
+    if (!tematicoId) return;
+    setMascoteTam(tam);
+    definirMascoteVideo(tematicoId, mascoteCanto, tam).catch(() => {});
   }
   // Troca o estilo da CAPA (clássica / impacto / ia) — salva na hora; vale no próximo Gerar.
   function trocarCapaEstilo(novo: string) {
@@ -772,6 +789,21 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       </div>
                     </>
                   )}
+                  {/* MASCOTE (prévia aproximada) — canto/tamanho escolhidos na aba Estilo */}
+                  {mascoteCanto && mascoteUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={mascoteUrl}
+                      alt=""
+                      className="pointer-events-none absolute w-auto object-contain"
+                      style={{
+                        ...(mascoteCanto.startsWith("cima") ? { top: "6%" } : { bottom: "6%" }),
+                        ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }),
+                        height: mascoteTam === "p" ? "26%" : mascoteTam === "g" ? "46%" : "36%",
+                        filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.45))",
+                      }}
+                    />
+                  )}
                   {/* texto sobre a cena (aproximação): título na capa / legenda nas outras */}
                   {legendaCena && (
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 text-center lg:px-4 lg:pb-4">
@@ -1089,6 +1121,27 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     )}
                     {fundoCheia && <p className="mt-1 text-[10px] leading-snug text-amber-300/80">Com o fundo <strong>🔳 na tela toda</strong>, a foto preenche a tela e a moldura não aparece.</p>}
                   </div>
+
+                  {/* MASCOTE no vídeo (só no buffet e se a marca tem mascote) */}
+                  {tematicoId && mascoteUrl && (
+                    <div>
+                      <span className="text-[11px] font-semibold text-white">🦸 Mascote no vídeo</span>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {[{ id: "", l: "Não" }, { id: "cima-esq", l: "Cima ↖" }, { id: "cima-dir", l: "Cima ↗" }, { id: "esq", l: "Baixo ↙" }, { id: "dir", l: "Baixo ↘" }].map((o) => (
+                          <button key={o.id || "nao"} type="button" onClick={() => trocarMascoteCanto(o.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${mascoteCanto === o.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{o.l}</button>
+                        ))}
+                      </div>
+                      {mascoteCanto && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted">Tamanho:</span>
+                          {[{ id: "p", l: "P" }, { id: "m", l: "M" }, { id: "g", l: "G" }].map((o) => (
+                            <button key={o.id} type="button" onClick={() => trocarMascoteTam(o.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${mascoteTam === o.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{o.l}</button>
+                          ))}
+                        </div>
+                      )}
+                      <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Aparece em todos os quadros. Dica: evite <strong className="text-white/70">baixo à direita</strong> — é onde o vídeo carimba o logo.</p>
+                    </div>
+                  )}
 
                   {/* mini-preview "como fica" — clica pra ampliar */}
                   {fotoPrevFV && !fundoCheia && (

@@ -337,6 +337,20 @@ export async function definirMolduraCorVideo(videoId: string, cor: string) {
   return { ok: true as const, cor: valor };
 }
 
+// MASCOTE nos quadros do vídeo: canto ("" não | dir | esq | cima-dir | cima-esq) + tamanho (p|m|g).
+// Muda como o /api/quadro-tema desenha cada quadro (cola o mascote da marca no canto escolhido).
+export async function definirMascoteVideo(videoId: string, canto: string, tam: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const c = ["", "dir", "esq", "cima-dir", "cima-esq"].includes(canto) ? canto : "";
+  const t = ["p", "m", "g"].includes(tam) ? tam : "m";
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { mascoteCanto: c, mascoteTam: t } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, canto: c, tam: t };
+}
+
 // Estilo da CAPA (1º quadro) do vídeo do buffet: "" (clássica) | "impacto" (capa chamativa, tipo
 // thumbnail — foto na tela toda + texto gigante com contorno). Muda como o /api/quadro-tema desenha o quadro 0.
 export async function definirCapaEstilo(videoId: string, estilo: string) {
@@ -470,7 +484,7 @@ export async function renomearVideoTematico(videoId: string, titulo: string) {
 export async function gerarVideoTematico(videoId: string) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
-    include: { marca: { select: { logoUrl: true, slug: true, corPrimaria: true, corFundo: true, site: true } } },
+    include: { marca: { select: { logoUrl: true, slug: true, corPrimaria: true, corFundo: true, site: true, mascoteUrl: true } } },
   });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
@@ -552,13 +566,16 @@ export async function gerarVideoTematico(videoId: string) {
   // muda — legenda, fotos, capa, a URL de cada foto E a identidade da marca (cor/logo/site).
   // "q2" = VERSÃO do desenho do quadro (fundo virou foto BORRADA). Bumpar isso quando o visual do
   // quadro muda força a CDN a redesenhar (o ?v= só depende de dados; sem isso, serviria o antigo).
+  // Mascote ligado → os quadros precisam ser os NOSSOS (o overlay mora no /api/quadro-tema).
+  const mascoteOn = Boolean(v.marca.mascoteUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.mascoteCanto || "");
   const versao = hashCurto(
-    ["q3", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
+    ["q4", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
 
   let fotosMotor: string[];
-  if (temLegenda) {
-    // O índice do quadro é a posição da foto em videoFotos (a rota lê o MESMO array).
+  if (temLegenda || mascoteOn) {
+    // O índice do quadro é a posição da foto em videoFotos (a rota lê o MESMO array). Também
+    // entra aqui quando o MASCOTE está ligado (o overlay dele mora no /api/quadro-tema).
     fotosMotor = idsSlideshow.map((id) => `${base}/api/quadro-tema/${videoId}/${ids.indexOf(id) + 1}.jpg?v=${versao}`);
   } else {
     // Sem legenda: fotos cruas (o motor faz fundo borrado + moldura). Respeita o corte da
@@ -571,7 +588,7 @@ export async function gerarVideoTematico(videoId: string) {
   // Com frase de capa, a capa é a NOSSA arte (n=0). Sem frase, vai a foto crua — mas SEM texto:
   // o nome do tema ("Brinquedos") é etiqueta interna, não abertura de vídeo. Melhor capa limpa
   // do que capa com etiqueta. Por isso o motor nunca escreve nada na capa.
-  const capaFinal = fraseCapa ? `${base}/api/quadro-tema/${videoId}/0.jpg?v=${versao}` : capaUrl;
+  const capaFinal = fraseCapa || mascoteOn ? `${base}/api/quadro-tema/${videoId}/0.jpg?v=${versao}` : capaUrl;
   const textoDaCapa = "";
 
   const antigo = v.videoUrl; // guardado ANTES do lock (só apagamos depois, e se ninguém usar)
@@ -584,7 +601,7 @@ export async function gerarVideoTematico(videoId: string) {
   const r = await dispararMotorReels({
     fotos: fotosMotor,
     capaUrl: capaFinal,
-    moldura: temLegenda ? "nenhuma" : v.videoMoldura || "branca",
+    moldura: temLegenda || mascoteOn ? "nenhuma" : v.videoMoldura || "branca",
     corMoldura: v.marca.corPrimaria || "#FFFFFF",
     logoUrl: v.marca.logoUrl,
     // A trilha do vídeo: a NARRAÇÃO (que já vem com o jingle misturado por baixo) ou, sem

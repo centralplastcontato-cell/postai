@@ -283,6 +283,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       capaEstilo: v.capaEstilo || "",
       capaIaUrl: v.capaIaUrl || "",
       capaRecorteUrl: v.capaRecorteUrl || "",
+      mascoteCanto: v.mascoteCanto || "",
+      mascoteTam: v.mascoteTam || "m",
       videoMusica: v.videoMusica || "",
       videoTextos: (() => { try { const m = JSON.parse(v.videoTextos || "{}"); return m && typeof m === "object" && !Array.isArray(m) ? (m as Record<string, string>) : {}; } catch { return {}; } })(),
       narracao: { texto: v.narracaoTexto, voz: v.narracaoVoz, estilo: v.narracaoEstilo, url: v.narracaoUrl, segundos: v.narracaoSeg },
@@ -290,8 +292,9 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         const raw = (v.videoCapa && urlDaFoto.get(v.videoCapa)) || (ids[0] && urlDaFoto.get(ids[0])) || null;
         // Capa ESTILIZADA (impacto/ia/recortado): a miniatura é o QUADRO 0 renderizado (a capa de
         // verdade), não a foto crua. O ?v muda quando algo da capa muda (pra a CDN atualizar).
-        if (v.capaEstilo === "impacto" || v.capaEstilo === "ia" || v.capaEstilo === "recortado") {
-          const s = [v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.videoCapa, v.videoTextos, v.videoFundo, v.videoFundoCor, marca.corPrimaria, marca.logoUrl].join("|");
+        const temMascoteVideo = Boolean(marca.mascoteUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.mascoteCanto || "");
+        if (v.capaEstilo === "impacto" || v.capaEstilo === "ia" || v.capaEstilo === "recortado" || temMascoteVideo) {
+          const s = [v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.videoCapa, v.videoTextos, v.videoFundo, v.videoFundoCor, v.mascoteCanto, v.mascoteTam, marca.mascoteUrl, marca.corPrimaria, marca.logoUrl].join("|");
           let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
           return `/api/quadro-tema/${v.id}/0.jpg?v=${h.toString(36)}`;
         }

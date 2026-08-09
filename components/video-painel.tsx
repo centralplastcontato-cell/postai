@@ -26,6 +26,8 @@ export type VideoTematicoView = {
   capaEstilo: string; // estilo da capa: "" (clássica) | "impacto" (foto na tela toda) | "ia" (arte da IA)
   capaIaUrl: string; // URL da arte de capa gerada pela IA (quando capaEstilo = "ia")
   capaRecorteUrl: string; // URL da foto recortada (quando capaEstilo = "recortado")
+  mascoteCanto: string; // mascote no vídeo: "" (não) | dir | esq | cima-dir | cima-esq
+  mascoteTam: string; // tamanho do mascote no vídeo: p | m | g
   videoMusica: string; // trilha escolhida (URL) — "" = jingle do buffet
   videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
   narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
@@ -258,7 +260,7 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
   );
 }
 
-export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco = [] }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string; capasBanco?: string[] }) {
+export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco = [], mascoteUrl = "" }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string; capasBanco?: string[]; mascoteUrl?: string }) {
   const router = useRouter();
   const [seletor, setSeletor] = useState<FestaView | null>(null);
   // criação/edição de vídeo TEMÁTICO
@@ -391,6 +393,9 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           capaEstiloInicial={seletorTema.video.capaEstilo}
           capaIaUrlInicial={seletorTema.video.capaIaUrl}
           capaRecorteUrlInicial={seletorTema.video.capaRecorteUrl}
+          mascoteCantoInicial={seletorTema.video.mascoteCanto}
+          mascoteTamInicial={seletorTema.video.mascoteTam}
+          mascoteUrl={mascoteUrl}
           capasBanco={capasBanco}
           musicaInicial={seletorTema.video.videoMusica}
           musicasBanco={musicasBanco}

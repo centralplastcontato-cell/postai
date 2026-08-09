@@ -53,7 +53,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
   try {
     const v = await prisma.videoTematico.findUnique({
       where: { id },
-      include: { marca: { select: { corPrimaria: true, corFundo: true } } },
+      include: { marca: { select: { corPrimaria: true, corFundo: true, mascoteUrl: true } } },
     });
     if (!v) return falhou("Vídeo não encontrado.");
 
@@ -287,7 +287,31 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
         </div>
       );
 
-    const png = await new ImageResponse(el, { width: L, height: A, fonts: carregarFontes() }).arrayBuffer();
+    // MASCOTE (Fase 3): cola o mascote da marca num canto do quadro. O MOTOR carimba o logo
+    // embaixo à direita (e no topo, na capa), então o dono escolhe um canto livre. Sempre a
+    // MESMA imagem → o mascote é idêntico em todo quadro do vídeo.
+    const mascCanto = v.mascoteCanto;
+    const mascUrl = v.marca.mascoteUrl;
+    const usaMascote = Boolean(mascUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(mascCanto || "");
+    const mascDim = v.mascoteTam === "p" ? { w: 300, h: 380 } : v.mascoteTam === "g" ? { w: 560, h: 700 } : { w: 420, h: 530 };
+    const mascEmCima = mascCanto === "cima-dir" || mascCanto === "cima-esq";
+    const mascNaDireita = mascCanto === "dir" || mascCanto === "cima-dir";
+    const elFinal = usaMascote ? (
+      <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative" }}>
+        {el}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={mascUrl}
+          width={mascDim.w}
+          height={mascDim.h}
+          style={{ position: "absolute", ...(mascEmCima ? { top: 40 } : { bottom: 40 }), ...(mascNaDireita ? { right: 40 } : { left: 40 }), width: `${mascDim.w}px`, height: `${mascDim.h}px`, objectFit: "contain", filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.45))" }}
+        />
+      </div>
+    ) : (
+      el
+    );
+
+    const png = await new ImageResponse(elFinal, { width: L, height: A, fonts: carregarFontes() }).arrayBuffer();
 
     // PNG (2-3 MB) → JPEG (~300 KB): o motor baixa 26 quadros; o download é o gargalo, não o CPU.
     const jpg = await sharp(Buffer.from(png)).jpeg({ quality: 88, chromaSubsampling: "4:4:4" }).toBuffer();

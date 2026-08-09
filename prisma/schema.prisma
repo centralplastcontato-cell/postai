@@ -95,6 +95,8 @@ model VideoTematico {
   capaEstilo      String   @default("") // estilo da CAPA (1º quadro): "" (clássica) | "impacto" (foto na tela toda + texto) | "ia" (arte festiva da IA + texto)
   capaIaUrl       String   @default("") // URL (Blob) da arte de capa gerada pela IA — usada quando capaEstilo = "ia"
   capaRecorteUrl  String   @default("") // URL (Blob) da foto RECORTADA (assunto sem fundo) — usada quando capaEstilo = "recortado"
+  mascoteCanto    String   @default("") // MASCOTE nos quadros do vídeo: "" (não) | dir | esq | cima-dir | cima-esq
+  mascoteTam      String   @default("m") // tamanho do mascote no vídeo: p | m | g
   videoMusica     String   @default("") // trilha escolhida (URL do MP3); "" = jingle do buffet. Vale quando NÃO há narração.
   videoUrl        String   @default("")
   // Quando o MP4 FICOU PRONTO (o motor avisou). Diferente de `criadoEm`: o vídeo do buffet é
