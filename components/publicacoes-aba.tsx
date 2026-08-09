@@ -522,9 +522,10 @@ export function PublicacoesAba({
     });
   }
   function handlePostar(p: PublicacaoView) {
+    const comStory = (p.espelhar ?? !!espelharStoryPadrao);
     setConfirmacao({
       titulo: temFacebook ? "Postar no Instagram e Facebook agora?" : "Postar no Instagram agora?",
-      descricao: `"${p.titulo}" vai ao ar de verdade ${redesTexto}.`,
+      descricao: `"${p.titulo}" vai ao ar de verdade ${redesTexto}${comStory ? " — e também sobe como Story" : ""}.`,
       textoConfirmar: "Postar agora",
       acao: async () => {
         setProc(p.id);
@@ -532,6 +533,8 @@ export function PublicacoesAba({
         try {
           const r = await postarPublicacao(p.id);
           if (!r.ok) setErro(r.erro);
+          // O feed foi ao ar, mas o Story (espelho) pode ter falhado — avisa sem alarmar.
+          else if (r.story === false) setErro(`O post foi publicado, mas não consegui subir o Story: ${r.erroStory ?? "tente de novo pelo botão 🟣."}`);
           router.refresh();
         } finally {
           setProc(null);

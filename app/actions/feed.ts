@@ -1328,6 +1328,17 @@ export async function postarPublicacao(id: string) {
   await prisma.publicacao.update({ where: { id }, data: { status: "postado", postadoEm: new Date(), mediaId: r.ig.mediaId } });
   const onde = r.fb?.ok ? "Instagram + Facebook" : "Instagram";
   await registrarAtividade(AGENTE, `Postei "${p.titulo}" no ${onde} de ${p.marca.nome}.`, p.marcaId);
+  // Espelhar no Story: se o post estiver com "Story: sim" (override) ou for o padrão da marca,
+  // sobe também como Story — igual ao piloto automático. Antes o Postar MANUAL ignorava isso
+  // e só o feed ia. Best-effort: se o Story falhar, o feed já está postado (não desfaz).
+  let story: boolean | null = null;
+  let erroStory: string | undefined;
+  if (p.formato !== "story" && (p.espelhar ?? p.marca.espelharStory)) {
+    const rs = await publicarStoryNasRedes(p.marca, `${baseUrl()}/api/story/${p.id}?v=${tokenArte(p)}`);
+    story = rs.ig.ok;
+    if (!rs.ig.ok) erroStory = rs.ig.erro;
+    await registrarAtividade(AGENTE, rs.ig.ok ? `Espelhei "${p.titulo}" no Story de ${p.marca.nome}.` : `Não consegui espelhar "${p.titulo}" no Story: ${rs.ig.erro}`, p.marcaId).catch(() => {});
+  }
   revalidatePath(`/painel/marcas/${p.marcaId}`);
-  return { ok: true as const, permalink: r.ig.permalink, facebook: r.fb?.ok ?? null, erroFacebook: r.fb && !r.fb.ok ? r.fb.erro : undefined };
+  return { ok: true as const, permalink: r.ig.permalink, facebook: r.fb?.ok ?? null, erroFacebook: r.fb && !r.fb.ok ? r.fb.erro : undefined, story, erroStory };
 }
