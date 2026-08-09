@@ -293,7 +293,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     const mascCanto = v.mascoteCanto;
     const mascUrl = v.marca.mascoteUrl;
     const usaMascote = Boolean(mascUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(mascCanto || "");
-    const mascDim = v.mascoteTam === "p" ? { w: 300, h: 380 } : v.mascoteTam === "g" ? { w: 560, h: 700 } : { w: 420, h: 530 };
+    const mascDim = v.mascoteTam === "p" ? { w: 190, h: 235 } : v.mascoteTam === "g" ? { w: 430, h: 540 } : { w: 290, h: 360 };
     const mascEmCima = mascCanto === "cima-dir" || mascCanto === "cima-esq";
     const mascNaDireita = mascCanto === "dir" || mascCanto === "cima-dir";
     const elFinal = usaMascote ? (

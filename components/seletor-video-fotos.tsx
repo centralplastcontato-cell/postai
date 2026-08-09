@@ -800,7 +800,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       style={{
                         ...(mascoteCanto.startsWith("cima") ? { top: "6%" } : { bottom: "6%" }),
                         ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }),
-                        height: mascoteTam === "p" ? "26%" : mascoteTam === "g" ? "46%" : "36%",
+                        height: mascoteTam === "p" ? "12%" : mascoteTam === "g" ? "28%" : "19%",
                         filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.45))",
                       }}
                     />
@@ -1572,7 +1572,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 {/* MASCOTE (prévia) — buffet em todas as cenas; festa só na capa */}
                 {mascoteCanto && mascoteUrl && (tematicoId || ehCapaCena) && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={mascoteUrl} alt="" className="pointer-events-none absolute w-auto object-contain" style={{ ...(mascoteCanto.startsWith("cima") ? { top: "6%" } : { bottom: "6%" }), ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }), height: mascoteTam === "p" ? "26%" : mascoteTam === "g" ? "46%" : "36%", filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.5))" }} />
+                  <img src={mascoteUrl} alt="" className="pointer-events-none absolute w-auto object-contain" style={{ ...(mascoteCanto.startsWith("cima") ? { top: "6%" } : { bottom: "6%" }), ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }), height: mascoteTam === "p" ? "12%" : mascoteTam === "g" ? "28%" : "19%", filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.5))" }} />
                 )}
               </>
             ) : null}
@@ -1649,7 +1649,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             {/* MASCOTE na prévia ampliada (buffet: aparece em todos os quadros) */}
             {mascoteCanto && mascoteUrl && tematicoId && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={mascoteUrl} alt="" className="pointer-events-none absolute w-auto object-contain" style={{ ...(mascoteCanto.startsWith("cima") ? { top: "5%" } : { bottom: "5%" }), ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }), height: mascoteTam === "p" ? "26%" : mascoteTam === "g" ? "46%" : "36%", filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.5))" }} />
+              <img src={mascoteUrl} alt="" className="pointer-events-none absolute w-auto object-contain" style={{ ...(mascoteCanto.startsWith("cima") ? { top: "5%" } : { bottom: "5%" }), ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }), height: mascoteTam === "p" ? "12%" : mascoteTam === "g" ? "28%" : "19%", filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.5))" }} />
             )}
           </div>
           <button onClick={(e) => { e.stopPropagation(); setAmpliada(null); }} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">Fechar</button>

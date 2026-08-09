@@ -74,7 +74,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     const mascUrl = festa.marca.mascoteUrl;
     const mascCanto = festa.mascoteCanto;
     const usaMascote = Boolean(mascUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(mascCanto || "");
-    const mascDim = festa.mascoteTam === "p" ? { w: 300, h: 380 } : festa.mascoteTam === "g" ? { w: 560, h: 700 } : { w: 420, h: 530 };
+    const mascDim = festa.mascoteTam === "p" ? { w: 190, h: 235 } : festa.mascoteTam === "g" ? { w: 430, h: 540 } : { w: 290, h: 360 };
     const mascEmCima = mascCanto === "cima-dir" || mascCanto === "cima-esq";
     const mascNaDireita = mascCanto === "dir" || mascCanto === "cima-dir";
 
