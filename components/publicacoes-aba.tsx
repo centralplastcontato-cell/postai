@@ -8,6 +8,7 @@ import {
   regerarComoNova,
   alternarAprovacao,
   postarPublicacao,
+  postarStoryDoFeed,
   excluirPublicacao,
   gerarImagemPublicacao,
   definirImagemPublicacao,
@@ -535,6 +536,27 @@ export function PublicacoesAba({
           if (!r.ok) setErro(r.erro);
           // O feed foi ao ar, mas o Story (espelho) pode ter falhado — avisa sem alarmar.
           else if (r.story === false) setErro(`O post foi publicado, mas não consegui subir o Story: ${r.erroStory ?? "tente de novo pelo botão 🟣."}`);
+          router.refresh();
+        } finally {
+          setProc(null);
+          setPostandoId(null);
+        }
+      },
+    });
+  }
+  // Sobe SÓ o Story de um post de feed já postado (a mesma arte) — pra quando o feed já foi
+  // ao ar sem o Story e o dono quer o Story depois.
+  function handlePostarStory(p: PublicacaoView) {
+    setConfirmacao({
+      titulo: "Postar o Story agora?",
+      descricao: `A arte de "${p.titulo}" vai ao ar como Story no Instagram (some em 24h). O post do feed continua como está.`,
+      textoConfirmar: "Postar Story",
+      acao: async () => {
+        setProc(p.id);
+        setPostandoId(p.id);
+        try {
+          const r = await postarStoryDoFeed(p.id);
+          if (!r.ok) setErro(r.erro);
           router.refresh();
         } finally {
           setProc(null);
@@ -1352,6 +1374,11 @@ export function PublicacoesAba({
                   )}
                   {!postado && (
                     <button onClick={() => handleEspelhar(p.id, !(p.espelhar ?? !!espelharStoryPadrao))} disabled={ocupado} title="Quando este post for ao ar, também sobe como Story no Instagram" className={`rounded-md px-2.5 py-1 text-xs font-semibold transition disabled:opacity-40 ${(p.espelhar ?? !!espelharStoryPadrao) ? "bg-[#7c3aed] text-white hover:opacity-90" : "border border-linha text-muted hover:border-[#7c3aed] hover:text-white"}`}>{(p.espelhar ?? !!espelharStoryPadrao) ? "🟣 Story: sim" : "🟣 Story: não"}</button>
+                  )}
+                  {/* Post de feed JÁ postado: sobe SÓ o Story (mesma arte) sob demanda, pra quando
+                      o feed foi ao ar sem o Story e o dono quer o Story depois. */}
+                  {postado && p.formato !== "story" && (
+                    <button onClick={() => handlePostarStory(p)} disabled={ocupado} title="Subir a mesma arte como Story agora (some em 24h) — não altera o post do feed" className="rounded-md bg-[#7c3aed] px-2.5 py-1 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50">🟣 Postar Story</button>
                   )}
                   <button onClick={() => handleExcluir(p.id)} disabled={ocupado} className="rounded-md border border-red-900 px-2.5 py-1 text-xs text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">Excluir</button>
                 </div>

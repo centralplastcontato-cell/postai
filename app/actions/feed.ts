@@ -785,6 +785,23 @@ export async function postarStory(id: string) {
   return { ok: true as const };
 }
 
+// Sobe SÓ o Story de um post de feed que JÁ foi postado (a mesma arte, em 9:16). Não mexe
+// no status/mediaId do feed (ele continua "postado" com o id de feed dele) — é só um Story
+// extra, sob demanda. Pra quando o feed já foi ao ar sem o Story e o dono quer o Story depois.
+export async function postarStoryDoFeed(id: string) {
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (ehTrial(g.sessao)) return { ok: false as const, erro: MSG_TRIAL_POSTAR };
+  const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
+  if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  if (!marcaConectada(p.marca)) return { ok: false as const, erro: "Conecte o Instagram da marca primeiro." };
+  const r = await publicarStoryNasRedes(p.marca, `${baseUrl()}/api/story/${p.id}?v=${tokenArte(p)}`);
+  if (!r.ig.ok) return { ok: false as const, erro: r.ig.erro };
+  await registrarAtividade(AGENTE, `Postei o Story de "${p.titulo}" no Instagram de ${p.marca.nome}.`, p.marcaId);
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const };
+}
+
 // Define se ESTE post de feed também vira Story ao ser publicado (override do padrão
 // da marca). O piloto usa `espelhar ?? marca.espelharStory`.
 export async function definirEspelhar(id: string, espelhar: boolean) {
