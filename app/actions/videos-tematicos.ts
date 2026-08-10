@@ -618,8 +618,10 @@ export async function gerarVideoTematico(videoId: string) {
     capaUrl: capaFinal,
     moldura: temLegenda || mascoteOn || logoOn ? "nenhuma" : v.videoMoldura || "branca",
     corMoldura: v.marca.corPrimaria || "#FFFFFF",
-    // Logo posicionado por nós → o motor NÃO carimba o dele (senão sairiam dois logos).
-    logoUrl: logoOn ? "" : v.marca.logoUrl,
+    // Logo posicionado por nós → mandamos um logo INVISÍVEL pro motor (ele EXIGE um logo,
+    // recusa com "Sem logo" se vier vazio). Assim ele não carimba nada visível e o logo de
+    // verdade aparece no canto escolhido (desenhado por nós no /api/quadro-tema).
+    logoUrl: logoOn ? `${base}/api/logo-vazio` : v.marca.logoUrl,
     // A trilha do vídeo: a NARRAÇÃO (que já vem com o jingle misturado por baixo) ou, sem
     // narração, o jingle puro. O motor só aceita uma trilha — por isso a mistura é nossa.
     // Com narração: a voz (com o jingle já misturado). Sem narração: a trilha ESCOLHIDA pelo dono
