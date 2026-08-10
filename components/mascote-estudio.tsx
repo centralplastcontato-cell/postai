@@ -280,7 +280,7 @@ export function MascoteEstudio({
                   </button>
                   <div className="flex items-center justify-between gap-2 px-2 py-1.5">
                     <span className="text-[11px] font-semibold text-muted">{FICHA_LABELS[i] || `Vista ${i + 1}`}</span>
-                    <a href={url} download={`mascote-${(FICHA_LABELS[i] || `vista-${i + 1}`).toLowerCase()}.png`} className="text-[11px] font-semibold text-[#c7b2ff] hover:underline">⬇ Baixar</a>
+                    <a href={url} target="_blank" rel="noopener noreferrer" download={`mascote-${(FICHA_LABELS[i] || `vista-${i + 1}`).toLowerCase()}.png`} className="text-[11px] font-semibold text-[#c7b2ff] hover:underline">⬇ Baixar</a>
                   </div>
                 </div>
               ))}
