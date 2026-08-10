@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d } from "@/app/actions/mascote";
 
+const FICHA_LABELS = ["Frente", "Lado", "Costas"];
+
 // 🦸 ESTÚDIO DO MASCOTE (Fase 1): o dono gera opções em 3D fofo, escolhe uma e ela vira o
 // mascote OFICIAL da marca. Depois (Fases 2/3) esse MESMO mascote é colado nos posts/vídeos.
 
@@ -87,6 +89,12 @@ export function MascoteEstudio({
       setProc(null);
     });
   }
+  // Ficha 3D: novo formato é JSON [frente, lado, costas]; formato antigo era 1 URL só.
+  const fichaUrls: string[] = (() => {
+    if (!ficha3d) return [];
+    if (ficha3d.startsWith("[")) { try { const a = JSON.parse(ficha3d); return Array.isArray(a) ? a.filter((u): u is string => typeof u === "string" && u.startsWith("http")) : []; } catch { return []; } }
+    return [ficha3d];
+  })();
   const [gerandoFicha, setGerandoFicha] = useState(false);
   function handleFicha3d() {
     setErro(null);
@@ -262,11 +270,21 @@ export function MascoteEstudio({
 
           {erro && <p className="mt-3 rounded-md border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">{erro}</p>}
 
-          {ficha3d && (
-            <button type="button" onClick={() => setAmpliada(ficha3d)} className="mt-3 block w-full overflow-hidden rounded-lg border border-linha transition hover:border-[#7c3aed]" title="Ampliar">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ficha3d} alt="Ficha do mascote (frente, lado e costas)" className="w-full object-contain" />
-            </button>
+          {fichaUrls.length > 0 && (
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {fichaUrls.map((url, i) => (
+                <div key={url} className="overflow-hidden rounded-lg border border-linha">
+                  <button type="button" onClick={() => setAmpliada(url)} className="block w-full transition hover:opacity-90" title="Ampliar">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={FICHA_LABELS[i] || "Vista"} className="w-full object-contain" />
+                  </button>
+                  <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                    <span className="text-[11px] font-semibold text-muted">{FICHA_LABELS[i] || `Vista ${i + 1}`}</span>
+                    <a href={url} download={`mascote-${(FICHA_LABELS[i] || `vista-${i + 1}`).toLowerCase()}.png`} className="text-[11px] font-semibold text-[#c7b2ff] hover:underline">⬇ Baixar</a>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
 
           <div className="mt-3 flex flex-wrap gap-2">
@@ -276,13 +294,10 @@ export function MascoteEstudio({
               disabled={gerandoFicha || isPending}
               className="rounded-lg bg-[#7c3aed] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50"
             >
-              {gerandoFicha ? "🧊 Criando a ficha… (uns segundos)" : ficha3d ? "🔄 Gerar de novo" : "🧊 Gerar ficha pro 3D"}
+              {gerandoFicha ? "🧊 Criando a ficha… (uns segundos)" : fichaUrls.length ? "🔄 Gerar de novo" : "🧊 Gerar ficha pro 3D"}
             </button>
-            {ficha3d && (
-              <a href={ficha3d} download="mascote-ficha-3d.png" className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">⬇ Baixar ficha</a>
-            )}
           </div>
-          <p className="mt-2 text-[10px] text-muted/70">A IA recria o mascote em 3 ângulos — pode ter pequenas diferenças entre as vistas; é uma referência pro 3D, não a peça final.</p>
+          <p className="mt-2 text-[10px] text-muted/70">A IA recria o mascote em 3 vistas (frente, lado e costas) — pode ter pequenas diferenças entre elas; é uma referência pro 3D, não a peça final. A bandeira sai branca (o logo de verdade o 3D coloca depois).</p>
         </div>
       )}
     </div>

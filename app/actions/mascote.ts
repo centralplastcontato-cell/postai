@@ -198,23 +198,40 @@ export async function gerarFicha3d(marcaId: string) {
     if (!rr.ok) return { ok: false as const, erro: "Não consegui baixar o mascote." };
     const ctype = rr.headers.get("content-type") || "image/png";
     const buf = Buffer.from(await rr.arrayBuffer());
-    const form = new FormData();
-    form.append("model", "gpt-image-1");
-    form.append("prompt", "Prancha de referência (model sheet / turnaround) do MESMO personagem da imagem, para modelagem 3D. Mostre o personagem de CORPO INTEIRO em TRÊS vistas EMPILHADAS uma EMBAIXO da outra (em COLUNA), na mesma escala e centralizadas: de cima para baixo — 1) VISTA DE FRENTE, 2) VISTA DE LADO (perfil), 3) VISTA DE COSTAS. MANTENHA TODOS os elementos do personagem IDÊNTICOS à referência, INCLUSIVE a BANDEIRINHA no topo (mantenha a bandeira nas três vistas; o texto dela não precisa ficar legível). MUITO IMPORTANTE: deixe MARGEM em volta de cada vista e mostre o personagem INTEIRO — do TOPO (a bandeira) até os PÉS, com as MÃOS e os braços completos — sem CORTAR nenhuma parte (nem as mãos, nem as laterais, nem o topo, nem os pés). Pose neutra em pé (T-pose leve), proporções e cores iguais nas três vistas, mesmo estilo 3D fofo. Fundo cinza-claro liso de estúdio, iluminação uniforme, alto nível de detalhe. Sem legendas, sem números, sem molduras ao redor.");
-    form.append("size", "1024x1536");
-    // "medium" (não "high") pra caber no limite de 60s da função — a ficha é referência pra
-    // o 3D (não precisa de render final), e dá pra gerar de novo se quiser.
-    form.append("quality", "medium");
-    form.append("image", new Blob([buf], { type: ctype }), "mascote.png");
-    const resp = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(55000) });
-    if (!resp.ok) return { ok: false as const, erro: `A IA não respondeu agora (${resp.status}). Tente de novo.` };
-    const data = await resp.json();
-    const b64 = data.data?.[0]?.b64_json;
-    if (!b64) return { ok: false as const, erro: "A IA não devolveu a ficha. Tente de novo." };
-    const blob = await put(`${marcaId}/mascote-ficha3d-${Date.now()}.png`, Buffer.from(b64, "base64"), { access: "public", contentType: "image/png" });
-    await prisma.marca.update({ where: { id: marcaId }, data: { mascoteFicha3d: blob.url } });
+
+    // 3 VISTAS SEPARADAS (frente, lado, costas) — cada uma numa imagem, corpo INTEIRO e com
+    // margem, pra nunca cortar (encaixar as 3 numa imagem só sempre cortava alguma). A bandeira
+    // fica BRANCA LISA (sem texto) pra não sair embolada — o 3D usa o logo de verdade à parte.
+    const comum = "do MESMO personagem da imagem de referência, para modelagem 3D. Estilo 3D fofo IDÊNTICO à referência, mesmas cores e proporções. MANTENHA a bandeirinha no topo, mas deixe a bandeira BRANCA LISA (SEM texto, SEM letras, SEM desenho). Corpo INTEIRO em pé (T-pose leve), com MARGEM em volta — mostre tudo, do topo (bandeira) aos pés, com as mãos e braços completos, SEM cortar nada. Fundo cinza-claro liso de estúdio, iluminação uniforme. Sem legendas, sem números, sem molduras.";
+    const vistas = [
+      `VISTA DE FRENTE ${comum}`,
+      `VISTA DE LADO (perfil) ${comum}`,
+      `VISTA DE COSTAS (de costas para a câmera) ${comum}`,
+    ];
+
+    const gerarVista = async (prompt: string): Promise<string> => {
+      const form = new FormData();
+      form.append("model", "gpt-image-1");
+      form.append("prompt", prompt);
+      form.append("size", "1024x1536");
+      form.append("quality", "medium");
+      form.append("image", new Blob([buf], { type: ctype }), "mascote.png");
+      const resp = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(55000) });
+      if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+      const data = await resp.json();
+      const b64 = data.data?.[0]?.b64_json;
+      if (!b64) throw new Error("sem imagem");
+      const blob = await put(`${marcaId}/mascote-ficha3d-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.png`, Buffer.from(b64, "base64"), { access: "public", contentType: "image/png" });
+      return blob.url;
+    };
+
+    const results = await Promise.allSettled(vistas.map(gerarVista));
+    const urls = results.filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled").map((r) => r.value);
+    if (urls.length < 2) return { ok: false as const, erro: "A IA não conseguiu montar a ficha agora. Tente de novo." };
+
+    await prisma.marca.update({ where: { id: marcaId }, data: { mascoteFicha3d: JSON.stringify(urls) } });
     revalidatePath(`/painel/marcas/${marcaId}`);
-    return { ok: true as const, url: blob.url };
+    return { ok: true as const, urls };
   } catch (e) {
     console.error("Erro ao gerar ficha 3D:", e);
     return { ok: false as const, erro: "Não consegui gerar a ficha agora. Tente de novo." };
