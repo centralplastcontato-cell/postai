@@ -202,7 +202,7 @@ export async function gerarFicha3d(marcaId: string) {
     // 3 VISTAS SEPARADAS (frente, lado, costas) — cada uma numa imagem, corpo INTEIRO e com
     // margem, pra nunca cortar (encaixar as 3 numa imagem só sempre cortava alguma). A bandeira
     // fica BRANCA LISA (sem texto) pra não sair embolada — o 3D usa o logo de verdade à parte.
-    const comum = "do MESMO personagem da imagem de referência, para modelagem 3D. Estilo 3D fofo IDÊNTICO à referência, mesmas cores e proporções. MANTENHA a bandeirinha no topo, mas deixe a bandeira BRANCA LISA (SEM texto, SEM letras, SEM desenho). Corpo INTEIRO em pé (T-pose leve), com MARGEM em volta — mostre tudo, do topo (bandeira) aos pés, com as mãos e braços completos, SEM cortar nada. Fundo cinza-claro liso de estúdio, iluminação uniforme. Sem legendas, sem números, sem molduras.";
+    const comum = "do MESMO personagem da imagem de referência, para modelagem 3D. Estilo 3D fofo IDÊNTICO à referência, mesmas cores e proporções. MANTENHA a bandeirinha no topo com o SÍMBOLO DA COROA (igual à referência), mas SEM texto e SEM letras na bandeira (só o desenho da coroa, nada escrito). Corpo INTEIRO em pé (T-pose leve), com MARGEM em volta — mostre tudo, do topo (bandeira) aos pés, com as mãos e braços completos, SEM cortar nada. Fundo cinza-claro liso de estúdio, iluminação uniforme. Sem legendas, sem números, sem molduras.";
     const vistas = [
       `VISTA DE FRENTE ${comum}`,
       `VISTA DE LADO (perfil) ${comum}`,
