@@ -182,6 +182,45 @@ export async function removerFundoMascote(marcaId: string, url: string) {
   }
 }
 
+// FASE 4 — FICHA PRO 3D: a partir do mascote oficial, gera uma PRANCHA DE REFERÊNCIA com as
+// vistas de FRENTE, LADO e COSTAS (turnaround), fundo claro, alta qualidade. É o material que
+// um artista/serviço de 3D usa pra modelar o mascote (pra vender nas festas).
+export async function gerarFicha3d(marcaId: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, nome: true } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  if (!marca.mascoteUrl) return { ok: false as const, erro: "Escolha o mascote oficial primeiro." };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  try {
+    const rr = await fetch(marca.mascoteUrl, { signal: AbortSignal.timeout(20000) });
+    if (!rr.ok) return { ok: false as const, erro: "Não consegui baixar o mascote." };
+    const ctype = rr.headers.get("content-type") || "image/png";
+    const buf = Buffer.from(await rr.arrayBuffer());
+    const form = new FormData();
+    form.append("model", "gpt-image-1");
+    form.append("prompt", "Prancha de referência (model sheet / turnaround) do MESMO personagem da imagem, para modelagem 3D. Mostre o personagem de CORPO INTEIRO em TRÊS vistas lado a lado, na mesma escala e alinhadas: 1) VISTA DE FRENTE, 2) VISTA DE LADO (perfil), 3) VISTA DE COSTAS. Pose neutra em pé (T-pose leve), proporções e cores IDÊNTICAS à referência nas três vistas, mesmo estilo 3D fofo. Fundo cinza-claro liso de estúdio, iluminação uniforme, alto nível de detalhe. SEM texto, sem legendas, sem números, sem molduras.");
+    form.append("size", "1536x1024");
+    // "medium" (não "high") pra caber no limite de 60s da função — a ficha é referência pra
+    // o 3D (não precisa de render final), e dá pra gerar de novo se quiser.
+    form.append("quality", "medium");
+    form.append("image", new Blob([buf], { type: ctype }), "mascote.png");
+    const resp = await fetch("https://api.openai.com/v1/images/edits", { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(55000) });
+    if (!resp.ok) return { ok: false as const, erro: `A IA não respondeu agora (${resp.status}). Tente de novo.` };
+    const data = await resp.json();
+    const b64 = data.data?.[0]?.b64_json;
+    if (!b64) return { ok: false as const, erro: "A IA não devolveu a ficha. Tente de novo." };
+    const blob = await put(`${marcaId}/mascote-ficha3d-${Date.now()}.png`, Buffer.from(b64, "base64"), { access: "public", contentType: "image/png" });
+    await prisma.marca.update({ where: { id: marcaId }, data: { mascoteFicha3d: blob.url } });
+    revalidatePath(`/painel/marcas/${marcaId}`);
+    return { ok: true as const, url: blob.url };
+  } catch (e) {
+    console.error("Erro ao gerar ficha 3D:", e);
+    return { ok: false as const, erro: "Não consegui gerar a ficha agora. Tente de novo." };
+  }
+}
+
 // Define o mascote OFICIAL da marca (tem que estar na biblioteca de opções geradas).
 export async function definirMascote(marcaId: string, url: string) {
   const g = await guardaMarca(marcaId);

@@ -15,6 +15,7 @@ export type MarcaView = {
   feedArtes?: string[]; // biblioteca de artes de fundo de feed (IA) da marca, pra reusar
   mascoteUrl?: string; // mascote oficial da marca (PNG transparente)
   mascotesArte?: string[]; // biblioteca de opções de mascote geradas pela IA
+  mascoteFicha3d?: string; // ficha do personagem (frente/lado/costas) pra fazer o 3D
   paleta: string; // JSON array de hex
   logoTexto: string;
   logoUrl: string;

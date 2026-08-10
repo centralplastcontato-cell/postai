@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d } from "@/app/actions/mascote";
 
 // 🦸 ESTÚDIO DO MASCOTE (Fase 1): o dono gera opções em 3D fofo, escolhe uma e ela vira o
 // mascote OFICIAL da marca. Depois (Fases 2/3) esse MESMO mascote é colado nos posts/vídeos.
@@ -11,10 +11,12 @@ export function MascoteEstudio({
   marcaId,
   mascoteUrl,
   mascotes,
+  ficha3d,
 }: {
   marcaId: string;
   mascoteUrl: string; // mascote oficial atual ("" = nenhum)
   mascotes: string[]; // biblioteca de opções geradas
+  ficha3d?: string; // ficha do personagem (frente/lado/costas) pro 3D ("" = não gerada)
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -83,6 +85,17 @@ export function MascoteEstudio({
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setProc(null);
+    });
+  }
+  const [gerandoFicha, setGerandoFicha] = useState(false);
+  function handleFicha3d() {
+    setErro(null);
+    setGerandoFicha(true);
+    startTransition(async () => {
+      const r = await gerarFicha3d(marcaId);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setGerandoFicha(false);
     });
   }
   function handleRemoverFundo() {
@@ -236,8 +249,42 @@ export function MascoteEstudio({
       )}
 
       <p className="mt-6 text-[11px] text-muted">
-        Dica: gere quantas vezes quiser até achar o mascote perfeito — as opções ficam salvas aqui. Depois eu ligo ele nos <strong className="text-white/80">posts</strong> e nos <strong className="text-white/80">vídeos</strong> (próximas fases).
+        Dica: gere quantas vezes quiser até achar o mascote perfeito — as opções ficam salvas aqui. O mascote escolhido já pode entrar nos <strong className="text-white/80">posts</strong> e nos <strong className="text-white/80">vídeos</strong>.
       </p>
+
+      {/* FASE 4 — Ficha pro 3D (só quando há mascote oficial) */}
+      {mascoteUrl && (
+        <div className="mt-7 rounded-xl border border-[#7c3aed]/40 bg-[#7c3aed]/5 p-4 sm:p-5">
+          <p className="text-sm font-semibold text-white">🧊 Ficha pro 3D <span className="ml-1 rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2 py-0.5 text-[10px] font-semibold text-[#c7b2ff]">pra vender nas festas</span></p>
+          <p className="mt-1 text-xs text-muted">
+            Gera uma <strong className="text-white/80">prancha de referência</strong> do mascote em 3 vistas — <strong className="text-white/80">frente, lado e costas</strong>. É o material que um artista ou serviço de 3D usa pra modelar o boneco.
+          </p>
+
+          {erro && <p className="mt-3 rounded-md border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">{erro}</p>}
+
+          {ficha3d && (
+            <button type="button" onClick={() => setAmpliada(ficha3d)} className="mt-3 block w-full overflow-hidden rounded-lg border border-linha transition hover:border-[#7c3aed]" title="Ampliar">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ficha3d} alt="Ficha do mascote (frente, lado e costas)" className="w-full object-contain" />
+            </button>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleFicha3d}
+              disabled={gerandoFicha || isPending}
+              className="rounded-lg bg-[#7c3aed] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+            >
+              {gerandoFicha ? "🧊 Criando a ficha… (uns segundos)" : ficha3d ? "🔄 Gerar de novo" : "🧊 Gerar ficha pro 3D"}
+            </button>
+            {ficha3d && (
+              <a href={ficha3d} download="mascote-ficha-3d.png" className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-muted transition hover:border-[#7c3aed] hover:text-white">⬇ Baixar ficha</a>
+            )}
+          </div>
+          <p className="mt-2 text-[10px] text-muted/70">A IA recria o mascote em 3 ângulos — pode ter pequenas diferenças entre as vistas; é uma referência pro 3D, não a peça final.</p>
+        </div>
+      )}
     </div>
   );
 }
