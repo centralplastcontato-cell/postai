@@ -271,19 +271,24 @@ export function MascoteEstudio({
           {erro && <p className="mt-3 rounded-md border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">{erro}</p>}
 
           {fichaUrls.length > 0 && (
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              {fichaUrls.map((url, i) => (
-                <div key={url} className="overflow-hidden rounded-lg border border-linha">
-                  <button type="button" onClick={() => setAmpliada(url)} className="block w-full transition hover:opacity-90" title="Ampliar">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt={FICHA_LABELS[i] || "Vista"} className="w-full object-contain" />
-                  </button>
-                  <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                    <span className="text-[11px] font-semibold text-muted">{FICHA_LABELS[i] || `Vista ${i + 1}`}</span>
-                    <a href={url} target="_blank" rel="noopener noreferrer" download={`mascote-${(FICHA_LABELS[i] || `vista-${i + 1}`).toLowerCase()}.png`} className="text-[11px] font-semibold text-[#c7b2ff] hover:underline">⬇ Baixar</a>
+            <div className={`mt-3 grid gap-3 ${fichaUrls.length === 1 ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-3"}`}>
+              {fichaUrls.map((url, i) => {
+                // Ficha única = as 3 vistas numa imagem só (mantém a coroa igual entre elas).
+                const rotulo = fichaUrls.length === 1 ? "Ficha — frente, lado e costas" : (FICHA_LABELS[i] || `Vista ${i + 1}`);
+                const nomeArquivo = fichaUrls.length === 1 ? "mascote-ficha-3d.png" : `mascote-${(FICHA_LABELS[i] || `vista-${i + 1}`).toLowerCase()}.png`;
+                return (
+                  <div key={url} className="overflow-hidden rounded-lg border border-linha">
+                    <button type="button" onClick={() => setAmpliada(url)} className="block w-full transition hover:opacity-90" title="Ampliar">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={url} alt={rotulo} className="w-full object-contain" />
+                    </button>
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                      <span className="text-[11px] font-semibold text-muted">{rotulo}</span>
+                      <a href={url} target="_blank" rel="noopener noreferrer" download={nomeArquivo} className="text-[11px] font-semibold text-[#c7b2ff] hover:underline">⬇ Baixar</a>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -297,7 +302,7 @@ export function MascoteEstudio({
               {gerandoFicha ? "🧊 Criando a ficha… (uns segundos)" : fichaUrls.length ? "🔄 Gerar de novo" : "🧊 Gerar ficha pro 3D"}
             </button>
           </div>
-          <p className="mt-2 text-[10px] text-muted/70">A IA recria o mascote em 3 vistas (frente, lado e costas) — pode ter pequenas diferenças entre elas; é uma referência pro 3D, não a peça final. A bandeira sai branca (o logo de verdade o 3D coloca depois).</p>
+          <p className="mt-2 text-[10px] text-muted/70">A IA desenha as 3 vistas (frente, lado e costas) numa <strong className="text-white/70">imagem só</strong> — assim a coroa/bandeira fica igual entre elas. É uma referência pro 3D, não a peça final. A bandeira sai branca (o logo de verdade o 3D coloca depois).</p>
         </div>
       )}
     </div>
