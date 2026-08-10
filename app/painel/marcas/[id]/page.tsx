@@ -287,6 +287,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       capaRecorteUrl: v.capaRecorteUrl || "",
       mascoteCanto: v.mascoteCanto || "",
       mascoteTam: v.mascoteTam || "m",
+      logoCanto: v.logoCanto || "",
+      logoTam: v.logoTam || "m",
       videoMusica: v.videoMusica || "",
       videoTextos: (() => { try { const m = JSON.parse(v.videoTextos || "{}"); return m && typeof m === "object" && !Array.isArray(m) ? (m as Record<string, string>) : {}; } catch { return {}; } })(),
       narracao: { texto: v.narracaoTexto, voz: v.narracaoVoz, estilo: v.narracaoEstilo, url: v.narracaoUrl, segundos: v.narracaoSeg },

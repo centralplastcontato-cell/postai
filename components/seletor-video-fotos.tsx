@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, definirMascoteFesta } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
 const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
@@ -132,7 +132,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", logoCantoInicial = "", logoTamInicial = "m", logoUrlMarca = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -156,6 +156,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   mascoteCantoInicial?: string; // mascote no vídeo: "" (não) | dir | esq | cima-dir | cima-esq
   mascoteTamInicial?: string; // tamanho do mascote no vídeo: p | m | g
   mascoteUrl?: string; // mascote oficial da marca (PNG) — pro preview e pra saber se existe
+  logoCantoInicial?: string; // logo posicionado por nós: "" (padrão do motor) | dir | esq | cima-dir | cima-esq
+  logoTamInicial?: string; // tamanho do logo quando posicionado por nós: p | m | g
+  logoUrlMarca?: string; // logo da marca (URL) — pro preview e pra saber se existe (só buffet)
   capasBanco?: string[]; // biblioteca de artes de capa (IA) da marca, pra reusar
   corMarca?: string;
   jaTemVideo?: boolean;
@@ -197,6 +200,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // MASCOTE no vídeo: canto ("" = não mostra) + tamanho. Só faz sentido se a marca tem mascote.
   const [mascoteCanto, setMascoteCanto] = useState<string>(mascoteCantoInicial || "");
   const [mascoteTam, setMascoteTam] = useState<string>(mascoteTamInicial || "m");
+  // LOGO com posição própria no vídeo (só buffet): canto ("" = padrão do motor) + tamanho.
+  const [logoCanto, setLogoCanto] = useState<string>(logoCantoInicial || "");
+  const [logoTam, setLogoTam] = useState<string>(logoTamInicial || "m");
   // Nome do vídeo (só o do buffet dá pra renomear aqui; no de festa o nome são os aniversariantes).
   const [nomeVideo, setNomeVideo] = useState(nome);
   const [editandoNome, setEditandoNome] = useState(false);
@@ -241,6 +247,17 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setMascoteTam(tam);
     if (tematicoId) definirMascoteVideo(tematicoId, mascoteCanto, tam).catch(() => {});
     else if (festaId) definirMascoteFesta(festaId, mascoteCanto, tam).catch(() => {});
+  }
+  // LOGO com posição própria (só buffet): canto/tamanho — salva na hora; vale no próximo Gerar.
+  function trocarLogoCanto(canto: string) {
+    if (!tematicoId) return;
+    setLogoCanto(canto);
+    definirLogoVideo(tematicoId, canto, logoTam).catch(() => {});
+  }
+  function trocarLogoTam(tam: string) {
+    if (!tematicoId) return;
+    setLogoTam(tam);
+    definirLogoVideo(tematicoId, logoCanto, tam).catch(() => {});
   }
   // Troca o estilo da CAPA (clássica / impacto / ia) — salva na hora; vale no próximo Gerar.
   function trocarCapaEstilo(novo: string) {
@@ -805,6 +822,21 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       }}
                     />
                   )}
+                  {/* LOGO (prévia) — só buffet, quando posicionado por nós */}
+                  {tematicoId && logoCanto && logoUrlMarca && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={logoUrlMarca}
+                      alt=""
+                      className="pointer-events-none absolute h-auto object-contain"
+                      style={{
+                        ...(logoCanto.startsWith("cima") ? { top: "3%" } : { bottom: "3%" }),
+                        ...(logoCanto.endsWith("dir") ? { right: "4%" } : { left: "4%" }),
+                        width: logoTam === "p" ? "19%" : logoTam === "g" ? "37%" : "28%",
+                        filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.5))",
+                      }}
+                    />
+                  )}
                   {/* texto sobre a cena (aproximação): título na capa / legenda nas outras */}
                   {legendaCena && (
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 text-center lg:px-4 lg:pb-4">
@@ -1141,6 +1173,27 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                         </div>
                       )}
                       <p className="mt-1.5 text-[10px] leading-snug text-muted/70">{tematicoId ? "Aparece em todos os quadros." : "Aparece só na capa (abertura) — as fotos da festa ficam como estão."} Dica: evite <strong className="text-white/70">baixo à direita</strong> — é onde o vídeo carimba o logo.</p>
+                    </div>
+                  )}
+
+                  {/* LOGO com posição própria (só buffet e se a marca tem logo) */}
+                  {tematicoId && logoUrlMarca && (
+                    <div>
+                      <span className="text-[11px] font-semibold text-white">🏷️ Logo no vídeo</span>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {[{ id: "", l: "Padrão" }, { id: "cima-esq", l: "Cima ↖" }, { id: "cima-dir", l: "Cima ↗" }, { id: "esq", l: "Baixo ↙" }, { id: "dir", l: "Baixo ↘" }].map((o) => (
+                          <button key={o.id || "padrao"} type="button" onClick={() => trocarLogoCanto(o.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${logoCanto === o.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{o.l}</button>
+                        ))}
+                      </div>
+                      {logoCanto && (
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <span className="text-[10px] text-muted">Tamanho:</span>
+                          {[{ id: "p", l: "P" }, { id: "m", l: "M" }, { id: "g", l: "G" }].map((o) => (
+                            <button key={o.id} type="button" onClick={() => trocarLogoTam(o.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${logoTam === o.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{o.l}</button>
+                          ))}
+                        </div>
+                      )}
+                      <p className="mt-1.5 text-[10px] leading-snug text-muted/70">Em <strong className="text-white/70">Padrão</strong>, o vídeo carimba o logo sozinho (embaixo à direita). Escolhendo um canto, você posiciona o logo do seu jeito.</p>
                     </div>
                   )}
 
@@ -1574,6 +1627,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={mascoteUrl} alt="" className="pointer-events-none absolute w-auto object-contain" style={{ ...(mascoteCanto.startsWith("cima") ? { top: "6%" } : { bottom: "6%" }), ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }), height: mascoteTam === "p" ? "12%" : mascoteTam === "g" ? "28%" : "19%", filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.5))" }} />
                 )}
+                {tematicoId && logoCanto && logoUrlMarca && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrlMarca} alt="" className="pointer-events-none absolute h-auto object-contain" style={{ ...(logoCanto.startsWith("cima") ? { top: "3%" } : { bottom: "3%" }), ...(logoCanto.endsWith("dir") ? { right: "4%" } : { left: "4%" }), width: logoTam === "p" ? "19%" : logoTam === "g" ? "37%" : "28%", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))" }} />
+                )}
               </>
             ) : null}
           </div>
@@ -1650,6 +1707,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             {mascoteCanto && mascoteUrl && tematicoId && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={mascoteUrl} alt="" className="pointer-events-none absolute w-auto object-contain" style={{ ...(mascoteCanto.startsWith("cima") ? { top: "5%" } : { bottom: "5%" }), ...(mascoteCanto.endsWith("dir") ? { right: "5%" } : { left: "5%" }), height: mascoteTam === "p" ? "12%" : mascoteTam === "g" ? "28%" : "19%", filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.5))" }} />
+            )}
+            {tematicoId && logoCanto && logoUrlMarca && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrlMarca} alt="" className="pointer-events-none absolute h-auto object-contain" style={{ ...(logoCanto.startsWith("cima") ? { top: "4%" } : { bottom: "4%" }), ...(logoCanto.endsWith("dir") ? { right: "4%" } : { left: "4%" }), width: logoTam === "p" ? "19%" : logoTam === "g" ? "37%" : "28%", filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5))" }} />
             )}
           </div>
           <button onClick={(e) => { e.stopPropagation(); setAmpliada(null); }} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">Fechar</button>

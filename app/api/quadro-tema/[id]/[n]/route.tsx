@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/prisma";
-import { carregarFontes } from "@/lib/arte";
+import { carregarFontes, logoUrlMarca } from "@/lib/arte";
 import { fotoSeguraComTamanho } from "@/lib/foto-arte";
 
 // QUADRO do vídeo temático: a foto EMOLDURADA sobre o fundo da marca, com a LEGENDA embaixo
@@ -43,6 +43,7 @@ const falhou = (msg: string) => new Response(msg, { status: 503, headers: { "cac
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: string }> }) {
   const { id, n } = await ctx.params;
+  const origin = new URL(req.url).origin;
   const num = parseInt(n, 10); // aceita "3" e "3.jpg"
   // n = 0 é a CAPA (a foto de abertura com a frase-gancho). Ela também é desenhada aqui porque
   // o motor escreve o texto da capa numa fonte fixa e SEM quebrar linha — frase de gancho de
@@ -53,7 +54,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
   try {
     const v = await prisma.videoTematico.findUnique({
       where: { id },
-      include: { marca: { select: { corPrimaria: true, corFundo: true, mascoteUrl: true } } },
+      include: { marca: { select: { corPrimaria: true, corFundo: true, mascoteUrl: true, logoUrl: true, id: true } } },
     });
     if (!v) return falhou("Vídeo não encontrado.");
 
@@ -296,16 +297,26 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     const mascDim = v.mascoteTam === "p" ? { w: 190, h: 235 } : v.mascoteTam === "g" ? { w: 430, h: 540 } : { w: 290, h: 360 };
     const mascEmCima = mascCanto === "cima-dir" || mascCanto === "cima-esq";
     const mascNaDireita = mascCanto === "dir" || mascCanto === "cima-dir";
-    const elFinal = usaMascote ? (
+
+    // LOGO com posição própria (quando o dono escolheu um canto): o motor não carimba o logo
+    // (mandamos logoUrl vazio na geração), e desenhamos o logo aqui, no canto/tamanho escolhidos.
+    const logoCanto = v.logoCanto;
+    const usaLogo = Boolean(v.marca.logoUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(logoCanto || "");
+    const logoDim = v.logoTam === "p" ? { w: 210, h: 92 } : v.logoTam === "g" ? { w: 400, h: 172 } : { w: 300, h: 128 };
+    const logoEmCima = logoCanto === "cima-dir" || logoCanto === "cima-esq";
+    const logoNaDireita = logoCanto === "dir" || logoCanto === "cima-dir";
+
+    const elFinal = usaMascote || usaLogo ? (
       <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative" }}>
         {el}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={mascUrl}
-          width={mascDim.w}
-          height={mascDim.h}
-          style={{ position: "absolute", ...(mascEmCima ? { top: 40 } : { bottom: 40 }), ...(mascNaDireita ? { right: 40 } : { left: 40 }), width: `${mascDim.w}px`, height: `${mascDim.h}px`, objectFit: "contain", filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.45))" }}
-        />
+        {usaLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrlMarca(origin, v.marca.id)} width={logoDim.w} height={logoDim.h} style={{ position: "absolute", ...(logoEmCima ? { top: 44 } : { bottom: 44 }), ...(logoNaDireita ? { right: 44 } : { left: 44 }), width: `${logoDim.w}px`, height: `${logoDim.h}px`, objectFit: "contain", filter: "drop-shadow(0 3px 10px rgba(0,0,0,0.5))" }} />
+        ) : null}
+        {usaMascote ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={mascUrl} width={mascDim.w} height={mascDim.h} style={{ position: "absolute", ...(mascEmCima ? { top: 40 } : { bottom: 40 }), ...(mascNaDireita ? { right: 40 } : { left: 40 }), width: `${mascDim.w}px`, height: `${mascDim.h}px`, objectFit: "contain", filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.45))" }} />
+        ) : null}
       </div>
     ) : (
       el

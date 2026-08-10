@@ -97,6 +97,8 @@ model VideoTematico {
   capaRecorteUrl  String   @default("") // URL (Blob) da foto RECORTADA (assunto sem fundo) — usada quando capaEstilo = "recortado"
   mascoteCanto    String   @default("") // MASCOTE nos quadros do vídeo: "" (não) | dir | esq | cima-dir | cima-esq
   mascoteTam      String   @default("m") // tamanho do mascote no vídeo: p | m | g
+  logoCanto       String   @default("") // LOGO com posição própria no vídeo: "" (padrão do motor) | dir | esq | cima-dir | cima-esq
+  logoTam         String   @default("m") // tamanho do logo quando posicionado por nós: p | m | g
   videoMusica     String   @default("") // trilha escolhida (URL do MP3); "" = jingle do buffet. Vale quando NÃO há narração.
   videoUrl        String   @default("")
   // Quando o MP4 FICOU PRONTO (o motor avisou). Diferente de `criadoEm`: o vídeo do buffet é

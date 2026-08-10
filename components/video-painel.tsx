@@ -28,6 +28,8 @@ export type VideoTematicoView = {
   capaRecorteUrl: string; // URL da foto recortada (quando capaEstilo = "recortado")
   mascoteCanto: string; // mascote no vídeo: "" (não) | dir | esq | cima-dir | cima-esq
   mascoteTam: string; // tamanho do mascote no vídeo: p | m | g
+  logoCanto: string; // logo posicionado por nós: "" (padrão do motor) | dir | esq | cima-dir | cima-esq
+  logoTam: string; // tamanho do logo quando posicionado por nós: p | m | g
   videoMusica: string; // trilha escolhida (URL) — "" = jingle do buffet
   videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
   narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
@@ -260,7 +262,7 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
   );
 }
 
-export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco = [], mascoteUrl = "" }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string; capasBanco?: string[]; mascoteUrl?: string }) {
+export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco = [], mascoteUrl = "", logoUrl = "" }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string; capasBanco?: string[]; mascoteUrl?: string; logoUrl?: string }) {
   const router = useRouter();
   const [seletor, setSeletor] = useState<FestaView | null>(null);
   // criação/edição de vídeo TEMÁTICO
@@ -399,6 +401,9 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           mascoteCantoInicial={seletorTema.video.mascoteCanto}
           mascoteTamInicial={seletorTema.video.mascoteTam}
           mascoteUrl={mascoteUrl}
+          logoCantoInicial={seletorTema.video.logoCanto}
+          logoTamInicial={seletorTema.video.logoTam}
+          logoUrlMarca={logoUrl}
           capasBanco={capasBanco}
           musicaInicial={seletorTema.video.videoMusica}
           musicasBanco={musicasBanco}
