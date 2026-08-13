@@ -697,7 +697,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       .filter((n, i, a) => a.indexOf(n) === i)
       .map((n) => escolhidas[n]);
     const t = setTimeout(() => {
-      preloadRef.current = alvos.map((f) => { const im = new Image(); im.src = miniatura(f.url, 640); return im; });
+      preloadRef.current = alvos.map((f) => { const im = new Image(); im.src = f.url; return im; });
     }, 500);
     return () => clearTimeout(t);
   }, [sel, cena]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -811,19 +811,19 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 <>
                   {fundoCheia ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+                    <img src={cenaFoto.url} alt="" fetchPriority="high" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
                   ) : (
                     <>
                       {fundoCor ? (
                         <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                        <img src={cenaFoto.url} alt="" fetchPriority="high" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
                       )}
                       <div className="absolute inset-0 flex items-center justify-center p-3 lg:p-4">
                         <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corDaMoldura, 2)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="block max-h-[21vh] w-auto max-w-full object-contain lg:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
+                          <img src={cenaFoto.url} alt="" fetchPriority="high" decoding="async" className="block max-h-[21vh] w-auto max-w-full object-contain lg:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
                         </span>
                       </div>
                     </>
@@ -1620,19 +1620,19 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
               <>
                 {fundoCheia ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+                  <img src={cenaFoto.url} alt="" fetchPriority="high" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
                 ) : (
                   <>
                     {fundoCor ? (
                       <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                      <img src={cenaFoto.url} alt="" fetchPriority="high" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
                     )}
                     <div className="absolute inset-0 flex items-center justify-center p-4">
                       <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corDaMoldura, 3)}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="block max-h-[62vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
+                        <img src={cenaFoto.url} alt="" fetchPriority="high" decoding="async" className="block max-h-[62vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
                       </span>
                     </div>
                   </>
