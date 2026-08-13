@@ -806,7 +806,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   )}
                 </div>
               )}
-            <div className="relative aspect-[9/16] h-[26vh] max-w-full overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[62vh] lg:rounded-[22px]">
+            {/* LARGURA EXPLÍCITA (= altura × 9/16): dentro do flex o iOS Safari não estava derivando a
+                largura pelo aspect-ratio e a caixa colapsava numa linha fininha (a prévia não aparecia).
+                w-[14.6vh]/lg:w-[34.9vh] força a caixa 9:16 e shrink-0 impede o flex de espremer. */}
+            <div className="relative aspect-[9/16] h-[26vh] w-[14.6vh] max-w-full shrink-0 overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[62vh] lg:w-[34.9vh] lg:rounded-[22px]">
               {cenaFoto ? (
                 <>
                   {fundoCheia ? (
@@ -1615,7 +1618,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
           MESMA cena/estado da prévia pequena; ◀ ▶ trocam a cena e ▶ passa sozinho. */}
       {previaCheia && (
         <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/95 p-4" onClick={(e) => { e.stopPropagation(); setPreviaCheia(false); setTocandoPrev(false); }}>
-          <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[72vh] max-w-full overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-white/15">
+          <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[72vh] w-[40.5vh] max-w-full shrink-0 overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-white/15">
             {cenaFoto ? (
               <>
                 {fundoCheia ? (
@@ -1674,7 +1677,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         return (
           <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/95 p-4" onClick={(e) => { e.stopPropagation(); setCapaCheia(false); }}>
             <p className="text-center text-xs font-semibold text-white/80">👇 Assim a capa vai aparecer (o logo entra no topo)</p>
-            <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[72vh] max-w-full overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-white/15">
+            <div onClick={(e) => e.stopPropagation()} className="relative aspect-[9/16] h-[72vh] w-[40.5vh] max-w-full shrink-0 overflow-hidden rounded-2xl bg-black shadow-2xl ring-1 ring-white/15">
               {(bg || ehRecorte) ? (
                 <>
                   {ehRecorte ? (
