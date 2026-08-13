@@ -568,7 +568,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     const musicaVol = volMusica / 100;
     // duração ALVO = o vídeo com TODAS as fotos (uma vira a capa) — a música estica até lá, e
     // com a 2ª fala a voz volta no fim. ~2,3s por foto + 6s fixos (capa + slide final).
-    const nSlide = Math.max(1, sel.length - 1);
+    // corpo = fotos - 1 (uma vira capa), com TETO de 29 (o motor aceita no máx 30 fotos: 29 no
+    // corpo + a capa). Sem esse teto, com muitas fotos a voz saía longa demais e pedia mais fotos
+    // do que cabem — dava pra nunca fechar a conta.
+    const nSlide = Math.max(1, Math.min(sel.length - 1, 29));
     const alvoSegundos = Math.round(nSlide * 2.3 + 6);
     // A trilha ESCOLHIDA entra sob a voz: prepara/pega o WAV dela AGORA e passa direto (não depende
     // de ter salvo antes). Sem trilha escolhida, ou se falhar, a narração usa o jingle do buffet.
@@ -1595,8 +1598,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         <div className="shrink-0 border-t border-white/10 bg-black/30 px-3 py-2.5">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wide text-muted">🎞️ Linha do tempo · {sel.length} {sel.length === 1 ? "cena" : "cenas"}{segs ? ` · ≈ ${segs}s` : ""}</span>
-            {segs > 90 ? <span className="text-[10px] font-bold text-vermelho">● passa de 90s</span> : escolhidas.length > 0 && <span className="text-[10px] font-bold text-emerald-400">● pronto pra gerar</span>}
+            {sel.length > 30 ? <span className="text-[10px] font-bold text-amber-400">● usa as 30 primeiras</span> : segs > 90 ? <span className="text-[10px] font-bold text-vermelho">● passa de 90s</span> : escolhidas.length > 0 && <span className="text-[10px] font-bold text-emerald-400">● pronto pra gerar</span>}
           </div>
+          {sel.length > 30 && (
+            <p className="mb-1.5 text-[10px] leading-snug text-amber-400/90">O vídeo usa no máximo <strong>30 fotos</strong> — as {sel.length - 30} de baixo ficam de fora. Tire {sel.length - 30} pra escolher exatamente quais entram.</p>
+          )}
           {escolhidas.length > 0 ? (
             <div className="flex gap-2 overflow-x-auto pb-1">
               {escolhidas.map((f, i) => (

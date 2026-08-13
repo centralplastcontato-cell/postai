@@ -24,6 +24,11 @@ import { vozValida, VOZ_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 
 const MOLDURAS = ["nenhuma", "branca", "grossa", "marca"];
 const MAX_FOTOS = 30; // teto do motor (mesmo do vídeo de festa)
+// A CAPA ocupa 1 das MAX_FOTOS salvas (ela é uma das cenas da sequência) mas entra separada, no
+// começo — então o CORPO do vídeo tem no máximo MAX_FOTOS-1 fotos. A narração precisa caber nesse
+// corpo: sem reservar a capa, uma locução que pedisse 30 fotos NUNCA fechava (o corpo só tem 29),
+// e o dono via "precisa de 30, você escolheu 29" pra sempre, sem conseguir resolver.
+const MAX_FOTOS_CORPO = MAX_FOTOS - 1;
 const FOTOS_SUGERIDAS = 26; // ~65s de vídeo
 
 function lerIds(json: string): string[] {
@@ -540,13 +545,24 @@ export async function gerarVideoTematico(videoId: string) {
   const idsTodos = ids.filter((id) => mapa.has(id) && mapa.get(id) !== capaUrl);
   let idsSlideshow = idsTodos;
   if (temNarracao) {
-    const cabem = fotosParaDuracao(v.narracaoSeg, MAX_FOTOS);
+    const cabem = fotosParaDuracao(v.narracaoSeg, MAX_FOTOS_CORPO);
     // Fotos DE MENOS = a voz é cortada no meio (e o convite final nunca é ouvido). Melhor
     // recusar com uma conta clara do que entregar um vídeo com a fala truncada.
     if (idsTodos.length < cabem) {
+      // A conta que o dono vê ("33 fotos") menos as que NÃO entram no corpo: a capa (entra
+      // separada, no começo) e as que sumiram/perderam a autorização. Sem explicar isso, a
+      // mensagem "você escolheu 29" bate de frente com o "33 fotos" da tela e parece bug.
+      const totalSel = ids.length;
+      const indisp = totalSel - fotos.length; // selecionadas que não estão mais disponíveis
+      const capaConta = fotos.length - idsTodos.length; // 1 se a capa está entre as escolhidas
+      const faltam = cabem - idsTodos.length;
+      const partes: string[] = [];
+      if (capaConta > 0) partes.push("a capa entra separada, no começo");
+      if (indisp > 0) partes.push(`${indisp} ${indisp === 1 ? "não está mais disponível" : "não estão mais disponíveis"}`);
+      const porque = partes.length ? ` (${partes.join(" e ")})` : "";
       return {
         ok: false as const,
-        erro: `A narração tem ${v.narracaoSeg}s e precisa de ${cabem} fotos — você escolheu ${idsTodos.length}. Adicione mais fotos ou peça um roteiro mais curto.`,
+        erro: `A narração de ${v.narracaoSeg}s precisa de ${cabem} fotos no corpo do vídeo, e das suas ${totalSel} sobram ${idsTodos.length}${porque}. Adicione mais ${faltam} foto${faltam === 1 ? "" : "s"} ou peça um roteiro mais curto na aba Narração.`,
       };
     }
     // Fotos DE MAIS: corta — mas mantendo as que TÊM LEGENDA (a Bia espalha as frases pelo
@@ -963,7 +979,7 @@ export async function gerarNarracaoVideo(videoId: string, texto: string, vozId: 
     // A narração anterior não serve mais — o Blob tem limite.
     if (antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
     revalidatePath(`/painel/marcas/${v.marcaId}`);
-    return { ok: true as const, url, segundos, fotos: fotosParaDuracao(segundos, MAX_FOTOS) };
+    return { ok: true as const, url, segundos, fotos: fotosParaDuracao(segundos, MAX_FOTOS_CORPO) };
   } catch (e) {
     console.error("Erro ao gerar a narração:", e);
     return { ok: false as const, erro: "Não consegui gerar a voz agora." };
