@@ -584,7 +584,7 @@ export async function gerarVideoTematico(videoId: string) {
   const mascoteOn = Boolean(v.marca.mascoteUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.mascoteCanto || "");
   const logoOn = Boolean(v.marca.logoUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.logoCanto || "");
   const versao = hashCurto(
-    ["q5", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.logoCanto, v.logoTam, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
+    ["q6", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.logoCanto, v.logoTam, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
 
   let fotosMotor: string[];

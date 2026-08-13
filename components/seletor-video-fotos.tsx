@@ -677,6 +677,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const fundoCor = !!tematicoId && fundo === "cor"; // fundo em degradê de cor
   const corDoFundo = corFundo || corMarca; // a cor escolhida (ou a da marca, se nenhuma)
   const corDaMoldura = corMoldura || corMarca; // cor da moldura "Cor" (ou a da marca)
+  // Onde a LEGENDA fica na prévia (pra bater com o vídeo real): quando o dono posicionou o logo no
+  // RODAPÉ (a prévia mostra esse logo), a legenda encolhe e vai pro lado OPOSTO, pra texto e logo
+  // ficarem lado a lado embaixo sem se sobrepor. Logo embaixo à esquerda → texto vai pra direita.
+  // Sem logo posicionado, a prévia não mostra logo, então mantém o texto centralizado como antes.
+  const logoNoRodapePrev = !!tematicoId && !ehCapaCena && !!logoCanto && !logoCanto.startsWith("cima");
+  const legNaDireita = logoNoRodapePrev && !logoCanto.endsWith("dir");
   // Auto-avanço da prévia (dá a sensação de "tocar" o vídeo). Pausa sozinho ao trocar de cena na mão.
   useEffect(() => {
     if (!tocandoPrev || escolhidas.length < 2) return;
@@ -863,8 +869,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   )}
                   {/* texto sobre a cena (aproximação): título na capa / legenda nas outras */}
                   {legendaCena && (
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 text-center lg:px-4 lg:pb-4">
-                      <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${ehCapaCena ? "text-sm lg:text-lg" : "text-[11px] lg:text-sm"}`}>{legendaCena}</span>
+                    <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 lg:px-4 lg:pb-4 ${logoNoRodapePrev ? (legNaDireita ? "text-right" : "text-left") : "text-center"}`}>
+                      <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${logoNoRodapePrev ? "max-w-[62%]" : ""} ${ehCapaCena ? "text-sm lg:text-lg" : "text-[11px] lg:text-sm"}`}>{legendaCena}</span>
                     </div>
                   )}
                   {/* selo do momento + nº da cena */}
@@ -1641,8 +1647,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   </>
                 )}
                 {legendaCena && (
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-5 pt-12 text-center">
-                    <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${ehCapaCena ? "text-2xl" : "text-lg"}`}>{legendaCena}</span>
+                  <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-4 pb-5 pt-12 ${logoNoRodapePrev ? (legNaDireita ? "text-right" : "text-left") : "text-center"}`}>
+                    <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${logoNoRodapePrev ? "max-w-[62%]" : ""} ${ehCapaCena ? "text-2xl" : "text-lg"}`}>{legendaCena}</span>
                   </div>
                 )}
                 <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">{cenaIdx + 1}/{escolhidas.length}{ehCapaCena && <span className="text-amber-300">⭐</span>}</span>

@@ -239,6 +239,30 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     const molCor = mol === "preta" ? "#141414" : mol === "marca" ? molCorMarca : "#ffffff";
     const molPad = mol === "nenhuma" ? 0 : mol === "grossa" ? 30 : BORDA;
 
+    // MASCOTE (Fase 3): cola o mascote da marca num canto do quadro. Sempre a MESMA imagem →
+    // o mascote é idêntico em todo quadro do vídeo.
+    const mascCanto = v.mascoteCanto;
+    const mascUrl = v.marca.mascoteUrl;
+    const usaMascote = Boolean(mascUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(mascCanto || "");
+    const mascDim = v.mascoteTam === "p" ? { w: 190, h: 235 } : v.mascoteTam === "g" ? { w: 430, h: 540 } : { w: 290, h: 360 };
+    const mascEmCima = mascCanto === "cima-dir" || mascCanto === "cima-esq";
+    const mascNaDireita = mascCanto === "dir" || mascCanto === "cima-dir";
+
+    // LOGO com posição própria (quando o dono escolheu um canto): o motor não carimba o logo
+    // (mandamos logoUrl vazio na geração), e desenhamos o logo aqui, no canto/tamanho escolhidos.
+    const logoCanto = v.logoCanto;
+    const usaLogo = Boolean(v.marca.logoUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(logoCanto || "");
+    const logoDim = v.logoTam === "p" ? { w: 210, h: 92 } : v.logoTam === "g" ? { w: 400, h: 172 } : { w: 300, h: 128 };
+    const logoEmCima = logoCanto === "cima-dir" || logoCanto === "cima-esq";
+    const logoNaDireita = logoCanto === "dir" || logoCanto === "cima-dir";
+
+    // Se o logo fica no RODAPÉ (não na capa), a legenda encurta e vai pro lado OPOSTO ao logo,
+    // pra os dois ficarem lado a lado embaixo sem se sobrepor. Sem logo no rodapé, usa a largura
+    // padrão (o motor carimba o logo dele à direita, então continua reservando esse espaço).
+    const logoNoRodape = usaLogo && !logoEmCima && !ehCapa;
+    const legLargPx = logoNoRodape ? Math.max(430, L - 128 - logoDim.w) : LARG_LEGENDA;
+    const legAlinhaDir = logoNoRodape && !logoNaDireita; // logo embaixo à ESQUERDA → texto vai pra direita
+
     const el = capaRecorte ? recorteEl : capaGrande ? impactoEl :
       modo === "cheia" ? (
         // FOTO NA TELA TODA: preenche o 9:16 (corta as beiradas); legenda embaixo, sobre um
@@ -247,7 +271,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={foto.src} width={L} height={A} style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, objectFit: "cover" }} />
           <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-start", padding: ehCapa ? "215px 60px 150px" : "60px 60px 210px", backgroundImage: "linear-gradient(180deg, rgba(0,0,0,0) 38%, rgba(0,0,0,0.35) 68%, rgba(0,0,0,0.82) 100%)" }}>
-            <div style={{ display: "flex", flexDirection: "column", width: ehCapa ? "100%" : `${LARG_LEGENDA}px`, minHeight: 120 }}>{legendaEl}</div>
+            <div style={{ display: "flex", flexDirection: "column", width: ehCapa ? "100%" : `${legLargPx}px`, ...(legAlinhaDir ? { marginLeft: "auto" } : {}), minHeight: 120 }}>{legendaEl}</div>
           </div>
         </div>
       ) : (
@@ -283,28 +307,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
               </div>
             </div>
             {/* O TEXTO (gancho na capa; legenda estreita nos demais, o logo do motor mora à direita). */}
-            <div style={{ display: "flex", flexDirection: "column", width: ehCapa ? "100%" : `${LARG_LEGENDA}px`, marginRight: ehCapa ? 0 : "auto", marginTop: ehCapa ? 52 : 44, minHeight: 190 }}>{legendaEl}</div>
+            <div style={{ display: "flex", flexDirection: "column", width: ehCapa ? "100%" : `${legLargPx}px`, marginRight: ehCapa || legAlinhaDir ? 0 : "auto", ...(legAlinhaDir ? { marginLeft: "auto" } : {}), marginTop: ehCapa ? 52 : 44, minHeight: 190 }}>{legendaEl}</div>
           </div>
         </div>
       );
-
-    // MASCOTE (Fase 3): cola o mascote da marca num canto do quadro. O MOTOR carimba o logo
-    // embaixo à direita (e no topo, na capa), então o dono escolhe um canto livre. Sempre a
-    // MESMA imagem → o mascote é idêntico em todo quadro do vídeo.
-    const mascCanto = v.mascoteCanto;
-    const mascUrl = v.marca.mascoteUrl;
-    const usaMascote = Boolean(mascUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(mascCanto || "");
-    const mascDim = v.mascoteTam === "p" ? { w: 190, h: 235 } : v.mascoteTam === "g" ? { w: 430, h: 540 } : { w: 290, h: 360 };
-    const mascEmCima = mascCanto === "cima-dir" || mascCanto === "cima-esq";
-    const mascNaDireita = mascCanto === "dir" || mascCanto === "cima-dir";
-
-    // LOGO com posição própria (quando o dono escolheu um canto): o motor não carimba o logo
-    // (mandamos logoUrl vazio na geração), e desenhamos o logo aqui, no canto/tamanho escolhidos.
-    const logoCanto = v.logoCanto;
-    const usaLogo = Boolean(v.marca.logoUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(logoCanto || "");
-    const logoDim = v.logoTam === "p" ? { w: 210, h: 92 } : v.logoTam === "g" ? { w: 400, h: 172 } : { w: 300, h: 128 };
-    const logoEmCima = logoCanto === "cima-dir" || logoCanto === "cima-esq";
-    const logoNaDireita = logoCanto === "dir" || logoCanto === "cima-dir";
 
     const elFinal = usaMascote || usaLogo ? (
       <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", position: "relative" }}>
