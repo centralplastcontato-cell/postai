@@ -339,7 +339,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     (async () => {
       const hs: { id: string; h: number[] }[] = [];
       for (const f of fotos) {
-        const h = await dHashFoto(f.url);
+        // USA A MESMA miniatura otimizada da grade (mesma URL) — assim o navegador baixa CADA foto
+        // UMA vez (sem baixar a original gigante SÓ pro dHash, que era o que travava a rolagem). E
+        // como /_next/image é do MESMO domínio, o canvas lê os pixels sem problema de CORS.
+        const h = await dHashFoto(miniatura(f.url, 256));
         if (cancelado) return;
         if (h !== null) hs.push({ id: f.id, h });
       }
