@@ -47,8 +47,45 @@ function dataCurta(iso: string): string {
 }
 
 // Player do Reels em tela cheia (clicar fora ou no ✕ fecha).
-function PlayerModal({ url, onFechar }: { url: string; onFechar: () => void }) {
+function PlayerModal({ url, nome, onFechar }: { url: string; nome?: string; onFechar: () => void }) {
   const [copiado, setCopiado] = useState(false);
+  const [baixando, setBaixando] = useState(false);
+  const [erroBaixar, setErroBaixar] = useState(false);
+
+  // Nome do arquivo amigável (só letras/números/traços), pra salvar/compartilhar bonito.
+  const nomeArquivo = `${(nome || "video").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "video"}.mp4`;
+
+  // Baixa o MP4 e ABRE A TELA DE COMPARTILHAR do celular (WhatsApp, salvar nos vídeos, etc.). Se o
+  // aparelho não tiver esse recurso (ex: navegador de computador), cai pro download normal do arquivo.
+  async function baixarOuEnviar() {
+    setErroBaixar(false);
+    setBaixando(true);
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("download falhou");
+      const blob = await resp.blob();
+      const file = new File([blob], nomeArquivo, { type: "video/mp4" });
+      const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
+      if (typeof nav.share === "function" && nav.canShare?.({ files: [file] })) {
+        await nav.share({ files: [file], title: nome || "Vídeo" });
+      } else {
+        const objUrl = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = objUrl;
+        a.download = nomeArquivo;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(objUrl), 15000);
+      }
+    } catch (e) {
+      // Usuário cancelar a tela de compartilhar cai aqui (AbortError) — nesse caso não é erro.
+      if (!(e instanceof DOMException && e.name === "AbortError")) setErroBaixar(true);
+    } finally {
+      setBaixando(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/90 p-4" onClick={onFechar}>
       <div onClick={(e) => e.stopPropagation()} className="relative">
@@ -56,10 +93,17 @@ function PlayerModal({ url, onFechar }: { url: string; onFechar: () => void }) {
         <video src={url} controls playsInline preload="metadata" className="max-h-[80vh] rounded-xl" />
         <button onClick={onFechar} aria-label="Fechar" className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-black">✕</button>
       </div>
-      {/* Ações de apoio: abrir o vídeo direto (bom teste quando não carrega) e copiar o link. */}
-      <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-2">
-        <a href={url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">↗ Abrir em nova aba</a>
-        <button type="button" onClick={() => { navigator.clipboard?.writeText(url).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); }).catch(() => {}); }} className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">{copiado ? "✓ Copiado" : "🔗 Copiar link"}</button>
+      {/* Ação PRINCIPAL: salvar/enviar o vídeo (abre o WhatsApp na tela de compartilhar do celular). */}
+      <div onClick={(e) => e.stopPropagation()} className="flex flex-col items-center gap-2">
+        <button type="button" onClick={baixarOuEnviar} disabled={baixando} className="rounded-xl bg-gradient-to-r from-[#25D366] to-[#128C7E] px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_-8px_rgba(37,211,102,0.7)] transition hover:brightness-110 disabled:opacity-60">
+          {baixando ? "⏳ Preparando o vídeo…" : "📲 Baixar / Enviar no WhatsApp"}
+        </button>
+        {erroBaixar && <p className="text-[11px] font-semibold text-red-300">Não consegui preparar agora. Tente “↗ Abrir em nova aba” e segure no vídeo pra salvar.</p>}
+        {/* Ações de apoio: abrir direto (bom teste quando não carrega) e copiar o link. */}
+        <div className="flex items-center gap-2">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">↗ Abrir em nova aba</a>
+          <button type="button" onClick={() => { navigator.clipboard?.writeText(url).then(() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); }).catch(() => {}); }} className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">{copiado ? "✓ Copiado" : "🔗 Copiar link"}</button>
+        </div>
       </div>
     </div>
   );
@@ -166,7 +210,7 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
         )}
       </div>
 
-      {ver && pronto && <PlayerModal url={f.videoUrl} onFechar={() => setVer(false)} />}
+      {ver && pronto && <PlayerModal url={f.videoUrl} nome={nomes} onFechar={() => setVer(false)} />}
     </div>
   );
 }
@@ -257,7 +301,7 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
         ))}
       </div>
 
-      {ver && pronto && <PlayerModal url={v.videoUrl} onFechar={() => setVer(false)} />}
+      {ver && pronto && <PlayerModal url={v.videoUrl} nome={v.titulo} onFechar={() => setVer(false)} />}
     </div>
   );
 }
