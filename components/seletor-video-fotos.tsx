@@ -1408,16 +1408,25 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
 
               {/* ============ ABA NARRAÇÃO (só buffet) ============ */}
               {aba === "narr" && tematicoId && (
-                <div>
+                <div className="flex flex-col gap-3">
+                  {/* cabeçalho da aba */}
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-xs font-semibold text-white">🎙️ Narração <span className="font-normal text-muted">(uma voz falando no vídeo)</span></span>
+                    <div>
+                      <span className="text-sm font-bold text-white">🎙️ Narração</span>
+                      <p className="text-[10px] text-muted">Uma voz falando no seu vídeo. Monte em 3 passos e ouça antes.</p>
+                    </div>
                     {audioUrl && (
                       <button type="button" onClick={tirarNarracao} disabled={gerandoVoz} className="shrink-0 rounded-md border border-red-900/60 px-2 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕ tirar a voz</button>
                     )}
                   </div>
 
-                  {/* 1) o que você quer anunciar */}
-                  <div className="mt-2">
+                  {/* ───────── PASSO 1 — O ROTEIRO (o que a voz fala) ───────── */}
+                  <section className="rounded-xl border border-linha bg-preto/40 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[11px] font-black text-emerald-300">1</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-white/90">📝 O que a voz vai falar</span>
+                    </div>
+
                     <label className="block text-[10px] font-semibold text-muted">O que você quer anunciar?</label>
                     <input
                       type="text"
@@ -1429,41 +1438,47 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <button type="button" onClick={biaEscreveRoteiro} disabled={escrevendoRoteiro || gerandoVoz} title="A Bia escreve o roteiro da locução (texto feito pra ser FALADO)" className="mt-1.5 w-full rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50">
                       {escrevendoRoteiro ? "✍️ escrevendo…" : "✨ Bia escreve o roteiro"}
                     </button>
-                  </div>
 
-                  {/* 2) o roteiro (editável) — a 1ª FALA */}
-                  <textarea
-                    value={roteiro}
-                    onChange={(e) => setRoteiro(e.target.value)}
-                    rows={4}
-                    maxLength={1200}
-                    placeholder="O roteiro da fala aparece aqui — dá pra editar cada palavra."
-                    className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
-                  />
-
-                  {/* 2b) a 2ª FALA (CTA no fim) — opcional */}
-                  <div className="mt-2.5 rounded-md border border-emerald-500/25 bg-emerald-500/[0.04] px-2.5 py-2">
-                    <div className="flex flex-wrap items-center justify-between gap-1.5">
-                      <span className="text-[11px] font-semibold text-white">🔁 Fala do final <span className="font-normal text-muted">(o convite)</span></span>
-                      <button type="button" onClick={biaEscreveCta} disabled={escrevendoCta || gerandoVoz} title="A Bia escreve a fala final (CTA) — ex: acesse o site e faça seu orçamento" className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50">
-                        {escrevendoCta ? "✍️ escrevendo…" : "✨ Bia escreve o final"}
-                      </button>
-                    </div>
+                    {/* a 1ª FALA (abertura) — editável */}
+                    <label className="mt-3 block text-[10px] font-semibold text-muted">🗣️ Fala de abertura</label>
                     <textarea
-                      value={roteiro2}
-                      onChange={(e) => setRoteiro2(e.target.value)}
-                      rows={2}
-                      maxLength={400}
-                      placeholder="Ex: Acesse www.castelodadiversao.com.br e faça seu orçamento agora mesmo!"
-                      className="mt-1.5 w-full rounded-md border border-linha bg-preto px-2 py-1.5 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+                      value={roteiro}
+                      onChange={(e) => setRoteiro(e.target.value)}
+                      rows={4}
+                      maxLength={1200}
+                      placeholder="O roteiro da fala aparece aqui — dá pra editar cada palavra."
+                      className="mt-1 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
                     />
-                    <p className="mt-1 text-[10px] leading-snug text-muted/70">Em branco = a voz fala só no começo e a música leva até o fim. Com uma fala aqui, a voz <strong className="text-white/70">volta no fim</strong> — e <strong className="text-white/70">todas as fotos aparecem</strong>.</p>
-                  </div>
 
-                  {/* 3) COMO A VOZ FALA (a direção) */}
-                  <div className="mt-2.5 rounded-md border border-linha bg-preto/40 px-2.5 py-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] font-semibold text-white">🎭 Como a voz deve falar</span>
+                    {/* a 2ª FALA (CTA no fim) — opcional */}
+                    <div className="mt-2.5 rounded-md border border-emerald-500/25 bg-emerald-500/[0.04] px-2.5 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
+                        <span className="text-[11px] font-semibold text-white">🔁 Fala do final <span className="font-normal text-muted">(o convite)</span></span>
+                        <button type="button" onClick={biaEscreveCta} disabled={escrevendoCta || gerandoVoz} title="A Bia escreve a fala final (CTA) — ex: acesse o site e faça seu orçamento" className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-[11px] font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-50">
+                          {escrevendoCta ? "✍️ escrevendo…" : "✨ Bia escreve o final"}
+                        </button>
+                      </div>
+                      <textarea
+                        value={roteiro2}
+                        onChange={(e) => setRoteiro2(e.target.value)}
+                        rows={2}
+                        maxLength={400}
+                        placeholder="Ex: Acesse www.castelodadiversao.com.br e faça seu orçamento agora mesmo!"
+                        className="mt-1.5 w-full rounded-md border border-linha bg-preto px-2 py-1.5 text-[11px] leading-relaxed text-white placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
+                      />
+                      <p className="mt-1 text-[10px] leading-snug text-muted/70">Em branco = a voz fala só no começo e a música leva até o fim. Com uma fala aqui, a voz <strong className="text-white/70">volta no fim</strong> — e <strong className="text-white/70">todas as fotos aparecem</strong>.</p>
+                    </div>
+                  </section>
+
+                  {/* ───────── PASSO 2 — A VOZ (jeito de falar + qual voz) ───────── */}
+                  <section className="rounded-xl border border-linha bg-preto/40 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[11px] font-black text-emerald-300">2</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-white/90">🎙️ A voz</span>
+                    </div>
+
+                    <span className="text-[10px] font-semibold text-muted">🎭 Como a voz deve falar</span>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                       {ESTILOS.map((e) => (
                         <button
                           key={e.nome}
@@ -1485,25 +1500,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       className="mt-1.5 w-full rounded-md border border-linha bg-preto px-2 py-1.5 text-[10px] leading-relaxed text-white/90 placeholder:text-muted/40 focus:border-emerald-500 focus:outline-none"
                     />
                     <p className="mt-1 text-[10px] leading-snug text-muted/70">Escreva como se estivesse dirigindo um locutor no estúdio — <strong className="text-white/70">a voz obedece de verdade</strong>. Ex: “paulista descontraído, energia de showman de circo, abertura explosiva, sem gritaria forçada”.</p>
-                  </div>
 
-                  {/* 4) VOLUME da música de fundo */}
-                  <div className="mt-2.5 rounded-md border border-linha bg-preto/40 px-2.5 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-semibold text-white">🎵 Volume da música de fundo</span>
-                      <span className="text-[10px] font-semibold text-emerald-300">{volMusica === 0 ? "sem música" : volMusica === 50 ? "padrão" : `${volMusica}%`}</span>
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <span className="text-[10px] text-muted">🔈</span>
-                      <input type="range" min={0} max={100} step={5} value={volMusica} onChange={(e) => setVolMusica(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-emerald-500" aria-label="Volume da música de fundo" />
-                      <span className="text-[10px] text-muted">🔊</span>
-                    </div>
-                    <p className="mt-1 text-[10px] leading-snug text-muted/70">Arraste pra deixar a <strong className="text-white/70">música mais baixa ou mais alta</strong> por trás da voz. Tudo à esquerda = <strong className="text-white/70">só a voz</strong>. A música é a que você escolheu na aba <strong className="text-white/70">🎵 Música</strong>.</p>
-                  </div>
-
-                  {/* 5) voz + ouvir */}
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <select value={voz} onChange={(e) => setVoz(e.target.value)} className="input-base flex-1 py-1.5 text-[11px]" aria-label="Voz da narração">
+                    <label className="mt-3 block text-[10px] font-semibold text-muted">🎤 Qual voz</label>
+                    <select value={voz} onChange={(e) => setVoz(e.target.value)} className="input-base mt-1 w-full py-1.5 text-[11px]" aria-label="Voz da narração">
                       <optgroup label="⭐ As que você aprovou">
                         {VOZES.filter((v) => v.favorita).map((v) => (
                           <option key={v.id} value={v.id}>⭐ {v.nome} — {v.sexo === "f" ? "feminina" : "masculina"}, {v.nota}</option>
@@ -1515,34 +1514,53 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                         ))}
                       </optgroup>
                     </select>
-                    <button type="button" onClick={ouvirNarracao} disabled={gerandoVoz || roteiro.trim().length < 20} title={roteiro.trim().length < 20 ? "Escreva o roteiro primeiro" : "Gera a voz com a música por baixo e toca aqui"} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-50">
-                      {gerandoVoz ? "🎙️ gerando…" : audioUrl ? "🔊 Ouvir de novo" : "🔊 Ouvir"}
-                    </button>
-                  </div>
+                  </section>
 
-                  {/* player + aviso de quantas fotos o vídeo vai usar */}
-                  {audioUrl && (() => {
-                    const precisa = fotosParaDuracao(audioSeg);
-                    const temFotos = sel.length;
-                    const faltam = precisa - (temFotos - 1);
-                    return (
-                      <div className="mt-2">
-                        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                        <audio src={audioUrl} controls className="h-8 w-full" />
-                        {faltam > 0 ? (
-                          <p className="mt-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug font-semibold text-amber-300">
-                            ⚠️ As falas somam <strong>{audioSeg}s</strong> e não cabem nas fotos escolhidas — faltam <strong>{faltam}</strong>. Adicione mais fotos (ou encurte as falas), senão o convite do fim é cortado.
-                          </p>
-                        ) : (
-                          <p className="mt-1 text-[10px] leading-snug text-emerald-300/90">
-                            🎵 Trilha de <strong>{audioSeg}s</strong> pronta — <strong>todas as suas fotos entram</strong> no vídeo (a voz fala no começo{roteiro2.trim() ? " e volta no fim pro convite" : ""}, e a música leva o meio). As com legenda entram na frente.
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  {msgVoz && <p className={`mt-1.5 text-[11px] font-semibold ${msgVoz.tipo === "ok" ? "text-emerald-400" : "text-vermelho"}`}>{msgVoz.txt}</p>}
-                  {!audioUrl && !msgVoz && <p className="mt-1.5 text-[10px] leading-snug text-muted/80">Sem narração, o vídeo sai com o <strong className="text-white/70">jingle do buffet</strong> como hoje. Com narração, a voz entra por cima da música.</p>}
+                  {/* ───────── PASSO 3 — MÚSICA DE FUNDO ───────── */}
+                  <section className="rounded-xl border border-linha bg-preto/40 p-3">
+                    <div className="mb-2 flex items-center gap-2">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-[11px] font-black text-emerald-300">3</span>
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-white/90">🎵 Música de fundo</span>
+                      <span className="ml-auto text-[10px] font-semibold text-emerald-300">{volMusica === 0 ? "sem música" : volMusica === 50 ? "padrão" : `${volMusica}%`}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted">🔈</span>
+                      <input type="range" min={0} max={100} step={5} value={volMusica} onChange={(e) => setVolMusica(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-emerald-500" aria-label="Volume da música de fundo" />
+                      <span className="text-[10px] text-muted">🔊</span>
+                    </div>
+                    <p className="mt-1 text-[10px] leading-snug text-muted/70">Arraste pra deixar a <strong className="text-white/70">música mais baixa ou mais alta</strong> por trás da voz. Tudo à esquerda = <strong className="text-white/70">só a voz</strong>. A música é a que você escolheu na aba <strong className="text-white/70">🎵 Música</strong>.</p>
+                  </section>
+
+                  {/* ───────── OUVIR (gera a voz e toca aqui) ───────── */}
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] p-3">
+                    <button type="button" onClick={ouvirNarracao} disabled={gerandoVoz || roteiro.trim().length < 20} title={roteiro.trim().length < 20 ? "Escreva o roteiro primeiro" : "Gera a voz com a música por baixo e toca aqui"} className="w-full rounded-lg bg-emerald-600 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:opacity-50">
+                      {gerandoVoz ? "🎙️ gerando a voz…" : audioUrl ? "🔊 Ouvir de novo" : "🔊 Ouvir"}
+                    </button>
+
+                    {/* player + aviso de quantas fotos o vídeo vai usar */}
+                    {audioUrl && (() => {
+                      const precisa = fotosParaDuracao(audioSeg);
+                      const temFotos = sel.length;
+                      const faltam = precisa - (temFotos - 1);
+                      return (
+                        <div className="mt-2">
+                          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                          <audio src={audioUrl} controls className="h-8 w-full" />
+                          {faltam > 0 ? (
+                            <p className="mt-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[10px] leading-snug font-semibold text-amber-300">
+                              ⚠️ As falas somam <strong>{audioSeg}s</strong> e não cabem nas fotos escolhidas — faltam <strong>{faltam}</strong>. Adicione mais fotos (ou encurte as falas), senão o convite do fim é cortado.
+                            </p>
+                          ) : (
+                            <p className="mt-1 text-[10px] leading-snug text-emerald-300/90">
+                              🎵 Trilha de <strong>{audioSeg}s</strong> pronta — <strong>todas as suas fotos entram</strong> no vídeo (a voz fala no começo{roteiro2.trim() ? " e volta no fim pro convite" : ""}, e a música leva o meio). As com legenda entram na frente.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {msgVoz && <p className={`mt-1.5 text-[11px] font-semibold ${msgVoz.tipo === "ok" ? "text-emerald-400" : "text-vermelho"}`}>{msgVoz.txt}</p>}
+                    {!audioUrl && !msgVoz && <p className="mt-1.5 text-[10px] leading-snug text-muted/80">Sem narração, o vídeo sai com o <strong className="text-white/70">jingle do buffet</strong> como hoje. Com narração, a voz entra por cima da música.</p>}
+                  </div>
                 </div>
               )}
 
