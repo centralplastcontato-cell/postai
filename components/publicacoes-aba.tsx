@@ -227,6 +227,11 @@ export function PublicacoesAba({
   const [isPending, startTransition] = useTransition();
   const [template, setTemplate] = useState<Template>("dica");
   const [hora, setHora] = useState(horaPadrao); // hora do post (BRT) — vários no mesmo dia
+  // Dia escolhido À MÃO no formulário (o Victor pediu poder mudar direto aqui, sem depender de
+  // clicar no calendário). Vazio = usa o dia do calendário (dataAlvo) ou cai na próxima data livre.
+  const [dataManual, setDataManual] = useState("");
+  // Hoje em São Paulo (YYYY-MM-DD) — trava o seletor pra não marcar um dia que já passou.
+  const hojeSP = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
   const [tema, setTema] = useState("");
   const [oferta, setOferta] = useState("");
   const [validade, setValidade] = useState("");
@@ -276,6 +281,9 @@ export function PublicacoesAba({
   const [pagina, setPagina] = useState(1);
   // Volta pra página 1 quando muda o filtro de dia ou a lista cresce/encolhe.
   useEffect(() => { setPagina(1); }, [dataAlvo, publicacoes.length]);
+  // Clicar num dia do calendário (dataAlvo) manda no seletor: limpa a escolha manual pra o campo
+  // mostrar o dia clicado. Depois o dono ainda pode trocar à mão no próprio campo.
+  useEffect(() => { setDataManual(""); }, [dataAlvo]);
   // Filtro por dia (clicar num dia do calendário) + paginação, pra não virar
   // rolagem infinita no mobile. Sem dia = mostra tudo, de POR_PAGINA em POR_PAGINA.
   const filtradas = dataAlvo ? publicacoes.filter((p) => chaveDiaSP(p.data) === dataAlvo) : publicacoes;
@@ -415,7 +423,7 @@ export function PublicacoesAba({
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
       const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback" || template === "enquete" || template === "vitrine";
       const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: dataAlvo ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, parcelamento, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora, imagemUrl: imagemFundo || undefined });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: (dataManual || dataAlvo) ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, parcelamento, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora, imagemUrl: imagemFundo || undefined });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -819,13 +827,16 @@ export function PublicacoesAba({
         <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1 text-xs text-muted">
             Dia do post
-            <div className="mt-1 rounded-md border border-linha bg-preto px-3 py-2 text-sm">
-              {dataAlvo ? (
-                <span className="font-semibold text-white">📅 {dataBR(`${dataAlvo}T12:00:00-03:00`)}</span>
-              ) : (
-                <span className="text-muted">Clique num dia livre ↑ (senão vai pra próxima data livre)</span>
-              )}
-            </div>
+            <input
+              type="date"
+              value={dataManual || dataAlvo || ""}
+              min={hojeSP}
+              onChange={(e) => setDataManual(e.target.value)}
+              style={{ colorScheme: "dark" }}
+              title="Escolha o dia da postagem (ex: amanhã). Em branco = próxima data livre."
+              className="mt-1 w-full rounded-md border border-linha bg-preto px-3 py-2 text-sm font-semibold text-white transition hover:border-vermelho focus:border-vermelho focus:outline-none"
+            />
+            <p className="mt-1 text-[11px] leading-snug text-muted/70">Toque pra escolher o dia (ou clique num dia livre no calendário ↑). Em branco = cai na próxima data livre.</p>
           </div>
           <label className="text-xs text-muted">
             Hora <span className="text-muted/70">(BRT)</span>
