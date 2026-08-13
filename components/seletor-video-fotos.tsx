@@ -48,6 +48,16 @@ function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
   return {};
 }
 
+// As fotos do buffet são ENORMES (originais de vários MB). Nas miniaturas (linha do tempo, grade,
+// prévia) não precisamos do tamanho original — passamos pelo otimizador de imagem do Next
+// (/_next/image), que devolve uma versão redimensionada e leve (fica em cache no CDN depois da 1ª
+// vez). Isso faz a linha do tempo aparecer NA HORA em vez de esperar baixar 26 fotos gigantes.
+// `w` tem que ser um dos tamanhos padrão do Next (128/256/384 = miniatura, 640 = prévia).
+function miniatura(url: string, w: number): string {
+  if (!url || !url.startsWith("http")) return url;
+  return `/_next/image?url=${encodeURIComponent(url)}&w=${w}&q=75`;
+}
+
 // --- Detector de fotos PARECIDAS/repetidas (ex: fotos em rajada do mesmo momento) ---
 // dHash 8×8 (64 bits, guardados como array de 0/1) calculado no NAVEGADOR: reduz a foto a 9×8 tons
 // de cinza e marca 1/0 comparando cada pixel com o vizinho. Fotos parecidas têm hashes parecidos
@@ -678,7 +688,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const preloadRef = useRef<HTMLImageElement[]>([]);
   useEffect(() => {
     if (typeof window === "undefined") return;
-    preloadRef.current = escolhidas.map((f) => { const im = new Image(); im.src = f.url; return im; });
+    preloadRef.current = escolhidas.map((f) => { const im = new Image(); im.src = miniatura(f.url, 640); return im; });
   }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
   function irCena(d: number) {
     setTocandoPrev(false);
@@ -790,19 +800,19 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 <>
                   {fundoCheia ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                    <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
                   ) : (
                     <>
                       {fundoCor ? (
                         <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
                       ) : (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                        <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
                       )}
                       <div className="absolute inset-0 flex items-center justify-center p-3 lg:p-4">
                         <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corDaMoldura, 2)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={cenaFoto.url} alt="" className="block max-h-[21vh] w-auto max-w-full object-contain lg:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
+                          <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="block max-h-[21vh] w-auto max-w-full object-contain lg:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
                         </span>
                       </div>
                     </>
@@ -942,7 +952,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                             className={`relative cursor-pointer select-none overflow-hidden rounded-lg border-2 transition-transform ${dragId === f.id ? "z-30 scale-105 border-[#c7b2ff] opacity-90 shadow-xl" : i === cenaIdx ? "border-[#c7b2ff] ring-2 ring-[#7c3aed]" : ehCapa ? "border-amber-400" : "border-vermelho"}`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={f.url} alt="" draggable={false} className="aspect-square w-full select-none object-cover" />
+                            <img src={miniatura(f.url, 256)} alt="" draggable={false} loading="lazy" decoding="async" className="aspect-square w-full select-none object-cover" />
                             {/* ALÇA de arrastar — SÓ ela é arrastável (o resto do card rola a lista no celular).
                                 Fica no TOPO pra não tapar a foto. Segure e arraste pra reordenar (PC e celular). */}
                             <div
@@ -1029,7 +1039,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                           return (
                           <div key={f.id} onClick={() => toggle(f.id)} title="Tocar pra adicionar" className={`group relative cursor-pointer overflow-hidden rounded-lg border-2 transition ${ehCapa ? "border-amber-400" : "border-transparent hover:border-white/30"}`}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={f.url} alt="" className={`aspect-square w-full object-cover transition ${ehCapa ? "" : "opacity-60 group-hover:opacity-100"}`} />
+                            <img src={miniatura(f.url, 256)} alt="" loading="lazy" decoding="async" className={`aspect-square w-full object-cover transition ${ehCapa ? "" : "opacity-60 group-hover:opacity-100"}`} />
                             {dupGrupo.get(f.id) && (
                               <span title="Foto PARECIDA com outra(s) da lista — evite repetir no vídeo" className="absolute left-1 top-1 z-10 rounded bg-amber-400 px-1 py-0.5 text-[9px] font-black leading-none text-black shadow">🔁{dupGrupo.get(f.id)}</span>
                             )}
@@ -1203,7 +1213,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       <span className="flex items-center justify-center rounded-md bg-zinc-700/50 p-2 transition group-hover/p:bg-zinc-600/70">
                         <span className="block" style={estiloMoldura(moldura, corDaMoldura)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={fotoPrev} alt="" className="block h-16 w-16 object-cover" style={{ borderRadius: moldura === "nenhuma" ? 2 : 0 }} />
+                          <img src={miniatura(fotoPrev, 128)} alt="" decoding="async" className="block h-16 w-16 object-cover" style={{ borderRadius: moldura === "nenhuma" ? 2 : 0 }} />
                         </span>
                       </span>
                       <span className="text-left text-[10px] leading-tight text-muted">como a moldura fica<br /><span className="text-[#c7b2ff] group-hover/p:underline">🔍 ampliar</span></span>
@@ -1333,7 +1343,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                           {escolhidas.map((f) => (
                             <button key={f.id} type="button" onClick={() => { if (f.id !== capaId) definirCapa(f.id); }} className={`relative shrink-0 overflow-hidden rounded-lg border-2 transition ${f.id === capaId ? "border-amber-400 ring-2 ring-amber-400/40" : "border-white/10 opacity-70 hover:opacity-100"}`}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={f.url} alt="" className="h-16 w-11 object-cover" />
+                              <img src={miniatura(f.url, 128)} alt="" loading="lazy" decoding="async" className="h-16 w-11 object-cover" />
                               {f.id === capaId && <span className="absolute bottom-0 right-0 rounded-tl bg-amber-400 px-0.5 text-[9px]">⭐</span>}
                             </button>
                           ))}
@@ -1572,7 +1582,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
               {escolhidas.map((f, i) => (
                 <button key={f.id} type="button" onClick={() => { setCena(i); setTocandoPrev(false); }} title={`Cena ${i + 1}`} className={`relative shrink-0 overflow-hidden rounded-lg border-2 transition ${i === cenaIdx ? "border-[#c7b2ff] ring-2 ring-[#a855f7]" : capaId === f.id ? "border-amber-400" : "border-white/10 opacity-70 hover:opacity-100"}`}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt="" className="h-16 w-11 object-cover" />
+                  <img src={miniatura(f.url, 128)} alt="" loading="lazy" decoding="async" className="h-16 w-11 object-cover" />
                   <span className="absolute left-0 top-0 rounded-br-md bg-black/70 px-1 text-[9px] font-bold text-white">{i + 1}</span>
                   {capaId === f.id && <span className="absolute bottom-0 right-0 rounded-tl bg-amber-400 px-0.5 text-[8px]">⭐</span>}
                   {dupGrupo.get(f.id) && <span className="absolute right-0 top-0 rounded-bl bg-amber-400 px-0.5 text-[8px] font-black text-black">🔁</span>}
@@ -1599,19 +1609,19 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
               <>
                 {fundoCheia ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                  <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
                 ) : (
                   <>
                     {fundoCor ? (
                       <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${corDoFundo}, #101018)` }} />
                     ) : (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={cenaFoto.url} alt="" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
+                      <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
                     )}
                     <div className="absolute inset-0 flex items-center justify-center p-4">
                       <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corDaMoldura, 3)}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={cenaFoto.url} alt="" className="block max-h-[62vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
+                        <img src={miniatura(cenaFoto.url, 640)} alt="" decoding="async" className="block max-h-[62vh] w-auto max-w-full object-contain" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
                       </span>
                     </div>
                   </>
