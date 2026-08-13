@@ -600,7 +600,7 @@ export async function gerarVideoTematico(videoId: string) {
   const mascoteOn = Boolean(v.marca.mascoteUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.mascoteCanto || "");
   const logoOn = Boolean(v.marca.logoUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.logoCanto || "");
   const versao = hashCurto(
-    ["q6", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.logoCanto, v.logoTam, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
+    ["q7", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.logoCanto, v.logoTam, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
 
   let fotosMotor: string[];
@@ -713,7 +713,7 @@ Você escreve a COPY de um Reels sobre "${v.titulo}" — frases curtas que apare
 REGRAS:
 - Fale COM o pai/mãe que decide a festa ("seu filho", "sua festa"), vendendo o BENEFÍCIO (diversão segura, memórias, festa sem trabalho pra você) — não descreva a foto ("Mesa decorada") nem rotule ("Brinquedos", "Nosso espaço").
 - Cada frase nasce da FOTO daquele quadro: fale do que ela mostra, conectando com o benefício.
-- Frases CURTAS: 3 a 8 palavras. Nada de ponto final em todas; pode usar "!" com moderação. No máximo 1 emoji no vídeo inteiro.
+- Frases CURTAS: 3 a 8 palavras. TERMINE cada frase com pontuação — ponto final "." nas afirmações e "!" nas mais animadas (a capa combina com "!"). No máximo 1 emoji no vídeo inteiro.
 - A copy tem ARCO: a CAPA é o gancho que segura o dedo, as do meio entregam o que a família ganha, a última é um convite.
 - A marca É o lugar da festa: nunca mande "procurar um local".`,
           },
@@ -802,7 +802,7 @@ export async function gerarLegendaUmaFotoVideo(videoId: string, fotoId: string) 
             role: "system",
             content: `Você é a social media do buffet infantil "${v.marca.nome}". ${v.marca.descricao || ""}
 O vídeo é um Reels sobre "${v.titulo}". Você escreve UMA frase curta que aparece por cima de uma foto.
-REGRAS: fale COM o pai/mãe que decide a festa ("seu filho", "sua festa") vendendo o BENEFÍCIO (diversão segura, memórias, festa sem trabalho pra você); a frase NASCE da foto (fale do que ela mostra), mas NUNCA descreva a foto ("Mesa decorada") nem rotule ("Brinquedos"). Sem ponto final obrigatório; no máximo 1 emoji. A marca É o lugar da festa — nunca mande procurar local.`,
+REGRAS: fale COM o pai/mãe que decide a festa ("seu filho", "sua festa") vendendo o BENEFÍCIO (diversão segura, memórias, festa sem trabalho pra você); a frase NASCE da foto (fale do que ela mostra), mas NUNCA descreva a foto ("Mesa decorada") nem rotule ("Brinquedos"). TERMINE com pontuação (ponto final "." ou "!"); no máximo 1 emoji. A marca É o lugar da festa — nunca mande procurar local.`,
           },
           { role: "user", content: `${pedido}${contexto}${trocar}\n\nResponda só com JSON: {"frase":"..."}` },
         ],

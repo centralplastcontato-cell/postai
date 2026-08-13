@@ -41,6 +41,16 @@ const LARG_LEGENDA = 730;
 
 const falhou = (msg: string) => new Response(msg, { status: 503, headers: { "cache-control": "no-store" } });
 
+// Fecha a frase com pontuação, se faltar. Já termina em . ! ? … : ou reticências → não mexe.
+// Senão, "!" (tom animado de buffet). Também não pontua se a frase acaba em emoji.
+function pontuarFrase(t: string): string {
+  const s = (t || "").trim();
+  if (!s) return s;
+  if (/[.!?…:)]$/.test(s)) return s;
+  // último caractere não-espaço é letra/número? então falta pontuação
+  return /[\p{L}\p{N}]$/u.test(s) ? `${s}!` : s;
+}
+
 export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: string }> }) {
   const { id, n } = await ctx.params;
   const origin = new URL(req.url).origin;
@@ -79,6 +89,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
       const mapa = JSON.parse(v.videoTextos || "{}") as Record<string, string>;
       legenda = (mapa?.[fotoId] || "").trim();
     } catch {}
+    // Garante pontuação no fim da frase (o Victor pediu): se ela não termina em . ! ? …, fecha
+    // com "!" (combina com o tom animado do buffet). Vale pra legendas JÁ escritas, sem regerar.
+    legenda = pontuarFrase(legenda);
 
     const foto = await fotoSeguraComTamanho(img.url);
     if (!foto) return falhou("Não consegui preparar a foto.");

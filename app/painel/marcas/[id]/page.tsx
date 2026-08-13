@@ -298,7 +298,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         // verdade), não a foto crua. O ?v muda quando algo da capa muda (pra a CDN atualizar).
         const temMascoteVideo = Boolean(marca.mascoteUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.mascoteCanto || "");
         if (v.capaEstilo === "impacto" || v.capaEstilo === "ia" || v.capaEstilo === "recortado" || temMascoteVideo) {
-          const s = [v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.videoCapa, v.videoTextos, v.videoFundo, v.videoFundoCor, v.mascoteCanto, v.mascoteTam, marca.mascoteUrl, marca.corPrimaria, marca.logoUrl].join("|");
+          const s = ["q7", v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.videoCapa, v.videoTextos, v.videoFundo, v.videoFundoCor, v.mascoteCanto, v.mascoteTam, marca.mascoteUrl, marca.corPrimaria, marca.logoUrl].join("|");
           let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
           return `/api/quadro-tema/${v.id}/0.jpg?v=${h.toString(36)}`;
         }

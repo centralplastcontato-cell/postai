@@ -38,6 +38,15 @@ const MOLDURAS_UI = [
   { id: "marca", label: "Cor" }, // cor escolhida na paleta (padrão = cor da marca)
 ];
 
+// Fecha a frase com pontuação, se faltar (mesma regra do /api/quadro-tema, pra a prévia bater com
+// o vídeo). Já termina em . ! ? … : ) → não mexe; senão "!" (tom animado de buffet).
+function pontuarFrase(t: string): string {
+  const s = (t || "").trim();
+  if (!s) return s;
+  if (/[.!?…:)]$/.test(s)) return s;
+  return /[\p{L}\p{N}]$/u.test(s) ? `${s}!` : s;
+}
+
 // Estilo da moldura no PREVIEW (aproxima o que o motor faz: borda colorida ao redor da foto).
 // `esc` escala a espessura — 1 no mini-preview, maior no modal ampliado.
 function estiloMoldura(m: string, cor: string, esc = 1): CSSProperties {
@@ -671,11 +680,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const ehCapaCena = !!cenaFoto && cenaFoto.id === capaId;
   // o que aparece escrito na prévia: no buffet, a legenda da foto (ou o tema na capa); na festa, o
   // título só na capa. É só uma aproximação do vídeo — o motor é quem manda de verdade.
-  const legendaCena = cenaFoto
+  const legendaCena = pontuarFrase(cenaFoto
     ? tematicoId
       ? (textos[cenaFoto.id] || (ehCapaCena ? nome : ""))
       : (ehCapaCena ? (tituloCapa.trim() || tituloCapaAuto || nome) : "")
-    : "";
+    : "");
   const fundoCheia = !!tematicoId && fundo === "cheia";
   const fundoCor = !!tematicoId && fundo === "cor"; // fundo em degradê de cor
   const corDoFundo = corFundo || corMarca; // a cor escolhida (ou a da marca, se nenhuma)
