@@ -615,6 +615,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setSubindoMusica(false);
   }
   // Salva a seleção e FICA na tela (não fecha) — mostra "✓ Salvo!" por uns segundos como confirmação.
+  // NÃO chama router.refresh() aqui: a própria server action já revalida a página (o card lá fora
+  // atualiza sozinho), e o refresh extra estava re-montando o modal e "jogando" o Victor pra fora.
   async function salvar() {
     setSalvando(true);
     try {
@@ -624,7 +626,6 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       salvoTimer.current = setTimeout(() => setSalvoOk(false), 2500);
     } catch {}
     setSalvando(false);
-    router.refresh();
   }
   // Salva a seleção E dispara o motor de vídeo (o "Gerar" agora passa por aqui, depois de escolher).
   async function salvarEGerar() {
@@ -682,14 +683,24 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     const t = setInterval(() => setCena((c) => (c + 1) % escolhidas.length), 1100);
     return () => clearInterval(t);
   }, [tocandoPrev, escolhidas.length]);
-  // Pré-carrega as fotos da sequência (deixa no cache do navegador) pra a prévia trocar de cena NA
-  // HORA, sem aquele preto esperando a foto baixar. Guarda as referências (preloadRef) pra o
-  // navegador não cancelar o download no meio. Roda quando a seleção muda.
+  // Pré-carrega as fotos da prévia (deixa no cache do navegador) pra trocar de cena NA HORA, sem
+  // aquele preto esperando baixar. IMPORTANTE: só carrega uma JANELA em volta da cena atual (não as
+  // 26 de uma vez) e com um pequeno atraso — assim não briga com as miniaturas da linha do tempo/
+  // grade, que são o que o Victor está esperando aparecer. Roda quando muda a seleção ou a cena.
   const preloadRef = useRef<HTMLImageElement[]>([]);
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    preloadRef.current = escolhidas.map((f) => { const im = new Image(); im.src = miniatura(f.url, 640); return im; });
-  }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (typeof window === "undefined" || !escolhidas.length) return;
+    const idx = Math.min(cena, escolhidas.length - 1);
+    // vizinhas: atual, 2 pra frente e 1 pra trás (é o que a prévia costuma mostrar em seguida).
+    const alvos = [idx, idx + 1, idx + 2, idx - 1]
+      .map((n) => ((n % escolhidas.length) + escolhidas.length) % escolhidas.length)
+      .filter((n, i, a) => a.indexOf(n) === i)
+      .map((n) => escolhidas[n]);
+    const t = setTimeout(() => {
+      preloadRef.current = alvos.map((f) => { const im = new Image(); im.src = miniatura(f.url, 640); return im; });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [sel, cena]); // eslint-disable-line react-hooks/exhaustive-deps
   function irCena(d: number) {
     setTocandoPrev(false);
     if (!escolhidas.length) return;
