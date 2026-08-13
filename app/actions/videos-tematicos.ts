@@ -862,13 +862,15 @@ export async function gerarRoteiroNarracao(videoId: string, briefing: string, se
 - Fale COM o pai/mãe ("seu filho", "sua festa"), vendendo o BENEFÍCIO — não liste características.
 - Termine com uma CHAMADA clara pra ação.
 - Números por extenso ("vinte por cento", "dia vinte") — a voz lê melhor.
+- NÃO leia o número de WhatsApp/telefone dígito a dígito (fica LONGO e ninguém decora ouvindo) — ele aparece na tela. Se convidar, diga só "chama no nosso WhatsApp" ou "link na bio".
+- UMA chamada pra ação só, no fim (não repita o convite várias vezes).
 - Sem emoji, sem hashtag, sem marcação de cena. SÓ o que a voz fala.
 - A marca É o lugar da festa: nunca mande procurar outro local.
-- Tamanho: cerca de ${palavras} palavras (a locução tem que durar ~${segundosAlvo}s).`,
+- IMPORTANTE — CURTO: no máximo ${palavras} palavras. A locução TEM que durar ~${segundosAlvo}s (se passar muito, o vídeo corta a fala). Prefira cortar do que estourar.`,
           },
           {
             role: "user",
-            content: `Tema do vídeo: "${v.titulo}".\nO que o dono quer anunciar: ${b || "um convite pra conhecer o buffet e fechar a festa aqui"}.${v.marca.telefone ? `\nWhatsApp da marca: ${v.marca.telefone} (só cite se fizer sentido na chamada final).` : ""}\n\nEscreva o roteiro. Responda só com JSON: {"roteiro":"..."}`,
+            content: `Tema do vídeo: "${v.titulo}".\nO que o dono quer anunciar: ${b || "um convite pra conhecer o buffet e fechar a festa aqui"}.${v.marca.telefone ? `\nA marca tem WhatsApp, mas NÃO leia o número na fala (ele aparece na tela) — convide só "chama no nosso WhatsApp".` : ""}\n\nEscreva o roteiro. Responda só com JSON: {"roteiro":"..."}`,
           },
         ],
       }),
@@ -916,9 +918,9 @@ export async function gerarCtaNarracao(videoId: string) {
           {
             role: "system",
             content: `Você escreve a FALA FINAL (CTA) de um vídeo do buffet infantil "${v.marca.nome}" — pra ser FALADA em voz alta no fim do vídeo. Regras:
-- UMA a DUAS frases CURTAS (no máximo ~18 palavras no total).
+- UMA frase CURTA (no máximo ~14 palavras). Ela é FALADA — se ficar longa, o vídeo corta o fim.
 - Tom empolgado e direto, convidando a pessoa a AGIR AGORA (fazer o orçamento / garantir a festa).
-${site ? `- Cite o site no fim: ${site} (deixe a URL na fala pra a voz ler).` : ""}${v.marca.telefone ? `\n- Pode convidar a chamar no WhatsApp.` : ""}
+- NÃO leia URL de site nem número de telefone por extenso na fala (fica longo e a pessoa não anota ouvindo) — eles aparecem na tela. Convide só "chama no nosso WhatsApp" ou "link na bio".
 - A marca É o lugar da festa; nunca mande procurar outro local.
 - Sem emoji, sem hashtag, sem marcação de cena. Só o que a voz fala.`,
           },

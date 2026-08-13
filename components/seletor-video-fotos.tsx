@@ -555,7 +555,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (!tematicoId) return;
     setEscrevendoRoteiro(true);
     setMsgVoz(null);
-    const r = await gerarRoteiroNarracao(tematicoId, briefing, 25).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }));
+    // O roteiro precisa CABER nas fotos (o motor corta o áudio quando acaba a última foto). Miro a
+    // locução num tamanho que sobra uma folga: orçamento de tempo das fotos (corpo × 2,3s) MENOS a
+    // fala do final (~10s) e uma margem de segurança. Assim a frase toda é falada sem cortar.
+    const nCorpo = Math.min(sel.length - 1, 29);
+    const alvoRoteiro = Math.max(14, Math.min(38, Math.round(nCorpo * 2.3 - 14)));
+    const r = await gerarRoteiroNarracao(tematicoId, briefing, alvoRoteiro).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }));
     setEscrevendoRoteiro(false);
     if (!r.ok) { setMsgVoz({ tipo: "erro", txt: r.erro || "Não consegui escrever." }); return; }
     setRoteiro(r.roteiro);
