@@ -182,6 +182,16 @@ export async function fotosDoVideoTematico(videoId: string) {
   };
 }
 
+// Só o STATUS do vídeo (leve): o seletor fica nesta consulta enquanto o motor monta, pra mostrar
+// "gerando…" e, quando vira uma URL http, deixar o dono ASSISTIR sem sair da tela de edição.
+export async function statusVideoTematico(videoId: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoUrl: true } });
+  if (!v) return { ok: false as const };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const };
+  return { ok: true as const, videoUrl: v.videoUrl };
+}
+
 export async function excluirVideoTematico(videoId: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoUrl: true, titulo: true, narracaoUrl: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };

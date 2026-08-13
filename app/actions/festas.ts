@@ -607,6 +607,16 @@ export async function postarReelsAgora(pubId: string) {
 // Dispara o MOTOR DE VÍDEO pra gerar o Reels da festa (botão "⚡ Gerar vídeo"). Marca a festa
 // como "gerando"; o motor monta em segundo plano e o /api/video-pronto salva a URL no fim.
 // videoUrl = "" (sem vídeo) | "gerando" (em montagem) | URL http (pronto).
+// Só o STATUS do vídeo da festa (leve): o seletor fica consultando enquanto o motor monta, pra
+// mostrar "gerando…" e deixar o dono ASSISTIR sem sair da tela de edição quando ficar pronto.
+export async function statusVideoFesta(festaId: string) {
+  const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true, videoUrl: true } });
+  if (!f) return { ok: false as const };
+  const g = await guardaMarca(f.marcaId);
+  if (!g.ok) return { ok: false as const };
+  return { ok: true as const, videoUrl: f.videoUrl };
+}
+
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },

@@ -9,8 +9,8 @@
 
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { salvarFotosVideo, gerarVideoDaFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, definirMascoteFesta } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideo, gerarVideoDaFesta, statusVideoFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, definirMascoteFesta } from "@/app/actions/festas";
+import { salvarFotosVideoTematico, gerarVideoTematico, statusVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
 const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
@@ -202,6 +202,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [dragId, setDragId] = useState<string | null>(null); // foto sendo arrastada (PC ou alça)
   const [ampliada, setAmpliada] = useState<FotoView | null>(null); // foto aberta em tela cheia
   const [erroGerar, setErroGerar] = useState("");
+  // Geração do vídeo SEM sair da tela: dispara o motor, fica em "gerando" e, quando o vídeo fica
+  // pronto (a consulta vira uma URL http), mostra o botão de ASSISTIR aqui mesmo — pra rever e
+  // ajustar sem fechar. `jaTemVideo` já vem da abertura; usamos como estado inicial do vídeo pronto.
+  const [gerandoVideo, setGerandoVideo] = useState(false);
+  const [videoProntoUrl, setVideoProntoUrl] = useState<string | null>(null);
+  const [verVideoPronto, setVerVideoPronto] = useState(false);
   // foto escolhida pra CAPA (fotoId). "" = a 1ª foto vira capa automaticamente.
   const [capa, setCapa] = useState<string>(fotos.some((f) => f.id === capaInicial) ? capaInicial : "");
   const [moldura, setMoldura] = useState<string>(molduraInicial || "branca"); // moldura das fotos no vídeo
@@ -645,6 +651,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setSalvando(false);
   }
   // Salva a seleção E dispara o motor de vídeo (o "Gerar" agora passa por aqui, depois de escolher).
+  // NÃO fecha mais a tela: fica em "gerando" e, quando o motor termina, mostra o vídeo pra assistir
+  // e ajustar aqui mesmo (o polling em statusVideo* acompanha até virar uma URL http).
   async function salvarEGerar() {
     setSalvando(true);
     setErroGerar("");
@@ -652,13 +660,40 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       await salvarSelecao();
       const r = await (tematicoId ? gerarVideoTematico(tematicoId) : gerarVideoDaFesta(festaId)).catch(() => ({ ok: false as const, erro: "Não consegui gerar agora." }));
       if (!r.ok) { setErroGerar(r.erro || "Não deu pra gerar."); setSalvando(false); return; }
-      router.refresh();
-      onFechar();
+      setSalvando(false);
+      setVideoProntoUrl(null);
+      setVerVideoPronto(false);
+      setGerandoVideo(true); // fica na tela acompanhando; o useEffect de polling faz o resto
+      // Sem router.refresh() aqui de propósito: ele re-monta o modal e fecharia a tela (era o bug
+      // do "Salvar saía da tela"). O status vem do polling; o card lá fora atualiza depois.
     } catch {
       setErroGerar("Não consegui gerar agora.");
       setSalvando(false);
     }
   }
+  // Enquanto o motor monta (gerandoVideo), pergunta o status de tempos em tempos. Quando vira uma
+  // URL http → vídeo pronto (mostra o "Assistir"); quando volta pra "" → o motor falhou (avisa).
+  useEffect(() => {
+    if (!gerandoVideo) return;
+    let parou = false;
+    const consultar = async () => {
+      const r = await (tematicoId ? statusVideoTematico(tematicoId) : statusVideoFesta(festaId)).catch(() => null);
+      if (parou || !r || !r.ok) return;
+      if (r.videoUrl && r.videoUrl.startsWith("http")) {
+        setVideoProntoUrl(r.videoUrl);
+        setGerandoVideo(false);
+        // sem router.refresh(): manteria a tela aberta é o objetivo; o card atualiza ao fechar
+      } else if (r.videoUrl === "" || r.videoUrl === "arquivado") {
+        // o callback põe "" quando a montagem falha (ex: foto que não baixou)
+        setGerandoVideo(false);
+        setErroGerar("Não consegui montar o vídeo dessa vez. Confira as fotos e o logo e tente de novo — a Bia registra o motivo nas Atividades.");
+      }
+      // senão (ainda "gerando") segue consultando
+    };
+    const t = setInterval(consultar, 8000);
+    consultar();
+    return () => { parou = true; clearInterval(t); };
+  }, [gerandoVideo, tematicoId, festaId, router]);
 
   const segs = sel.length ? Math.round(sel.length * 2.3 + 6) : 0;
   const escolhidas = sel.map((id) => fotos.find((f) => f.id === id)).filter((f): f is FotoView => !!f);
@@ -809,12 +844,27 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
           </span>
           <div className="ml-auto flex items-center gap-2">
             <button onClick={salvar} disabled={salvando} className={`rounded-xl border px-3.5 py-2 text-xs font-semibold transition disabled:opacity-60 ${salvoOk ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300" : "border-white/15 text-white hover:border-white/40"}`}>{salvando ? "…" : salvoOk ? "✓ Salvo!" : "Salvar"}</button>
-            <button onClick={salvarEGerar} disabled={salvando || sel.length === 0} title={sel.length === 0 ? "Escolha as fotos primeiro" : "Salvar a seleção e gerar o vídeo"} className="rounded-xl bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-50">{jaTemVideo ? "🔄 Refazer vídeo" : "⚡ Gerar vídeo"}</button>
+            <button onClick={salvarEGerar} disabled={salvando || gerandoVideo || sel.length === 0} title={sel.length === 0 ? "Escolha as fotos primeiro" : "Salvar a seleção e gerar o vídeo (fica nesta tela)"} className="rounded-xl bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-50">{gerandoVideo ? "🎬 Gerando…" : jaTemVideo || videoProntoUrl ? "🔄 Refazer vídeo" : "⚡ Gerar vídeo"}</button>
             <button onClick={onFechar} aria-label="Fechar" className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/15 text-sm text-muted transition hover:text-white">✕</button>
           </div>
         </div>
 
         {erroGerar && <p className="border-b border-white/10 bg-vermelho/10 px-4 py-1.5 text-center text-xs text-vermelho">{erroGerar}</p>}
+
+        {/* Faixa de status da GERAÇÃO (fica nesta tela): gerando… → pronto pra assistir. */}
+        {gerandoVideo && (
+          <div className="flex items-center justify-center gap-2 border-b border-white/10 bg-[#a855f7]/10 px-4 py-2 text-center text-xs font-semibold text-[#d6c6ff]">
+            <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#d6c6ff]/40 border-t-[#d6c6ff]" />
+            🎬 Montando seu vídeo… pode ficar nesta tela (leva ~1 a 2 min). Aviso aqui quando ficar pronto.
+          </div>
+        )}
+        {!gerandoVideo && videoProntoUrl && (
+          <div className="flex flex-wrap items-center justify-center gap-3 border-b border-white/10 bg-emerald-500/10 px-4 py-2 text-center text-xs font-semibold text-emerald-300">
+            ✅ Vídeo pronto!
+            <button type="button" onClick={() => setVerVideoPronto(true)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-500">▶️ Assistir</button>
+            <span className="font-normal text-emerald-300/80">Não gostou de algo? Ajuste aqui e clique em 🔄 Refazer vídeo.</span>
+          </div>
+        )}
 
         {/* ---------- MIOLO: prévia (player) à esquerda + abas à direita ---------- */}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
@@ -1657,6 +1707,18 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       {/* player ÚNICO (escondido) que o ▶️/⏸ de cada trilha da aba Música controla */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <audio ref={audioRef} onEnded={() => setTocando("")} className="hidden" />
+
+      {/* VÍDEO PRONTO em tela cheia — assiste aqui mesmo, sem sair da edição. Fecha e ajusta se quiser. */}
+      {verVideoPronto && videoProntoUrl && (
+        <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-3 bg-black/95 p-4" onClick={(e) => { e.stopPropagation(); setVerVideoPronto(false); }}>
+          <div onClick={(e) => e.stopPropagation()} className="relative">
+            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+            <video src={videoProntoUrl} controls autoPlay playsInline className="max-h-[80vh] rounded-xl" />
+            <button onClick={() => setVerVideoPronto(false)} aria-label="Fechar" className="absolute -right-2 -top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-bold text-black">✕</button>
+          </div>
+          <button type="button" onClick={() => setVerVideoPronto(false)} className="rounded-lg border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">Fechar e ajustar</button>
+        </div>
+      )}
 
       {/* PRÉVIA EM TELA CHEIA — pra ver a sequência de perto (principalmente no celular). Usa a
           MESMA cena/estado da prévia pequena; ◀ ▶ trocam a cena e ▶ passa sozinho. */}
