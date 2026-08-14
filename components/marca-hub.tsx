@@ -187,7 +187,7 @@ export function MarcaHub({
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
         {aba === "video" && <VideoPainel marcaId={marca.id} festas={festas} tematicos={videosTematicos} corMarca={marca.corPrimaria} capasBanco={marca.capasArte ?? []} mascoteUrl={marca.mascoteUrl ?? ""} logoUrl={marca.logoUrl ?? ""} />}
-        {aba === "mascote" && <MascoteEstudio marcaId={marca.id} mascoteUrl={marca.mascoteUrl ?? ""} mascotes={marca.mascotesArte ?? []} ficha3d={marca.mascoteFicha3d ?? ""} clipes={marca.mascoteClipes ?? []} />}
+        {aba === "mascote" && <MascoteEstudio marcaId={marca.id} mascoteUrl={marca.mascoteUrl ?? ""} mascotes={marca.mascotesArte ?? []} ficha3d={marca.mascoteFicha3d ?? ""} clipes={marca.mascoteClipes ?? []} corMarca={marca.corPrimaria} />}
         {aba === "instagram" && <InstagramEspelho marcaId={marca.id} />}
         {aba === "paginas" && <PaginasPainel festas={festas} linkBase={linkBase} />}
         {aba === "campanhas" && <CampanhasPainel marcaId={marca.id} temTelefone={Boolean(marca.telefone)} campanhas={campanhas} acento={marca.corPrimaria} />}

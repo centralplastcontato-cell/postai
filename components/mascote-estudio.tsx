@@ -25,12 +25,14 @@ export function MascoteEstudio({
   mascotes,
   ficha3d,
   clipes,
+  corMarca,
 }: {
   marcaId: string;
   mascoteUrl: string; // mascote oficial atual ("" = nenhum)
   mascotes: string[]; // biblioteca de opções geradas
   ficha3d?: string; // ficha do personagem (frente/lado/costas) pro 3D ("" = não gerada)
   clipes?: string[]; // clipes animados (IA de vídeo) já gerados
+  corMarca?: string; // cor primária da marca (opção de fundo do clipe)
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -123,6 +125,14 @@ export function MascoteEstudio({
   const clipesUrls = clipes ?? [];
   const [descClipe, setDescClipe] = useState("");
   const [durClipe, setDurClipe] = useState(8); // duração do clipe: 4 | 8 | 12
+  const [fundoClipe, setFundoClipe] = useState("#FFFFFF"); // cor do fundo do clipe
+  // paleta de fundos: branco + cor da marca + cores alegres de buffet.
+  const FUNDOS_CLIPE = [
+    { cor: "#FFFFFF", nome: "Branco" },
+    ...(corMarca && /^#[0-9a-fA-F]{6}$/.test(corMarca) ? [{ cor: corMarca, nome: "Marca" }] : []),
+    { cor: "#BFDBFE", nome: "Azul" }, { cor: "#FBCFE8", nome: "Rosa" }, { cor: "#FEF08A", nome: "Amarelo" },
+    { cor: "#DDD6FE", nome: "Roxo" }, { cor: "#BBF7D0", nome: "Verde" }, { cor: "#111827", nome: "Escuro" },
+  ];
   const [gerandoClipe, setGerandoClipe] = useState(false);
   const [statusClipe, setStatusClipe] = useState("");
   // Postar o clipe (Reels/Story) — confirmação + resultado.
@@ -153,7 +163,7 @@ export function MascoteEstudio({
     setErro(null);
     setGerandoClipe(true);
     setStatusClipe("🎬 Preparando o mascote…");
-    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
+    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe, fundoClipe).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
     if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
     await acompanharClipe(ini.jobId);
   }
@@ -429,6 +439,23 @@ export function MascoteEstudio({
               <button key={s} type="button" disabled={gerandoClipe} onClick={() => setDurClipe(s)} className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${durClipe === s ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{s}s</button>
             ))}
             <span className="text-[10px] text-muted/60">(mais longo = mais demorado)</span>
+          </div>
+
+          {/* cor do fundo do clipe */}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="text-[10px] font-semibold text-muted">Fundo:</span>
+            {FUNDOS_CLIPE.map((f) => (
+              <button
+                key={f.cor}
+                type="button"
+                disabled={gerandoClipe}
+                onClick={() => setFundoClipe(f.cor)}
+                title={f.nome}
+                aria-label={`Fundo ${f.nome}`}
+                className={`h-7 w-7 rounded-full border-2 transition disabled:opacity-40 ${fundoClipe.toUpperCase() === f.cor.toUpperCase() ? "border-[#ec4899] ring-2 ring-[#ec4899]/40" : "border-white/20 hover:border-white/50"}`}
+                style={{ background: f.cor }}
+              />
+            ))}
           </div>
 
           {clipesUrls.length > 0 && (
