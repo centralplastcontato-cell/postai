@@ -613,10 +613,10 @@ export async function gerarVideoTematico(videoId: string) {
     ["q8", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.logoCanto, v.logoTam, v.videoTextos, v.videoTextoFinal, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
 
-  // QUADRO FINAL com o LOGO no centro: só quando o logo está POSICIONADO (logoOn). Nesse caso o
-  // motor já recebe um logo INVISÍVEL (não carimba nada), então a nossa tela de fechamento não
-  // ganha um 2º logo. Fecha o Reels com a marca em vez de uma tela preta.
-  const quadroFinalOn = logoOn;
+  // TELA FINAL: o motor SEMPRE crava uma tela de encerramento própria (não dá pra desligar daqui) e
+  // ela é sempre a ÚLTIMA. Colar a NOSSA tela do logo antes dela deixava DUAS telas finais (o Victor
+  // não quis). Então desligamos a nossa: fica só a tela do motor (com a mensagem do dono), UMA só.
+  const quadroFinalOn = false;
 
   let fotosMotor: string[];
   if (temLegenda || mascoteOn || logoOn) {

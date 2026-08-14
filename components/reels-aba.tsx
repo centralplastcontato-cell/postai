@@ -100,6 +100,7 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
   const [edLegenda, setEdLegenda] = useState("");
   // postar agora
   const [confirmarPostar, setConfirmarPostar] = useState<string | null>(null);
+  const [confirmarPostarNovo, setConfirmarPostarNovo] = useState(false); // "postar agora" direto do agendador
   const [postando, setPostando] = useState(false);
   const [resultadoPostar, setResultadoPostar] = useState<{ tipo: "ok" | "erro"; txt: string; link?: string | null } | null>(null);
 
@@ -145,6 +146,25 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
     setAgendando(false);
     if (!r.ok) { setMsg({ tipo: "erro", txt: r.erro || "Não deu pra agendar." }); return; }
     setMsg({ tipo: "ok", txt: "✓ Reels agendado! Aparece aqui embaixo." });
+    setFestaId(""); setDataISO(""); setLegenda("");
+    router.refresh();
+  }
+  // "Postar agora" direto do agendador: cria o Reels (com a data de hoje) e JÁ publica no Instagram,
+  // sem precisar esperar a fila. Não exige escolher data (posta agora mesmo).
+  async function postarAgoraNovo() {
+    if (!escolhido) return;
+    setPostando(true); setResultadoPostar(null);
+    const hoje = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
+    const cria = await (escolhido.tipo === "tema"
+      ? agendarReelsTematico(escolhido.id, hoje, legenda, hora)
+      : agendarReelsDaFesta(escolhido.id, hoje, legenda, hora)
+    ).catch(() => ({ ok: false as const, erro: "Não deu pra preparar o Reels." }));
+    if (!cria.ok) { setPostando(false); setResultadoPostar({ tipo: "erro", txt: cria.erro || "Não deu pra preparar o Reels." }); return; }
+    const r = await postarReelsAgora(cria.id).catch(() => ({ ok: false as const, erro: "Não consegui postar agora." }));
+    setPostando(false);
+    if (!r.ok) { setResultadoPostar({ tipo: "erro", txt: r.erro || "Falhou ao postar." }); return; }
+    setResultadoPostar({ tipo: "ok", txt: "Reels publicado no Instagram!", link: r.permalink });
+    setConfirmarPostarNovo(false);
     setFestaId(""); setDataISO(""); setLegenda("");
     router.refresh();
   }
@@ -262,7 +282,10 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
             </div>
             <textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} rows={4} placeholder="Deixe em branco que eu escrevo uma — ou clique em ✨ Escrever com a Bia" className="input-base mt-1 w-full text-xs" />
             {msg && <p className={`mt-2 text-xs font-semibold ${msg.tipo === "ok" ? "text-green-400" : "text-vermelho"}`}>{msg.txt}</p>}
-            <button onClick={agendar} disabled={agendando || !festaId || !dataISO} title={!festaId || !dataISO ? "Escolha a festa e a data" : ""} className="mt-3 rounded-lg bg-[#7c3aed] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{agendando ? "Salvando…" : "💾 Salvar e agendar Reels"}</button>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button onClick={agendar} disabled={agendando || !festaId || !dataISO} title={!festaId || !dataISO ? "Escolha a festa e a data" : ""} className="rounded-lg bg-[#7c3aed] px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{agendando ? "Salvando…" : "💾 Salvar e agendar Reels"}</button>
+              <button onClick={() => { setResultadoPostar(null); setConfirmarPostarNovo(true); }} disabled={agendando || postando || !festaId} title={!festaId ? "Escolha o vídeo primeiro" : "Publica agora no Instagram (não precisa escolher data)"} className="rounded-lg bg-[#C13584] px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50">🎬 Postar agora</button>
+            </div>
           </>
         )}
       </div>
@@ -374,6 +397,20 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
             <div className="mt-4 flex gap-2">
               <button onClick={() => setConfirmarPostar(null)} disabled={postando} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-muted transition hover:text-white disabled:opacity-50">Cancelar</button>
               <button onClick={() => postarAgora(confirmarPostar)} disabled={postando} className="flex-1 rounded-lg bg-[#C13584] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{postando ? "Postando… ⏳" : "Sim, postar agora"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmarPostarNovo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4" onClick={() => !postando && setConfirmarPostarNovo(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-linha bg-preto-card p-5">
+            <p className="text-sm font-bold text-white">🎬 Postar esse Reels agora?</p>
+            <p className="mt-2 text-xs text-muted">Publica o vídeo <strong className="text-white">AGORA</strong> no Instagram da marca (perfil público), sem esperar a fila. A Meta processa o vídeo primeiro, então pode levar até <strong className="text-white">1 minuto</strong>. ⏳</p>
+            {resultadoPostar?.tipo === "erro" && <p className="mt-2 rounded-md border border-vermelho/30 bg-vermelho/10 px-2.5 py-1.5 text-xs text-vermelho">{resultadoPostar.txt}</p>}
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setConfirmarPostarNovo(false)} disabled={postando} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-muted transition hover:text-white disabled:opacity-50">Cancelar</button>
+              <button onClick={postarAgoraNovo} disabled={postando} className="flex-1 rounded-lg bg-[#C13584] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{postando ? "Postando… ⏳" : "Sim, postar agora"}</button>
             </div>
           </div>
         </div>
