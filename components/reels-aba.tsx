@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import { type PublicacaoView } from "./publicacoes-aba";
 import { InputDataBR } from "./input-data-br";
 import { alternarAprovacao, excluirPublicacao } from "@/app/actions/feed";
-import { agendarReelsDaFesta, gerarLegendaReels, atualizarReels, postarReelsAgora } from "@/app/actions/festas";
+import { agendarReelsDaFesta, gerarLegendaReels, atualizarReels, prepararReelsAgora, concluirReelsAgora } from "@/app/actions/festas";
 import { agendarReelsTematico, gerarLegendaReelsTematico } from "@/app/actions/videos-tematicos";
 import { rotuloHora } from "@/lib/horarios";
 
@@ -160,7 +160,7 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
       : agendarReelsDaFesta(escolhido.id, hoje, legenda, hora)
     ).catch(() => ({ ok: false as const, erro: "Não deu pra preparar o Reels." }));
     if (!cria.ok) { setPostando(false); setResultadoPostar({ tipo: "erro", txt: cria.erro || "Não deu pra preparar o Reels." }); return; }
-    const r = await postarReelsAgora(cria.id).catch(() => ({ ok: false as const, erro: "Não consegui postar agora." }));
+    const r = await postarComPolling(cria.id);
     setPostando(false);
     if (!r.ok) { setResultadoPostar({ tipo: "erro", txt: r.erro || "Falhou ao postar." }); return; }
     setResultadoPostar({ tipo: "ok", txt: "Reels publicado no Instagram!", link: r.permalink });
@@ -195,9 +195,24 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
     setOcupadoId(id);
     startT(async () => { await atualizarReels(id, edData, edHora, edLegenda).catch(() => {}); router.refresh(); setOcupadoId(null); setEditando(null); });
   }
+  // Publica em 2 fases: cria o container e fica CONSULTANDO até a Meta terminar de processar o vídeo
+  // (leva até ~1min). Cada chamada ao servidor é curta (não estoura o limite de 60s da função).
+  async function postarComPolling(pubId: string): Promise<{ ok: true; permalink?: string | null } | { ok: false; erro: string }> {
+    const prep = await prepararReelsAgora(pubId).catch(() => ({ ok: false as const, erro: "Não consegui preparar o vídeo no Instagram." }));
+    if (!prep.ok) return prep;
+    for (let i = 0; i < 30; i++) { // ~2,5 min de espera no total (5s × 30)
+      await new Promise((r) => setTimeout(r, 5000));
+      const c = await concluirReelsAgora(pubId, prep.containerId).catch(() => null);
+      if (!c) continue; // erro de rede momentâneo → tenta de novo
+      if (!c.ok) return c;
+      if (c.pronto) return { ok: true as const, permalink: c.permalink };
+      // pronto:false → a Meta ainda está processando; segue consultando
+    }
+    return { ok: false as const, erro: "O vídeo ainda está processando no Instagram. Ele ficou agendado — tente 'Postar agora' de novo em 1 minuto." };
+  }
   async function postarAgora(id: string) {
     setPostando(true); setResultadoPostar(null);
-    const r = await postarReelsAgora(id).catch(() => ({ ok: false as const, erro: "Não consegui postar agora." }));
+    const r = await postarComPolling(id);
     setPostando(false);
     if (!r.ok) { setResultadoPostar({ tipo: "erro", txt: r.erro || "Falhou ao postar." }); return; }
     setResultadoPostar({ tipo: "ok", txt: "Reels publicado no Instagram!", link: r.permalink });

@@ -8,7 +8,7 @@ import { marcaPorTokenFotos, festaPorToken, gerarTokenFesta, gerarTokenAlbum } f
 import { parseAniversariantes, nomesAniversariantes, tituloCapaFesta } from "@/lib/aniversariantes";
 import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO, LIMITE_FOTOS_FESTA } from "@/lib/momentos-festa";
 import { descreverImagem } from "@/lib/imagem-ia";
-import { publicarReelsNasRedes } from "@/lib/instagram";
+import { publicarReelsNasRedes, criarContainerReels, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
 import { dispararMotorReels } from "@/lib/video-engine";
 import { musicaBuffet } from "@/lib/musica-buffet";
 import { baseUrl } from "@/lib/config";
@@ -602,6 +602,56 @@ export async function postarReelsAgora(pubId: string) {
   await prisma.publicacao.update({ where: { id: pubId }, data: { mediaId: r.ig.mediaId } });
   revalidatePath(`/painel/marcas/${pub.marcaId}`);
   return { ok: true as const, permalink: r.ig.permalink };
+}
+
+// "Postar agora" em 2 FASES (igual o piloto): postar tudo de uma vez estourava o limite de 60s da
+// função (a Meta leva até ~1min PROCESSANDO o vídeo). Aqui a FASE 1 só cria o container (rápido) e
+// devolve o id; a tela fica consultando a FASE 2 até o vídeo ficar pronto e aí publica. Cada chamada
+// é curta — nenhuma passa dos 60s.
+export async function prepararReelsAgora(pubId: string) {
+  const pub = await prisma.publicacao.findUnique({
+    where: { id: pubId },
+    select: { marcaId: true, formato: true, status: true, videoUrl: true, legenda: true, marca: { select: { igUserId: true, accessToken: true } } },
+  });
+  if (!pub) return { ok: false as const, erro: "Reels não encontrado." };
+  if (pub.formato !== "reels") return { ok: false as const, erro: "Não é um Reels." };
+  const g = await guardaMarca(pub.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (pub.status === "postado") return { ok: false as const, erro: "Esse Reels já foi postado." };
+  if (!pub.videoUrl) return { ok: false as const, erro: "Esse Reels não tem vídeo." };
+  if (!pub.marca.igUserId || !pub.marca.accessToken) return { ok: false as const, erro: "A marca não está conectada ao Instagram." };
+  const c = await criarContainerReels({ igUserId: pub.marca.igUserId, accessToken: pub.marca.accessToken }, pub.videoUrl, pub.legenda);
+  if (!c.ok) return { ok: false as const, erro: c.erro };
+  return { ok: true as const, containerId: c.containerId };
+}
+
+// FASE 2: a tela chama de tempos em tempos. Enquanto a Meta processa → { pronto: false }. Quando
+// FINISHED → marca como postado (trava contra 2 cliques) e publica de verdade. ERRO/EXPIRED → falha.
+export async function concluirReelsAgora(pubId: string, containerId: string) {
+  const pub = await prisma.publicacao.findUnique({
+    where: { id: pubId },
+    select: { marcaId: true, status: true, marca: { select: { igUserId: true, accessToken: true } } },
+  });
+  if (!pub) return { ok: false as const, erro: "Reels não encontrado." };
+  const g = await guardaMarca(pub.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (pub.status === "postado") return { ok: false as const, erro: "Esse Reels já foi postado." };
+  if (!pub.marca.igUserId || !pub.marca.accessToken) return { ok: false as const, erro: "A marca não está conectada ao Instagram." };
+  const conn = { igUserId: pub.marca.igUserId, accessToken: pub.marca.accessToken };
+  const st = await statusContainerReels(conn, containerId);
+  if (st === "IN_PROGRESS" || st === "UNKNOWN") return { ok: true as const, pronto: false as const };
+  if (st === "ERROR" || st === "EXPIRED") return { ok: false as const, erro: `A Meta não conseguiu processar o vídeo (${st}). Tente de novo.` };
+  // FINISHED → trava (só um clique publica) e publica.
+  const claim = await prisma.publicacao.updateMany({ where: { id: pubId, status: "a_postar" }, data: { status: "postado", postadoEm: new Date() } });
+  if (claim.count === 0) return { ok: false as const, erro: "Esse Reels já foi postado." };
+  const r = await publicarContainerReels(conn, containerId);
+  if (!r.ok) {
+    await prisma.publicacao.update({ where: { id: pubId }, data: { status: "a_postar", postadoEm: null } });
+    return { ok: false as const, erro: r.erro };
+  }
+  await prisma.publicacao.update({ where: { id: pubId }, data: { mediaId: r.mediaId } });
+  revalidatePath(`/painel/marcas/${pub.marcaId}`);
+  return { ok: true as const, pronto: true as const, permalink: r.permalink };
 }
 
 // Dispara o MOTOR DE VÍDEO pra gerar o Reels da festa (botão "⚡ Gerar vídeo"). Marca a festa
