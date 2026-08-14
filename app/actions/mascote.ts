@@ -271,19 +271,28 @@ export async function removerMascote(marcaId: string) {
 // ─────────────────────────────────────────────────────────────────────────────
 const CLIPE_MODELO = process.env.OPENAI_VIDEO_MODEL || "sora-2"; // dá pra trocar por env sem mexer no código
 
-// Monta a imagem de PARTIDA do vídeo: o mascote centralizado num quadro 720x1280 (9:16) sobre a cor
-// da marca. A IA de vídeo aceita melhor uma referência já no tamanho/proporção do vídeo final.
-async function quadroPartidaMascote(mascotePng: Buffer, cor: string): Promise<Buffer> {
-  const fundo = /^#[0-9a-fA-F]{6}$/.test(cor) ? cor : "#7C3AED";
-  const personagem = await sharp(mascotePng).resize(560, 940, { fit: "inside", withoutEnlargement: false }).png().toBuffer();
-  return sharp({ create: { width: 720, height: 1280, channels: 4, background: fundo } })
+// Monta a imagem de PARTIDA do vídeo (720x1280, 9:16): o mascote sobre um fundo — uma COR sólida
+// OU uma FOTO do buffet (cover-crop). A IA de vídeo aceita melhor uma referência já no tamanho final.
+async function quadroPartidaMascote(mascotePng: Buffer, fundo: { cor: string } | { foto: Buffer }): Promise<Buffer> {
+  if ("foto" in fundo) {
+    // Fundo = foto do espaço. O mascote fica MENOR e mais pra baixo (como se estivesse no cenário).
+    const base = await sharp(fundo.foto).resize(720, 1280, { fit: "cover", position: "attention" }).jpeg({ quality: 88 }).toBuffer();
+    const personagem = await sharp(mascotePng).resize(460, 760, { fit: "inside" }).png().toBuffer();
+    const meta = await sharp(personagem).metadata();
+    const left = Math.round((720 - (meta.width || 460)) / 2);
+    const top = Math.round(1280 - (meta.height || 760) - 90); // ~90px de margem embaixo
+    return sharp(base).composite([{ input: personagem, left: Math.max(0, left), top: Math.max(0, top) }]).png().toBuffer();
+  }
+  const cor = /^#[0-9a-fA-F]{6}$/.test(fundo.cor) ? fundo.cor : "#FFFFFF";
+  const personagem = await sharp(mascotePng).resize(560, 940, { fit: "inside" }).png().toBuffer();
+  return sharp({ create: { width: 720, height: 1280, channels: 4, background: cor } })
     .composite([{ input: personagem, gravity: "center" }])
     .png()
     .toBuffer();
 }
 
 // FASE 1 — inicia a geração do clipe e devolve o id do job (rápido).
-export async function gerarClipeMascote(marcaId: string, descricao?: string, segundos?: number, fundo?: string) {
+export async function gerarClipeMascote(marcaId: string, descricao?: string, segundos?: number, fundo?: string, fundoFotoUrl?: string) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true } });
@@ -294,14 +303,30 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string, seg
   const dur = [4, 8, 12].includes(segundos ?? 0) ? String(segundos) : "8"; // padrão 8s
   // Cor do fundo escolhida pelo dono (hex). Sem escolha → branco (limpo, o mascote azul se destaca).
   const corFundo = /^#[0-9a-fA-F]{6}$/.test(fundo || "") ? (fundo as string) : "#FFFFFF";
+
+  // Fundo = FOTO do buffet: só vale se a foto for da marca e DIVULGÁVEL (LGPD — solta ou de festa
+  // autorizada). Baixa a foto pra virar o cenário de partida.
+  let fotoFundoBuf: Buffer | null = null;
+  if (fundoFotoUrl && fundoFotoUrl.startsWith("http")) {
+    const foto = await prisma.imagemMarca.findFirst({ where: { url: fundoFotoUrl, marcaId, OR: [{ festaId: null }, { festa: { autorizacao: "autorizada" } }] }, select: { url: true } });
+    if (!foto) return { ok: false as const, erro: "Essa foto não pode ser usada (não é do seu acervo autorizado)." };
+    try {
+      const fr = await fetch(fundoFotoUrl, { signal: AbortSignal.timeout(20000) });
+      if (fr.ok) fotoFundoBuf = Buffer.from(await fr.arrayBuffer());
+    } catch {}
+    if (!fotoFundoBuf) return { ok: false as const, erro: "Não consegui baixar a foto do fundo. Tente outra." };
+  }
+
   try {
     const rr = await fetch(marca.mascoteUrl, { signal: AbortSignal.timeout(20000) });
     if (!rr.ok) return { ok: false as const, erro: "Não consegui baixar o mascote." };
     const buf = Buffer.from(await rr.arrayBuffer());
-    const partida = await quadroPartidaMascote(buf, corFundo);
+    const partida = await quadroPartidaMascote(buf, fotoFundoBuf ? { foto: fotoFundoBuf } : { cor: corFundo });
 
     const acao = (descricao || "").trim().slice(0, 400) || "acenando feliz, dando boas-vindas, com um sorriso alegre";
-    const prompt = `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. FUNDO: uma cor SÓLIDA, LISA e UNIFORME EXATAMENTE igual à da imagem de referência (${corFundo}) — NÃO mude a cor do fundo, NÃO escureça, NÃO coloque cenário, objetos nem gradiente. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
+    const prompt = fotoFundoBuf
+      ? `O personagem mascote 3D fofo da imagem de referência ${acao}, na frente de um CENÁRIO REAL de buffet infantil (o fundo da imagem). MANTENHA o cenário de fundo REAL e parado, sem distorcer, sem mudar — SÓ O PERSONAGEM se mexe, com movimento suave e natural, mantendo EXATAMENTE o mesmo desenho e cores do mascote. Câmera parada. Vídeo vertical 9:16. Sem texto, sem legendas. ÁUDIO: música instrumental alegre e efeitos sonoros fofos (clima de buffet infantil), sem voz humana.`
+      : `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. FUNDO: uma cor SÓLIDA, LISA e UNIFORME EXATAMENTE igual à da imagem de referência (${corFundo}) — NÃO mude a cor do fundo, NÃO escureça, NÃO coloque cenário, objetos nem gradiente. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
 
     const form = new FormData();
     form.append("model", CLIPE_MODELO);

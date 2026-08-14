@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe } from "@/app/actions/mascote";
+import { imagensDoBanco } from "@/app/actions/imagens";
 
 // Ações prontas pro clipe do mascote (1 toque preenche a descrição, sem digitar).
 const ACOES_CLIPE = [
@@ -126,6 +127,22 @@ export function MascoteEstudio({
   const [descClipe, setDescClipe] = useState("");
   const [durClipe, setDurClipe] = useState(8); // duração do clipe: 4 | 8 | 12
   const [fundoClipe, setFundoClipe] = useState("#FFFFFF"); // cor do fundo do clipe
+  const [fundoFoto, setFundoFoto] = useState(""); // foto do buffet como fundo ("" = usa a cor)
+  const [abrirFotos, setAbrirFotos] = useState(false); // seletor de foto aberto
+  const [fotosBanco, setFotosBanco] = useState<{ id: string; url: string; categoria: string }[]>([]);
+  const [carregandoFotos, setCarregandoFotos] = useState(false);
+  async function abrirSeletorFotos() {
+    setAbrirFotos(true);
+    if (fotosBanco.length) return;
+    setCarregandoFotos(true);
+    const r = await imagensDoBanco(marcaId).catch(() => null);
+    setCarregandoFotos(false);
+    if (r && r.ok) {
+      // prioriza fotos do ESPAÇO (cenário do buffet, sem crianças) — melhores/mais seguras de fundo.
+      const espaco = r.imagens.filter((i) => i.categoria === "espaco");
+      setFotosBanco((espaco.length ? espaco : r.imagens).map((i) => ({ id: i.id, url: i.url, categoria: i.categoria })));
+    }
+  }
   // paleta de fundos: branco + cor da marca + cores alegres de buffet.
   const FUNDOS_CLIPE = [
     { cor: "#FFFFFF", nome: "Branco" },
@@ -163,7 +180,7 @@ export function MascoteEstudio({
     setErro(null);
     setGerandoClipe(true);
     setStatusClipe("🎬 Preparando o mascote…");
-    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe, fundoClipe).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
+    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe, fundoClipe, fundoFoto || undefined).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
     if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
     await acompanharClipe(ini.jobId);
   }
@@ -441,7 +458,7 @@ export function MascoteEstudio({
             <span className="text-[10px] text-muted/60">(mais longo = mais demorado)</span>
           </div>
 
-          {/* cor do fundo do clipe */}
+          {/* fundo do clipe: cor OU foto do buffet */}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className="text-[10px] font-semibold text-muted">Fundo:</span>
             {FUNDOS_CLIPE.map((f) => (
@@ -449,14 +466,22 @@ export function MascoteEstudio({
                 key={f.cor}
                 type="button"
                 disabled={gerandoClipe}
-                onClick={() => setFundoClipe(f.cor)}
+                onClick={() => { setFundoClipe(f.cor); setFundoFoto(""); }}
                 title={f.nome}
                 aria-label={`Fundo ${f.nome}`}
-                className={`h-7 w-7 rounded-full border-2 transition disabled:opacity-40 ${fundoClipe.toUpperCase() === f.cor.toUpperCase() ? "border-[#ec4899] ring-2 ring-[#ec4899]/40" : "border-white/20 hover:border-white/50"}`}
+                className={`h-7 w-7 rounded-full border-2 transition disabled:opacity-40 ${!fundoFoto && fundoClipe.toUpperCase() === f.cor.toUpperCase() ? "border-[#ec4899] ring-2 ring-[#ec4899]/40" : "border-white/20 hover:border-white/50"}`}
                 style={{ background: f.cor }}
               />
             ))}
+            <button type="button" disabled={gerandoClipe} onClick={abrirSeletorFotos} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${fundoFoto ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>📷 Foto do buffet</button>
           </div>
+          {fundoFoto && (
+            <div className="mt-2 flex items-center gap-2 rounded-md border border-[#ec4899]/30 bg-[#ec4899]/5 p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={fundoFoto} alt="" className="h-12 w-12 rounded object-cover" />
+              <span className="text-[11px] text-muted">Fundo: foto do seu espaço. <button type="button" onClick={() => setFundoFoto("")} className="font-semibold text-[#f9a8d4] hover:underline">trocar por cor</button></span>
+            </div>
+          )}
 
           {clipesUrls.length > 0 && (
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -488,6 +513,33 @@ export function MascoteEstudio({
           </div>
           {gerandoClipe && <p className="mt-2 text-[10px] leading-snug text-muted/70">⏳ A animação por IA leva de <strong className="text-white/70">1 a 2 minutos</strong> — pode deixar essa tela aberta. Não feche enquanto estiver "Animando…".</p>}
           {!gerandoClipe && <p className="mt-2 text-[10px] leading-snug text-muted/70">Cada clipe é gerado por IA de vídeo (pode variar um pouco). Se não gostar, é só gerar de novo com outra descrição.</p>}
+        </div>
+      )}
+
+      {/* SELETOR de foto do buffet pro fundo do clipe */}
+      {abrirFotos && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4" onClick={() => setAbrirFotos(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-linha bg-preto-card p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-sm font-bold text-white">📷 Escolha a foto do fundo</p>
+              <button type="button" onClick={() => setAbrirFotos(false)} className="text-sm text-muted hover:text-white">✕</button>
+            </div>
+            <p className="mb-3 text-[11px] text-muted">O mascote vai aparecer animado na frente dessa foto. As fotos do <strong className="text-white/80">Espaço</strong> costumam ficar melhores (sem crianças no fundo).</p>
+            {carregandoFotos ? (
+              <p className="py-8 text-center text-xs text-muted">Carregando suas fotos…</p>
+            ) : fotosBanco.length === 0 ? (
+              <p className="py-8 text-center text-xs text-muted">Nenhuma foto no acervo ainda. Suba fotos na aba <strong className="text-white/80">🖼️ Imagens</strong>.</p>
+            ) : (
+              <div className="grid grid-cols-3 gap-2">
+                {fotosBanco.map((f) => (
+                  <button key={f.id} type="button" onClick={() => { setFundoFoto(f.url); setAbrirFotos(false); }} className="overflow-hidden rounded-lg border-2 border-transparent transition hover:border-[#ec4899]">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={f.url} alt="" loading="lazy" className="aspect-square w-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
