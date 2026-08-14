@@ -589,13 +589,13 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setMsgVoz(null);
     // slider 0-100 → FRAÇÃO (0..1); o motor traduz em ganho audível (0 = sem música; 100 = bem alta).
     const musicaVol = volMusica / 100;
-    // duração ALVO = o vídeo com TODAS as fotos (uma vira a capa) — a música estica até lá, e
-    // com a 2ª fala a voz volta no fim. ~2,3s por foto + 6s fixos (capa + slide final).
-    // corpo = fotos - 1 (uma vira capa), com TETO de 29 (o motor aceita no máx 30 fotos: 29 no
-    // corpo + a capa). Sem esse teto, com muitas fotos a voz saía longa demais e pedia mais fotos
-    // do que cabem — dava pra nunca fechar a conta.
+    // duração ALVO = o TEMPO REAL que as fotos ocupam no vídeo (é onde a voz TEM que caber, senão o
+    // motor corta o fim). O vídeo mostra a capa + o corpo = (nSlide+1) quadros, ~2,2s cada (uso 2,2
+    // e não 2,3 de propósito, como margem — melhor a voz caber com folga do que estourar). Se a fala
+    // passar disso, a narração é acelerada um tiquinho pra caber (sem cortar o convite).
+    // corpo = fotos - 1 (uma vira capa), TETO 29 (o motor aceita no máx 30: 29 no corpo + a capa).
     const nSlide = Math.max(1, Math.min(sel.length - 1, 29));
-    const alvoSegundos = Math.round(nSlide * 2.3 + 6);
+    const alvoSegundos = Math.round((nSlide + 1) * 2.2);
     // A trilha ESCOLHIDA entra sob a voz: prepara/pega o WAV dela AGORA e passa direto (não depende
     // de ter salvo antes). Sem trilha escolhida, ou se falhar, a narração usa o jingle do buffet.
     const wavUrl = musica ? await garantirWav(musica).catch(() => null) : null;

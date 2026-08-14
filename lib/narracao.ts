@@ -127,9 +127,26 @@ function normalizarPico(pcm: Int16Array, alvo = 0.95): Int16Array {
   return out;
 }
 
+// Acelera um pouco a fala (reamostra por interpolação linear) pra ela CABER no tempo do vídeo. É
+// o único jeito sem cortar: se a voz é mais longa que o número de fotos aguenta, o motor cortaria o
+// fim (o convite). `ratio` < 1 = mais curto/rápido. Sobe levemente o tom, mas é melhor que cortar.
+function acelerarVoz(v: Int16Array, ratio: number): Int16Array {
+  if (ratio >= 0.999 || v.length < 2) return v;
+  const novoLen = Math.max(1, Math.round(v.length * ratio));
+  const out = new Int16Array(novoLen);
+  for (let i = 0; i < novoLen; i++) {
+    const src = i / ratio;
+    const i0 = Math.floor(src);
+    const i1 = Math.min(v.length - 1, i0 + 1);
+    const frac = src - i0;
+    out[i] = Math.round(v[i0] * (1 - frac) + v[i1] * frac);
+  }
+  return out;
+}
+
 function montarTrilha(
-  voz1: Int16Array,
-  voz2: Int16Array | null,
+  voz1in: Int16Array,
+  voz2in: Int16Array | null,
   jingle: Int16Array | null,
   volMusica?: number,
   alvoSegundos?: number,
@@ -143,11 +160,26 @@ function montarTrilha(
   const gap = Math.round(GAP_S * TAXA);
   const ramp = Math.round(RAMP_S * TAXA);
   const tail = Math.round(RABICHO_S * TAXA);
+
+  // Duração alvo = o tempo REAL que as fotos do vídeo ocupam. Se as falas não cabem nesse tempo,
+  // ACELERA a voz o quanto precisar (com limite ~18%, pra não virar "esquilo") — assim o convite
+  // do fim NUNCA é cortado. Falas curtas cabem sem acelerar (ratio 1).
+  const alvo = alvoSegundos && alvoSegundos > 0 ? Math.round(alvoSegundos * TAXA) : 0;
+  let voz1 = voz1in;
+  let voz2 = voz2in;
+  if (alvo > 0) {
+    const conteudo = voz1.length + gap + (voz2 ? voz2.length : 0) + tail;
+    if (conteudo > alvo) {
+      const espacoFalas = alvo - gap - tail; // o que sobra pras 2 falas depois do gap e do rabicho
+      const totalFalas = voz1.length + (voz2 ? voz2.length : 0);
+      const ratio = Math.max(0.82, Math.min(1, espacoFalas / totalFalas));
+      voz1 = acelerarVoz(voz1, ratio);
+      if (voz2) voz2 = acelerarVoz(voz2, ratio);
+    }
+  }
   const len1 = voz1.length;
   const len2 = voz2 ? voz2.length : 0;
 
-  // Duração alvo (todas as fotos) — mas nunca menor que o necessário pra as falas caberem.
-  const alvo = alvoSegundos && alvoSegundos > 0 ? Math.round(alvoSegundos * TAXA) : 0;
   let total: number, start2: number;
   if (voz2) {
     const minTotal = len1 + gap + len2 + tail;
