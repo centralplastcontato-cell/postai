@@ -29,6 +29,8 @@ const MAX_FOTOS = 30; // teto do motor (mesmo do vídeo de festa)
 // corpo: sem reservar a capa, uma locução que pedisse 30 fotos NUNCA fechava (o corpo só tem 29),
 // e o dono via "precisa de 30, você escolheu 29" pra sempre, sem conseguir resolver.
 const MAX_FOTOS_CORPO = MAX_FOTOS - 1;
+// Fecha a frase com "!" se não terminar em pontuação (mesma regra das legendas do vídeo).
+const comPonto = (t: string) => { const s = (t || "").trim(); return !s || /[.!?…]$/.test(s) ? s : `${s}!`; };
 const FOTOS_SUGERIDAS = 26; // ~65s de vídeo
 
 function lerIds(json: string): string[] {
@@ -670,7 +672,7 @@ export async function gerarVideoTematico(videoId: string) {
     // Sem a nossa tela, mantém o comportamento antigo (o texto do dono, se houver).
     ...(quadroFinalOn
       ? { tituloFinal: "Agende a sua festa!", subFinal: "" }
-      : v.videoTextoFinal?.trim() ? { tituloFinal: v.videoTextoFinal.trim(), subFinal: "" } : {}),
+      : v.videoTextoFinal?.trim() ? { tituloFinal: comPonto(v.videoTextoFinal), subFinal: "" } : {}),
     // O motor só ECOA esse id no callback — mandamos o id do vídeo temático e o
     // /api/video-pronto descobre sozinho se é de festa ou temático.
     festaId: videoId,
