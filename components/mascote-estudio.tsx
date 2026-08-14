@@ -2,7 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe } from "@/app/actions/mascote";
+
+// Ações prontas pro clipe do mascote (1 toque preenche a descrição, sem digitar).
+const ACOES_CLIPE = [
+  { emoji: "👋", nome: "Acenar", desc: "acenando feliz com as duas mãos, dando boas-vindas, sorrindo" },
+  { emoji: "🎉", nome: "Pular", desc: "pulando de alegria, animado e sorrindo" },
+  { emoji: "🏰", nome: "Apresentar", desc: "abrindo os bracinhos apresentando o espaço, com orgulho e alegria" },
+  { emoji: "😘", nome: "Beijo", desc: "soprando um beijo carinhoso e piscando o olho" },
+  { emoji: "💃", nome: "Dançar", desc: "dançando animado, balançando o corpo com alegria" },
+  { emoji: "👍", nome: "Joinha", desc: "fazendo joinha (positivo) com as duas mãos e piscando" },
+];
 
 const FICHA_LABELS = ["Frente", "Lado", "Costas"];
 
@@ -112,13 +122,18 @@ export function MascoteEstudio({
   // job e fica consultando até o clipe ficar pronto.
   const clipesUrls = clipes ?? [];
   const [descClipe, setDescClipe] = useState("");
+  const [durClipe, setDurClipe] = useState(8); // duração do clipe: 4 | 8 | 12
   const [gerandoClipe, setGerandoClipe] = useState(false);
   const [statusClipe, setStatusClipe] = useState("");
+  // Postar o clipe (Reels/Story) — confirmação + resultado.
+  const [confirmPost, setConfirmPost] = useState<{ url: string; tipo: "reels" | "story" } | null>(null);
+  const [postandoClipe, setPostandoClipe] = useState(false);
+  const [resultadoPost, setResultadoPost] = useState<{ tipo: "ok" | "erro"; txt: string; link?: string | null } | null>(null);
   async function handleGerarClipe() {
     setErro(null);
     setGerandoClipe(true);
     setStatusClipe("🎬 Preparando o mascote…");
-    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
+    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
     if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
     setStatusClipe("🎬 A IA está animando… (pode levar 1-2 min)");
     // consulta a cada 10s até ficar pronto (ou dar erro) — até ~5 min
@@ -143,6 +158,27 @@ export function MascoteEstudio({
       router.refresh();
       setProc(null);
     });
+  }
+  // Publica o clipe no Instagram (Reels/Story), em 2 fases (o vídeo processa na Meta ~1min): cria o
+  // container e fica consultando até publicar. Cada chamada é curta (não estoura o limite de 60s).
+  async function postarClipe(url: string, tipo: "reels" | "story") {
+    setPostandoClipe(true); setResultadoPost(null);
+    const prep = await prepararPostClipe(marcaId, url, tipo).catch(() => ({ ok: false as const, erro: "Não consegui preparar o post." }));
+    if (!prep.ok) { setPostandoClipe(false); setResultadoPost({ tipo: "erro", txt: prep.erro }); return; }
+    for (let i = 0; i < 30; i++) { // ~2,5 min
+      await new Promise((r) => setTimeout(r, 5000));
+      const c = await concluirPostClipe(marcaId, prep.containerId).catch(() => null);
+      if (!c) continue;
+      if (!c.ok) { setPostandoClipe(false); setResultadoPost({ tipo: "erro", txt: c.erro }); return; }
+      if (c.pronto) {
+        setPostandoClipe(false);
+        setResultadoPost({ tipo: "ok", txt: tipo === "story" ? "Story publicado no Instagram!" : "Reels publicado no Instagram!", link: c.permalink });
+        setConfirmPost(null);
+        return;
+      }
+    }
+    setPostandoClipe(false);
+    setResultadoPost({ tipo: "erro", txt: "O vídeo ainda está processando no Instagram. Tente de novo em 1 minuto." });
   }
   function handleRemoverFundo() {
     if (!mascoteUrl) return;
@@ -349,18 +385,36 @@ export function MascoteEstudio({
         <div className="mt-7 rounded-xl border border-[#ec4899]/40 bg-[#ec4899]/5 p-4 sm:p-5">
           <p className="text-sm font-semibold text-white">🎬 Dar vida ao mascote <span className="ml-1 rounded-full border border-[#ec4899]/40 bg-[#ec4899]/15 px-2 py-0.5 text-[10px] font-semibold text-[#f9a8d4]">novo · beta</span></p>
           <p className="mt-1 text-xs text-muted">
-            A IA <strong className="text-white/80">anima o seu mascote</strong> num clipe curto (~4s). Descreva o que ele faz e gere — depois dá pra usar de <strong className="text-white/80">abertura/fecho dos Reels</strong>.
+            A IA <strong className="text-white/80">anima o seu mascote</strong> num clipe curto. Escolha uma ação (ou descreva), gere, e depois dá pra <strong className="text-white/80">postar como Story ou Reels</strong>.
           </p>
 
-          <label className="mt-3 block text-[10px] font-semibold text-muted">O que o mascote faz no clipe?</label>
+          {/* ações prontas — 1 toque preenche a descrição */}
+          <label className="mt-3 block text-[10px] font-semibold text-muted">Ação rápida <span className="font-normal text-muted/70">(ou escreva embaixo)</span></label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {ACOES_CLIPE.map((a) => (
+              <button key={a.nome} type="button" disabled={gerandoClipe} onClick={() => setDescClipe(a.desc)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${descClipe === a.desc ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+                {a.emoji} {a.nome}
+              </button>
+            ))}
+          </div>
+
           <textarea
             value={descClipe}
             onChange={(e) => setDescClipe(e.target.value)}
             rows={2}
             maxLength={400}
             placeholder="Ex: acenando feliz na porta do buffet, dando boas-vindas"
-            className="mt-1 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none"
+            className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none"
           />
+
+          {/* duração do clipe */}
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-[10px] font-semibold text-muted">Duração:</span>
+            {[4, 8, 12].map((s) => (
+              <button key={s} type="button" disabled={gerandoClipe} onClick={() => setDurClipe(s)} className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${durClipe === s ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{s}s</button>
+            ))}
+            <span className="text-[10px] text-muted/60">(mais longo = mais demorado)</span>
+          </div>
 
           {clipesUrls.length > 0 && (
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -368,9 +422,11 @@ export function MascoteEstudio({
                 <div key={url} className="overflow-hidden rounded-lg border border-linha bg-black">
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                   <video src={url} controls playsInline loop className="aspect-[9/16] w-full bg-black object-contain" />
-                  <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                    <a href={url} target="_blank" rel="noopener noreferrer" download className="text-[11px] font-semibold text-[#f9a8d4] hover:underline">⬇ Baixar</a>
-                    <button type="button" onClick={() => handleExcluirClipe(url)} disabled={proc === url || isPending} className="text-[11px] font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-40">{proc === url ? "…" : "✕ excluir"}</button>
+                  <div className="flex flex-wrap items-center gap-1.5 px-2 py-2">
+                    <button type="button" onClick={() => { setResultadoPost(null); setConfirmPost({ url, tipo: "story" }); }} disabled={postandoClipe} className="rounded-md bg-gradient-to-r from-[#f58529] via-[#dd2a7b] to-[#8134af] px-2 py-1 text-[10px] font-bold text-white transition hover:brightness-110 disabled:opacity-50">📲 Story</button>
+                    <button type="button" onClick={() => { setResultadoPost(null); setConfirmPost({ url, tipo: "reels" }); }} disabled={postandoClipe} className="rounded-md bg-[#C13584] px-2 py-1 text-[10px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">🎬 Reels</button>
+                    <a href={url} target="_blank" rel="noopener noreferrer" download className="ml-auto text-[10px] font-semibold text-[#f9a8d4] hover:underline">⬇</a>
+                    <button type="button" onClick={() => handleExcluirClipe(url)} disabled={proc === url || isPending} className="text-[10px] font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-40">{proc === url ? "…" : "✕"}</button>
                   </div>
                 </div>
               ))}
@@ -390,6 +446,33 @@ export function MascoteEstudio({
           </div>
           {gerandoClipe && <p className="mt-2 text-[10px] leading-snug text-muted/70">⏳ A animação por IA leva de <strong className="text-white/70">1 a 2 minutos</strong> — pode deixar essa tela aberta. Não feche enquanto estiver "Animando…".</p>}
           {!gerandoClipe && <p className="mt-2 text-[10px] leading-snug text-muted/70">Cada clipe é gerado por IA de vídeo (pode variar um pouco). Se não gostar, é só gerar de novo com outra descrição.</p>}
+        </div>
+      )}
+
+      {/* CONFIRMAÇÃO de postar o clipe (Reels/Story) */}
+      {confirmPost && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4" onClick={() => !postandoClipe && setConfirmPost(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-linha bg-preto-card p-5">
+            <p className="text-sm font-bold text-white">{confirmPost.tipo === "story" ? "📲 Postar como Story agora?" : "🎬 Postar como Reels agora?"}</p>
+            <p className="mt-2 text-xs text-muted">Publica o clipe do mascote <strong className="text-white">AGORA</strong> no Instagram da marca. A Meta processa o vídeo primeiro, então pode levar até <strong className="text-white">1 minuto</strong>. ⏳{confirmPost.tipo === "story" ? " O Story some em 24h." : ""}</p>
+            {resultadoPost?.tipo === "erro" && <p className="mt-2 rounded-md border border-red-900 bg-red-950/40 p-2 text-xs text-red-300">{resultadoPost.txt}</p>}
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setConfirmPost(null)} disabled={postandoClipe} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-muted transition hover:text-white disabled:opacity-50">Cancelar</button>
+              <button onClick={() => postarClipe(confirmPost.url, confirmPost.tipo)} disabled={postandoClipe} className="flex-1 rounded-lg bg-[#C13584] px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{postandoClipe ? "Postando… ⏳" : "Sim, postar"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUCESSO do post */}
+      {resultadoPost?.tipo === "ok" && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4" onClick={() => setResultadoPost(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-emerald-500/30 bg-preto-card p-5 text-center">
+            <p className="text-3xl">🎉</p>
+            <p className="mt-2 text-sm font-bold text-white">{resultadoPost.txt}</p>
+            {resultadoPost.link && <a href={resultadoPost.link} target="_blank" rel="noreferrer" className="mt-3 inline-block rounded-lg bg-[#C13584] px-4 py-2 text-xs font-semibold text-white transition hover:opacity-90">Ver no Instagram ↗</a>}
+            <button onClick={() => setResultadoPost(null)} className="mt-3 block w-full rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-muted transition hover:text-white">Fechar</button>
+          </div>
         </div>
       )}
     </div>

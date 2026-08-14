@@ -271,6 +271,18 @@ export async function criarContainerReels(conn: ConexaoIG, videoUrl: string, leg
   }
 }
 
+/** Cria o container de um STORY DE VÍDEO na Meta (media_type=STORIES + video_url). O vídeo entra em
+ *  PROCESSAMENTO (igual Reels) — usa o mesmo status/publish. Story não tem legenda (a Meta ignora). */
+export async function criarContainerStoryVideo(conn: ConexaoIG, videoUrl: string): Promise<{ ok: true; containerId: string } | { ok: false; erro: string }> {
+  if (!marcaConectada(conn)) return { ok: false, erro: "Marca sem conexão com o Instagram." };
+  try {
+    const c = await graphRetry(conn, `${conn.igUserId}/media`, { media_type: "STORIES", video_url: videoUrl });
+    return { ok: true, containerId: String(c.id) };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "Erro ao criar o Story na Meta." };
+  }
+}
+
 /** Verifica o processamento do container do Reels na Meta (1 checagem, sem esperar). */
 export async function statusContainerReels(conn: ConexaoIG, containerId: string): Promise<StatusReels> {
   try {

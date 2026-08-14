@@ -5,6 +5,7 @@ import { put } from "@vercel/blob";
 import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
+import { criarContainerReels, criarContainerStoryVideo, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
 
 // ESTÚDIO DO MASCOTE (Fase 1): gera opções de mascote em 3D fofo com FUNDO TRANSPARENTE
 // (PNG), pra depois "colar" o MESMO mascote nos posts/vídeos e ele ficar sempre idêntico.
@@ -282,7 +283,7 @@ async function quadroPartidaMascote(mascotePng: Buffer, cor: string): Promise<Bu
 }
 
 // FASE 1 — inicia a geração do clipe e devolve o id do job (rápido).
-export async function gerarClipeMascote(marcaId: string, descricao?: string) {
+export async function gerarClipeMascote(marcaId: string, descricao?: string, segundos?: number) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true } });
@@ -290,6 +291,7 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string) {
   if (!marca.mascoteUrl) return { ok: false as const, erro: "Escolha o mascote oficial primeiro." };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  const dur = [4, 8, 12].includes(segundos ?? 0) ? String(segundos) : "8"; // padrão 8s
   try {
     const rr = await fetch(marca.mascoteUrl, { signal: AbortSignal.timeout(20000) });
     if (!rr.ok) return { ok: false as const, erro: "Não consegui baixar o mascote." };
@@ -302,7 +304,7 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string) {
     const form = new FormData();
     form.append("model", CLIPE_MODELO);
     form.append("prompt", prompt);
-    form.append("seconds", "4");
+    form.append("seconds", dur);
     form.append("size", "720x1280");
     form.append("input_reference", new Blob([new Uint8Array(partida)], { type: "image/png" }), "partida.png");
 
@@ -373,4 +375,35 @@ export async function excluirClipeMascote(marcaId: string, url: string) {
   try { const { del } = await import("@vercel/blob"); await del(url); } catch {}
   revalidatePath(`/painel/marcas/${marcaId}`);
   return { ok: true as const, clipes: restantes };
+}
+
+// ── POSTAR O CLIPE do mascote direto no Instagram (Reels ou Story), em 2 fases (o vídeo processa na
+// Meta, ~1min) — igual o "Postar agora" dos Reels. FASE 1 cria o container; a tela consulta a FASE 2.
+export async function prepararPostClipe(marcaId: string, url: string, tipo: "reels" | "story") {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { igUserId: true, accessToken: true, nome: true, mascoteClipes: true } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  if (!marca.igUserId || !marca.accessToken) return { ok: false as const, erro: "A marca não está conectada ao Instagram." };
+  if (!url.startsWith("http") || !lerListaUrls(marca.mascoteClipes).includes(url)) return { ok: false as const, erro: "Clipe não encontrado." };
+  const conn = { igUserId: marca.igUserId, accessToken: marca.accessToken };
+  const c = tipo === "story"
+    ? await criarContainerStoryVideo(conn, url)
+    : await criarContainerReels(conn, url, `${marca.nome} 🏰`);
+  if (!c.ok) return { ok: false as const, erro: c.erro };
+  return { ok: true as const, containerId: c.containerId };
+}
+
+export async function concluirPostClipe(marcaId: string, containerId: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { igUserId: true, accessToken: true } });
+  if (!marca?.igUserId || !marca.accessToken) return { ok: false as const, erro: "A marca não está conectada ao Instagram." };
+  const conn = { igUserId: marca.igUserId, accessToken: marca.accessToken };
+  const st = await statusContainerReels(conn, containerId);
+  if (st === "IN_PROGRESS" || st === "UNKNOWN") return { ok: true as const, pronto: false as const };
+  if (st === "ERROR" || st === "EXPIRED") return { ok: false as const, erro: `A Meta não conseguiu processar o vídeo (${st}). Tente de novo.` };
+  const r = await publicarContainerReels(conn, containerId);
+  if (!r.ok) return { ok: false as const, erro: r.erro };
+  return { ok: true as const, pronto: true as const, permalink: r.permalink };
 }
