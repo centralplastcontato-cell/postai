@@ -615,10 +615,11 @@ export async function gerarVideoTematico(videoId: string) {
     ["q8", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.logoCanto, v.logoTam, v.videoTextos, v.videoTextoFinal, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
 
-  // TELA FINAL: o motor SEMPRE crava uma tela de encerramento própria (não dá pra desligar daqui) e
-  // ela é sempre a ÚLTIMA. Colar a NOSSA tela do logo antes dela deixava DUAS telas finais (o Victor
-  // não quis). Então desligamos a nossa: fica só a tela do motor (com a mensagem do dono), UMA só.
-  const quadroFinalOn = false;
+  // TELA FINAL: o motor SEMPRE crava uma tela borrada própria por último (não dá pra desligar daqui).
+  // Sozinha ela fica feia (foto borrada sem logo). Então, quando o logo está posicionado, colamos
+  // ANTES a NOSSA tela bonita (logo no centro + mensagem) e deixamos a do motor como um convite curto
+  // na cor da marca — vira um fechamento estilo Reels: [logo] → [convite], em vez da tela borrada.
+  const quadroFinalOn = logoOn;
 
   let fotosMotor: string[];
   if (temLegenda || mascoteOn || logoOn) {
