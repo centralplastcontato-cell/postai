@@ -27,6 +27,7 @@ model Marca {
   mascoteUrl  String   @default("") // MASCOTE oficial da marca (PNG transparente) — colado nos posts/vídeos pra ficar sempre igual
   mascotesArte String  @default("[]") // biblioteca de opções de mascote geradas pela IA (pra escolher/trocar): JSON [url,...]
   mascoteFicha3d String @default("") // FICHA do personagem (frente/lado/costas) em alta — referência pra fazer o 3D
+  mascoteClipes String @default("[]") // CLIPES animados do mascote (IA de vídeo): JSON [url.mp4,...] — pra abertura/fecho dos Reels
   logoUrl     String   @default("") // logotipo (PNG) — aparece na faixa da arte e a IA lê as cores dele
   site        String   @default("") // aparece no rodapé das artes
   telefone    String   @default("") // aparece no rodapé/CTA

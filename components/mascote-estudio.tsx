@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote } from "@/app/actions/mascote";
 
 const FICHA_LABELS = ["Frente", "Lado", "Costas"];
 
@@ -14,11 +14,13 @@ export function MascoteEstudio({
   mascoteUrl,
   mascotes,
   ficha3d,
+  clipes,
 }: {
   marcaId: string;
   mascoteUrl: string; // mascote oficial atual ("" = nenhum)
   mascotes: string[]; // biblioteca de opções geradas
   ficha3d?: string; // ficha do personagem (frente/lado/costas) pro 3D ("" = não gerada)
+  clipes?: string[]; // clipes animados (IA de vídeo) já gerados
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -104,6 +106,42 @@ export function MascoteEstudio({
       if (!r.ok) setErro(r.erro);
       router.refresh();
       setGerandoFicha(false);
+    });
+  }
+  // DAR VIDA (Fase 5): anima o mascote com IA de vídeo. Em 2 fases (a IA leva 1-2 min): inicia o
+  // job e fica consultando até o clipe ficar pronto.
+  const clipesUrls = clipes ?? [];
+  const [descClipe, setDescClipe] = useState("");
+  const [gerandoClipe, setGerandoClipe] = useState(false);
+  const [statusClipe, setStatusClipe] = useState("");
+  async function handleGerarClipe() {
+    setErro(null);
+    setGerandoClipe(true);
+    setStatusClipe("🎬 Preparando o mascote…");
+    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
+    if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
+    setStatusClipe("🎬 A IA está animando… (pode levar 1-2 min)");
+    // consulta a cada 10s até ficar pronto (ou dar erro) — até ~5 min
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 10000));
+      const st = await statusClipeMascote(marcaId, ini.jobId).catch(() => null);
+      if (!st) continue;
+      if (!st.ok) { setErro(st.erro); setGerandoClipe(false); setStatusClipe(""); return; }
+      if (st.pronto) { setGerandoClipe(false); setStatusClipe(""); setDescClipe(""); router.refresh(); return; }
+      if (typeof st.progresso === "number" && st.progresso > 0) setStatusClipe(`🎬 A IA está animando… ${st.progresso}%`);
+    }
+    setGerandoClipe(false);
+    setStatusClipe("");
+    setErro("O clipe está demorando mais que o normal. Tente de novo em 1 minuto.");
+  }
+  function handleExcluirClipe(url: string) {
+    setErro(null);
+    setProc(url);
+    startTransition(async () => {
+      const r = await excluirClipeMascote(marcaId, url);
+      if (!r.ok) setErro(r.erro);
+      router.refresh();
+      setProc(null);
     });
   }
   function handleRemoverFundo() {
@@ -303,6 +341,55 @@ export function MascoteEstudio({
             </button>
           </div>
           <p className="mt-2 text-[10px] text-muted/70">A IA desenha as 3 vistas (frente, lado e costas) numa <strong className="text-white/70">imagem só</strong> — assim a coroa/bandeira fica igual entre elas. É uma referência pro 3D, não a peça final. A bandeira sai branca (o logo de verdade o 3D coloca depois).</p>
+        </div>
+      )}
+
+      {/* FASE 5 — DAR VIDA: anima o mascote com IA de vídeo (só quando há mascote oficial) */}
+      {mascoteUrl && (
+        <div className="mt-7 rounded-xl border border-[#ec4899]/40 bg-[#ec4899]/5 p-4 sm:p-5">
+          <p className="text-sm font-semibold text-white">🎬 Dar vida ao mascote <span className="ml-1 rounded-full border border-[#ec4899]/40 bg-[#ec4899]/15 px-2 py-0.5 text-[10px] font-semibold text-[#f9a8d4]">novo · beta</span></p>
+          <p className="mt-1 text-xs text-muted">
+            A IA <strong className="text-white/80">anima o seu mascote</strong> num clipe curto (~4s). Descreva o que ele faz e gere — depois dá pra usar de <strong className="text-white/80">abertura/fecho dos Reels</strong>.
+          </p>
+
+          <label className="mt-3 block text-[10px] font-semibold text-muted">O que o mascote faz no clipe?</label>
+          <textarea
+            value={descClipe}
+            onChange={(e) => setDescClipe(e.target.value)}
+            rows={2}
+            maxLength={400}
+            placeholder="Ex: acenando feliz na porta do buffet, dando boas-vindas"
+            className="mt-1 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none"
+          />
+
+          {clipesUrls.length > 0 && (
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {clipesUrls.map((url) => (
+                <div key={url} className="overflow-hidden rounded-lg border border-linha bg-black">
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <video src={url} controls playsInline loop className="aspect-[9/16] w-full bg-black object-contain" />
+                  <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                    <a href={url} target="_blank" rel="noopener noreferrer" download className="text-[11px] font-semibold text-[#f9a8d4] hover:underline">⬇ Baixar</a>
+                    <button type="button" onClick={() => handleExcluirClipe(url)} disabled={proc === url || isPending} className="text-[11px] font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-40">{proc === url ? "…" : "✕ excluir"}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleGerarClipe}
+              disabled={gerandoClipe || isPending}
+              className="rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-4 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
+            >
+              {gerandoClipe ? "🎬 Animando…" : clipesUrls.length ? "🎬 Gerar outro clipe" : "🎬 Gerar clipe animado"}
+            </button>
+            {gerandoClipe && statusClipe && <span className="text-[11px] font-semibold text-[#f9a8d4]">{statusClipe}</span>}
+          </div>
+          {gerandoClipe && <p className="mt-2 text-[10px] leading-snug text-muted/70">⏳ A animação por IA leva de <strong className="text-white/70">1 a 2 minutos</strong> — pode deixar essa tela aberta. Não feche enquanto estiver "Animando…".</p>}
+          {!gerandoClipe && <p className="mt-2 text-[10px] leading-snug text-muted/70">Cada clipe é gerado por IA de vídeo (pode variar um pouco). Se não gostar, é só gerar de novo com outra descrição.</p>}
         </div>
       )}
     </div>

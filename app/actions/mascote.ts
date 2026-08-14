@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
+import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 
@@ -259,4 +260,117 @@ export async function removerMascote(marcaId: string) {
   await prisma.marca.update({ where: { id: marcaId }, data: { mascoteUrl: "" } });
   revalidatePath(`/painel/marcas/${marcaId}`);
   return { ok: true as const };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DAR VIDA AO MASCOTE (Fase 5): anima o mascote com IA de vídeo (image-to-video da OpenAI/Sora).
+// Pega o mascote OFICIAL como referência + uma descrição do que ele faz e devolve um CLIPE de ~4s
+// (9:16), pra usar de abertura/fecho dos Reels. É em 2 fases (a IA leva 1-2 min): 1) inicia o job
+// e devolve o id; 2) a tela consulta até ficar pronto, aí baixamos o MP4 e guardamos no Blob.
+// ─────────────────────────────────────────────────────────────────────────────
+const CLIPE_MODELO = process.env.OPENAI_VIDEO_MODEL || "sora-2"; // dá pra trocar por env sem mexer no código
+
+// Monta a imagem de PARTIDA do vídeo: o mascote centralizado num quadro 720x1280 (9:16) sobre a cor
+// da marca. A IA de vídeo aceita melhor uma referência já no tamanho/proporção do vídeo final.
+async function quadroPartidaMascote(mascotePng: Buffer, cor: string): Promise<Buffer> {
+  const fundo = /^#[0-9a-fA-F]{6}$/.test(cor) ? cor : "#7C3AED";
+  const personagem = await sharp(mascotePng).resize(560, 940, { fit: "inside", withoutEnlargement: false }).png().toBuffer();
+  return sharp({ create: { width: 720, height: 1280, channels: 4, background: fundo } })
+    .composite([{ input: personagem, gravity: "center" }])
+    .png()
+    .toBuffer();
+}
+
+// FASE 1 — inicia a geração do clipe e devolve o id do job (rápido).
+export async function gerarClipeMascote(marcaId: string, descricao?: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  if (!marca.mascoteUrl) return { ok: false as const, erro: "Escolha o mascote oficial primeiro." };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  try {
+    const rr = await fetch(marca.mascoteUrl, { signal: AbortSignal.timeout(20000) });
+    if (!rr.ok) return { ok: false as const, erro: "Não consegui baixar o mascote." };
+    const buf = Buffer.from(await rr.arrayBuffer());
+    const partida = await quadroPartidaMascote(buf, marca.corPrimaria || "#7C3AED");
+
+    const acao = (descricao || "").trim().slice(0, 400) || "acenando feliz, dando boas-vindas, com um sorriso alegre";
+    const prompt = `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. Vídeo vertical 9:16. Sem texto, sem legendas.`;
+
+    const form = new FormData();
+    form.append("model", CLIPE_MODELO);
+    form.append("prompt", prompt);
+    form.append("seconds", "4");
+    form.append("size", "720x1280");
+    form.append("input_reference", new Blob([new Uint8Array(partida)], { type: "image/png" }), "partida.png");
+
+    const resp = await fetch("https://api.openai.com/v1/videos", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}` },
+      body: form,
+      signal: AbortSignal.timeout(50000),
+    });
+    if (!resp.ok) {
+      const txt = (await resp.text()).slice(0, 300);
+      return { ok: false as const, erro: `A IA de vídeo não aceitou (${resp.status}). ${txt}` };
+    }
+    const data = await resp.json();
+    if (!data?.id) return { ok: false as const, erro: "A IA não devolveu o id do vídeo." };
+    return { ok: true as const, jobId: String(data.id) };
+  } catch (e) {
+    console.error("Erro ao iniciar o clipe do mascote:", e);
+    return { ok: false as const, erro: "Não consegui iniciar o clipe agora." };
+  }
+}
+
+// FASE 2 — a tela consulta de tempos em tempos. Enquanto processa → { pronto:false }. Quando fica
+// pronto, baixa o MP4, guarda no Blob e adiciona na galeria de clipes da marca.
+export async function statusClipeMascote(marcaId: string, jobId: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  try {
+    const r = await fetch(`https://api.openai.com/v1/videos/${jobId}`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!r.ok) return { ok: false as const, erro: `Não consegui checar o vídeo (${r.status}).` };
+    const j = await r.json();
+    const st = String(j?.status || "");
+    if (st === "failed" || st === "error") return { ok: false as const, erro: j?.error?.message || "A IA não conseguiu gerar o vídeo." };
+    if (st !== "completed") return { ok: true as const, pronto: false as const, progresso: typeof j?.progress === "number" ? j.progress : null };
+
+    // pronto → baixa o conteúdo (MP4) e guarda no nosso Blob.
+    const cont = await fetch(`https://api.openai.com/v1/videos/${jobId}/content`, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(55000),
+    });
+    if (!cont.ok) return { ok: false as const, erro: "Não consegui baixar o clipe pronto." };
+    const bytes = Buffer.from(await cont.arrayBuffer());
+    const blob = await put(`${marcaId}/mascote-clipe-${Date.now()}.mp4`, bytes, { access: "public", contentType: "video/mp4" });
+
+    const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
+    const novos = [blob.url, ...lerListaUrls(marca?.mascoteClipes ?? "[]")].slice(0, 30);
+    await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(novos) } });
+    revalidatePath(`/painel/marcas/${marcaId}`);
+    return { ok: true as const, pronto: true as const, url: blob.url };
+  } catch (e) {
+    console.error("Erro ao finalizar o clipe do mascote:", e);
+    return { ok: false as const, erro: "Não consegui finalizar o clipe." };
+  }
+}
+
+// Apaga um clipe da galeria (e libera o espaço no Blob).
+export async function excluirClipeMascote(marcaId: string, url: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
+  const restantes = lerListaUrls(marca?.mascoteClipes ?? "[]").filter((u) => u !== url);
+  await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(restantes) } });
+  try { const { del } = await import("@vercel/blob"); await del(url); } catch {}
+  revalidatePath(`/painel/marcas/${marcaId}`);
+  return { ok: true as const, clipes: restantes };
 }
