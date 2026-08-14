@@ -66,35 +66,38 @@ function PlayerModal({ url, nome, onFechar }: { url: string; nome?: string; onFe
     a.href = proxyUrl; a.download = nomeArquivo;
     document.body.appendChild(a); a.click(); a.remove();
   }
-  // Detecta se o aparelho consegue COMPARTILHAR arquivo (na prática, celular). No PC isso é falso.
-  function podeCompartilharArquivo(): boolean {
-    try {
-      const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean; share?: unknown };
-      if (typeof nav.share !== "function" || typeof nav.canShare !== "function") return false;
-      const teste = new File([new Uint8Array(1)], nomeArquivo, { type: "video/mp4" });
-      return nav.canShare({ files: [teste] });
-    } catch { return false; }
-  }
-
-  // CELULAR: baixa o MP4 e abre a TELA DE COMPARTILHAR (WhatsApp, salvar nos vídeos…).
-  // COMPUTADOR: baixa o arquivo direto (sem tela de compartilhar).
+  // CELULAR: pega o MP4 (do nosso servidor, mesma origem — sem CORS) e abre a TELA DE COMPARTILHAR
+  // (WhatsApp, salvar nos vídeos…). COMPUTADOR (ou sem esse recurso): baixa o arquivo direto.
+  // Importante: testamos o compartilhar com o ARQUIVO DE VERDADE (o teste com arquivo "vazio"
+  // dava falso-negativo no iPhone e pulava o WhatsApp).
   async function baixarOuEnviar() {
     setErroBaixar(false);
-    // No PC: download direto, sem fetch nenhum (não tem como dar o erro de "não consegui preparar").
-    if (!podeCompartilharArquivo()) { baixarDireto(); return; }
-    // No celular: pega o arquivo (mesma origem, sem CORS) e abre o compartilhar.
     setBaixando(true);
+    const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean; share?: (d: unknown) => Promise<void> };
     try {
       const resp = await fetch(proxyUrl);
       if (!resp.ok) throw new Error("download falhou");
       const blob = await resp.blob();
       const file = new File([blob], nomeArquivo, { type: "video/mp4" });
-      const nav = navigator as Navigator & { share: (d: unknown) => Promise<void> };
-      await nav.share({ files: [file], title: nome || "Vídeo" });
-    } catch (e) {
-      // Cancelar a tela de compartilhar cai aqui (AbortError) — não é erro. Qualquer outra falha:
-      // tenta o download direto pelo link como plano B, antes de mostrar a mensagem de erro.
-      if (e instanceof DOMException && e.name === "AbortError") { setBaixando(false); return; }
+      // Dá pra compartilhar o arquivo? (celular) → abre o WhatsApp/compartilhar.
+      if (typeof nav.share === "function" && typeof nav.canShare === "function" && nav.canShare({ files: [file] })) {
+        try {
+          await nav.share({ files: [file], title: nome || "Vídeo" });
+          return;
+        } catch (e) {
+          // Usuário cancelou o compartilhar → não é erro, encerra em silêncio.
+          if (e instanceof DOMException && e.name === "AbortError") return;
+          // Compartilhar falhou por outro motivo → cai pro download normal logo abaixo.
+        }
+      }
+      // COMPUTADOR (ou aparelho sem compartilhar arquivo): baixa o arquivo que já temos em mãos.
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl; a.download = nomeArquivo;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(objUrl), 15000);
+    } catch {
+      // Último recurso: link direto pro servidor (também baixa o arquivo).
       try { baixarDireto(); } catch { setErroBaixar(true); }
     } finally {
       setBaixando(false);
