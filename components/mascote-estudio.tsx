@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe } from "@/app/actions/mascote";
 
@@ -129,26 +129,41 @@ export function MascoteEstudio({
   const [confirmPost, setConfirmPost] = useState<{ url: string; tipo: "reels" | "story" } | null>(null);
   const [postandoClipe, setPostandoClipe] = useState(false);
   const [resultadoPost, setResultadoPost] = useState<{ tipo: "ok" | "erro"; txt: string; link?: string | null } | null>(null);
+  const jobKey = `mascoteClipeJob:${marcaId}`;
+  // Acompanha um clipe até ficar pronto. Guarda o id do job no navegador, então se você RECARREGAR
+  // ou voltar pra aba, ele RETOMA sozinho (o clipe não se perde). Espera até ~12 min.
+  async function acompanharClipe(jobId: string) {
+    setGerandoClipe(true);
+    setStatusClipe("🎬 A IA está animando… (pode levar alguns minutos)");
+    try { localStorage.setItem(jobKey, jobId); } catch {}
+    for (let i = 0; i < 72; i++) { // ~12 min (10s cada)
+      await new Promise((r) => setTimeout(r, 10000));
+      const st = await statusClipeMascote(marcaId, jobId).catch(() => null);
+      if (!st) continue;
+      if (!st.ok) { try { localStorage.removeItem(jobKey); } catch {} setErro(st.erro); setGerandoClipe(false); setStatusClipe(""); return; }
+      if (st.pronto) { try { localStorage.removeItem(jobKey); } catch {} setGerandoClipe(false); setStatusClipe(""); setDescClipe(""); router.refresh(); return; }
+      if (typeof st.progresso === "number" && st.progresso > 0) setStatusClipe(`🎬 A IA está animando… ${st.progresso}%`);
+    }
+    // passou do tempo: mantém o job salvo (recarregar a página retoma o acompanhamento).
+    setGerandoClipe(false);
+    setStatusClipe("");
+    setErro("O clipe está demorando bastante. Deixe a aba aberta, ou recarregue a página daqui a pouco que eu continuo acompanhando — ele não se perde.");
+  }
   async function handleGerarClipe() {
     setErro(null);
     setGerandoClipe(true);
     setStatusClipe("🎬 Preparando o mascote…");
     const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
     if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
-    setStatusClipe("🎬 A IA está animando… (pode levar 1-2 min)");
-    // consulta a cada 10s até ficar pronto (ou dar erro) — até ~5 min
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 10000));
-      const st = await statusClipeMascote(marcaId, ini.jobId).catch(() => null);
-      if (!st) continue;
-      if (!st.ok) { setErro(st.erro); setGerandoClipe(false); setStatusClipe(""); return; }
-      if (st.pronto) { setGerandoClipe(false); setStatusClipe(""); setDescClipe(""); router.refresh(); return; }
-      if (typeof st.progresso === "number" && st.progresso > 0) setStatusClipe(`🎬 A IA está animando… ${st.progresso}%`);
-    }
-    setGerandoClipe(false);
-    setStatusClipe("");
-    setErro("O clipe está demorando mais que o normal. Tente de novo em 1 minuto.");
+    await acompanharClipe(ini.jobId);
   }
+  // Ao abrir a aba: se havia um clipe sendo gerado (guardado no navegador), RETOMA o acompanhamento.
+  useEffect(() => {
+    let job = "";
+    try { job = localStorage.getItem(jobKey) || ""; } catch {}
+    if (job) acompanharClipe(job);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   function handleExcluirClipe(url: string) {
     setErro(null);
     setProc(url);
