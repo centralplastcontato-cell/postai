@@ -385,7 +385,7 @@ export function MascoteEstudio({
         <div className="mt-7 rounded-xl border border-[#ec4899]/40 bg-[#ec4899]/5 p-4 sm:p-5">
           <p className="text-sm font-semibold text-white">🎬 Dar vida ao mascote <span className="ml-1 rounded-full border border-[#ec4899]/40 bg-[#ec4899]/15 px-2 py-0.5 text-[10px] font-semibold text-[#f9a8d4]">novo · beta</span></p>
           <p className="mt-1 text-xs text-muted">
-            A IA <strong className="text-white/80">anima o seu mascote</strong> num clipe curto. Escolha uma ação (ou descreva), gere, e depois dá pra <strong className="text-white/80">postar como Story ou Reels</strong>.
+            A IA <strong className="text-white/80">anima o seu mascote</strong> num clipe curto — <strong className="text-white/80">já com música e efeitos</strong> 🎵. Escolha uma ação (ou descreva), gere, e depois dá pra <strong className="text-white/80">postar como Story ou Reels</strong>.
           </p>
 
           {/* ações prontas — 1 toque preenche a descrição */}

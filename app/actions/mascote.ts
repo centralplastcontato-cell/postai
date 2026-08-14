@@ -299,7 +299,7 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string, seg
     const partida = await quadroPartidaMascote(buf, marca.corPrimaria || "#7C3AED");
 
     const acao = (descricao || "").trim().slice(0, 400) || "acenando feliz, dando boas-vindas, com um sorriso alegre";
-    const prompt = `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. Vídeo vertical 9:16. Sem texto, sem legendas.`;
+    const prompt = `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
 
     const form = new FormData();
     form.append("model", CLIPE_MODELO);
