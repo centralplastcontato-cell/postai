@@ -610,8 +610,13 @@ export async function gerarVideoTematico(videoId: string) {
   const mascoteOn = Boolean(v.marca.mascoteUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.mascoteCanto || "");
   const logoOn = Boolean(v.marca.logoUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.logoCanto || "");
   const versao = hashCurto(
-    ["q7", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.logoCanto, v.logoTam, v.videoTextos, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
+    ["q8", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.logoCanto, v.logoTam, v.videoTextos, v.videoTextoFinal, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
+
+  // QUADRO FINAL com o LOGO no centro: só quando o logo está POSICIONADO (logoOn). Nesse caso o
+  // motor já recebe um logo INVISÍVEL (não carimba nada), então a nossa tela de fechamento não
+  // ganha um 2º logo. Fecha o Reels com a marca em vez de uma tela preta.
+  const quadroFinalOn = logoOn;
 
   let fotosMotor: string[];
   if (temLegenda || mascoteOn || logoOn) {
@@ -625,6 +630,8 @@ export async function gerarVideoTematico(videoId: string) {
     if (!fotosMotor.length) fotosMotor = fotos.filter((u) => u !== capaUrl);
   }
   if (!fotosMotor.length) return { ok: false as const, erro: "Escolha pelo menos 2 fotos pro vídeo (uma vira a capa)." };
+  // Cola a tela de fechamento (logo no centro) como ÚLTIMO quadro.
+  if (quadroFinalOn) fotosMotor = [...fotosMotor, `${base}/api/quadro-final/${videoId}?v=${versao}`];
 
   // Com frase de capa, a capa é a NOSSA arte (n=0). Sem frase, vai a foto crua — mas SEM texto:
   // o nome do tema ("Brinquedos") é etiqueta interna, não abertura de vídeo. Melhor capa limpa
@@ -657,7 +664,9 @@ export async function gerarVideoTematico(videoId: string) {
     // por cima (ele usa fonte fixa, numa linha só, e cortava as pontas da frase).
     textoCapa: textoDaCapa,
     nomeArquivo: `${v.marca.slug || "reels"}-tema`,
-    ...(v.videoTextoFinal?.trim() ? { tituloFinal: v.videoTextoFinal.trim(), subFinal: "" } : {}),
+    // Com a NOSSA tela de fechamento (logo no centro), o texto do convite já vai NELA — então não
+    // mandamos tituloFinal (senão o motor colava OUTRA tela final por cima). Sem ela, segue igual.
+    ...(!quadroFinalOn && v.videoTextoFinal?.trim() ? { tituloFinal: v.videoTextoFinal.trim(), subFinal: "" } : {}),
     // O motor só ECOA esse id no callback — mandamos o id do vídeo temático e o
     // /api/video-pronto descobre sozinho se é de festa ou temático.
     festaId: videoId,

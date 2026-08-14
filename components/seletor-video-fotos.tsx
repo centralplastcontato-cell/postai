@@ -594,8 +594,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     // e não 2,3 de propósito, como margem — melhor a voz caber com folga do que estourar). Se a fala
     // passar disso, a narração é acelerada um tiquinho pra caber (sem cortar o convite).
     // corpo = fotos - 1 (uma vira capa), TETO 29 (o motor aceita no máx 30: 29 no corpo + a capa).
+    // Com o logo posicionado, entra ainda a TELA DE FECHAMENTO (logo no centro) como +1 quadro —
+    // então a voz pode ir um tiquinho mais longe (a música fecha sobre o logo).
     const nSlide = Math.max(1, Math.min(sel.length - 1, 29));
-    const alvoSegundos = Math.round((nSlide + 1) * 2.2);
+    const temQuadroFinal = !!(tematicoId && logoCanto && logoUrlMarca);
+    const alvoSegundos = Math.round((nSlide + 1 + (temQuadroFinal ? 1 : 0)) * 2.2);
     // A trilha ESCOLHIDA entra sob a voz: prepara/pega o WAV dela AGORA e passa direto (não depende
     // de ter salvo antes). Sem trilha escolhida, ou se falhar, a narração usa o jingle do buffet.
     const wavUrl = musica ? await garantirWav(musica).catch(() => null) : null;
