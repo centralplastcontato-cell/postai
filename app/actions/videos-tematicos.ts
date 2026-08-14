@@ -664,9 +664,13 @@ export async function gerarVideoTematico(videoId: string) {
     // por cima (ele usa fonte fixa, numa linha só, e cortava as pontas da frase).
     textoCapa: textoDaCapa,
     nomeArquivo: `${v.marca.slug || "reels"}-tema`,
-    // Com a NOSSA tela de fechamento (logo no centro), o texto do convite já vai NELA — então não
-    // mandamos tituloFinal (senão o motor colava OUTRA tela final por cima). Sem ela, segue igual.
-    ...(!quadroFinalOn && v.videoTextoFinal?.trim() ? { tituloFinal: v.videoTextoFinal.trim(), subFinal: "" } : {}),
+    // O motor SEMPRE cola uma tela final própria (não dá pra desligar daqui). Com a NOSSA tela de
+    // fechamento (logo no centro), fazemos a do motor virar uma CONTINUAÇÃO proposital: um convite
+    // curto na cor da marca ("Agende a sua festa!") em vez do "Muito obrigado! Volte sempre" padrão.
+    // Sem a nossa tela, mantém o comportamento antigo (o texto do dono, se houver).
+    ...(quadroFinalOn
+      ? { tituloFinal: "Agende a sua festa!", subFinal: "" }
+      : v.videoTextoFinal?.trim() ? { tituloFinal: v.videoTextoFinal.trim(), subFinal: "" } : {}),
     // O motor só ECOA esse id no callback — mandamos o id do vídeo temático e o
     // /api/video-pronto descobre sozinho se é de festa ou temático.
     festaId: videoId,
