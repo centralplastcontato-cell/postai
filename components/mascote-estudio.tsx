@@ -125,6 +125,7 @@ export function MascoteEstudio({
   // job e fica consultando até o clipe ficar pronto.
   const clipesUrls = clipes ?? [];
   const [descClipe, setDescClipe] = useState("");
+  const [falaClipe, setFalaClipe] = useState(""); // o que o mascote FALA no clipe ("" = só música)
   const [durClipe, setDurClipe] = useState(8); // duração do clipe: 4 | 8 | 12
   const [fundoClipe, setFundoClipe] = useState("#FFFFFF"); // cor do fundo do clipe
   const [fundoFoto, setFundoFoto] = useState(""); // foto do buffet como fundo ("" = usa a cor)
@@ -168,7 +169,7 @@ export function MascoteEstudio({
       const st = await statusClipeMascote(marcaId, jobId).catch(() => null);
       if (!st) continue;
       if (!st.ok) { try { localStorage.removeItem(jobKey); } catch {} setErro(st.erro); setGerandoClipe(false); setStatusClipe(""); return; }
-      if (st.pronto) { try { localStorage.removeItem(jobKey); } catch {} setGerandoClipe(false); setStatusClipe(""); setDescClipe(""); router.refresh(); return; }
+      if (st.pronto) { try { localStorage.removeItem(jobKey); } catch {} setGerandoClipe(false); setStatusClipe(""); setDescClipe(""); setFalaClipe(""); router.refresh(); return; }
       if (typeof st.progresso === "number" && st.progresso > 0) setStatusClipe(`🎬 A IA está animando… ${st.progresso}%`);
     }
     // passou do tempo: mantém o job salvo (recarregar a página retoma o acompanhamento).
@@ -180,7 +181,7 @@ export function MascoteEstudio({
     setErro(null);
     setGerandoClipe(true);
     setStatusClipe("🎬 Preparando o mascote…");
-    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe, fundoClipe, fundoFoto || undefined).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
+    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe, fundoClipe, fundoFoto || undefined, falaClipe.trim() || undefined).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
     if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
     await acompanharClipe(ini.jobId);
   }
@@ -448,6 +449,19 @@ export function MascoteEstudio({
             placeholder="Ex: acenando feliz na porta do buffet, dando boas-vindas"
             className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none"
           />
+
+          {/* voz do mascote — o que ele FALA (lip sync) */}
+          <label className="mt-3 block text-[10px] font-semibold text-muted">🗣️ O que o mascote fala? <span className="font-normal text-muted/70">(opcional — se preencher, ele fala com a boquinha mexendo)</span></label>
+          <input
+            type="text"
+            value={falaClipe}
+            onChange={(e) => setFalaClipe(e.target.value)}
+            maxLength={160}
+            disabled={gerandoClipe}
+            placeholder="Ex: Venha comemorar sua festa aqui no Castelo!"
+            className="mt-1 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none disabled:opacity-50"
+          />
+          <p className="mt-1 text-[10px] leading-snug text-muted/70">A IA cria a <strong className="text-white/70">voz de personagem</strong> na hora e sincroniza com a boca. Frases curtas ({durClipe}s dá pra ~{Math.max(4, durClipe * 2)} palavras) saem melhor. Deixe vazio pra ter só uma musiquinha.</p>
 
           {/* duração do clipe */}
           <div className="mt-2 flex items-center gap-2">

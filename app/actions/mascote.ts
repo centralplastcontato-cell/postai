@@ -292,7 +292,7 @@ async function quadroPartidaMascote(mascotePng: Buffer, fundo: { cor: string } |
 }
 
 // FASE 1 — inicia a geração do clipe e devolve o id do job (rápido).
-export async function gerarClipeMascote(marcaId: string, descricao?: string, segundos?: number, fundo?: string, fundoFotoUrl?: string) {
+export async function gerarClipeMascote(marcaId: string, descricao?: string, segundos?: number, fundo?: string, fundoFotoUrl?: string, fala?: string) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true } });
@@ -324,9 +324,14 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string, seg
     const partida = await quadroPartidaMascote(buf, fotoFundoBuf ? { foto: fotoFundoBuf } : { cor: corFundo });
 
     const acao = (descricao || "").trim().slice(0, 400) || "acenando feliz, dando boas-vindas, com um sorriso alegre";
+    // Se o dono escreveu uma FALA, o mascote FALA (lip sync + voz de personagem fofo). Senão, só música.
+    const falaTxt = (fala || "").trim().slice(0, 160);
+    const audio = falaTxt
+      ? `ÁUDIO: o mascote FALA, em português do Brasil, com a BOCA sincronizada (lip sync), a frase: "${falaTxt}". Voz de PERSONAGEM INFANTIL fofa, alegre, simpática e animada (tom mais agudo, cativante, de mascote de desenho). A fala tem que estar CLARA e bem sincronizada com a boca. Uma musiquinha bem baixinha por trás, sem competir com a voz.`
+      : `ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
     const prompt = fotoFundoBuf
-      ? `O personagem mascote 3D fofo da imagem de referência ${acao}, na frente de um CENÁRIO REAL de buffet infantil (o fundo da imagem). MANTENHA o cenário de fundo REAL e parado, sem distorcer, sem mudar — SÓ O PERSONAGEM se mexe, com movimento suave e natural, mantendo EXATAMENTE o mesmo desenho e cores do mascote. Câmera parada. Vídeo vertical 9:16. Sem texto, sem legendas. ÁUDIO: música instrumental alegre e efeitos sonoros fofos (clima de buffet infantil), sem voz humana.`
-      : `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. FUNDO: uma cor SÓLIDA, LISA e UNIFORME EXATAMENTE igual à da imagem de referência (${corFundo}) — NÃO mude a cor do fundo, NÃO escureça, NÃO coloque cenário, objetos nem gradiente. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
+      ? `O personagem mascote 3D fofo da imagem de referência ${acao}, na frente de um CENÁRIO REAL de buffet infantil (o fundo da imagem). MANTENHA o cenário de fundo REAL e parado, sem distorcer, sem mudar — SÓ O PERSONAGEM se mexe, com movimento suave e natural, mantendo EXATAMENTE o mesmo desenho e cores do mascote. Câmera parada. Vídeo vertical 9:16. Sem texto, sem legendas. ${audio}`
+      : `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. FUNDO: uma cor SÓLIDA, LISA e UNIFORME EXATAMENTE igual à da imagem de referência (${corFundo}) — NÃO mude a cor do fundo, NÃO escureça, NÃO coloque cenário, objetos nem gradiente. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ${audio}`;
 
     const form = new FormData();
     form.append("model", CLIPE_MODELO);
