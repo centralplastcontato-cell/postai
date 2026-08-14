@@ -55,29 +55,39 @@ function PlayerModal({ url, nome, onFechar }: { url: string; nome?: string; onFe
   // Nome do arquivo amigável (só letras/números/traços), pra salvar/compartilhar bonito.
   const nomeArquivo = `${(nome || "video").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "video"}.mp4`;
 
-  // Baixa o MP4 e ABRE A TELA DE COMPARTILHAR do celular (WhatsApp, salvar nos vídeos, etc.). Se o
-  // aparelho não tiver esse recurso (ex: navegador de computador), cai pro download normal do arquivo.
+  // Passamos SEMPRE pelo nosso servidor (/api/baixar-video): mesma origem, sem a trava de CORS que
+  // impedia o download direto no COMPUTADOR (o host do vídeo não libera o navegador a baixar de fora).
+  const proxyUrl = `/api/baixar-video?url=${encodeURIComponent(url)}&nome=${encodeURIComponent(nomeArquivo)}`;
+
+  // No CELULAR: baixa o MP4 e abre a TELA DE COMPARTILHAR (WhatsApp, salvar nos vídeos, etc.).
+  // No COMPUTADOR (ou sem esse recurso): baixa o arquivo direto pelo nosso link (download real).
   async function baixarOuEnviar() {
     setErroBaixar(false);
     setBaixando(true);
+    const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean; share?: (d: unknown) => Promise<void> };
     try {
-      const resp = await fetch(url);
-      if (!resp.ok) throw new Error("download falhou");
-      const blob = await resp.blob();
-      const file = new File([blob], nomeArquivo, { type: "video/mp4" });
-      const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean };
-      if (typeof nav.share === "function" && nav.canShare?.({ files: [file] })) {
-        await nav.share({ files: [file], title: nome || "Vídeo" });
-      } else {
+      // Só tenta compartilhar em aparelho que suporta arquivos (celular). Senão, vai direto pro download.
+      if (typeof nav.share === "function" && typeof nav.canShare === "function") {
+        const resp = await fetch(proxyUrl);
+        if (!resp.ok) throw new Error("download falhou");
+        const blob = await resp.blob();
+        const file = new File([blob], nomeArquivo, { type: "video/mp4" });
+        if (nav.canShare({ files: [file] })) {
+          await nav.share({ files: [file], title: nome || "Vídeo" });
+          return;
+        }
+        // suporta share mas não arquivos: cai pro download com o blob que já temos.
         const objUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.href = objUrl;
-        a.download = nomeArquivo;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+        a.href = objUrl; a.download = nomeArquivo;
+        document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(objUrl), 15000);
+        return;
       }
+      // COMPUTADOR: baixa direto pelo link do servidor (Content-Disposition: attachment).
+      const a = document.createElement("a");
+      a.href = proxyUrl; a.download = nomeArquivo;
+      document.body.appendChild(a); a.click(); a.remove();
     } catch (e) {
       // Usuário cancelar a tela de compartilhar cai aqui (AbortError) — nesse caso não é erro.
       if (!(e instanceof DOMException && e.name === "AbortError")) setErroBaixar(true);
