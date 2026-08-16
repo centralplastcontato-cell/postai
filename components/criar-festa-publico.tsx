@@ -108,7 +108,7 @@ export function CriarFestaPublico({ tokenMarca, marca }: { tokenMarca: string; m
               <InputDataBR value={data} onChange={setData} className="mt-1" />
             </label>
             <label className="block w-28 shrink-0 text-xs font-medium text-muted">Horário
-              <input type="time" value={horario} onChange={(e) => setHorario(e.target.value)} style={{ colorScheme: "dark" }} className="input-base mt-1 min-w-0" />
+              <input type="time" value={horario} onChange={(e) => setHorario(e.target.value)} style={{ colorScheme: "dark", WebkitAppearance: "none", appearance: "none", minWidth: 0 }} className="input-base mt-1 min-w-0" />
             </label>
           </div>
 

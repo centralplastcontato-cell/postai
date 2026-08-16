@@ -293,7 +293,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
                 <InputDataBR value={edData} onChange={setEdData} className="mt-1" />
               </label>
               <label className="block w-28 shrink-0 text-xs font-medium text-muted">Horário
-                <input type="time" value={edHorario} onChange={(e) => setEdHorario(e.target.value)} style={{ colorScheme: "dark" }} className="input-base mt-1 min-w-0" />
+                <input type="time" value={edHorario} onChange={(e) => setEdHorario(e.target.value)} style={{ colorScheme: "dark", WebkitAppearance: "none", appearance: "none", minWidth: 0 }} className="input-base mt-1 min-w-0" />
               </label>
             </div>
 
