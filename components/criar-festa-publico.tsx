@@ -104,11 +104,11 @@ export function CriarFestaPublico({ tokenMarca, marca }: { tokenMarca: string; m
           <p className="text-sm font-semibold text-white">✨ Nova festa</p>
 
           <div className="mt-4 flex gap-3">
-            <label className="block flex-1 text-xs font-medium text-muted">Data da festa
+            <label className="block min-w-0 flex-1 text-xs font-medium text-muted">Data da festa
               <InputDataBR value={data} onChange={setData} className="mt-1" />
             </label>
-            <label className="block text-xs font-medium text-muted">Horário
-              <input type="time" value={horario} onChange={(e) => setHorario(e.target.value)} style={{ colorScheme: "dark" }} className="input-base mt-1" />
+            <label className="block w-28 shrink-0 text-xs font-medium text-muted">Horário
+              <input type="time" value={horario} onChange={(e) => setHorario(e.target.value)} style={{ colorScheme: "dark" }} className="input-base mt-1 min-w-0" />
             </label>
           </div>
 

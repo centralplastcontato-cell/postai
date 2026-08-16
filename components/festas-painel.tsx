@@ -289,11 +289,11 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
             <p className="text-sm font-semibold text-white">✏️ Editar festa</p>
 
             <div className="mt-4 flex gap-3">
-              <label className="block flex-1 text-xs font-medium text-muted">Data da festa
+              <label className="block min-w-0 flex-1 text-xs font-medium text-muted">Data da festa
                 <InputDataBR value={edData} onChange={setEdData} className="mt-1" />
               </label>
-              <label className="block text-xs font-medium text-muted">Horário
-                <input type="time" value={edHorario} onChange={(e) => setEdHorario(e.target.value)} style={{ colorScheme: "dark" }} className="input-base mt-1" />
+              <label className="block w-28 shrink-0 text-xs font-medium text-muted">Horário
+                <input type="time" value={edHorario} onChange={(e) => setEdHorario(e.target.value)} style={{ colorScheme: "dark" }} className="input-base mt-1 min-w-0" />
               </label>
             </div>
 
