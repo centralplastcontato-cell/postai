@@ -148,6 +148,23 @@ input[type="date"].input-base::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
+/* <input type="time">: mesmo tratamento do date. Sem -webkit-appearance:none, o iOS dá ao
+   campo uma LARGURA NATURAL grande (min-width nativo) que ignora a largura definida e faz o
+   campo estourar/ficar largo demais. Com appearance:none ele respeita a largura do container. */
+input[type="time"].input-base {
+  color-scheme: dark;
+  min-height: 38px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type="time"].input-base::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+input[type="time"].input-base::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
 /* No iPhone (Safari), tocar num campo de DIGITAÇÃO com fonte < 16px faz a página dar
    zoom sozinha e "escorregar" pro lado. Forçar 16px nos campos de texto no mobile mata
    esse zoom (a tela para de desconfigurar ao digitar). Só no mobile — no desktop mantém
