@@ -10,6 +10,7 @@ import { type FestaView, type FotoView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes, tituloCapaFesta } from "@/lib/aniversariantes";
 import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
 import { criarVideoTematico, excluirVideoTematico, fotosDoVideoTematico } from "@/app/actions/videos-tematicos";
+import { excluirFesta } from "@/app/actions/festas";
 
 // Vídeo TEMÁTICO do buffet (Reels institucional do acervo, sem festa) — view do painel.
 export type VideoTematicoView = {
@@ -127,7 +128,7 @@ function PlayerModal({ url, nome, onFechar }: { url: string; nome?: string; onFe
   );
 }
 
-function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => void }) {
+function CardVideo({ f, onAbrirSeletor, onExcluir }: { f: FestaView; onAbrirSeletor: () => void; onExcluir: () => void }) {
   const [ver, setVer] = useState(false);
 
   const pronto = f.videoUrl.startsWith("http");
@@ -226,6 +227,8 @@ function CardVideo({ f, onAbrirSeletor }: { f: FestaView; onAbrirSeletor: () => 
         ) : (
           <button onClick={onAbrirSeletor} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">⚡ Gerar vídeo</button>
         )}
+        {/* Excluir a festa (útil pra tirar festas repetidas). A confirmação avisa que apaga as fotos. */}
+        <button type="button" onClick={onExcluir} title="Excluir esta festa (e as fotos dela)" className="shrink-0 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500 hover:bg-red-900/20">✕</button>
       </div>
 
       {ver && pronto && <PlayerModal url={f.videoUrl} nome={nomes} onFechar={() => setVer(false)} />}
@@ -333,6 +336,9 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
   const [msgTema, setMsgTema] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
   const [carregandoTema, setCarregandoTema] = useState<string | null>(null); // id do temático abrindo o seletor
   const [seletorTema, setSeletorTema] = useState<{ video: VideoTematicoView; fotos: FotoView[] } | null>(null);
+  // Exclusão de FESTA (pra tirar festas repetidas) — abre um aviso claro antes de apagar de vez.
+  const [apagarFesta, setApagarFesta] = useState<FestaView | null>(null);
+  const [apagando, setApagando] = useState(false);
   // "Banco" de trilhas: as músicas já enviadas em outros vídeos desta marca, pra reusar sem re-upload.
   const musicasBanco = Array.from(new Set(festas.map((f) => f.videoMusica).filter((u) => u && u.startsWith("http")))).map((url) => ({ url, nome: nomeDaMusica(url) }));
 
@@ -364,6 +370,16 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
     setCarregandoTema(null);
     if (!r.ok) { setMsgTema({ tipo: "erro", txt: r.erro || "Não consegui carregar as fotos." }); return; }
     setSeletorTema({ video: v, fotos: r.fotos as FotoView[] });
+  }
+  // Confirma e apaga a FESTA de vez (festa + fotos). Usado pra limpar festas repetidas.
+  async function confirmarApagarFesta() {
+    if (!apagarFesta) return;
+    setApagando(true); setMsgTema(null);
+    const r = await excluirFesta(apagarFesta.id).catch(() => ({ ok: false as const, erro: "Não deu pra excluir agora." }));
+    setApagando(false);
+    if (!r.ok) { setMsgTema({ tipo: "erro", txt: r.erro || "Não deu pra excluir." }); setApagarFesta(null); return; }
+    setApagarFesta(null);
+    router.refresh();
   }
   async function excluirTema(id: string) {
     setMsgTema(null);
@@ -415,7 +431,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {festas.map((f) => (
-            <CardVideo key={f.id} f={f} onAbrirSeletor={() => setSeletor(f)} />
+            <CardVideo key={f.id} f={f} onAbrirSeletor={() => setSeletor(f)} onExcluir={() => setApagarFesta(f)} />
           ))}
         </div>
       )}
@@ -473,6 +489,22 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           jaTemVideo={seletorTema.video.videoUrl.startsWith("http")}
           onFechar={() => setSeletorTema(null)}
         />
+      )}
+
+      {/* CONFIRMAÇÃO de excluir a festa (irreversível — apaga a festa e as fotos). */}
+      {apagarFesta && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4" onClick={() => !apagando && setApagarFesta(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-red-500/40 bg-preto-card p-5">
+            <p className="text-sm font-bold text-white">Excluir a festa de {rotuloAniversariantes(apagarFesta.aniversariantes) || "Festa"}?</p>
+            <p className="mt-2 text-xs text-muted">
+              Isso apaga a festa <strong className="text-white">e as {apagarFesta.fotos.length} foto{apagarFesta.fotos.length === 1 ? "" : "s"}</strong> dela de vez. <strong className="text-red-300">Não dá pra desfazer.</strong> Use pra tirar festas repetidas.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setApagarFesta(null)} disabled={apagando} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-muted transition hover:text-white disabled:opacity-50">Cancelar</button>
+              <button onClick={confirmarApagarFesta} disabled={apagando} className="flex-1 rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-600 disabled:opacity-60">{apagando ? "Excluindo…" : "Sim, excluir festa"}</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
