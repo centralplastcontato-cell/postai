@@ -50,6 +50,27 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
   const [erroUpload, setErroUpload] = useState<string | null>(null);
 
   const linkCriar = token ? `${linkBase}/f/${token}` : "";
+
+  // RANKING DOS GERENTES: quantas fotos cada gerente registra por festa (pra o dono ver quem tira
+  // bastante e quem tira pouco). Conta SÓ festas que já aconteceram (data passou ou finalizada) —
+  // festa futura ainda não teve fotos, contar não seria justo.
+  const hojeBRT = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // yyyy-mm-dd
+  const rankingGerentes = (() => {
+    const mapa = new Map<string, { nome: string; festas: number; fotos: number }>();
+    for (const f of festas) {
+      const jaAconteceu = Boolean(f.finalizadaEm) || f.dataISO.slice(0, 10) <= hojeBRT;
+      if (!jaAconteceu) continue;
+      const nome = (f.gerente || "").trim() || "Sem nome";
+      const cur = mapa.get(nome.toLowerCase()) || { nome, festas: 0, fotos: 0 };
+      cur.festas += 1;
+      cur.fotos += f.fotos.length;
+      mapa.set(nome.toLowerCase(), cur);
+    }
+    return Array.from(mapa.values())
+      .map((g) => ({ ...g, media: g.festas ? g.fotos / g.festas : 0 }))
+      .sort((a, b) => b.media - a.media);
+  })();
+  const maiorMedia = rankingGerentes[0]?.media || 0;
   // Derivado do `festas` (não de um snapshot): após router.refresh() o modal reflete os dados novos.
   const detalhe = detalheId ? festas.find((f) => f.id === detalheId) ?? null : null;
 
@@ -434,6 +455,38 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
         )}
         {erro && <p className="mt-3 text-sm text-vermelho">{erro}</p>}
       </div>
+
+      {/* RANKING DOS GERENTES — quem registra mais/menos fotos por festa (pra cobrar) */}
+      {rankingGerentes.length > 0 && (
+        <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold text-white">📷 Ranking dos gerentes</h3>
+            <span className="rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2 py-0.5 text-[10px] font-semibold text-[#c7b2ff]">fotos por festa</span>
+          </div>
+          <p className="mt-1.5 text-xs leading-relaxed text-muted">
+            Média de fotos que cada gerente registra por festa — pra você ver quem tira <strong className="text-white/80">bastante</strong> e quem tira <strong className="text-white/80">pouco</strong>. Conta só as festas que <strong className="text-white/80">já aconteceram</strong>.
+          </p>
+          <div className="mt-3 space-y-2">
+            {rankingGerentes.map((g, i) => {
+              const pct = maiorMedia > 0 ? Math.max(6, Math.round((g.media / maiorMedia) * 100)) : 0;
+              const poucas = g.media < 15; // aviso suave: 15 fotos/festa é o mínimo pra um bom vídeo
+              return (
+                <div key={g.nome} className="rounded-lg border border-linha bg-preto p-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-semibold text-white">{i + 1}. {g.nome}</span>
+                    <span className={`shrink-0 text-sm font-bold ${poucas ? "text-amber-400" : "text-green-400"}`}>{g.media.toFixed(1)} <span className="text-[10px] font-normal text-muted">fotos/festa</span></span>
+                  </div>
+                  <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                    <div className={`h-full rounded-full ${poucas ? "bg-amber-500" : "bg-[#7c3aed]"}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="mt-1 text-[11px] text-muted">{g.festas} festa{g.festas === 1 ? "" : "s"} · {g.fotos} foto{g.fotos === 1 ? "" : "s"} no total</p>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-[10px] text-muted/70">Em <span className="font-semibold text-amber-400">laranja</span>, quem está registrando poucas fotos (abaixo de 15 por festa). O nome vem do que o gerente preenche no link da festa.</p>
+        </div>
+      )}
 
       {/* GALERIA por festa — cada uma é um card; clicar abre o detalhe no modal */}
       <div>
