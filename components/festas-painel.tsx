@@ -69,9 +69,9 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
     }
     return Array.from(mapa.values())
       .map((g) => ({ ...g, media: g.festas ? g.fotos / g.festas : 0 }))
-      .sort((a, b) => b.media - a.media);
+      .sort((a, b) => b.fotos - a.fotos); // do que MAIS registrou fotos (mais ativo) pro que menos
   })();
-  const maiorMedia = rankingGerentes[0]?.media || 0;
+  const maiorTotal = rankingGerentes[0]?.fotos || 0;
   // Derivado do `festas` (não de um snapshot): após router.refresh() o modal reflete os dados novos.
   const detalhe = detalheId ? festas.find((f) => f.id === detalheId) ?? null : null;
 
@@ -467,27 +467,27 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
           </button>
           {mostrarRanking && (<>
           <p className="mt-2 text-xs leading-relaxed text-muted">
-            Média de fotos que cada gerente registra por festa — pra você ver quem tira <strong className="text-white/80">bastante</strong> e quem tira <strong className="text-white/80">pouco</strong>. Conta só as festas que <strong className="text-white/80">já aconteceram</strong>.
+            Total de fotos que cada gerente já registrou (do que <strong className="text-white/80">mais trabalha</strong> pro que <strong className="text-white/80">menos</strong>). Do lado, a <strong className="text-white/80">média por festa</strong>. Conta só as festas que <strong className="text-white/80">já aconteceram</strong>.
           </p>
           <div className="mt-3 space-y-2">
             {rankingGerentes.map((g, i) => {
-              const pct = maiorMedia > 0 ? Math.max(6, Math.round((g.media / maiorMedia) * 100)) : 0;
+              const pct = maiorTotal > 0 ? Math.max(6, Math.round((g.fotos / maiorTotal) * 100)) : 0;
               const poucas = g.media < 15; // aviso suave: 15 fotos/festa é o mínimo pra um bom vídeo
               return (
                 <div key={g.nome} className="rounded-lg border border-linha bg-preto p-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-semibold text-white">{i + 1}. {g.nome}</span>
-                    <span className={`shrink-0 text-sm font-bold ${poucas ? "text-amber-400" : "text-green-400"}`}>{g.media.toFixed(1)} <span className="text-[10px] font-normal text-muted">fotos/festa</span></span>
+                    <span className="shrink-0 text-sm font-bold text-white">{g.fotos} <span className="text-[10px] font-normal text-muted">fotos</span></span>
                   </div>
                   <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/10">
                     <div className={`h-full rounded-full ${poucas ? "bg-amber-500" : "bg-[#7c3aed]"}`} style={{ width: `${pct}%` }} />
                   </div>
-                  <p className="mt-1 text-[11px] text-muted">{g.festas} festa{g.festas === 1 ? "" : "s"} · {g.fotos} foto{g.fotos === 1 ? "" : "s"} no total</p>
+                  <p className="mt-1 text-[11px] text-muted">{g.festas} festa{g.festas === 1 ? "" : "s"} · média <span className={poucas ? "font-semibold text-amber-400" : "font-semibold text-green-400"}>{g.media.toFixed(1)}</span> fotos/festa</p>
                 </div>
               );
             })}
           </div>
-          <p className="mt-2 text-[10px] text-muted/70">Em <span className="font-semibold text-amber-400">laranja</span>, quem está registrando poucas fotos (abaixo de 15 por festa). O nome vem do que o gerente preenche no link da festa.</p>
+          <p className="mt-2 text-[10px] text-muted/70">A <span className="font-semibold text-amber-400">média em laranja</span> é de quem registra poucas fotos por festa (abaixo de 15) — mesmo com total alto, vale ficar de olho. O nome vem do que o gerente preenche no link da festa.</p>
           </>)}
         </div>
       )}
