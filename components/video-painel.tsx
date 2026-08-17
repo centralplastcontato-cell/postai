@@ -327,7 +327,7 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
   );
 }
 
-export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco = [], mascoteUrl = "", logoUrl = "" }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string; capasBanco?: string[]; mascoteUrl?: string; logoUrl?: string }) {
+export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco = [], mascoteUrl = "", logoUrl = "", secao = "tudo" }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string; capasBanco?: string[]; mascoteUrl?: string; logoUrl?: string; secao?: "buffet" | "festas" | "tudo" }) {
   const router = useRouter();
   const [seletor, setSeletor] = useState<FestaView | null>(null);
   // criação/edição de vídeo TEMÁTICO
@@ -388,9 +388,12 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
     router.refresh();
   }
 
+  const mostraBuffet = secao !== "festas";
+  const mostraFestas = secao !== "buffet";
   return (
     <div>
       {/* ---- VÍDEOS DO BUFFET (temáticos, do acervo) ---- */}
+      {mostraBuffet && (<>
       <div className="mb-4">
         <p className="text-sm font-semibold text-white">🏰 Vídeos do buffet</p>
         <p className="mt-1 text-xs text-muted">
@@ -415,14 +418,19 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           ))}
         </div>
       )}
+      </>)}
 
       {/* ---- VÍDEOS DAS FESTAS ---- */}
+      {mostraFestas && (<>
       <div className="mb-4">
         <p className="text-sm font-semibold text-white">🎬 Vídeo das festas</p>
         <p className="mt-1 text-xs text-muted">
           Monte o <strong className="text-white/80">Reels</strong> de cada festa: escolha e ordene as fotos (🎬 Fotos), clique em <strong className="text-white/80">⚡ Gerar vídeo</strong> e o Postaí monta sozinho (capa + jingle). Depois, pra <strong className="text-white/80">agendar/postar</strong>, vá em <strong className="text-white/80">📱 Redes Sociais → 🎬 Reels</strong>.
         </p>
       </div>
+
+      {/* mensagens (ex: erro ao excluir festa) — só aqui quando a seção do buffet está escondida, pra não duplicar */}
+      {!mostraBuffet && msgTema && <p className={`mb-3 text-xs font-semibold ${msgTema.tipo === "ok" ? "text-green-400" : "text-vermelho"}`}>{msgTema.txt}</p>}
 
       {festas.length === 0 ? (
         <div className="rounded-xl border border-linha bg-preto-card p-6 text-center text-sm text-muted">
@@ -435,6 +443,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           ))}
         </div>
       )}
+      </>)}
 
       {seletor && (
         <SeletorVideoFotos
