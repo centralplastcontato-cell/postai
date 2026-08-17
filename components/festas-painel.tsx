@@ -34,6 +34,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
   const [erro, setErro] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<Confirmacao | null>(null);
   const [detalheId, setDetalheId] = useState<string | null>(null); // festa aberta no modal de detalhe
+  const [mostrarRanking, setMostrarRanking] = useState(false); // ranking dos gerentes começa colapsado
   const [fotoAberta, setFotoAberta] = useState<FotoView | null>(null); // foto aberta no modal (ampliar + descrição)
   const [descEdit, setDescEdit] = useState("");
   const [salvandoDesc, setSalvandoDesc] = useState(false);
@@ -456,14 +457,16 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
         {erro && <p className="mt-3 text-sm text-vermelho">{erro}</p>}
       </div>
 
-      {/* RANKING DOS GERENTES — quem registra mais/menos fotos por festa (pra cobrar) */}
+      {/* RANKING DOS GERENTES — quem registra mais/menos fotos por festa (pra cobrar). Começa colapsado. */}
       {rankingGerentes.length > 0 && (
         <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-          <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={() => setMostrarRanking((v) => !v)} className="flex w-full flex-wrap items-center gap-2 text-left">
             <h3 className="text-sm font-semibold text-white">📷 Ranking dos gerentes</h3>
             <span className="rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2 py-0.5 text-[10px] font-semibold text-[#c7b2ff]">fotos por festa</span>
-          </div>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted">
+            <span className="ml-auto shrink-0 text-xs font-semibold text-muted">{mostrarRanking ? "▲ ocultar" : `▼ ver (${rankingGerentes.length})`}</span>
+          </button>
+          {mostrarRanking && (<>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
             Média de fotos que cada gerente registra por festa — pra você ver quem tira <strong className="text-white/80">bastante</strong> e quem tira <strong className="text-white/80">pouco</strong>. Conta só as festas que <strong className="text-white/80">já aconteceram</strong>.
           </p>
           <div className="mt-3 space-y-2">
@@ -485,6 +488,7 @@ export function FestasPainel({ marcaId, linkBase, token: tokenInicial, festas }:
             })}
           </div>
           <p className="mt-2 text-[10px] text-muted/70">Em <span className="font-semibold text-amber-400">laranja</span>, quem está registrando poucas fotos (abaixo de 15 por festa). O nome vem do que o gerente preenche no link da festa.</p>
+          </>)}
         </div>
       )}
 

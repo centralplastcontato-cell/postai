@@ -449,6 +449,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
         <SeletorVideoFotos
           festaId={seletor.id}
           nome={rotuloAniversariantes(seletor.aniversariantes) || "Festa"}
+          gerente={seletor.gerente}
           fotos={seletor.fotos}
           inicial={seletor.videoFotos}
           capaInicial={seletor.videoCapa}

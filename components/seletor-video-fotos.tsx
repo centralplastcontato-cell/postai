@@ -151,10 +151,11 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", logoCantoInicial = "", logoTamInicial = "m", logoUrlMarca = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", logoCantoInicial = "", logoTamInicial = "m", logoUrlMarca = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, gerente = "", onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
+  gerente?: string; // gerente que registrou as fotos da festa (só no vídeo de festa; "" = não mostra)
   fotos: FotoView[];
   inicial: string[];
   capaInicial?: string;
@@ -870,6 +871,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             {sel.length} {sel.length === 1 ? "foto" : "fotos"}{segs > 0 ? ` · ≈ ${segs}s` : ""}
             {segs > 90 && <span className="ml-1 font-semibold text-vermelho">(passa de 90s!)</span>}
           </span>
+          {/* Gerente responsável pelas fotos desta festa (só no vídeo de festa). */}
+          {!tematicoId && gerente.trim() && (
+            <span title="Gerente que registrou estas fotos" className="rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-0.5 text-[11px] font-semibold text-[#c7b2ff]">📷 {gerente.trim()}</span>
+          )}
           <div className="ml-auto flex items-center gap-2">
             <button onClick={salvar} disabled={salvando} className={`rounded-xl border px-3.5 py-2 text-xs font-semibold transition disabled:opacity-60 ${salvoOk ? "border-emerald-500/60 bg-emerald-500/15 text-emerald-300" : "border-white/15 text-white hover:border-white/40"}`}>{salvando ? "…" : salvoOk ? "✓ Salvo!" : "Salvar"}</button>
             <button onClick={salvarEGerar} disabled={salvando || gerandoVideo || sel.length === 0} title={sel.length === 0 ? "Escolha as fotos primeiro" : "Salvar a seleção e gerar o vídeo (fica nesta tela)"} className="rounded-xl bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-4 py-2 text-xs font-semibold text-white shadow-[0_8px_20px_-8px_rgba(168,85,247,0.7)] transition hover:brightness-110 disabled:opacity-50">{gerandoVideo ? "🎬 Gerando…" : jaTemVideo || videoProntoUrl ? "🔄 Refazer vídeo" : "⚡ Gerar vídeo"}</button>
