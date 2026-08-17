@@ -494,11 +494,33 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   function sugerir() {
     setSel(montarSugestao());
   }
-  // Reencaixa as fotos ESCOLHIDAS na ordem narrativa (as que você adicionou na mão saem do fim e
-  // vão pro lugar do momento delas). Mantém o MESMO conjunto de fotos — só muda a ORDEM.
+  // Monta uma ordem NOVA a cada clique (pra você ir clicando até achar a que gostou), sem perder a
+  // narrativa: agrupa por momento (salão, brinquedos, aniversariante, parabéns…) e embaralha DENTRO
+  // de cada grupo. No modo temático embaralha o conjunto todo. Mantém o MESMO conjunto de fotos.
   function reorganizar() {
-    const pos = new Map(galeria.map((f, i) => [f.id, i]));
-    setSel((s) => [...s].sort((a, b) => (pos.get(a) ?? 9999) - (pos.get(b) ?? 9999)));
+    const embaralhar = (a: string[]): string[] => {
+      const r = a.slice();
+      for (let i = r.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [r[i], r[j]] = [r[j], r[i]];
+      }
+      return r;
+    };
+    setSel((s) => {
+      if (s.length < 2) return s;
+      const set = new Set(s);
+      const montar = (): string[] => {
+        if (tematicoId) return embaralhar(s);
+        // grupos na ordem narrativa; dentro de cada um, ordem aleatória
+        const grupos = ORDEM.map((m) => fotos.filter((f) => f.momento === m && set.has(f.id)).map((f) => f.id));
+        grupos.push(fotos.filter((f) => !ORDEM.includes(f.momento) && set.has(f.id)).map((f) => f.id));
+        return grupos.flatMap((g) => embaralhar(g));
+      };
+      // tenta algumas vezes pra sair DIFERENTE da ordem atual (senão o clique parecia não fazer nada)
+      let nova = montar();
+      for (let i = 0; i < 8 && nova.join() === s.join(); i++) nova = montar();
+      return nova;
+    });
   }
   // A Bia gera uma frase carinhosa de encerramento (festa: nome/idade/tema; temático: o tema).
   async function biaEscreve() {
@@ -1020,7 +1042,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   {/* atalhos rápidos */}
                   <div className="mb-3 flex flex-wrap items-center gap-2">
                     <button onClick={sugerir} className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-white/40">✨ Sugerir</button>
-                    {sel.length > 1 && <button onClick={reorganizar} title="Reencaixa as fotos que você adicionou na mão no lugar certo (na ordem dos momentos)" className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-white/40">🔀 Reorganizar</button>}
+                    {sel.length > 1 && <button onClick={reorganizar} title="Monta uma nova ordem a cada toque — clique de novo pra ver outra opção" className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:border-white/40">🔀 Reorganizar</button>}
                     {sel.length > 0 && <button onClick={() => setSel([])} className="rounded-xl border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-muted transition hover:text-white">🧹 Limpar</button>}
                   </div>
                   <p className="mb-3 text-[11px] leading-relaxed text-muted">
