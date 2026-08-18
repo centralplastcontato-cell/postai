@@ -48,10 +48,33 @@ function dataCurta(iso: string): string {
 }
 
 // Player do Reels em tela cheia (clicar fora ou no ✕ fecha).
-function PlayerModal({ url, nome, onFechar }: { url: string; nome?: string; onFechar: () => void }) {
+function PlayerModal({ url, nome, capaImgUrl, onFechar }: { url: string; nome?: string; capaImgUrl?: string; onFechar: () => void }) {
   const [copiado, setCopiado] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [erroBaixar, setErroBaixar] = useState(false);
+  const [baixandoCapa, setBaixandoCapa] = useState(false);
+
+  // Baixa a CAPA do vídeo como imagem (mesma origem — nossa rota renderiza o quadro de capa em
+  // 1080×1920). Serve pra usar como MINIATURA no Meta/Instagram quando a auto-miniatura sai preta
+  // (o vídeo começa com um quadro escuro, então quem gera capa automática pega esse quadro).
+  async function baixarCapa() {
+    if (!capaImgUrl) return;
+    setBaixandoCapa(true);
+    try {
+      const resp = await fetch(capaImgUrl);
+      if (!resp.ok) throw new Error();
+      const blob = await resp.blob();
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl; a.download = `${nomeArquivo.replace(/\.mp4$/i, "")}-capa.jpg`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(objUrl), 15000);
+    } catch {
+      window.open(capaImgUrl, "_blank");
+    } finally {
+      setBaixandoCapa(false);
+    }
+  }
 
   // Nome do arquivo amigável (só letras/números/traços), pra salvar/compartilhar bonito.
   const nomeArquivo = `${(nome || "video").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "video"}.mp4`;
@@ -118,6 +141,10 @@ function PlayerModal({ url, nome, onFechar }: { url: string; nome?: string; onFe
           {baixando ? "⏳ Preparando o vídeo…" : "📲 Baixar / Enviar no WhatsApp"}
         </button>
         {erroBaixar && <p className="text-[11px] font-semibold text-red-300">Não consegui preparar agora. Tente “↗ Abrir em nova aba” e segure no vídeo pra salvar.</p>}
+        {/* Baixar a CAPA como imagem — pra usar de MINIATURA no Meta/Instagram (a auto-miniatura sai preta). */}
+        {capaImgUrl && (
+          <button type="button" onClick={baixarCapa} disabled={baixandoCapa} className="rounded-lg border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-3 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-60">{baixandoCapa ? "🖼️ Baixando…" : "🖼️ Baixar capa (miniatura)"}</button>
+        )}
         {/* Ações de apoio: abrir direto (bom teste quando não carrega) e copiar o link. */}
         <div className="flex items-center gap-2">
           <a href={url} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10">↗ Abrir em nova aba</a>
@@ -231,7 +258,7 @@ function CardVideo({ f, onAbrirSeletor, onExcluir }: { f: FestaView; onAbrirSele
         <button type="button" onClick={onExcluir} title="Excluir esta festa (e as fotos dela)" className="shrink-0 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500 hover:bg-red-900/20">✕</button>
       </div>
 
-      {ver && pronto && <PlayerModal url={f.videoUrl} nome={nomes} onFechar={() => setVer(false)} />}
+      {ver && pronto && <PlayerModal url={f.videoUrl} nome={nomes} capaImgUrl={`/api/capa-festa/${f.id}`} onFechar={() => setVer(false)} />}
     </div>
   );
 }
@@ -322,7 +349,7 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
         ))}
       </div>
 
-      {ver && pronto && <PlayerModal url={v.videoUrl} nome={v.titulo} onFechar={() => setVer(false)} />}
+      {ver && pronto && <PlayerModal url={v.videoUrl} nome={v.titulo} capaImgUrl={`/api/quadro-tema/${v.id}/0.jpg`} onFechar={() => setVer(false)} />}
     </div>
   );
 }
