@@ -376,6 +376,20 @@ export async function adicionarMusicaAoBanco(festaId: string, url: string, nome:
   return { ok: true as const, musicas: lista };
 }
 
+// Remove UMA trilha da biblioteca de músicas da marca (pra limpar repetidas). Só tira da lista de
+// reuso — NÃO mexe na música que já está escolhida em festas/vídeos (o vídeo daquela festa segue igual).
+export async function removerMusicaDoBanco(festaId: string, url: string) {
+  const festa = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada.", musicas: [] as MusicaBanco[] };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro, musicas: [] as MusicaBanco[] };
+  const marca = await prisma.marca.findUnique({ where: { id: festa.marcaId }, select: { musicas: true } });
+  const lista = lerMusicas(marca?.musicas ?? "[]").filter((m) => m.url !== url);
+  await prisma.marca.update({ where: { id: festa.marcaId }, data: { musicas: JSON.stringify(lista) } });
+  revalidatePath(`/painel/marcas/${festa.marcaId}`);
+  return { ok: true as const, musicas: lista };
+}
+
 // Cria um POST DE REELS agendado a partir do vídeo JÁ montado da festa. Entra na Agenda como
 // Publicacao formato="reels" (status a_postar), pronto pra revisar e ser postado pelo piloto.
 // TRAVA LGPD: festa sem autorização dos pais NUNCA vira divulgação pública.

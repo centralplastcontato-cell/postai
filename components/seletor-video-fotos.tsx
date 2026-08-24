@@ -9,8 +9,8 @@
 
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { salvarFotosVideo, gerarVideoDaFesta, statusVideoFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, definirMascoteFesta } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, statusVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideo, gerarVideoDaFesta, statusVideoFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, removerMusicaDoBanco, definirMascoteFesta } from "@/app/actions/festas";
+import { salvarFotosVideoTematico, gerarVideoTematico, statusVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, removerMusicaDoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
 const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
@@ -666,6 +666,23 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     } catch { setErroGerar("Não consegui enviar a música."); }
     setSubindoMusica(false);
   }
+  // Remove uma trilha da biblioteca (limpar repetidas). Some da lista de reuso; se era a escolhida
+  // deste vídeo, volta pro jingle do buffet. Não mexe nos vídeos já montados.
+  const [apagandoMusica, setApagandoMusica] = useState("");
+  async function excluirMusica(url: string) {
+    setApagandoMusica(url);
+    if (tocando === url) ouvir(url); // pausa se estiver tocando essa
+    const r = await (tematicoId ? removerMusicaDoBancoTema(tematicoId, url) : removerMusicaDoBanco(festaId, url)).catch(() => null);
+    setApagandoMusica("");
+    if (r?.ok) {
+      setBanco(r.musicas);
+      if (musica === url) setMusica("");
+    } else {
+      // fallback otimista: tira da lista aqui mesmo
+      setBanco((b) => b.filter((m) => m.url !== url));
+      if (musica === url) setMusica("");
+    }
+  }
   // Salva a seleção e FICA na tela (não fecha) — mostra "✓ Salvo!" por uns segundos como confirmação.
   // NÃO chama router.refresh() aqui: a própria server action já revalida a página (o card lá fora
   // atualiza sozinho), e o refresh extra estava re-montando o modal e "jogando" o Victor pra fora.
@@ -1214,12 +1231,13 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                             ? <span title="Pronta pra entrar sob a voz na narração" className="shrink-0 text-[10px] font-semibold text-green-400">🎙️✓</span>
                             : <span title="Preparando pra narração… (deixe a tela aberta um instante)" className="shrink-0 animate-pulse text-[10px] text-amber-300/80">🎙️⏳</span>)}
                           {escolhida && <span className="shrink-0 text-[10px] font-bold text-[#c7b2ff]">✓ escolhida</span>}
+                          <button type="button" onClick={() => excluirMusica(m.url)} disabled={apagandoMusica === m.url} title="Excluir esta música da lista (útil pra tirar repetidas)" aria-label="Excluir música" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold text-red-400 transition hover:bg-red-900/30 hover:text-red-300 disabled:opacity-40">{apagandoMusica === m.url ? "…" : "✕"}</button>
                         </div>
                       );
                     })}
                   </div>
 
-                  <p className="mt-2 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis em <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#c7b2ff] underline">Pixabay Music</a> (botão <strong className="text-white/70">🔎 Buscar</strong>) e toque em <strong className="text-white/70">➕ Enviar</strong>. Use o <strong className="text-white/70">▶️</strong> pra ouvir antes — as enviadas ficam guardadas aqui pra reusar.</p>
+                  <p className="mt-2 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis em <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#c7b2ff] underline">Pixabay Music</a> (botão <strong className="text-white/70">🔎 Buscar</strong>) e toque em <strong className="text-white/70">➕ Enviar</strong>. Use o <strong className="text-white/70">▶️</strong> pra ouvir antes — as enviadas ficam guardadas aqui pra reusar. Toque no <strong className="text-white/70">✕</strong> pra tirar uma repetida da lista.</p>
                   {tematicoId && (
                     <p className="mt-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-300/90">⚠️ No vídeo do buffet, a música escolhida vale quando o vídeo <strong>não tem narração (voz)</strong>. Com narração, ela entra <strong>por baixo da voz</strong> (aba 🎙️ Narração).</p>
                   )}

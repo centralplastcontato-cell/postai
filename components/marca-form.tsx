@@ -17,6 +17,7 @@ export type MarcaView = {
   mascotesArte?: string[]; // biblioteca de opções de mascote geradas pela IA
   mascoteFicha3d?: string; // ficha do personagem (frente/lado/costas) pra fazer o 3D
   mascoteClipes?: string[]; // clipes animados do mascote (IA de vídeo)
+  musicas?: { url: string; nome: string; wav?: string }[]; // biblioteca de trilhas enviadas, pra reusar
   paleta: string; // JSON array de hex
   logoTexto: string;
   logoUrl: string;

@@ -302,6 +302,20 @@ export async function adicionarMusicaAoBancoTema(videoId: string, url: string, n
   return { ok: true as const, musicas: lista };
 }
 
+// Remove UMA trilha da biblioteca de músicas da marca (limpar repetidas) — não mexe no que já está
+// escolhido em vídeos existentes.
+export async function removerMusicaDoBancoTema(videoId: string, url: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado.", musicas: [] as MusicaBanco[] };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro, musicas: [] as MusicaBanco[] };
+  const marca = await prisma.marca.findUnique({ where: { id: v.marcaId }, select: { musicas: true } });
+  const lista = lerMusicas(marca?.musicas ?? "[]").filter((m) => m.url !== url);
+  await prisma.marca.update({ where: { id: v.marcaId }, data: { musicas: JSON.stringify(lista) } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, musicas: lista };
+}
+
 // Guarda o WAV (24kHz mono, preparado no navegador) de uma trilha da biblioteca — pra ela poder
 // entrar como fundo da NARRAÇÃO (sob a voz). Casa pela URL do MP3.
 export async function definirWavMusicaTema(videoId: string, url: string, wav: string) {

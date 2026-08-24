@@ -354,7 +354,7 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
   );
 }
 
-export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco = [], mascoteUrl = "", logoUrl = "", secao = "tudo" }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string; capasBanco?: string[]; mascoteUrl?: string; logoUrl?: string; secao?: "buffet" | "festas" | "tudo" }) {
+export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco = [], mascoteUrl = "", logoUrl = "", secao = "tudo", bibliotecaMusicas = [] }: { marcaId: string; festas: FestaView[]; tematicos: VideoTematicoView[]; corMarca: string; capasBanco?: string[]; mascoteUrl?: string; logoUrl?: string; secao?: "buffet" | "festas" | "tudo"; bibliotecaMusicas?: { url: string; nome: string; wav?: string }[] }) {
   const router = useRouter();
   const [seletor, setSeletor] = useState<FestaView | null>(null);
   // criação/edição de vídeo TEMÁTICO
@@ -366,8 +366,14 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
   // Exclusão de FESTA (pra tirar festas repetidas) — abre um aviso claro antes de apagar de vez.
   const [apagarFesta, setApagarFesta] = useState<FestaView | null>(null);
   const [apagando, setApagando] = useState(false);
-  // "Banco" de trilhas: as músicas já enviadas em outros vídeos desta marca, pra reusar sem re-upload.
-  const musicasBanco = Array.from(new Set(festas.map((f) => f.videoMusica).filter((u) => u && u.startsWith("http")))).map((url) => ({ url, nome: nomeDaMusica(url) }));
+  // "Banco" de trilhas pra reusar. Fonte principal = BIBLIOTECA salva da marca (dá pra excluir dela).
+  // Completa com trilhas que festas usam mas ainda não estão na biblioteca (pra não sumir nada).
+  const musicasBanco = (() => {
+    const vistas = new Set(bibliotecaMusicas.map((m) => m.url));
+    const extras = Array.from(new Set(festas.map((f) => f.videoMusica).filter((u) => u && u.startsWith("http") && !vistas.has(u))))
+      .map((url) => ({ url, nome: nomeDaMusica(url) }));
+    return [...bibliotecaMusicas, ...extras];
+  })();
 
   // Auto-refresh enquanto algum vídeo está "Gerando": o motor monta na nuvem e avisa por callback
   // (salva no banco). Aqui o painel se atualiza sozinho a cada 12s pra o card virar "pronto" sem F5.
