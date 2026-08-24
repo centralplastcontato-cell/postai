@@ -824,8 +824,8 @@ export function PublicacoesAba({
           </div>
         )}
 
-        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <div className="flex-1 text-xs text-muted">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start">
+          <div className="min-w-0 flex-1 text-xs text-muted">
             Dia do post
             <input
               type="date"
@@ -838,9 +838,9 @@ export function PublicacoesAba({
             />
             <p className="mt-1 text-[11px] leading-snug text-muted/70">Toque pra escolher o dia (ou clique num dia livre no calendário ↑). Em branco = cai na próxima data livre.</p>
           </div>
-          <label className="text-xs text-muted">
+          <label className="text-xs text-muted sm:w-36 sm:shrink-0">
             Hora <span className="text-muted/70">(BRT)</span>
-            <select value={hora} onChange={(e) => setHora(Number(e.target.value))} className="input-base" title="Permite vários posts no mesmo dia em horas diferentes (ex: 10h, 16h, 20h)">
+            <select value={hora} onChange={(e) => setHora(Number(e.target.value))} className="input-base w-full" title="Permite vários posts no mesmo dia em horas diferentes (ex: 10h, 16h, 20h)">
               {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{rotuloHora(h)}</option>)}
             </select>
           </label>
