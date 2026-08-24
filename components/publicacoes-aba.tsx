@@ -107,6 +107,19 @@ const MODELOS_ENQUETE: { rotulo: string; assunto: string; ladoA: string; ladoB: 
   { rotulo: "🎀 Princesas x Heróis", assunto: "tema de festa preferido", ladoA: "Princesas", ladoB: "Heróis", categoria: "festa" },
   { rotulo: "🍫 Brigadeiro x Beijinho", assunto: "doce favorito da festa", ladoA: "Brigadeiro", ladoB: "Beijinho", categoria: "comida" },
   { rotulo: "🎂 Bolo x Doces", assunto: "o que você ataca primeiro na festa", ladoA: "Bolo", ladoB: "Doces", categoria: "comida" },
+  { rotulo: "🦸 Homem-Aranha x Batman", assunto: "herói favorito da criançada", ladoA: "Homem-Aranha", ladoB: "Batman", categoria: "festa" },
+  { rotulo: "👸 Elsa x Moana", assunto: "princesa favorita pra festa", ladoA: "Elsa", ladoB: "Moana", categoria: "festa" },
+  { rotulo: "🦄 Unicórnio x Dinossauro", assunto: "tema de festa mais pedido", ladoA: "Unicórnio", ladoB: "Dinossauro", categoria: "festa" },
+  { rotulo: "🚗 Carros x Dinossauros", assunto: "tema de menino favorito", ladoA: "Carros", ladoB: "Dinossauros", categoria: "festa" },
+  { rotulo: "🍔 Hambúrguer x Cachorro-quente", assunto: "lanche preferido da festa", ladoA: "Hambúrguer", ladoB: "Cachorro-quente", categoria: "comida" },
+  { rotulo: "🍿 Pipoca x Algodão-doce", assunto: "guloseima favorita da festa", ladoA: "Pipoca", ladoB: "Algodão-doce", categoria: "comida" },
+  { rotulo: "🧃 Suco x Refrigerante", assunto: "o que servir pra criançada", ladoA: "Suco natural", ladoB: "Refrigerante", categoria: "comida" },
+  { rotulo: "🍨 Chocolate x Morango", assunto: "sabor de bolo favorito", ladoA: "Bolo de chocolate", ladoB: "Bolo de morango", categoria: "comida" },
+  { rotulo: "🎮 Videogame x Pebolim", assunto: "brinquedo favorito da galera", ladoA: "Videogame", ladoB: "Pebolim", categoria: "brinquedos" },
+  { rotulo: "🕺 Pista de dança x Karaokê", assunto: "atração que mais anima a festa", ladoA: "Pista de dança", ladoB: "Karaokê", categoria: "brinquedos" },
+  { rotulo: "🧸 Área baby x Área kids", assunto: "onde a criançada curte mais", ladoA: "Área baby", ladoB: "Área kids", categoria: "brinquedos" },
+  { rotulo: "☀️ Festa de dia x Festa de noite", assunto: "melhor horário pra comemorar", ladoA: "Festa de dia", ladoB: "Festa de noite", categoria: "espaco" },
+  { rotulo: "🎈 Festa grande x Festa intimista", assunto: "estilo de festa preferido", ladoA: "Festa grande", ladoB: "Festa intimista", categoria: "festa" },
 ];
 
 // Modelos prontos de Vitrine (clique preenche o assunto + a categoria das 6 fotos).
