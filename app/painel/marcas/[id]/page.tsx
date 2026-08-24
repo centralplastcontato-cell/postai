@@ -69,6 +69,14 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
   const urlsReelsPostados = new Set(
     pubs.filter((p) => p.formato === "reels" && p.status === "postado" && (p.videoUrl || "").startsWith("http")).map((p) => p.videoUrl),
   );
+  // Festas que JÁ tiveram um reels POSTADO (casado pelo id embutido no slug "reels-<6>-…"). Assim o
+  // selo "Postado" gruda na FESTA, não na URL do vídeo — se o dono REFIZER o vídeo, continua "Postado".
+  const festasComReelsPostado = new Set(
+    pubs
+      .filter((p) => p.formato === "reels" && p.status === "postado" && !p.videoTematicoId)
+      .map((p) => (p.slug.match(/^reels-([a-z0-9]{6})-/) || [])[1])
+      .filter((s): s is string => Boolean(s)),
+  );
   // Reels de festa NA FILA (agendado, ainda não postado) → o card da aba Vídeo marca "⏰ Agendado
   // dd/mm", pra o dono bater o olho e não agendar a mesma festa duas vezes. O vínculo é o id da
   // festa embutido no slug ("reels-<6 últimos>-…") — exato, não confunde dois "Pedro". Só quando
@@ -119,7 +127,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       mascoteCanto: f.mascoteCanto || "",
       mascoteTam: f.mascoteTam || "m",
       videoUrl: f.videoUrl || "",
-      videoPostado: !!f.videoUrl && urlsReelsPostados.has(f.videoUrl),
+      videoPostado: (!!f.videoUrl && urlsReelsPostados.has(f.videoUrl)) || festasComReelsPostado.has(f.id.slice(-6)),
       videoAgendadoEm: (agendadoPorId.get(f.id.slice(-6)) ?? agendadoPorNome.get((f.aniversariante || "").trim()))?.toISOString() ?? null,
       mostrarAvaliacao: f.mostrarAvaliacao,
       fotos: f.fotos.map((foto) => ({ id: foto.id, url: foto.url, momento: foto.momento, descricao: foto.descricao })),
