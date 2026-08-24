@@ -212,10 +212,20 @@ function CardVideo({ f, onAbrirSeletor, onExcluir }: { f: FestaView; onAbrirSele
           <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">🎬 {f.videoFotos.length}</span>
         )}
 
-        {/* play central (pronto) ou spinner (gerando) */}
-        {pronto && (
+        {/* play central (pronto e AINDA não postado) */}
+        {pronto && !postado && (
           <button onClick={() => setVer(true)} aria-label="Ver vídeo" className="absolute inset-0 flex items-center justify-center">
             <span className="flex h-14 w-14 items-center justify-center rounded-full bg-black/55 text-2xl text-white backdrop-blur-sm transition hover:scale-110 hover:bg-[#7c3aed]">▶</span>
+          </button>
+        )}
+        {/* POSTADO com vídeo ainda disponível (ex: refez depois de postar): mesma cara de "postado"
+            dos outros, mas o vídeo continua clicável pra rever. */}
+        {pronto && postado && (
+          <button onClick={() => setVer(true)} aria-label="Ver vídeo" className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/55 px-3 text-center transition hover:bg-black/45">
+            <span className="text-3xl">📮</span>
+            <span className="text-[11px] font-semibold text-white">Vídeo postado no Instagram</span>
+            <span className="mt-1 flex h-11 w-11 items-center justify-center rounded-full bg-black/50 text-xl text-white backdrop-blur-sm">▶</span>
+            <span className="text-[10px] text-white/70">toque pra rever</span>
           </button>
         )}
         {emGeracao && (
