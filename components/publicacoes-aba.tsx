@@ -436,7 +436,7 @@ export function PublicacoesAba({
       const difs = diferenciais.split("\n").map((s) => s.trim()).filter(Boolean);
       const usaFoto = template === "dica" || template === "mosaico" || template === "faixa" || template === "feedback" || template === "enquete" || template === "vitrine";
       const conds = condicoesTxt.split("\n").map((s) => s.trim()).filter(Boolean);
-      const r = await gerarPublicacao({ marcaId, template, tema, data: (dataManual || dataAlvo) ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, parcelamento, categoria: usaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora, imagemUrl: imagemFundo || undefined });
+      const r = await gerarPublicacao({ marcaId, template, tema, data: (dataManual || dataAlvo) ?? undefined, oferta, validade, inclui: itens, regras, diferenciais: difs, parcelamento, categoria: usaFoto && categoriaFoto ? categoriaFoto : undefined, corFundo: TEMPLATES_COR.includes(template) ? corFundo : undefined, depoimento, autor: autorFb, estrelas: estrelasFb, destaque: destaqueFb, corCard, precoDe, precoPor, labelPor, parcelas, economia: economiaInput, condicoes: conds, modoPreco, ladoA, ladoB, fotoAutor, google: googleFb, hora, imagemUrl: imagemFundo || undefined });
       if (r.ok) {
         setTema("");
         setOferta("");
@@ -818,7 +818,7 @@ export function PublicacoesAba({
         )}
         <div className="mb-3 mt-3 flex flex-wrap gap-2">
           {TEMPLATES.map((t) => (
-            <button key={t} type="button" onClick={() => { if (!editandoId) setTemplate(t); }} disabled={!!editandoId && template !== t} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${template === t ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"} ${editandoId && template !== t ? "cursor-not-allowed opacity-30" : ""}`}>
+            <button key={t} type="button" onClick={() => { if (!editandoId) { setTemplate(t); if (t === "enquete") setCategoriaFoto(""); } }} disabled={!!editandoId && template !== t} className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${template === t ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"} ${editandoId && template !== t ? "cursor-not-allowed opacity-30" : ""}`}>
               {TEMPLATE_LABEL[t]}
             </button>
           ))}
@@ -1036,10 +1036,10 @@ export function PublicacoesAba({
 
         {template === "enquete" && (
           <div className="mb-3">
-            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique preenche os dois lados + a foto)</p>
+            <p className="mb-1.5 text-[11px] uppercase tracking-wider text-muted">💡 Modelos prontos (clique preenche os dois lados)</p>
             <div className="mb-3 flex flex-wrap gap-2">
               {MODELOS_ENQUETE.map((m) => (
-                <button key={m.rotulo} type="button" onClick={() => { setTema(m.assunto); setLadoA(m.ladoA); setLadoB(m.ladoB); setCategoriaFoto(m.categoria); }} className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
+                <button key={m.rotulo} type="button" onClick={() => { setTema(m.assunto); setLadoA(m.ladoA); setLadoB(m.ladoB); setCategoriaFoto(""); }} className="rounded-full border border-linha px-3 py-1 text-xs text-muted transition hover:border-vermelho hover:text-white">
                   {m.rotulo}
                 </button>
               ))}
@@ -1054,13 +1054,14 @@ export function PublicacoesAba({
                 <input value={ladoB} onChange={(e) => setLadoB(e.target.value)} placeholder="Time B" className="input-base" />
               </label>
               <label className="text-xs text-muted sm:col-span-2">
-                Foto de fundo <span className="text-muted/70">(de qual categoria puxar a imagem real)</span>
+                Fundo <span className="text-muted/70">(fundo colorido fica mais limpo pro VS; ou puxe uma foto do banco)</span>
                 <select value={categoriaFoto} onChange={(e) => setCategoriaFoto(e.target.value)} className="input-base">
-                  {CATEGORIAS.map((c) => <option key={c} value={c}>{CATEGORIA_LABEL[c]}</option>)}
+                  <option value="">🎨 Sem foto — fundo colorido (recomendado)</option>
+                  {CATEGORIAS.map((c) => <option key={c} value={c}>📷 {CATEGORIA_LABEL[c]}</option>)}
                 </select>
               </label>
             </div>
-            <p className="mt-1 text-[11px] text-amber-400/90">⚔️ Enquete pra ENGAJAR: o público comenta qual lado prefere. Lados vazios = a IA sugere. A foto vem do seu Banco (sem foto, vira fundo colorido).</p>
+            <p className="mt-1 text-[11px] text-amber-400/90">⚔️ Enquete pra ENGAJAR: o público comenta qual lado prefere. Lados vazios = a IA sugere. Por padrão vem com <strong>fundo colorido</strong> (o "VS" aparece bem); se quiser foto, escolha uma categoria acima — mas ela é genérica e pode não combinar com o tema.</p>
           </div>
         )}
 
