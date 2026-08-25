@@ -853,7 +853,7 @@ export function PublicacoesAba({
           </div>
           <label className="text-xs text-muted sm:w-36 sm:shrink-0">
             Hora <span className="text-muted/70">(BRT)</span>
-            <select value={hora} onChange={(e) => setHora(Number(e.target.value))} className="input-base w-full" title="Permite vários posts no mesmo dia em horas diferentes (ex: 10h, 16h, 20h)">
+            <select value={hora} onChange={(e) => setHora(Number(e.target.value))} style={{ WebkitAppearance: "none", appearance: "none", minWidth: 0, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23b9b9b9' stroke-width='1.5'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 0.6rem center", paddingRight: "1.6rem" }} className="input-base w-full" title="Permite vários posts no mesmo dia em horas diferentes (ex: 10h, 16h, 20h)">
               {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{rotuloHora(h)}</option>)}
             </select>
           </label>
