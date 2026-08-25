@@ -234,6 +234,32 @@ export function MascoteEstudio({
       setProc(null);
     });
   }
+  // Baixa o PNG do mascote. No celular abre o compartilhar (salvar nas Fotos); no PC baixa direto.
+  const [baixandoMascote, setBaixandoMascote] = useState(false);
+  async function baixarMascoteImg() {
+    if (!mascoteUrl) return;
+    setBaixandoMascote(true);
+    const nav = navigator as Navigator & { canShare?: (d: { files: File[] }) => boolean; share?: (d: unknown) => Promise<void> };
+    try {
+      const resp = await fetch(mascoteUrl);
+      if (!resp.ok) throw new Error();
+      const blob = await resp.blob();
+      const file = new File([blob], "mascote.png", { type: "image/png" });
+      if (typeof nav.share === "function" && typeof nav.canShare === "function" && nav.canShare({ files: [file] })) {
+        try { await nav.share({ files: [file], title: "Mascote" }); return; }
+        catch (e) { if (e instanceof DOMException && e.name === "AbortError") return; }
+      }
+      const objUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objUrl; a.download = "mascote.png";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(objUrl), 15000);
+    } catch {
+      try { window.open(mascoteUrl, "_blank"); } catch {}
+    } finally {
+      setBaixandoMascote(false);
+    }
+  }
   function handleExcluir(url: string) {
     setErro(null);
     setProc(url);
@@ -287,6 +313,7 @@ export function MascoteEstudio({
             <div className="flex flex-col gap-2">
               <span className="rounded-full border border-green-500/30 bg-green-500/15 px-3 py-1 text-xs font-semibold text-green-400">✓ Esse é o mascote ativo</span>
               <button type="button" onClick={handleRemoverFundo} disabled={isPending} title="Tira o fundo (deixa transparente) pra colar limpo nos posts" className="rounded-md bg-[#7c3aed] px-3 py-1.5 text-xs font-semibold text-white transition hover:opacity-90 disabled:opacity-50">{proc === "fundo" ? "🪄 Tirando o fundo…" : "🪄 Deixar fundo transparente"}</button>
+              <button type="button" onClick={baixarMascoteImg} disabled={baixandoMascote} title="Baixar a imagem do mascote (PNG com fundo transparente)" className="rounded-md border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-3 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed] hover:bg-[#7c3aed]/25 disabled:opacity-50">{baixandoMascote ? "⬇ Baixando…" : "⬇ Baixar imagem"}</button>
               <button type="button" onClick={handleRemover} disabled={isPending} className="rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-vermelho hover:text-white disabled:opacity-40">Tirar mascote ativo</button>
             </div>
           </div>
