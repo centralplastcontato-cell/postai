@@ -21,7 +21,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   const [hashtags, setHashtags] = useState("");
   const [lendoArte, setLendoArte] = useState(false);
   const [opcoes, setOpcoes] = useState<OpcaoLegenda[]>([]); // 3 níveis de legenda que a Bia sugere
-  const [formato, setFormato] = useState<"story" | "feed">("story");
+  const [formato, setFormato] = useState<"story" | "feed" | "ambos">("story");
   const [data, setData] = useState("");
   const [hora, setHora] = useState(10);
   const [salvando, setSalvando] = useState(false);
@@ -65,23 +65,31 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   }
   function usarOpcao(o: OpcaoLegenda) { setLegenda(o.legenda); setHashtags(o.hashtags); }
 
-  // Cria a arte na agenda. Se postarAgora, já publica no Instagram na hora.
+  // Cria a arte na agenda. Se postarAgora, já publica no Instagram na hora. "ambos" = Feed + Story.
   async function salvar(postarAgora: boolean) {
     if (!imagemUrl) { setErro("Envie a arte primeiro."); return; }
     setErro(""); setOk(""); setSalvando(true);
     const legendaFinal = [legenda.trim(), hashtags.trim()].filter(Boolean).join("\n\n");
-    const r = await criarArtePronta(marcaId, imagemUrl, formato, data || undefined, hora, legendaFinal, "").catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
-    if (!r.ok) { setSalvando(false); setErro(r.erro); return; }
-    if (postarAgora) {
-      const post = await (formato === "story" ? postarStory(r.id) : postarPublicacao(r.id)).catch(() => ({ ok: false as const, erro: "Salvei na agenda, mas não consegui postar agora." }));
-      setSalvando(false);
-      if (!post.ok) { setOk("Arte salva na agenda!"); setErro(post.erro); }
-      else setOk(formato === "story" ? "Story postado no Instagram! 🎉" : "Post publicado no Instagram! 🎉");
-    } else {
-      setSalvando(false);
-      setOk(data ? `Arte agendada pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : "Arte salva na agenda (próxima data livre)! 📅");
+    const alvos: ("feed" | "story")[] = formato === "ambos" ? ["feed", "story"] : [formato];
+    const feitos: string[] = [];
+    let ultimoErro = "";
+    for (const fmt of alvos) {
+      const r = await criarArtePronta(marcaId, imagemUrl, fmt, data || undefined, hora, legendaFinal, "").catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
+      if (!r.ok) { ultimoErro = r.erro; continue; }
+      if (postarAgora) {
+        const post = await (fmt === "story" ? postarStory(r.id) : postarPublicacao(r.id)).catch(() => ({ ok: false as const, erro: "Salvei na agenda, mas não consegui postar agora." }));
+        if (post.ok) feitos.push(fmt === "story" ? "Story" : "Feed");
+        else ultimoErro = post.erro;
+      } else {
+        feitos.push(fmt === "story" ? "Story" : "Feed");
+      }
     }
-    setImagemUrl(""); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
+    setSalvando(false);
+    if (feitos.length) {
+      setOk(postarAgora ? `Publicado no Instagram: ${feitos.join(" + ")}! 🎉` : (data ? `Agendado (${feitos.join(" + ")}) pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : `Agendado: ${feitos.join(" + ")} (próxima data livre)! 📅`));
+      setImagemUrl(""); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
+    }
+    if (ultimoErro) setErro(ultimoErro);
     recarregar();
     router.refresh();
   }
@@ -170,6 +178,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
             <div className="mt-2 flex flex-wrap gap-2">
               <button type="button" onClick={() => setFormato("story")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${formato === "story" ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>📲 Story (9:16)</button>
               <button type="button" onClick={() => setFormato("feed")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${formato === "feed" ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>🖼️ Feed (4:5)</button>
+              <button type="button" onClick={() => setFormato("ambos")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${formato === "ambos" ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>📲🖼️ Os dois</button>
             </div>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
               <label className="min-w-0 flex-1 text-xs text-muted">
