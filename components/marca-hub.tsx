@@ -11,6 +11,7 @@ import { BancoImagens, type ImagemView } from "./banco-imagens";
 import { FestasPainel } from "./festas-painel";
 import { VideoPainel, type VideoTematicoView } from "./video-painel";
 import { MascoteEstudio } from "./mascote-estudio";
+import { MinhaArte } from "./minha-arte";
 import { InstagramEspelho } from "./instagram-espelho";
 import { PaginasPainel } from "./paginas-painel";
 import { CampanhasPainel, type CampanhaView } from "./campanhas-painel";
@@ -83,7 +84,7 @@ export function MarcaHub({
   analise: AnaliseInsights;
   sugestao: SugestaoBia | null;
 }) {
-  const [aba, setAba] = useState<"redes" | "imagens" | "festas" | "video-buffet" | "video-festa" | "mascote" | "instagram" | "paginas" | "campanhas" | "config">("redes");
+  const [aba, setAba] = useState<"redes" | "imagens" | "arte" | "festas" | "video-buffet" | "video-festa" | "mascote" | "instagram" | "paginas" | "campanhas" | "config">("redes");
   const cls = (a: boolean) =>
     `rounded-lg px-4 py-2 text-sm font-semibold transition ${a ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"}`;
   const stAssin = assinatura ? statusAssinatura(assinatura.acessoAte) : null;
@@ -172,6 +173,7 @@ export function MarcaHub({
       <div className="mt-5 flex flex-wrap items-center gap-2">
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
         <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
+        <button onClick={() => setAba("arte")} className={cls(aba === "arte")}>🎨 Minha arte</button>
         <button onClick={() => setAba("festas")} className={cls(aba === "festas")}>📸 Festas</button>
         <button onClick={() => setAba("video-buffet")} className={cls(aba === "video-buffet")}>🏰 Vídeo do buffet</button>
         <button onClick={() => setAba("video-festa")} className={cls(aba === "video-festa")}>🎬 Vídeo de festa</button>
@@ -186,6 +188,7 @@ export function MarcaHub({
       <div className="mt-6">
         {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} reels={reels} festasComVideo={festasComVideo} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} sugestao={sugestao} feedArtes={marca.feedArtes ?? []} temMascote={Boolean(marca.mascoteUrl)} temLogo={Boolean(marca.logoUrl)} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
+        {aba === "arte" && <MinhaArte marcaId={marca.id} />}
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
         {aba === "video-buffet" && <VideoPainel secao="buffet" marcaId={marca.id} festas={festas} tematicos={videosTematicos} corMarca={marca.corPrimaria} capasBanco={marca.capasArte ?? []} mascoteUrl={marca.mascoteUrl ?? ""} logoUrl={marca.logoUrl ?? ""} bibliotecaMusicas={marca.musicas ?? []} />}
         {aba === "video-festa" && <VideoPainel secao="festas" marcaId={marca.id} festas={festas} tematicos={videosTematicos} corMarca={marca.corPrimaria} capasBanco={marca.capasArte ?? []} mascoteUrl={marca.mascoteUrl ?? ""} logoUrl={marca.logoUrl ?? ""} bibliotecaMusicas={marca.musicas ?? []} />}

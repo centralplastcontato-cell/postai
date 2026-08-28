@@ -768,6 +768,111 @@ export async function gerarPublicacao(input: {
   return { ok: true as const, id: criado.id, dia, aviso };
 }
 
+// ============ MINHA ARTE — o dono sobe uma arte PRONTA (feita fora) e posta como ela é ============
+// A IA "lê" a arte (visão) e escreve uma legenda que conversa com a imagem.
+export async function gerarLegendaArte(marcaId: string, imagemUrl: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  if (!imagemUrl.startsWith("http")) return { ok: false as const, erro: "Envie a arte primeiro." };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "A chave da OpenAI não está configurada." };
+  const sys = `Você é o social media do buffet infantil "${marca.nome}". Vou te mandar uma ARTE (imagem) já pronta pra postar no Instagram. OLHE a arte e escreva uma legenda que CONVERSE com o que está nela (se for promoção, fale da promoção; se tiver um valor/data escritos na arte, pode citar; NÃO invente preço/data que não estejam na arte). Tom alegre e acolhedor de festa infantil, curto (2 a 4 linhas), com 1 a 3 emojis e uma chamada pra ação no fim. Responda SÓ em JSON: {"legenda":"...","hashtags":"#... #..."} com 4 a 8 hashtags relevantes (buffet infantil, festa, aniversário).`;
+  let content: string;
+  try {
+    content = await chatOpenAI(key, {
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: [
+          { type: "text", text: "Escreva a legenda pra esta arte:" },
+          { type: "image_url", image_url: { url: imagemUrl, detail: "high" } },
+        ] },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 400,
+    });
+  } catch (e) {
+    return { ok: false as const, erro: e instanceof ErroOpenAI ? e.message : "Não consegui ler a arte agora. Tente de novo." };
+  }
+  try {
+    const o = JSON.parse(content) as { legenda?: string; hashtags?: string };
+    return { ok: true as const, legenda: String(o.legenda || "").slice(0, 2000), hashtags: String(o.hashtags || "").slice(0, 500) };
+  } catch {
+    return { ok: true as const, legenda: content.slice(0, 2000), hashtags: "" };
+  }
+}
+
+// Cria a publicação de uma ARTE PRONTA: entra na agenda como qualquer post, mas o render
+// (/api/feed|story/[id]) mostra a imagem enviada COMO ELA É (template "arte-pronta"), sem overlay.
+export async function criarArtePronta(marcaId: string, imagemUrl: string, formato: "feed" | "story", dataYMD: string | undefined, hora: number | undefined, legenda: string, hashtags: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const cred = await checarCreditoTrial(g.sessao);
+  if (!cred.ok) return { ok: false as const, erro: cred.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  if (!imagemUrl.startsWith("http")) return { ok: false as const, erro: "Envie a arte primeiro." };
+  const ehStory = formato === "story";
+  const plano = await planoDaMarca(marca.id);
+  if (plano && ehStory && !planoTemStory(plano)) return { ok: false as const, erro: "O Story está disponível a partir do pacote Profissional. Faça upgrade pra liberar." };
+  const horaFeed = typeof hora === "number" ? hora : marca.horaPost;
+  const data = dataYMD ? new Date(`${dataYMD}T${String(horaFeed).padStart(2, "0")}:00:00-03:00`) : await proximaDataFeed(marca);
+  if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
+  if (plano && !ehStory) {
+    const lim = await checarLimiteFeed(marca.id, data, plano);
+    if (lim.bloqueia) return { ok: false as const, erro: `O pacote ${rotuloPlano(plano)} permite ${lim.limite} post${lim.limite > 1 ? "s" : ""} de feed por dia — esse dia já tem ${lim.jaTem}. Escolha outro dia.` };
+  }
+  const slug = `${marca.slug}-arte-${Date.now().toString(36).slice(-6)}`;
+  const criado = await prisma.publicacao.create({
+    data: {
+      marcaId: marca.id, slug, data,
+      template: "arte-pronta",
+      titulo: "Arte enviada",
+      texto: "",
+      legenda: legenda.trim().slice(0, 2000),
+      hashtags: hashtags.trim().slice(0, 500),
+      imagemUrl,
+      extra: "{}",
+      tema: null,
+      categoria: categoriaDoTemplate("divulgacao"),
+      status: "a_postar",
+      formato: ehStory ? "story" : "feed",
+    },
+  });
+  revalidatePath(`/painel/marcas/${marca.id}`);
+  const dia = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(data);
+  return { ok: true as const, id: criado.id, dia };
+}
+
+// Lista as artes prontas enviadas pela marca (pra a aba "Minha arte").
+export async function listarArtesProntas(marcaId: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro, artes: [] as ArteProntaView[] };
+  const arts = await prisma.publicacao.findMany({
+    where: { marcaId, template: "arte-pronta" },
+    orderBy: { data: "desc" }, take: 60,
+    select: { id: true, imagemUrl: true, formato: true, data: true, status: true, legenda: true, postadoEm: true },
+  });
+  return {
+    ok: true as const,
+    artes: arts.map((a) => ({ id: a.id, imagemUrl: a.imagemUrl || "", formato: a.formato, dataISO: a.data.toISOString(), status: a.status, legenda: a.legenda, postado: a.status === "postado" })),
+  };
+}
+export type ArteProntaView = { id: string; imagemUrl: string; formato: string; dataISO: string; status: string; legenda: string; postado: boolean };
+
+// Exclui uma arte pronta enviada (só some da agenda; não mexe no que já foi postado no Insta).
+export async function excluirArtePronta(id: string) {
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const p = await prisma.publicacao.findUnique({ where: { id }, select: { marcaId: true, template: true } });
+  if (!p || p.template !== "arte-pronta") return { ok: false as const, erro: "Arte não encontrada." };
+  await prisma.publicacao.delete({ where: { id } });
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const };
+}
+
 // Posta um STORY (9:16) no Instagram da marca AGORA. Renderiza /api/story/[id] (vertical),
 // materializa e sobe como Story (media_type=STORIES). Marca como postado.
 export async function postarStory(id: string) {
@@ -910,6 +1015,8 @@ export async function regerarPublicacao(id: string) {
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  // Arte ENVIADA pelo dono não se regera (é a imagem dele) — evita sobrescrever com IA.
+  if (p.template === "arte-pronta") return { ok: false as const, erro: "Esta é uma arte enviada por você — não dá pra regerar. Edite a legenda ou envie outra arte." };
   const template: Template = (TEMPLATES as readonly string[]).includes(p.template) ? (p.template as Template) : "dica";
 
   // Recupera o que o usuário havia fixado pra manter a oferta/validade no regerar.
@@ -1029,6 +1136,7 @@ export async function regerarComoNova(id: string) {
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const p = await prisma.publicacao.findUnique({ where: { id } });
   if (!p) return { ok: false as const, erro: "Publicação não encontrada." };
+  if (p.template === "arte-pronta") return { ok: false as const, erro: "Esta é uma arte enviada por você — não dá pra regerar." };
   const template: Template = (TEMPLATES as readonly string[]).includes(p.template) ? (p.template as Template) : "dica";
   let ex: Record<string, unknown> = {};
   try {

@@ -56,6 +56,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const imagemUrl = await fotoSegura(p.imagemUrl);
   const opts = { width: 1080, height: 1920, fonts, headers: CACHE };
+
+  // ARTE PRONTA (enviada pelo dono): mostra a imagem COMO ELA É, cabendo inteira (contain) num
+  // fundo da cor da marca — sem template por cima. Ideal pra postar promoção pronta no Story.
+  if (p.template === "arte-pronta" && imagemUrl) {
+    return new ImageResponse(
+      <div style={{ width: "1080px", height: "1920px", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: marca.corPrimaria || "#111" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={imagemUrl} width={1080} height={1920} style={{ width: "1080px", height: "1920px", objectFit: "contain" }} />
+      </div>,
+      opts
+    );
+  }
   const dados = { ...base, oferta: extra.oferta, validade: extra.validade, corFundo: extra.corFundo, variante: extra.estiloStory };
 
   // FEEDBACK/DEPOIMENTO: o Story usa o MESMO card roxo do feed (LayoutFeedback), só em 9:16

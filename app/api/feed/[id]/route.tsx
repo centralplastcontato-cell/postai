@@ -55,6 +55,18 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   // do banco quebram o render. Feito uma vez e reusado pelos templates com foto.
   const fotoUrl = await fotoSegura(p.imagemUrl);
 
+  // ARTE PRONTA (enviada pelo dono): mostra a imagem dele COMO ELA É, cabendo inteira (contain)
+  // num fundo da cor da marca — não corta nada do que ele fez. Sem template/overlay por cima.
+  if (p.template === "arte-pronta" && fotoUrl) {
+    return new ImageResponse(
+      <div style={{ width: "1080px", height: "1350px", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: marca.corPrimaria || "#111" }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={fotoUrl} width={1080} height={1350} style={{ width: "1080px", height: "1350px", objectFit: "contain" }} />
+      </div>,
+      { width: 1080, height: 1350, fonts, headers: CACHE }
+    );
+  }
+
   let arte: ReactElement;
   if (p.template === "promocao") {
     arte = LayoutPromocao({ ...base, oferta: extra.oferta, validade: extra.validade, inclui: extra.inclui, regras: extra.regras, corFundo: extra.corFundo, imagemUrl: fotoUrl });
