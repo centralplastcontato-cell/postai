@@ -65,19 +65,22 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   }
   function usarOpcao(o: OpcaoLegenda) { setLegenda(o.legenda); setHashtags(o.hashtags); }
 
-  // Cria a arte na agenda. Se postarAgora, já publica no Instagram na hora. "ambos" = Feed + Story.
-  async function salvar(postarAgora: boolean) {
+  // modo: "rascunho" (só guarda, não posta nem agenda) | "agendar" (entra na agenda) | "postar" (posta já).
+  // "ambos" = Feed + Story.
+  async function salvar(modo: "rascunho" | "agendar" | "postar") {
     if (!imagemUrl) { setErro("Envie a arte primeiro."); return; }
     setErro(""); setOk(""); setSalvando(true);
     const legendaFinal = [legenda.trim(), hashtags.trim()].filter(Boolean).join("\n\n");
+    const rascunho = modo === "rascunho";
+    const postarAgora = modo === "postar";
     const alvos: ("feed" | "story")[] = formato === "ambos" ? ["feed", "story"] : [formato];
     const feitos: string[] = [];
     let ultimoErro = "";
     for (const fmt of alvos) {
-      const r = await criarArtePronta(marcaId, imagemUrl, fmt, data || undefined, hora, legendaFinal, "").catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
+      const r = await criarArtePronta(marcaId, imagemUrl, fmt, data || undefined, hora, legendaFinal, "", rascunho).catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
       if (!r.ok) { ultimoErro = r.erro; continue; }
       if (postarAgora) {
-        const post = await (fmt === "story" ? postarStory(r.id) : postarPublicacao(r.id)).catch(() => ({ ok: false as const, erro: "Salvei na agenda, mas não consegui postar agora." }));
+        const post = await (fmt === "story" ? postarStory(r.id) : postarPublicacao(r.id)).catch(() => ({ ok: false as const, erro: "Salvei, mas não consegui postar agora." }));
         if (post.ok) feitos.push(fmt === "story" ? "Story" : "Feed");
         else ultimoErro = post.erro;
       } else {
@@ -86,7 +89,11 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
     }
     setSalvando(false);
     if (feitos.length) {
-      setOk(postarAgora ? `Publicado no Instagram: ${feitos.join(" + ")}! 🎉` : (data ? `Agendado (${feitos.join(" + ")}) pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : `Agendado: ${feitos.join(" + ")} (próxima data livre)! 📅`));
+      setOk(
+        postarAgora ? `Publicado no Instagram: ${feitos.join(" + ")}! 🎉`
+        : rascunho ? `Arte salva (${feitos.join(" + ")})! Fica guardada em "Suas artes" pra postar quando quiser. 💾`
+        : (data ? `Agendado (${feitos.join(" + ")}) pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : `Agendado: ${feitos.join(" + ")} (próxima data livre)! 📅`)
+      );
       setImagemUrl(""); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
     }
     if (ultimoErro) setErro(ultimoErro);
@@ -193,8 +200,9 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
               </label>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => salvar(false)} disabled={salvando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 disabled:opacity-50">{salvando ? "Salvando…" : "📅 Agendar"}</button>
-              <button type="button" onClick={() => salvar(true)} disabled={salvando} className="rounded-lg bg-[#C13584] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50">{salvando ? "Postando…" : "📲 Postar agora"}</button>
+              <button type="button" onClick={() => salvar("rascunho")} disabled={salvando} title="Só guarda a arte pra postar depois — não agenda nem posta" className="rounded-lg border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-4 py-2 text-sm font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-50">{salvando ? "…" : "💾 Salvar"}</button>
+              <button type="button" onClick={() => salvar("agendar")} disabled={salvando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 disabled:opacity-50">{salvando ? "…" : "📅 Agendar"}</button>
+              <button type="button" onClick={() => salvar("postar")} disabled={salvando} className="rounded-lg bg-[#C13584] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50">{salvando ? "Postando…" : "📲 Postar agora"}</button>
             </div>
             <p className="mt-2 text-[10px] leading-snug text-muted/70">A arte vai <strong className="text-white/70">exatamente como você enviou</strong>. No Story a legenda não aparece na imagem (o Instagram não mostra legenda em Story).</p>
           </div>
@@ -218,7 +226,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
                 <div className="p-2">
                   <div className="flex items-center justify-between gap-1 text-[10px]">
                     <span className="font-semibold text-white/80">{a.formato === "story" ? "📲 Story" : "🖼️ Feed"}</span>
-                    <span className={`rounded-full px-1.5 py-0.5 font-bold ${a.postado ? "bg-sky-600 text-white" : "bg-amber-500/20 text-amber-300"}`}>{a.postado ? "📮 Postado" : `⏰ ${dataBR(a.dataISO)}`}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 font-bold ${a.postado ? "bg-sky-600 text-white" : a.status === "rascunho" ? "bg-[#7c3aed]/25 text-[#d6c6ff]" : "bg-amber-500/20 text-amber-300"}`}>{a.postado ? "📮 Postado" : a.status === "rascunho" ? "💾 Salvo" : `⏰ ${dataBR(a.dataISO)}`}</span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-1.5">
                     {!a.postado && <button type="button" onClick={() => postarArte(a)} disabled={proc === a.id} className="flex-1 rounded-md bg-[#C13584] px-2 py-1 text-[10px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">{proc === a.id ? "…" : "📲 Postar agora"}</button>}
