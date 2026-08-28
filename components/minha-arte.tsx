@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { gerarLegendaArte, criarArtePronta, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView } from "@/app/actions/feed";
+import { gerarLegendaArte, criarArtePronta, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
 import { InputDataBR } from "@/components/input-data-br";
 
 function dataBR(iso: string): string {
@@ -20,6 +20,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   const [legenda, setLegenda] = useState("");
   const [hashtags, setHashtags] = useState("");
   const [lendoArte, setLendoArte] = useState(false);
+  const [opcoes, setOpcoes] = useState<OpcaoLegenda[]>([]); // 3 níveis de legenda que a Bia sugere
   const [formato, setFormato] = useState<"story" | "feed">("story");
   const [data, setData] = useState("");
   const [hora, setHora] = useState(10);
@@ -46,7 +47,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
       form.append("file", file);
       const resp = await fetch("/api/marketing/upload", { method: "POST", body: form });
       const d = await resp.json();
-      if (d.ok && d.url) { setImagemUrl(d.url); setLegenda(""); setHashtags(""); }
+      if (d.ok && d.url) { setImagemUrl(d.url); setLegenda(""); setHashtags(""); setOpcoes([]); }
       else setErro(d.erro || "Não consegui enviar a arte.");
     } catch { setErro("Não consegui enviar a arte. Tente de novo."); }
     setSubindo(false);
@@ -58,9 +59,11 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
     const r = await gerarLegendaArte(marcaId, imagemUrl).catch(() => ({ ok: false as const, erro: "Não consegui ler a arte agora." }));
     setLendoArte(false);
     if (!r.ok) { setErro(r.erro); return; }
-    setLegenda(r.legenda);
-    if (r.hashtags) setHashtags(r.hashtags);
+    setOpcoes(r.opcoes);
+    // já deixa a 1ª (Simples) preenchida; o dono troca clicando nas outras.
+    if (r.opcoes[0]) { setLegenda(r.opcoes[0].legenda); setHashtags(r.opcoes[0].hashtags); }
   }
+  function usarOpcao(o: OpcaoLegenda) { setLegenda(o.legenda); setHashtags(o.hashtags); }
 
   // Cria a arte na agenda. Se postarAgora, já publica no Instagram na hora.
   async function salvar(postarAgora: boolean) {
@@ -78,7 +81,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
       setSalvando(false);
       setOk(data ? `Arte agendada pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : "Arte salva na agenda (próxima data livre)! 📅");
     }
-    setImagemUrl(""); setLegenda(""); setHashtags(""); setData("");
+    setImagemUrl(""); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
     recarregar();
     router.refresh();
   }
@@ -137,8 +140,26 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
           <div className="mb-4 rounded-xl border border-linha bg-preto-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">2 · Legenda</p>
-              <button type="button" onClick={lerArte} disabled={lendoArte} className="rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50">{lendoArte ? "🤖 Lendo a arte…" : "🤖 A Bia lê a arte e escreve"}</button>
+              <button type="button" onClick={lerArte} disabled={lendoArte} className="rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50">{lendoArte ? "🤖 Lendo a arte…" : opcoes.length ? "🔄 Gerar de novo" : "🤖 A Bia lê a arte e escreve"}</button>
             </div>
+
+            {/* 3 opções da Bia — toque na que gostar (ela cai no campo abaixo, e dá pra ajustar) */}
+            {opcoes.length > 0 && (
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {opcoes.map((o) => {
+                  const escolhida = o.legenda === legenda;
+                  const emoji = /simpl/i.test(o.nivel) ? "😊" : /top/i.test(o.nivel) ? "🌟" : "✨";
+                  return (
+                    <button key={o.nivel} type="button" onClick={() => usarOpcao(o)} className={`flex flex-col rounded-lg border p-2.5 text-left transition ${escolhida ? "border-[#ec4899] bg-[#ec4899]/10 ring-1 ring-[#ec4899]/40" : "border-linha bg-preto hover:border-white/30"}`}>
+                      <span className="mb-1 flex items-center justify-between text-[11px] font-bold text-white">{emoji} {o.nivel}{escolhida && <span className="text-[9px] font-semibold text-[#f9a8d4]">✓ usando</span>}</span>
+                      <span className="line-clamp-4 text-[11px] leading-snug text-muted">{o.legenda}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {opcoes.length > 0 && <p className="mt-1.5 text-[10px] text-muted/70">Toque na opção que você mais gostar — ela cai no campo abaixo, e você ainda pode ajustar. Ou toque em <strong className="text-white/70">🔄 Gerar de novo</strong> pra outras 3.</p>}
+
             <textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} rows={4} placeholder="Escreva a legenda (ou toque em 'A Bia lê a arte' pra ela escrever combinando com a imagem)" className="input-base mt-2 resize-y" />
             <textarea value={hashtags} onChange={(e) => setHashtags(e.target.value)} rows={2} placeholder="#hashtags (opcional)" className="input-base mt-2 resize-y text-[#c7b2ff]" />
           </div>

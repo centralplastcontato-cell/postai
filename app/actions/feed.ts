@@ -778,7 +778,11 @@ export async function gerarLegendaArte(marcaId: string, imagemUrl: string) {
   if (!imagemUrl.startsWith("http")) return { ok: false as const, erro: "Envie a arte primeiro." };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "A chave da OpenAI não está configurada." };
-  const sys = `Você é o social media do buffet infantil "${marca.nome}". Vou te mandar uma ARTE (imagem) já pronta pra postar no Instagram. OLHE a arte e escreva uma legenda que CONVERSE com o que está nela (se for promoção, fale da promoção; se tiver um valor/data escritos na arte, pode citar; NÃO invente preço/data que não estejam na arte). Tom alegre e acolhedor de festa infantil, curto (2 a 4 linhas), com 1 a 3 emojis e uma chamada pra ação no fim. Responda SÓ em JSON: {"legenda":"...","hashtags":"#... #..."} com 4 a 8 hashtags relevantes (buffet infantil, festa, aniversário).`;
+  const sys = `Você é o social media do buffet infantil "${marca.nome}". Vou te mandar uma ARTE (imagem) já pronta pra postar no Instagram. OLHE a arte e escreva TRÊS versões de legenda que CONVERSEM com o que está nela (se for promoção, fale da promoção; se tiver valor/data escritos na arte pode citar; NUNCA invente preço/data que não estejam na arte). Todas com tom alegre e acolhedor de festa infantil. Os três níveis:
+1) "Simples": curta e direta, 1 a 2 linhas, poucas palavras, 1 emoji.
+2) "Caprichada": calorosa e convidativa, 2 a 3 linhas, 2 a 3 emojis, com chamada pra ação.
+3) "Top": mais elaborada e envolvente, 3 a 5 linhas, com um toque de emoção/história, emojis e uma chamada pra ação forte.
+Cada versão com 4 a 8 hashtags relevantes (buffet infantil, festa, aniversário). Responda SÓ em JSON: {"opcoes":[{"nivel":"Simples","legenda":"...","hashtags":"#... #..."},{"nivel":"Caprichada","legenda":"...","hashtags":"..."},{"nivel":"Top","legenda":"...","hashtags":"..."}]}`;
   let content: string;
   try {
     content = await chatOpenAI(key, {
@@ -786,23 +790,30 @@ export async function gerarLegendaArte(marcaId: string, imagemUrl: string) {
       messages: [
         { role: "system", content: sys },
         { role: "user", content: [
-          { type: "text", text: "Escreva a legenda pra esta arte:" },
+          { type: "text", text: "Escreva as 3 versões de legenda pra esta arte:" },
           { type: "image_url", image_url: { url: imagemUrl, detail: "high" } },
         ] },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 400,
+      max_tokens: 900,
     });
   } catch (e) {
     return { ok: false as const, erro: e instanceof ErroOpenAI ? e.message : "Não consegui ler a arte agora. Tente de novo." };
   }
   try {
-    const o = JSON.parse(content) as { legenda?: string; hashtags?: string };
-    return { ok: true as const, legenda: String(o.legenda || "").slice(0, 2000), hashtags: String(o.hashtags || "").slice(0, 500) };
+    const o = JSON.parse(content) as { opcoes?: { nivel?: string; legenda?: string; hashtags?: string }[]; legenda?: string; hashtags?: string };
+    const opcoes = (Array.isArray(o.opcoes) ? o.opcoes : [])
+      .map((x) => ({ nivel: String(x.nivel || "Opção").slice(0, 40), legenda: String(x.legenda || "").slice(0, 2000), hashtags: String(x.hashtags || "").slice(0, 500) }))
+      .filter((x) => x.legenda);
+    if (opcoes.length) return { ok: true as const, opcoes };
+    // fallback: veio no formato antigo (uma só)
+    if (o.legenda) return { ok: true as const, opcoes: [{ nivel: "Opção", legenda: String(o.legenda).slice(0, 2000), hashtags: String(o.hashtags || "").slice(0, 500) }] };
+    return { ok: false as const, erro: "Não consegui montar as opções. Tente de novo." };
   } catch {
-    return { ok: true as const, legenda: content.slice(0, 2000), hashtags: "" };
+    return { ok: true as const, opcoes: [{ nivel: "Opção", legenda: content.slice(0, 2000), hashtags: "" }] };
   }
 }
+export type OpcaoLegenda = { nivel: string; legenda: string; hashtags: string };
 
 // Cria a publicação de uma ARTE PRONTA: entra na agenda como qualquer post, mas o render
 // (/api/feed|story/[id]) mostra a imagem enviada COMO ELA É (template "arte-pronta"), sem overlay.
