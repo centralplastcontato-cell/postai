@@ -77,7 +77,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
     const feitos: string[] = [];
     let ultimoErro = "";
     for (const fmt of alvos) {
-      const r = await criarArtePronta(marcaId, imagemUrl, fmt, data || undefined, hora, legendaFinal, "", rascunho).catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
+      const r = await criarArtePronta(marcaId, imagemUrl, fmt, postarAgora ? undefined : (data || undefined), hora, legendaFinal, "", rascunho, postarAgora).catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
       if (!r.ok) { ultimoErro = r.erro; continue; }
       if (postarAgora) {
         const post = await (fmt === "story" ? postarStory(r.id) : postarPublicacao(r.id)).catch(() => ({ ok: false as const, erro: "Salvei, mas não consegui postar agora." }));

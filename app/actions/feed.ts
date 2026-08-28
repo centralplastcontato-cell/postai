@@ -817,7 +817,7 @@ export type OpcaoLegenda = { nivel: string; legenda: string; hashtags: string };
 
 // Cria a publicação de uma ARTE PRONTA: entra na agenda como qualquer post, mas o render
 // (/api/feed|story/[id]) mostra a imagem enviada COMO ELA É (template "arte-pronta"), sem overlay.
-export async function criarArtePronta(marcaId: string, imagemUrl: string, formato: "feed" | "story", dataYMD: string | undefined, hora: number | undefined, legenda: string, hashtags: string, rascunho = false) {
+export async function criarArtePronta(marcaId: string, imagemUrl: string, formato: "feed" | "story", dataYMD: string | undefined, hora: number | undefined, legenda: string, hashtags: string, rascunho = false, agora = false) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const cred = await checarCreditoTrial(g.sessao);
@@ -829,10 +829,11 @@ export async function criarArtePronta(marcaId: string, imagemUrl: string, format
   const plano = await planoDaMarca(marca.id);
   if (plano && ehStory && !planoTemStory(plano)) return { ok: false as const, erro: "O Story está disponível a partir do pacote Profissional. Faça upgrade pra liberar." };
   const horaFeed = typeof hora === "number" ? hora : marca.horaPost;
-  // Rascunho: não vai pra agenda (fica guardado pra postar depois), então a data é só um carimbo.
-  const data = dataYMD ? new Date(`${dataYMD}T${String(horaFeed).padStart(2, "0")}:00:00-03:00`) : (rascunho ? new Date() : await proximaDataFeed(marca));
+  // Rascunho ou "postar agora": não ocupa slot da agenda — a data é AGORA (posta na hora / só guarda).
+  const semAgenda = rascunho || agora;
+  const data = agora ? new Date() : (dataYMD ? new Date(`${dataYMD}T${String(horaFeed).padStart(2, "0")}:00:00-03:00`) : (rascunho ? new Date() : await proximaDataFeed(marca)));
   if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
-  if (!rascunho && plano && !ehStory) {
+  if (!semAgenda && plano && !ehStory) {
     const lim = await checarLimiteFeed(marca.id, data, plano);
     if (lim.bloqueia) return { ok: false as const, erro: `O pacote ${rotuloPlano(plano)} permite ${lim.limite} post${lim.limite > 1 ? "s" : ""} de feed por dia — esse dia já tem ${lim.jaTem}. Escolha outro dia.` };
   }
