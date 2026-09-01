@@ -134,6 +134,7 @@ export function MascoteEstudio({
   // DAR VIDA (Fase 5): anima o mascote com IA de vídeo. Em 2 fases (a IA leva 1-2 min): inicia o
   // job e fica consultando até o clipe ficar pronto.
   const clipesUrls = clipes ?? [];
+  const [subAba, setSubAba] = useState<"criar" | "ficha" | "vida">("criar"); // sub-abas do estúdio
   const [descClipe, setDescClipe] = useState("");
   const [ehAventura, setEhAventura] = useState(false); // cena animada (aventura) x ação simples
   const [falaClipe, setFalaClipe] = useState(""); // o que o mascote FALA no clipe ("" = só música)
@@ -200,7 +201,7 @@ export function MascoteEstudio({
   useEffect(() => {
     let job = "";
     try { job = localStorage.getItem(jobKey) || ""; } catch {}
-    if (job) acompanharClipe(job);
+    if (job) { setSubAba("vida"); acompanharClipe(job); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   function handleExcluirClipe(url: string) {
@@ -312,6 +313,19 @@ export function MascoteEstudio({
 
       {erro && <p className="mb-4 rounded-md border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">{erro}</p>}
 
+      {/* SUB-ABAS: separa Criar/Escolher o mascote · Ficha 3D · Dar vida (vídeos). Ficha e Dar vida
+          só aparecem quando já existe um mascote oficial escolhido. */}
+      <div className="mb-5 flex flex-wrap gap-2">
+        {([
+          { id: "criar", rotulo: "🦸 Meu mascote" },
+          ...(mascoteUrl ? [{ id: "ficha", rotulo: "🧊 Ficha 3D" }, { id: "vida", rotulo: "🎬 Dar vida" }] : []),
+        ] as { id: "criar" | "ficha" | "vida"; rotulo: string }[]).map((t) => (
+          <button key={t.id} type="button" onClick={() => setSubAba(t.id)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${subAba === t.id ? "bg-[#7c3aed] text-white" : "border border-linha text-muted hover:text-white"}`}>{t.rotulo}</button>
+        ))}
+      </div>
+
+      {/* ===== SUB-ABA: MEU MASCOTE (criar/escolher) ===== */}
+      {subAba === "criar" && (<>
       {/* Mascote oficial atual */}
       <div className="mb-6">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Mascote oficial da marca</p>
@@ -412,11 +426,13 @@ export function MascoteEstudio({
       )}
 
       <p className="mt-6 text-[11px] text-muted">
-        Dica: gere quantas vezes quiser até achar o mascote perfeito — as opções ficam salvas aqui. O mascote escolhido já pode entrar nos <strong className="text-white/80">posts</strong> e nos <strong className="text-white/80">vídeos</strong>.
+        Dica: gere quantas vezes quiser até achar o mascote perfeito — as opções ficam salvas aqui. O mascote escolhido já pode entrar nos <strong className="text-white/80">posts</strong> e nos <strong className="text-white/80">vídeos</strong>.{mascoteUrl ? <> Depois, use as abas <strong className="text-white/80">🧊 Ficha 3D</strong> e <strong className="text-white/80">🎬 Dar vida</strong> aqui em cima.</> : null}
       </p>
+      </>)}
 
+      {/* ===== SUB-ABA: FICHA 3D ===== */}
       {/* FASE 4 — Ficha pro 3D (só quando há mascote oficial) */}
-      {mascoteUrl && (
+      {subAba === "ficha" && mascoteUrl && (
         <div className="mt-7 rounded-xl border border-[#7c3aed]/40 bg-[#7c3aed]/5 p-4 sm:p-5">
           <p className="text-sm font-semibold text-white">🧊 Ficha pro 3D <span className="ml-1 rounded-full border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2 py-0.5 text-[10px] font-semibold text-[#c7b2ff]">pra vender nas festas</span></p>
           <p className="mt-1 text-xs text-muted">
@@ -461,8 +477,9 @@ export function MascoteEstudio({
         </div>
       )}
 
+      {/* ===== SUB-ABA: DAR VIDA (vídeos/aventuras) ===== */}
       {/* FASE 5 — DAR VIDA: anima o mascote com IA de vídeo (só quando há mascote oficial) */}
-      {mascoteUrl && (
+      {subAba === "vida" && mascoteUrl && (
         <div className="mt-7 rounded-xl border border-[#ec4899]/40 bg-[#ec4899]/5 p-4 sm:p-5">
           <p className="text-sm font-semibold text-white">🎬 Dar vida ao mascote <span className="ml-1 rounded-full border border-[#ec4899]/40 bg-[#ec4899]/15 px-2 py-0.5 text-[10px] font-semibold text-[#f9a8d4]">novo · beta</span></p>
           <p className="mt-1 text-xs text-muted">
