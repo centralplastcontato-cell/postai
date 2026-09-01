@@ -706,7 +706,7 @@ export async function regerarSlide(input: { id: string; indice: number }) {
     slides[input.indice] = { ...slide, titulo: j.titulo || slide.titulo, texto: j.texto };
     await prisma.conteudo.update({ where: { id: input.id }, data: { slidesTexto: JSON.stringify(slides) } });
     revalidatePath(`/painel/marcas/${c.marcaId}`);
-    return { ok: true as const };
+    return { ok: true as const, titulo: j.titulo || slide.titulo, texto: j.texto || "" };
   } catch (e) {
     console.error("Erro ao regerar slide:", e);
     return { ok: false as const, erro: "Não consegui regerar esse slide agora." };

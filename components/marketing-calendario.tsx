@@ -184,6 +184,7 @@ export function MarketingCalendario({
   const [salvandoLegenda, setSalvandoLegenda] = useState(false);
   const [editandoSlide, setEditandoSlide] = useState<{ indice: number; titulo: string; texto: string } | null>(null);
   const [salvandoSlide, setSalvandoSlide] = useState(false);
+  const [regerandoModal, setRegerandoModal] = useState(false); // regerar o texto DENTRO do modal (sem fechar)
   const [copiado, setCopiado] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [slideProcessando, setSlideProcessando] = useState<number | null>(null);
@@ -393,15 +394,6 @@ export function MarketingCalendario({
       setSlideProcessando(null);
     });
   }
-  function handleRegerarSlide(id: string, indice: number) {
-    setSlideProcessando(indice);
-    startTransition(async () => {
-      const r = await regerarSlide({ id, indice });
-      if (!r.ok) setErro(r.erro);
-      else router.refresh();
-      setSlideProcessando(null);
-    });
-  }
   function handleAlternarTexto(id: string, indice: number) {
     setSlideProcessando(indice);
     startTransition(async () => {
@@ -485,11 +477,19 @@ export function MarketingCalendario({
               >{salvandoSlide ? "Salvando…" : "Salvar"}</button>
               <button
                 type="button"
-                disabled={salvandoSlide || slideProcessando !== null}
-                onClick={() => { const idx = editandoSlide.indice; setEditandoSlide(null); handleRegerarSlide(selecionado.id, idx); }}
+                disabled={salvandoSlide || regerandoModal}
+                onClick={async () => {
+                  const ed = editandoSlide;
+                  setRegerandoModal(true);
+                  const r = await regerarSlide({ id: selecionado.id, indice: ed.indice }).catch(() => ({ ok: false as const, erro: "Não consegui regerar agora." }));
+                  setRegerandoModal(false);
+                  // Atualiza os campos AQUI mesmo (modal fica aberto) — dá pra regerar de novo se não gostar.
+                  if (r.ok) { setEditandoSlide((s) => (s ? { ...s, titulo: r.titulo, texto: r.texto } : s)); router.refresh(); }
+                  else setErro(r.erro);
+                }}
                 className="rounded-lg border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-4 py-1.5 text-sm font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed] disabled:opacity-50"
-              >✨ Regerar com IA</button>
-              <button type="button" onClick={() => setEditandoSlide(null)} className="ml-auto rounded-lg border border-linha px-4 py-1.5 text-sm font-semibold text-muted transition hover:text-white">Cancelar</button>
+              >{regerandoModal ? "✨ Regerando…" : "✨ Regerar com IA"}</button>
+              <button type="button" disabled={regerandoModal} onClick={() => setEditandoSlide(null)} className="ml-auto rounded-lg border border-linha px-4 py-1.5 text-sm font-semibold text-muted transition hover:text-white disabled:opacity-50">Fechar</button>
             </div>
           </div>
         </div>
