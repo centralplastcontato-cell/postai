@@ -27,11 +27,12 @@ const AVENTURAS_CLIPE = [
 
 // 🎙️ VOZES do castelinho — o dono escolhe uma e ela fica salva, usada em todos os clipes com fala.
 const VOZES_CLIPE = [
+  { nome: "🎬 Desenho animado", desc: "de personagem de DESENHO ANIMADO estilo Disney/Pixar — MUITO expressiva, exagerada, teatral e cômica, cheia de emoção e energia, tom agudo e cantado, como um personagem clássico de filme de animação infantil" },
+  { nome: "🧚 Fadinha mágica", desc: "de fadinha mágica de conto de fadas, doce, encantada e brilhante, tom bem agudo e sonhador, estilo princesa de desenho animado" },
   { nome: "🧒 Menino animado", desc: "de menino de uns 8 anos, animada, alegre e brincalhona, tom médio-agudo" },
   { nome: "👧 Menininha fofa", desc: "de menininha fofa e doce, tom agudo, carinhosa e simpática" },
-  { nome: "🎈 Mascote clássico", desc: "de PERSONAGEM INFANTIL fofa, alegre e cativante, tom mais agudo, de mascote de desenho" },
   { nome: "🤖 Robôzinho divertido", desc: "de robôzinho divertido, levemente eletrônica e engraçada, animada" },
-  { nome: "🦣 Vozão engraçado", desc: "grave, bonachona e engraçada, tipo gigante gentil e bem-humorado" },
+  { nome: "🦣 Vozão engraçado", desc: "grave, bonachona e engraçada, tipo gigante gentil e bem-humorado, estilo vilão simpático de desenho" },
 ];
 
 const FICHA_LABELS = ["Frente", "Lado", "Costas"];

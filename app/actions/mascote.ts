@@ -164,7 +164,7 @@ export async function ouvirAmostraVoz(marcaId: string, vozDesc: string, frase?: 
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
   const texto = (frase || "").trim().slice(0, 120) || "Oi! Venha comemorar a festa do seu filho aqui no nosso buffet!";
-  const estilo = (vozDesc || "").trim().slice(0, 300) || "voz de personagem infantil fofa e alegre, tom agudo e cativante";
+  const estilo = (vozDesc || "").trim().slice(0, 300) || "de personagem de desenho animado estilo Disney/Pixar, muito expressiva, exagerada e cômica, tom agudo e cantado";
   try {
     const resp = await fetch("https://api.openai.com/v1/audio/speech", {
       method: "POST",
@@ -173,7 +173,7 @@ export async function ouvirAmostraVoz(marcaId: string, vozDesc: string, frase?: 
         model: "gpt-4o-mini-tts",
         voice: "coral",
         input: texto,
-        instructions: `Fale em português do Brasil, com voz ${estilo}. Tom alegre e brincalhão de mascote de festa infantil.`,
+        instructions: `Fale em português do Brasil, com voz ${estilo}. Interprete como um PERSONAGEM DE DESENHO ANIMADO (estilo Disney/Pixar): bem EXAGERADO, expressivo e teatral, cheio de emoção, energia e diversão — nada de voz neutra de locutor. Tom agudo, animado e cantado, de mascote fofo de festa infantil.`,
         response_format: "mp3",
       }),
       signal: AbortSignal.timeout(30000),
@@ -367,7 +367,7 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string, seg
     // Se o dono escreveu uma FALA, o mascote FALA (lip sync + voz de personagem fofo). Senão, só música.
     const falaTxt = (fala || "").trim().slice(0, 160);
     // Voz DEFINIDA do castelinho (o dono escolhe uma vez e fica salva) — dá personalidade consistente.
-    const vozDesc = (marca.mascoteVoz || "").trim() || "de PERSONAGEM INFANTIL fofa, alegre, simpática e animada (tom mais agudo, cativante, de mascote de desenho)";
+    const vozDesc = (marca.mascoteVoz || "").trim() || "de personagem de DESENHO ANIMADO estilo Disney/Pixar — MUITO expressiva, exagerada, teatral e cômica, cheia de emoção e energia, tom agudo e cantado (como um personagem clássico de filme de animação infantil)";
     const audio = falaTxt
       ? `ÁUDIO: o mascote FALA, em português do Brasil, com a BOCA sincronizada (lip sync), a frase: "${falaTxt}". Voz ${vozDesc}. A fala tem que estar CLARA e bem sincronizada com a boca. Uma musiquinha bem baixinha por trás, sem competir com a voz.`
       : `ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
