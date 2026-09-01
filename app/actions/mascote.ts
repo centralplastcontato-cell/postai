@@ -292,7 +292,7 @@ async function quadroPartidaMascote(mascotePng: Buffer, fundo: { cor: string } |
 }
 
 // FASE 1 — inicia a geração do clipe e devolve o id do job (rápido).
-export async function gerarClipeMascote(marcaId: string, descricao?: string, segundos?: number, fundo?: string, fundoFotoUrl?: string, fala?: string) {
+export async function gerarClipeMascote(marcaId: string, descricao?: string, segundos?: number, fundo?: string, fundoFotoUrl?: string, fala?: string, aventura?: boolean) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true } });
@@ -329,9 +329,15 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string, seg
     const audio = falaTxt
       ? `ÁUDIO: o mascote FALA, em português do Brasil, com a BOCA sincronizada (lip sync), a frase: "${falaTxt}". Voz de PERSONAGEM INFANTIL fofa, alegre, simpática e animada (tom mais agudo, cativante, de mascote de desenho). A fala tem que estar CLARA e bem sincronizada com a boca. Uma musiquinha bem baixinha por trás, sem competir com a voz.`
       : `ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
-    const prompt = fotoFundoBuf
-      ? `O personagem mascote 3D fofo da imagem de referência ${acao}, na frente de um CENÁRIO REAL de buffet infantil (o fundo da imagem). MANTENHA o cenário de fundo REAL e parado, sem distorcer, sem mudar — SÓ O PERSONAGEM se mexe, com movimento suave e natural, mantendo EXATAMENTE o mesmo desenho e cores do mascote. Câmera parada. Vídeo vertical 9:16. Sem texto, sem legendas. ${audio}`
-      : `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. FUNDO: uma cor SÓLIDA, LISA e UNIFORME EXATAMENTE igual à da imagem de referência (${corFundo}) — NÃO mude a cor do fundo, NÃO escureça, NÃO coloque cenário, objetos nem gradiente. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ${audio}`;
+    // AVENTURA: cena animada de verdade (o cenário ganha vida, o mascote é o protagonista).
+    // AÇÃO (padrão): o mascote se mexe sobre um fundo parado (cor sólida ou foto real do buffet).
+    const prompt = aventura
+      ? (fotoFundoBuf
+          ? `Crie uma CENA divertida em que o MESMO personagem mascote 3D fofo da imagem de referência ${acao}, DENTRO do espaço real de buffet infantil que está no fundo da imagem. O mascote se movimenta pela cena de forma natural, alegre e fofa, mantendo EXATAMENTE o mesmo desenho, cores e proporções; o cenário real continua coerente, com um leve movimento de câmera acompanhando a ação. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ${audio}`
+          : `Crie uma CENA ANIMADA divertida e fofa, no estilo de DESENHO 3D infantil (clima alegre de festa de buffet infantil), protagonizada pelo MESMO personagem mascote da imagem de referência — mantendo EXATAMENTE o mesmo desenho, as mesmas cores e proporções dele. Na cena, o mascote está ${acao}. O CENÁRIO ao redor GANHA VIDA (parquinho colorido, salão de festa decorado, balões, confete) com movimento alegre, e a câmera tem um leve movimento cinematográfico acompanhando a ação. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ${audio}`)
+      : (fotoFundoBuf
+          ? `O personagem mascote 3D fofo da imagem de referência ${acao}, na frente de um CENÁRIO REAL de buffet infantil (o fundo da imagem). MANTENHA o cenário de fundo REAL e parado, sem distorcer, sem mudar — SÓ O PERSONAGEM se mexe, com movimento suave e natural, mantendo EXATAMENTE o mesmo desenho e cores do mascote. Câmera parada. Vídeo vertical 9:16. Sem texto, sem legendas. ${audio}`
+          : `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. FUNDO: uma cor SÓLIDA, LISA e UNIFORME EXATAMENTE igual à da imagem de referência (${corFundo}) — NÃO mude a cor do fundo, NÃO escureça, NÃO coloque cenário, objetos nem gradiente. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ${audio}`);
 
     const form = new FormData();
     form.append("model", CLIPE_MODELO);

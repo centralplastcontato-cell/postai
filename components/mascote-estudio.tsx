@@ -15,6 +15,16 @@ const ACOES_CLIPE = [
   { emoji: "👍", nome: "Joinha", desc: "fazendo joinha (positivo) com as duas mãos e piscando" },
 ];
 
+// 🎬 AVENTURAS — cenas animadas de verdade (o cenário ganha vida, o castelinho é o protagonista).
+const AVENTURAS_CLIPE = [
+  { emoji: "🛝", nome: "Escorregador", desc: "escorregando por um tobogã colorido de parquinho, rindo de alegria" },
+  { emoji: "🎂", nome: "Velinhas", desc: "soprando as velinhas de um bolo de aniversário enorme e colorido" },
+  { emoji: "🎈", nome: "Boas-vindas", desc: "recebendo a criançada na porta do buffet, cercado de balões coloridos" },
+  { emoji: "🫧", nome: "Piscina de bolinhas", desc: "pulando e se divertindo numa piscina de bolinhas coloridas" },
+  { emoji: "🦸", nome: "Super-herói", desc: "voando como um super-herói pelo céu, com uma capinha esvoaçante" },
+  { emoji: "🎉", nome: "Festa", desc: "no meio de uma festa animada, dançando com confetes caindo do teto" },
+];
+
 const FICHA_LABELS = ["Frente", "Lado", "Costas"];
 
 // 🦸 ESTÚDIO DO MASCOTE (Fase 1): o dono gera opções em 3D fofo, escolhe uma e ela vira o
@@ -125,6 +135,7 @@ export function MascoteEstudio({
   // job e fica consultando até o clipe ficar pronto.
   const clipesUrls = clipes ?? [];
   const [descClipe, setDescClipe] = useState("");
+  const [ehAventura, setEhAventura] = useState(false); // cena animada (aventura) x ação simples
   const [falaClipe, setFalaClipe] = useState(""); // o que o mascote FALA no clipe ("" = só música)
   const [durClipe, setDurClipe] = useState(8); // duração do clipe: 4 | 8 | 12
   const [fundoClipe, setFundoClipe] = useState("#FFFFFF"); // cor do fundo do clipe
@@ -181,7 +192,7 @@ export function MascoteEstudio({
     setErro(null);
     setGerandoClipe(true);
     setStatusClipe("🎬 Preparando o mascote…");
-    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe, fundoClipe, fundoFoto || undefined, falaClipe.trim() || undefined).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
+    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe, fundoClipe, fundoFoto || undefined, falaClipe.trim() || undefined, ehAventura).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
     if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
     await acompanharClipe(ini.jobId);
   }
@@ -458,15 +469,31 @@ export function MascoteEstudio({
             A IA <strong className="text-white/80">anima o seu mascote</strong> num clipe curto — <strong className="text-white/80">já com música e efeitos</strong> 🎵. Escolha uma ação (ou descreva), gere, e depois dá pra <strong className="text-white/80">postar como Story ou Reels</strong>.
           </p>
 
-          {/* ações prontas — 1 toque preenche a descrição */}
-          <label className="mt-3 block text-[10px] font-semibold text-muted">Ação rápida <span className="font-normal text-muted/70">(ou escreva embaixo)</span></label>
+          {/* ações prontas — 1 toque preenche a descrição (fundo parado, o mascote se mexe) */}
+          <label className="mt-3 block text-[10px] font-semibold text-muted">Ação rápida <span className="font-normal text-muted/70">(o mascote se mexe num fundo parado)</span></label>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {ACOES_CLIPE.map((a) => (
-              <button key={a.nome} type="button" disabled={gerandoClipe} onClick={() => setDescClipe(a.desc)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${descClipe === a.desc ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+              <button key={a.nome} type="button" disabled={gerandoClipe} onClick={() => { setDescClipe(a.desc); setEhAventura(false); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${descClipe === a.desc && !ehAventura ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
                 {a.emoji} {a.nome}
               </button>
             ))}
           </div>
+
+          {/* aventuras — cena animada de verdade (o cenário ganha vida) */}
+          <label className="mt-3 block text-[10px] font-semibold text-muted">🎬 Aventuras <span className="font-normal text-muted/70">(cena animada — o cenário ganha vida)</span></label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {AVENTURAS_CLIPE.map((a) => (
+              <button key={a.nome} type="button" disabled={gerandoClipe} onClick={() => { setDescClipe(a.desc); setEhAventura(true); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${descClipe === a.desc && ehAventura ? "border-[#a855f7] bg-[#a855f7]/25 text-[#d6c6ff]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+                {a.emoji} {a.nome}
+              </button>
+            ))}
+          </div>
+
+          {/* liga/desliga o modo aventura (vale também pro texto que você escrever) */}
+          <label className="mt-2 flex cursor-pointer items-center gap-2 text-[11px] text-muted">
+            <input type="checkbox" checked={ehAventura} disabled={gerandoClipe} onChange={(e) => setEhAventura(e.target.checked)} className="h-3.5 w-3.5 accent-[#a855f7]" />
+            <span>🎬 <strong className="text-white/80">Modo aventura</strong> — deixa a IA criar uma cena animada ao redor do castelinho (em vez de fundo parado).</span>
+          </label>
 
           <textarea
             value={descClipe}
