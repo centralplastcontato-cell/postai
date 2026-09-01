@@ -158,10 +158,11 @@ export function MascoteEstudio({
     else setErro(r.erro);
   }
   const [ouvindoVoz, setOuvindoVoz] = useState(false);
+  const [tomVoz, setTomVoz] = useState(1.22); // quão agudo/cartoon (1.0 = normal; 1.22 = desenho; 1.4 = bem agudo)
   async function ouvirVoz() {
     setErro(null); setOuvindoVoz(true);
     // Usa a frase do campo "O que o mascote fala?" se tiver; senão, uma frase de exemplo.
-    const r = await ouvirAmostraVoz(marcaId, vozClipe, falaClipe.trim() || undefined).catch(() => ({ ok: false as const, erro: "Não consegui gerar a amostra." }));
+    const r = await ouvirAmostraVoz(marcaId, vozClipe, falaClipe.trim() || undefined, tomVoz).catch(() => ({ ok: false as const, erro: "Não consegui gerar a amostra." }));
     setOuvindoVoz(false);
     if (!r.ok) { setErro(r.erro); return; }
     try { await new Audio(r.audio).play(); } catch {}
@@ -574,13 +575,20 @@ export function MascoteEstudio({
               ))}
             </div>
             <input type="text" value={vozClipe} onChange={(e) => setVozClipe(e.target.value)} maxLength={300} disabled={salvandoVoz || gerandoClipe} placeholder="Ou descreva a voz (ex: menino animado, vozinha fofa e engraçada)" className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-1.5 text-[12px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+            {/* quão AGUDO / de desenho — o efeito de tom é o que dá a cara de cartoon na amostra */}
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold text-muted">🎚️ Tom de desenho:</span>
+              {[{ n: "Suave", v: 1.1 }, { n: "Desenho", v: 1.22 }, { n: "Bem agudo", v: 1.38 }].map((t) => (
+                <button key={t.n} type="button" disabled={ouvindoVoz || gerandoClipe} onClick={() => setTomVoz(t.v)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${Math.abs(tomVoz - t.v) < 0.001 ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{t.n}</button>
+              ))}
+            </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <button type="button" disabled={ouvindoVoz || gerandoClipe} onClick={ouvirVoz} className="rounded-md border border-[#a855f7]/50 bg-[#a855f7]/15 px-3 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25 disabled:opacity-50">{ouvindoVoz ? "🔊 Gerando…" : "🔊 Ouvir amostra"}</button>
               <button type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz(vozClipe)} className="rounded-md border border-[#a855f7]/50 bg-[#a855f7]/15 px-3 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25 disabled:opacity-50">{salvandoVoz ? "Salvando…" : "💾 Salvar voz"}</button>
               {vozClipe && <button type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz("")} className="text-[11px] font-semibold text-muted transition hover:text-white disabled:opacity-40">voltar ao padrão</button>}
               {vozSalva && <span className="text-[11px] font-semibold text-emerald-400">✓ Voz salva!</span>}
             </div>
-            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">🔊 A amostra é uma <strong className="text-white/70">prévia do estilo</strong> da voz. No vídeo, a voz é criada pela IA de vídeo e pode soar um pouquinho diferente. Escreva a fala acima pra ouvir a amostra com a sua frase.</p>
+            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">🔊 A amostra é uma <strong className="text-white/70">prévia do estilo</strong> (com o tom mais agudo de desenho). No vídeo, a voz é criada pela IA de vídeo e <strong className="text-white/70">pode soar diferente</strong> — se quiser a voz de desenho <strong className="text-white/70">de verdade dentro do vídeo</strong>, me avise que eu preparo isso. Escreva a fala acima pra ouvir com a sua frase.</p>
           </div>
 
           {/* duração do clipe */}
