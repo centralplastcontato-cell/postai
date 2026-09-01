@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote } from "@/app/actions/mascote";
 import { imagensDoBanco } from "@/app/actions/imagens";
 
 // Ações prontas pro clipe do mascote (1 toque preenche a descrição, sem digitar).
@@ -25,6 +25,15 @@ const AVENTURAS_CLIPE = [
   { emoji: "🎉", nome: "Festa", desc: "no meio de uma festa animada, dançando com confetes caindo do teto" },
 ];
 
+// 🎙️ VOZES do castelinho — o dono escolhe uma e ela fica salva, usada em todos os clipes com fala.
+const VOZES_CLIPE = [
+  { nome: "🧒 Menino animado", desc: "de menino de uns 8 anos, animada, alegre e brincalhona, tom médio-agudo" },
+  { nome: "👧 Menininha fofa", desc: "de menininha fofa e doce, tom agudo, carinhosa e simpática" },
+  { nome: "🎈 Mascote clássico", desc: "de PERSONAGEM INFANTIL fofa, alegre e cativante, tom mais agudo, de mascote de desenho" },
+  { nome: "🤖 Robôzinho divertido", desc: "de robôzinho divertido, levemente eletrônica e engraçada, animada" },
+  { nome: "🦣 Vozão engraçado", desc: "grave, bonachona e engraçada, tipo gigante gentil e bem-humorado" },
+];
+
 const FICHA_LABELS = ["Frente", "Lado", "Costas"];
 
 // 🦸 ESTÚDIO DO MASCOTE (Fase 1): o dono gera opções em 3D fofo, escolhe uma e ela vira o
@@ -37,6 +46,7 @@ export function MascoteEstudio({
   ficha3d,
   clipes,
   corMarca,
+  voz,
 }: {
   marcaId: string;
   mascoteUrl: string; // mascote oficial atual ("" = nenhum)
@@ -44,6 +54,7 @@ export function MascoteEstudio({
   ficha3d?: string; // ficha do personagem (frente/lado/costas) pro 3D ("" = não gerada)
   clipes?: string[]; // clipes animados (IA de vídeo) já gerados
   corMarca?: string; // cor primária da marca (opção de fundo do clipe)
+  voz?: string; // voz definida do castelinho ("" = padrão)
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -135,6 +146,16 @@ export function MascoteEstudio({
   // job e fica consultando até o clipe ficar pronto.
   const clipesUrls = clipes ?? [];
   const [subAba, setSubAba] = useState<"criar" | "ficha" | "vida">("criar"); // sub-abas do estúdio
+  const [vozClipe, setVozClipe] = useState(voz ?? ""); // voz definida do castelinho
+  const [salvandoVoz, setSalvandoVoz] = useState(false);
+  const [vozSalva, setVozSalva] = useState(false);
+  async function salvarVoz(nova: string) {
+    setVozClipe(nova); setSalvandoVoz(true); setVozSalva(false);
+    const r = await definirVozMascote(marcaId, nova).catch(() => ({ ok: false as const, erro: "Não consegui salvar a voz." }));
+    setSalvandoVoz(false);
+    if (r.ok) { setVozSalva(true); setTimeout(() => setVozSalva(false), 2500); }
+    else setErro(r.erro);
+  }
   const [descClipe, setDescClipe] = useState("");
   const [ehAventura, setEhAventura] = useState(false); // cena animada (aventura) x ação simples
   const [falaClipe, setFalaClipe] = useState(""); // o que o mascote FALA no clipe ("" = só música)
@@ -532,7 +553,23 @@ export function MascoteEstudio({
             placeholder="Ex: Venha comemorar sua festa aqui no Castelo!"
             className="mt-1 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none disabled:opacity-50"
           />
-          <p className="mt-1 text-[10px] leading-snug text-muted/70">A IA cria a <strong className="text-white/70">voz de personagem</strong> na hora e sincroniza com a boca. Frases curtas ({durClipe}s dá pra ~{Math.max(4, durClipe * 2)} palavras) saem melhor. Deixe vazio pra ter só uma musiquinha.</p>
+          <p className="mt-1 text-[10px] leading-snug text-muted/70">A IA cria a voz na hora e sincroniza com a boca. Frases curtas ({durClipe}s dá pra ~{Math.max(4, durClipe * 2)} palavras) saem melhor. Deixe vazio pra ter só uma musiquinha.</p>
+
+          {/* VOZ DEFINIDA do castelinho — escolha uma vez, vale pra todos os clipes com fala */}
+          <div className="mt-3 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-2.5">
+            <p className="text-[10px] font-semibold text-white">🎙️ Voz do castelinho <span className="font-normal text-muted/70">(vale pra todos os clipes com fala)</span></p>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {VOZES_CLIPE.map((v) => (
+                <button key={v.nome} type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz(v.desc)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${vozClipe === v.desc ? "border-[#a855f7] bg-[#a855f7]/25 text-[#d6c6ff]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{v.nome}</button>
+              ))}
+            </div>
+            <input type="text" value={vozClipe} onChange={(e) => setVozClipe(e.target.value)} maxLength={300} disabled={salvandoVoz || gerandoClipe} placeholder="Ou descreva a voz (ex: menino animado, vozinha fofa e engraçada)" className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-1.5 text-[12px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+            <div className="mt-1.5 flex items-center gap-2">
+              <button type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz(vozClipe)} className="rounded-md border border-[#a855f7]/50 bg-[#a855f7]/15 px-3 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25 disabled:opacity-50">{salvandoVoz ? "Salvando…" : "💾 Salvar voz"}</button>
+              {vozClipe && <button type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz("")} className="text-[11px] font-semibold text-muted transition hover:text-white disabled:opacity-40">voltar ao padrão</button>}
+              {vozSalva && <span className="text-[11px] font-semibold text-emerald-400">✓ Voz salva!</span>}
+            </div>
+          </div>
 
           {/* duração do clipe */}
           <div className="mt-2 flex items-center gap-2">

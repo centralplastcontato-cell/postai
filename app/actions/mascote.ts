@@ -146,6 +146,16 @@ export async function usarImagemComoMascote(marcaId: string, url: string) {
 // Tira o FUNDO da imagem do mascote (deixa transparente), mantendo o personagem fiel — pra ele
 // colar limpo nos posts/vídeos (sem o quadradão branco). Usa /images/edits com background
 // transparent + apara as bordas. Salva a versão nova e ja marca como oficial.
+// Define a VOZ do castelinho (o jeitão da voz nos clipes). Fica salva na marca e é usada em todo
+// clipe com fala — dá uma personalidade de voz consistente. "" = volta pro padrão.
+export async function definirVozMascote(marcaId: string, voz: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  await prisma.marca.update({ where: { id: marcaId }, data: { mascoteVoz: (voz || "").trim().slice(0, 300) } });
+  revalidatePath(`/painel/marcas/${marcaId}`);
+  return { ok: true as const };
+}
+
 export async function removerFundoMascote(marcaId: string, url: string) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
@@ -295,7 +305,7 @@ async function quadroPartidaMascote(mascotePng: Buffer, fundo: { cor: string } |
 export async function gerarClipeMascote(marcaId: string, descricao?: string, segundos?: number, fundo?: string, fundoFotoUrl?: string, fala?: string, aventura?: boolean) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true } });
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true, mascoteVoz: true } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   if (!marca.mascoteUrl) return { ok: false as const, erro: "Escolha o mascote oficial primeiro." };
   const key = process.env.OPENAI_API_KEY;
@@ -326,8 +336,10 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string, seg
     const acao = (descricao || "").trim().slice(0, 400) || "acenando feliz, dando boas-vindas, com um sorriso alegre";
     // Se o dono escreveu uma FALA, o mascote FALA (lip sync + voz de personagem fofo). Senão, só música.
     const falaTxt = (fala || "").trim().slice(0, 160);
+    // Voz DEFINIDA do castelinho (o dono escolhe uma vez e fica salva) — dá personalidade consistente.
+    const vozDesc = (marca.mascoteVoz || "").trim() || "de PERSONAGEM INFANTIL fofa, alegre, simpática e animada (tom mais agudo, cativante, de mascote de desenho)";
     const audio = falaTxt
-      ? `ÁUDIO: o mascote FALA, em português do Brasil, com a BOCA sincronizada (lip sync), a frase: "${falaTxt}". Voz de PERSONAGEM INFANTIL fofa, alegre, simpática e animada (tom mais agudo, cativante, de mascote de desenho). A fala tem que estar CLARA e bem sincronizada com a boca. Uma musiquinha bem baixinha por trás, sem competir com a voz.`
+      ? `ÁUDIO: o mascote FALA, em português do Brasil, com a BOCA sincronizada (lip sync), a frase: "${falaTxt}". Voz ${vozDesc}. A fala tem que estar CLARA e bem sincronizada com a boca. Uma musiquinha bem baixinha por trás, sem competir com a voz.`
       : `ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
     // AVENTURA: cena animada de verdade (o cenário ganha vida, o mascote é o protagonista).
     // AÇÃO (padrão): o mascote se mexe sobre um fundo parado (cor sólida ou foto real do buffet).

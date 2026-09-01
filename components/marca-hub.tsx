@@ -192,7 +192,7 @@ export function MarcaHub({
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
         {aba === "video-buffet" && <VideoPainel secao="buffet" marcaId={marca.id} festas={festas} tematicos={videosTematicos} corMarca={marca.corPrimaria} capasBanco={marca.capasArte ?? []} mascoteUrl={marca.mascoteUrl ?? ""} logoUrl={marca.logoUrl ?? ""} bibliotecaMusicas={marca.musicas ?? []} />}
         {aba === "video-festa" && <VideoPainel secao="festas" marcaId={marca.id} festas={festas} tematicos={videosTematicos} corMarca={marca.corPrimaria} capasBanco={marca.capasArte ?? []} mascoteUrl={marca.mascoteUrl ?? ""} logoUrl={marca.logoUrl ?? ""} bibliotecaMusicas={marca.musicas ?? []} />}
-        {aba === "mascote" && <MascoteEstudio marcaId={marca.id} mascoteUrl={marca.mascoteUrl ?? ""} mascotes={marca.mascotesArte ?? []} ficha3d={marca.mascoteFicha3d ?? ""} clipes={marca.mascoteClipes ?? []} corMarca={marca.corPrimaria} />}
+        {aba === "mascote" && <MascoteEstudio marcaId={marca.id} mascoteUrl={marca.mascoteUrl ?? ""} mascotes={marca.mascotesArte ?? []} ficha3d={marca.mascoteFicha3d ?? ""} clipes={marca.mascoteClipes ?? []} corMarca={marca.corPrimaria} voz={marca.mascoteVoz ?? ""} />}
         {aba === "instagram" && <InstagramEspelho marcaId={marca.id} />}
         {aba === "paginas" && <PaginasPainel festas={festas} linkBase={linkBase} />}
         {aba === "campanhas" && <CampanhasPainel marcaId={marca.id} temTelefone={Boolean(marca.telefone)} campanhas={campanhas} acento={marca.corPrimaria} />}
