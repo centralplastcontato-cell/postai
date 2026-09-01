@@ -26,13 +26,17 @@ const AVENTURAS_CLIPE = [
 ];
 
 // 🎙️ VOZES do castelinho — o dono escolhe uma e ela fica salva, usada em todos os clipes com fala.
+// Vozes do castelinho — usam o MESMO motor bom dos vídeos do buffet (Google Gemini-TTS): cada uma
+// é uma VOZ (vozId) + uma DIREÇÃO em português (é a direção que dá a personalidade de desenho).
+// `desc` é o texto que fica salvo e vira a dica de voz no vídeo (Sora).
+const BASE_CARTOON = "Fale como um PERSONAGEM DE DESENHO ANIMADO infantil (estilo Disney/Pixar): MUITO expressivo, exagerado, teatral e engraçado, cheio de energia, alegria e emoção, com sorriso na voz. Nada de locutor sério. É um mascote fofo de festa infantil falando com crianças.";
 const VOZES_CLIPE = [
-  { nome: "🎬 Desenho animado", desc: "de personagem de DESENHO ANIMADO estilo Disney/Pixar — MUITO expressiva, exagerada, teatral e cômica, cheia de emoção e energia, tom agudo e cantado, como um personagem clássico de filme de animação infantil" },
-  { nome: "🧚 Fadinha mágica", desc: "de fadinha mágica de conto de fadas, doce, encantada e brilhante, tom bem agudo e sonhador, estilo princesa de desenho animado" },
-  { nome: "🧒 Menino animado", desc: "de menino de uns 8 anos, animada, alegre e brincalhona, tom médio-agudo" },
-  { nome: "👧 Menininha fofa", desc: "de menininha fofa e doce, tom agudo, carinhosa e simpática" },
-  { nome: "🤖 Robôzinho divertido", desc: "de robôzinho divertido, levemente eletrônica e engraçada, animada" },
-  { nome: "🦣 Vozão engraçado", desc: "grave, bonachona e engraçada, tipo gigante gentil e bem-humorado, estilo vilão simpático de desenho" },
+  { nome: "🎬 Desenho animado", vozId: "Leda", direcao: BASE_CARTOON, desc: "de personagem de desenho animado infantil, expressiva e exagerada, alegre e engraçada" },
+  { nome: "🧚 Fadinha mágica", vozId: "Zephyr", direcao: "Fale como uma FADINHA MÁGICA de conto de fadas: encantada, doce e brilhante, tom bem agudo e sonhador, cheia de magia e ternura, como uma princesa de desenho animado falando com crianças.", desc: "de fadinha mágica encantada, doce e brilhante, tom bem agudo e sonhador" },
+  { nome: "🧒 Menino animado", vozId: "Puck", direcao: "Fale como um MENINO animado e brincalhão de uns 8 anos, cheio de energia e alegria, rindo à toa, super empolgado, como um personagem infantil de desenho animado.", desc: "de menino animado e brincalhão, alegre, tom médio-agudo" },
+  { nome: "👧 Menininha fofa", vozId: "Aoede", direcao: "Fale como uma MENININHA fofa e doce, carinhosa e simpática, tom agudo e meiguinho, como uma personagem infantil querida de desenho animado.", desc: "de menininha fofa e doce, carinhosa, tom agudo" },
+  { nome: "🎪 Palhaço animador", vozId: "Fenrir", direcao: "Fale como um PALHAÇO ANIMADOR de festa infantil: escandaloso, engraçado e MUITO animado, showman de picadeiro chamando a criançada, exagerado, divertido e cheio de graça.", desc: "de palhaço animador de festa, escandalosa e engraçada, muito animada" },
+  { nome: "🦣 Vozão engraçado", vozId: "Charon", direcao: "Fale com voz GRAVE, bonachona e engraçada, como um gigante gentil e bem-humorado de desenho animado: lento, cômico, simpático e acolhedor.", desc: "grave, bonachona e engraçada, tipo gigante gentil de desenho" },
 ];
 
 const FICHA_LABELS = ["Frente", "Lado", "Costas"];
@@ -158,11 +162,21 @@ export function MascoteEstudio({
     else setErro(r.erro);
   }
   const [ouvindoVoz, setOuvindoVoz] = useState(false);
-  const [tomVoz, setTomVoz] = useState(1.22); // quão agudo/cartoon (1.0 = normal; 1.22 = desenho; 1.4 = bem agudo)
+  const [tomVoz, setTomVoz] = useState(1.15); // quão agudo/cartoon (1.0 = natural; 1.15 = desenho; 1.3 = bem agudo)
+  // Descobre a VOZ (Google) + a DIREÇÃO da voz escolhida: se bate com um preset, usa o dele; se o
+  // dono escreveu à mão, usa uma voz padrão fofa e monta a direção com o texto dele.
+  function resolverVoz(): { vozId: string; direcao: string } {
+    const p = VOZES_CLIPE.find((v) => v.desc === vozClipe);
+    if (p) return { vozId: p.vozId, direcao: p.direcao };
+    const txt = vozClipe.trim();
+    if (txt) return { vozId: "Leda", direcao: `Fale com uma voz ${txt}. ${BASE_CARTOON}` };
+    return { vozId: VOZES_CLIPE[0].vozId, direcao: VOZES_CLIPE[0].direcao };
+  }
   async function ouvirVoz() {
     setErro(null); setOuvindoVoz(true);
+    const { vozId, direcao } = resolverVoz();
     // Usa a frase do campo "O que o mascote fala?" se tiver; senão, uma frase de exemplo.
-    const r = await ouvirAmostraVoz(marcaId, vozClipe, falaClipe.trim() || undefined, tomVoz).catch(() => ({ ok: false as const, erro: "Não consegui gerar a amostra." }));
+    const r = await ouvirAmostraVoz(marcaId, vozId, direcao, falaClipe.trim() || undefined, tomVoz).catch(() => ({ ok: false as const, erro: "Não consegui gerar a amostra." }));
     setOuvindoVoz(false);
     if (!r.ok) { setErro(r.erro); return; }
     try { await new Audio(r.audio).play(); } catch {}
@@ -578,7 +592,7 @@ export function MascoteEstudio({
             {/* quão AGUDO / de desenho — o efeito de tom é o que dá a cara de cartoon na amostra */}
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               <span className="text-[10px] font-semibold text-muted">🎚️ Tom de desenho:</span>
-              {[{ n: "Suave", v: 1.1 }, { n: "Desenho", v: 1.22 }, { n: "Bem agudo", v: 1.38 }].map((t) => (
+              {[{ n: "Natural", v: 1.0 }, { n: "Desenho", v: 1.15 }, { n: "Bem agudo", v: 1.3 }].map((t) => (
                 <button key={t.n} type="button" disabled={ouvindoVoz || gerandoClipe} onClick={() => setTomVoz(t.v)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${Math.abs(tomVoz - t.v) < 0.001 ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{t.n}</button>
               ))}
             </div>
@@ -588,7 +602,7 @@ export function MascoteEstudio({
               {vozClipe && <button type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz("")} className="text-[11px] font-semibold text-muted transition hover:text-white disabled:opacity-40">voltar ao padrão</button>}
               {vozSalva && <span className="text-[11px] font-semibold text-emerald-400">✓ Voz salva!</span>}
             </div>
-            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">🔊 A amostra é uma <strong className="text-white/70">prévia do estilo</strong> (com o tom mais agudo de desenho). No vídeo, a voz é criada pela IA de vídeo e <strong className="text-white/70">pode soar diferente</strong> — se quiser a voz de desenho <strong className="text-white/70">de verdade dentro do vídeo</strong>, me avise que eu preparo isso. Escreva a fala acima pra ouvir com a sua frase.</p>
+            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">🔊 A amostra usa o <strong className="text-white/70">mesmo motor de voz dos vídeos do buffet</strong> (o que soa bem), com o tom mais agudo de desenho. No vídeo do mascote, a voz é criada pela IA de vídeo e <strong className="text-white/70">pode soar diferente</strong> — se quiser essa voz de desenho <strong className="text-white/70">exatamente dentro do vídeo</strong>, me avise que eu preparo isso. Escreva a fala acima pra ouvir com a sua frase.</p>
           </div>
 
           {/* duração do clipe */}

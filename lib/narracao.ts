@@ -86,6 +86,14 @@ async function falar(texto: string, vozId: string, direcao: string): Promise<Int
   throw new Error(`Voz ${r.status}: ${r.erro}`);
 }
 
+// AMOSTRA de voz (sem música): texto → PCM cru (Int16, 24kHz) com a voz e a direção escolhidas.
+// É o MESMO motor de voz dos vídeos do buffet (Google Gemini-TTS) — o que soa bem e obedece a
+// direção. Serve pra o dono OUVIR uma voz antes de usar (ex.: a voz do mascote).
+export async function amostraVozPcm(texto: string, vozId: string, direcao: string): Promise<Int16Array> {
+  return falar(texto, vozId, direcao);
+}
+export const TAXA_VOZ = TAXA; // 24 kHz — sample rate real do PCM que o Google devolve
+
 // Lê as amostras de um WAV PCM 16 bits (pula o cabeçalho, achando o bloco "data").
 function pcmDoWav(buf: Buffer): Int16Array {
   let pos = 12; // depois de "RIFF....WAVE"

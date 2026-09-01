@@ -179,37 +179,25 @@ function pcmParaWavAgudo(pcm: Buffer, sampleRateReal: number, fator: number): Bu
   return Buffer.concat([header, pcm]);
 }
 
-// AMOSTRA da voz: gera um audiozinho (TTS) pra o dono OUVIR o estilo da voz ANTES de gerar o vídeo.
-// Pra soar de DESENHO ANIMADO de verdade a gente sobe o TOM do áudio (a IA de voz sozinha soa
-// humana demais; o efeito de tom é o que dá a cara de cartoon). `agudo` controla a intensidade.
-// É uma APROXIMAÇÃO do estilo — o vídeo final usa a voz da IA de vídeo (pode soar um pouco diferente).
-export async function ouvirAmostraVoz(marcaId: string, vozDesc: string, frase?: string, agudo?: number) {
+// AMOSTRA da voz: gera um audiozinho pra o dono OUVIR a voz do mascote ANTES de gerar o vídeo.
+// Usa o MESMO motor de voz dos vídeos do buffet (Google Gemini-TTS) — o que soa BEM e obedece a
+// DIREÇÃO de voz (é isso que tira o tom robótico). Por cima, dá pra subir o TOM (`agudo`) pra
+// aquele jeitão de personagem de DESENHO ANIMADO.
+// OBS: o vídeo final é gerado pela IA de vídeo (Sora), que cria a voz dela — pode soar diferente.
+export async function ouvirAmostraVoz(marcaId: string, vozId: string, direcao: string, frase?: string, agudo?: number) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
-  const texto = (frase || "").trim().slice(0, 120) || "Oi! Venha comemorar a festa do seu filho aqui no nosso buffet!";
-  const estilo = (vozDesc || "").trim().slice(0, 300) || "de personagem de desenho animado estilo Disney/Pixar, muito expressiva, exagerada e cômica, tom agudo e cantado";
-  // fator do tom (quanto sobe o agudo). 1.0 = normal; padrão 1.22 (cartoon). Limita pra não virar chiado.
-  const fator = Math.min(1.5, Math.max(1.0, typeof agudo === "number" && isFinite(agudo) ? agudo : 1.22));
+  const texto = (frase || "").trim().slice(0, 200) || "Oi! Venha comemorar a festa do seu filho aqui no nosso castelo!";
+  // fator do tom (quanto sobe o agudo). 1.0 = natural; padrão 1.15 (desenho). Limita pra não virar chiado.
+  const fator = Math.min(1.4, Math.max(1.0, typeof agudo === "number" && isFinite(agudo) ? agudo : 1.15));
   try {
-    const resp = await fetch("https://api.openai.com/v1/audio/speech", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "gpt-4o-mini-tts",
-        voice: "coral",
-        input: texto,
-        instructions: `Fale em português do Brasil, com voz ${estilo}. Interprete como um PERSONAGEM DE DESENHO ANIMADO (estilo Disney/Pixar): bem EXAGERADO, expressivo e teatral, cheio de emoção, energia e diversão — nada de voz neutra de locutor. Tom agudo, animado e cantado, de mascote fofo de festa infantil.`,
-        response_format: "pcm", // PCM cru (24kHz, mono, 16-bit) pra eu poder subir o tom
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
-    if (!resp.ok) return { ok: false as const, erro: `Não consegui gerar a amostra agora (${resp.status}).` };
-    const pcm = Buffer.from(await resp.arrayBuffer());
-    const wav = pcmParaWavAgudo(pcm, 24000, fator); // OpenAI PCM = 24kHz mono 16-bit
+    const { amostraVozPcm, TAXA_VOZ } = await import("@/lib/narracao");
+    const int16 = await amostraVozPcm(texto, (vozId || "").trim(), (direcao || "").trim());
+    const pcm = Buffer.from(int16.buffer, int16.byteOffset, int16.byteLength); // Int16 → bytes LE
+    const wav = pcmParaWavAgudo(pcm, TAXA_VOZ, fator);
     return { ok: true as const, audio: `data:audio/wav;base64,${wav.toString("base64")}` };
-  } catch {
+  } catch (e) {
+    console.error("Erro na amostra de voz do mascote:", e);
     return { ok: false as const, erro: "Não consegui gerar a amostra agora. Tente de novo." };
   }
 }
