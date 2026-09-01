@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote, ouvirAmostraVoz } from "@/app/actions/mascote";
 import { imagensDoBanco } from "@/app/actions/imagens";
 
 // Ações prontas pro clipe do mascote (1 toque preenche a descrição, sem digitar).
@@ -155,6 +155,15 @@ export function MascoteEstudio({
     setSalvandoVoz(false);
     if (r.ok) { setVozSalva(true); setTimeout(() => setVozSalva(false), 2500); }
     else setErro(r.erro);
+  }
+  const [ouvindoVoz, setOuvindoVoz] = useState(false);
+  async function ouvirVoz() {
+    setErro(null); setOuvindoVoz(true);
+    // Usa a frase do campo "O que o mascote fala?" se tiver; senão, uma frase de exemplo.
+    const r = await ouvirAmostraVoz(marcaId, vozClipe, falaClipe.trim() || undefined).catch(() => ({ ok: false as const, erro: "Não consegui gerar a amostra." }));
+    setOuvindoVoz(false);
+    if (!r.ok) { setErro(r.erro); return; }
+    try { await new Audio(r.audio).play(); } catch {}
   }
   const [descClipe, setDescClipe] = useState("");
   const [ehAventura, setEhAventura] = useState(false); // cena animada (aventura) x ação simples
@@ -564,11 +573,13 @@ export function MascoteEstudio({
               ))}
             </div>
             <input type="text" value={vozClipe} onChange={(e) => setVozClipe(e.target.value)} maxLength={300} disabled={salvandoVoz || gerandoClipe} placeholder="Ou descreva a voz (ex: menino animado, vozinha fofa e engraçada)" className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-1.5 text-[12px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
-            <div className="mt-1.5 flex items-center gap-2">
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <button type="button" disabled={ouvindoVoz || gerandoClipe} onClick={ouvirVoz} className="rounded-md border border-[#a855f7]/50 bg-[#a855f7]/15 px-3 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25 disabled:opacity-50">{ouvindoVoz ? "🔊 Gerando…" : "🔊 Ouvir amostra"}</button>
               <button type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz(vozClipe)} className="rounded-md border border-[#a855f7]/50 bg-[#a855f7]/15 px-3 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25 disabled:opacity-50">{salvandoVoz ? "Salvando…" : "💾 Salvar voz"}</button>
               {vozClipe && <button type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz("")} className="text-[11px] font-semibold text-muted transition hover:text-white disabled:opacity-40">voltar ao padrão</button>}
               {vozSalva && <span className="text-[11px] font-semibold text-emerald-400">✓ Voz salva!</span>}
             </div>
+            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">🔊 A amostra é uma <strong className="text-white/70">prévia do estilo</strong> da voz. No vídeo, a voz é criada pela IA de vídeo e pode soar um pouquinho diferente. Escreva a fala acima pra ouvir a amostra com a sua frase.</p>
           </div>
 
           {/* duração do clipe */}

@@ -156,6 +156,36 @@ export async function definirVozMascote(marcaId: string, voz: string) {
   return { ok: true as const };
 }
 
+// AMOSTRA da voz: gera um audiozinho (TTS) pra o dono OUVIR o estilo da voz ANTES de gerar o vídeo.
+// É uma APROXIMAÇÃO do estilo — o vídeo final usa a voz da IA de vídeo (pode soar um pouco diferente).
+export async function ouvirAmostraVoz(marcaId: string, vozDesc: string, frase?: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  const texto = (frase || "").trim().slice(0, 120) || "Oi! Venha comemorar a festa do seu filho aqui no nosso buffet!";
+  const estilo = (vozDesc || "").trim().slice(0, 300) || "voz de personagem infantil fofa e alegre, tom agudo e cativante";
+  try {
+    const resp = await fetch("https://api.openai.com/v1/audio/speech", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini-tts",
+        voice: "coral",
+        input: texto,
+        instructions: `Fale em português do Brasil, com voz ${estilo}. Tom alegre e brincalhão de mascote de festa infantil.`,
+        response_format: "mp3",
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!resp.ok) return { ok: false as const, erro: `Não consegui gerar a amostra agora (${resp.status}).` };
+    const buf = Buffer.from(await resp.arrayBuffer());
+    return { ok: true as const, audio: `data:audio/mp3;base64,${buf.toString("base64")}` };
+  } catch {
+    return { ok: false as const, erro: "Não consegui gerar a amostra agora. Tente de novo." };
+  }
+}
+
 export async function removerFundoMascote(marcaId: string, url: string) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
