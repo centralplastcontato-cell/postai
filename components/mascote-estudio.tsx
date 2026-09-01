@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote, ouvirAmostraVoz } from "@/app/actions/mascote";
 import { imagensDoBanco } from "@/app/actions/imagens";
@@ -40,6 +40,22 @@ const VOZES_CLIPE = [
 ];
 
 const FICHA_LABELS = ["Frente", "Lado", "Costas"];
+
+// Um clipinho de SILÊNCIO (WAV ~0,1s) só pra "destravar" o áudio no iPhone/iPad dentro do toque —
+// depois disso o Safari deixa a amostra tocar mesmo chegando depois de uma espera.
+const SILENCIO_WAV = (() => {
+  const sr = 8000, n = 800; // 0,1s mono 16-bit
+  const buf = new ArrayBuffer(44 + n * 2);
+  const dv = new DataView(buf);
+  const w = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
+  w(0, "RIFF"); dv.setUint32(4, 36 + n * 2, true); w(8, "WAVE"); w(12, "fmt ");
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  w(36, "data"); dv.setUint32(40, n * 2, true); // amostras já são zero (silêncio)
+  let bin = ""; const bytes = new Uint8Array(buf);
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return `data:audio/wav;base64,${typeof btoa !== "undefined" ? btoa(bin) : ""}`;
+})();
 
 // 🦸 ESTÚDIO DO MASCOTE (Fase 1): o dono gera opções em 3D fofo, escolhe uma e ela vira o
 // mascote OFICIAL da marca. Depois (Fases 2/3) esse MESMO mascote é colado nos posts/vídeos.
@@ -150,7 +166,7 @@ export function MascoteEstudio({
   // DAR VIDA (Fase 5): anima o mascote com IA de vídeo. Em 2 fases (a IA leva 1-2 min): inicia o
   // job e fica consultando até o clipe ficar pronto.
   const clipesUrls = clipes ?? [];
-  const [subAba, setSubAba] = useState<"criar" | "ficha" | "vida">("criar"); // sub-abas do estúdio
+  const [subAba, setSubAba] = useState<"criar" | "ficha" | "vida" | "voz">("criar"); // sub-abas do estúdio
   const [vozClipe, setVozClipe] = useState(voz ?? ""); // voz definida do castelinho
   const [salvandoVoz, setSalvandoVoz] = useState(false);
   const [vozSalva, setVozSalva] = useState(false);
@@ -163,6 +179,10 @@ export function MascoteEstudio({
   }
   const [ouvindoVoz, setOuvindoVoz] = useState(false);
   const [tomVoz, setTomVoz] = useState(1.15); // quão agudo/cartoon (1.0 = natural; 1.15 = desenho; 1.3 = bem agudo)
+  const [fraseVoz, setFraseVoz] = useState(""); // frase de teste da amostra (própria da aba Voz)
+  // Um ÚNICO <audio> reaproveitado. No iPhone/iPad o Safari só deixa tocar áudio se o player já foi
+  // "destravado" por um toque; como a amostra chega depois de uma espera, destravamos no clique.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   // Descobre a VOZ (Google) + a DIREÇÃO da voz escolhida: se bate com um preset, usa o dele; se o
   // dono escreveu à mão, usa uma voz padrão fofa e monta a direção com o texto dele.
   function resolverVoz(): { vozId: string; direcao: string } {
@@ -174,12 +194,20 @@ export function MascoteEstudio({
   }
   async function ouvirVoz() {
     setErro(null); setOuvindoVoz(true);
+    // DESTRAVA o áudio dentro do gesto do toque (senão o iOS bloqueia quando a amostra chega depois).
+    const audio = audioRef.current ?? new Audio();
+    audioRef.current = audio;
+    try { audio.src = SILENCIO_WAV; audio.play().catch(() => {}); } catch {}
     const { vozId, direcao } = resolverVoz();
-    // Usa a frase do campo "O que o mascote fala?" se tiver; senão, uma frase de exemplo.
-    const r = await ouvirAmostraVoz(marcaId, vozId, direcao, falaClipe.trim() || undefined, tomVoz).catch(() => ({ ok: false as const, erro: "Não consegui gerar a amostra." }));
+    const r = await ouvirAmostraVoz(marcaId, vozId, direcao, fraseVoz.trim() || undefined, tomVoz).catch(() => ({ ok: false as const, erro: "Não consegui gerar a amostra." }));
     setOuvindoVoz(false);
     if (!r.ok) { setErro(r.erro); return; }
-    try { await new Audio(r.audio).play(); } catch {}
+    try {
+      audio.src = r.audio;
+      await audio.play();
+    } catch {
+      setErro("O aparelho bloqueou o áudio. Toque em 🔊 Ouvir amostra de novo.");
+    }
   }
   const [descClipe, setDescClipe] = useState("");
   const [ehAventura, setEhAventura] = useState(false); // cena animada (aventura) x ação simples
@@ -364,8 +392,8 @@ export function MascoteEstudio({
       <div className="mb-5 flex flex-wrap gap-2">
         {([
           { id: "criar", rotulo: "🦸 Meu mascote" },
-          ...(mascoteUrl ? [{ id: "ficha", rotulo: "🧊 Ficha 3D" }, { id: "vida", rotulo: "🎬 Dar vida" }] : []),
-        ] as { id: "criar" | "ficha" | "vida"; rotulo: string }[]).map((t) => (
+          ...(mascoteUrl ? [{ id: "voz", rotulo: "🎙️ Voz" }, { id: "vida", rotulo: "🎬 Dar vida" }, { id: "ficha", rotulo: "🧊 Ficha 3D" }] : []),
+        ] as { id: "criar" | "ficha" | "vida" | "voz"; rotulo: string }[]).map((t) => (
           <button key={t.id} type="button" onClick={() => setSubAba(t.id)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${subAba === t.id ? "bg-[#7c3aed] text-white" : "border border-linha text-muted hover:text-white"}`}>{t.rotulo}</button>
         ))}
       </div>
@@ -523,6 +551,45 @@ export function MascoteEstudio({
         </div>
       )}
 
+      {/* ===== SUB-ABA: VOZ (escolher / ouvir a voz do castelinho) ===== */}
+      {subAba === "voz" && mascoteUrl && (
+        <div className="mt-7 rounded-xl border border-[#a855f7]/40 bg-[#a855f7]/5 p-4 sm:p-5">
+          <p className="text-sm font-semibold text-white">🎙️ Voz do castelinho</p>
+          <p className="mt-1 text-xs text-muted">
+            Escolha a voz do mascote e <strong className="text-white/80">ouça uma amostra</strong> antes de gerar o vídeo. A voz salva vale pra <strong className="text-white/80">todos os clipes com fala</strong>.
+          </p>
+
+          {/* 1) escolher a voz */}
+          <label className="mt-4 block text-[10px] font-semibold text-muted">1. Escolha a voz</label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {VOZES_CLIPE.map((v) => (
+              <button key={v.nome} type="button" disabled={salvandoVoz} onClick={() => salvarVoz(v.desc)} className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition disabled:opacity-40 ${vozClipe === v.desc ? "border-[#a855f7] bg-[#a855f7]/25 text-[#d6c6ff]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{v.nome}</button>
+            ))}
+          </div>
+          <input type="text" value={vozClipe} onChange={(e) => setVozClipe(e.target.value)} maxLength={300} disabled={salvandoVoz} placeholder="Ou descreva a voz do seu jeito (ex: menino animado e engraçado)" className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+
+          {/* 2) tom de desenho (efeito de agudo por cima) */}
+          <label className="mt-4 block text-[10px] font-semibold text-muted">2. Tom de desenho <span className="font-normal text-muted/70">(quanto mais agudo, mais cara de cartoon)</span></label>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {[{ n: "Natural", v: 1.0 }, { n: "Desenho", v: 1.15 }, { n: "Bem agudo", v: 1.3 }].map((t) => (
+              <button key={t.n} type="button" disabled={ouvindoVoz} onClick={() => setTomVoz(t.v)} className={`rounded-full border px-3 py-1.5 text-[12px] font-semibold transition disabled:opacity-40 ${Math.abs(tomVoz - t.v) < 0.001 ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{t.n}</button>
+            ))}
+          </div>
+
+          {/* 3) frase de teste + ouvir */}
+          <label className="mt-4 block text-[10px] font-semibold text-muted">3. Frase de teste <span className="font-normal text-muted/70">(opcional)</span></label>
+          <input type="text" value={fraseVoz} onChange={(e) => setFraseVoz(e.target.value)} maxLength={200} disabled={ouvindoVoz} placeholder="Ex: Venha comemorar sua festa aqui no Castelo!" className="mt-1 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" disabled={ouvindoVoz} onClick={ouvirVoz} className="rounded-lg bg-[#7c3aed] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50">{ouvindoVoz ? "🔊 Gerando amostra…" : "🔊 Ouvir amostra"}</button>
+            <button type="button" disabled={salvandoVoz} onClick={() => salvarVoz(vozClipe)} className="rounded-lg border border-[#a855f7]/50 bg-[#a855f7]/15 px-4 py-2 text-sm font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25 disabled:opacity-50">{salvandoVoz ? "Salvando…" : "💾 Salvar voz"}</button>
+            {vozClipe && <button type="button" disabled={salvandoVoz} onClick={() => salvarVoz("")} className="text-[12px] font-semibold text-muted transition hover:text-white disabled:opacity-40">voltar ao padrão</button>}
+            {vozSalva && <span className="text-[12px] font-semibold text-emerald-400">✓ Voz salva!</span>}
+          </div>
+          <p className="mt-2 text-[10px] leading-snug text-muted/70">🔊 A amostra usa o <strong className="text-white/70">mesmo motor de voz dos vídeos do buffet</strong> (o que soa bem). No vídeo do mascote, a voz é criada pela IA de vídeo e <strong className="text-white/70">pode soar diferente</strong> — se quiser essa voz de desenho <strong className="text-white/70">exatamente dentro do vídeo</strong>, me avise que eu preparo isso. <br />No iPhone/iPad, se não tocar de primeira, toque de novo em <strong className="text-white/70">Ouvir amostra</strong>.</p>
+        </div>
+      )}
+
       {/* ===== SUB-ABA: DAR VIDA (vídeos/aventuras) ===== */}
       {/* FASE 5 — DAR VIDA: anima o mascote com IA de vídeo (só quando há mascote oficial) */}
       {subAba === "vida" && mascoteUrl && (
@@ -580,29 +647,10 @@ export function MascoteEstudio({
           />
           <p className="mt-1 text-[10px] leading-snug text-muted/70">A IA cria a voz na hora e sincroniza com a boca. Frases curtas ({durClipe}s dá pra ~{Math.max(4, durClipe * 2)} palavras) saem melhor. Deixe vazio pra ter só uma musiquinha.</p>
 
-          {/* VOZ DEFINIDA do castelinho — escolha uma vez, vale pra todos os clipes com fala */}
-          <div className="mt-3 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-2.5">
-            <p className="text-[10px] font-semibold text-white">🎙️ Voz do castelinho <span className="font-normal text-muted/70">(vale pra todos os clipes com fala)</span></p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {VOZES_CLIPE.map((v) => (
-                <button key={v.nome} type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz(v.desc)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${vozClipe === v.desc ? "border-[#a855f7] bg-[#a855f7]/25 text-[#d6c6ff]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{v.nome}</button>
-              ))}
-            </div>
-            <input type="text" value={vozClipe} onChange={(e) => setVozClipe(e.target.value)} maxLength={300} disabled={salvandoVoz || gerandoClipe} placeholder="Ou descreva a voz (ex: menino animado, vozinha fofa e engraçada)" className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-1.5 text-[12px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
-            {/* quão AGUDO / de desenho — o efeito de tom é o que dá a cara de cartoon na amostra */}
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] font-semibold text-muted">🎚️ Tom de desenho:</span>
-              {[{ n: "Natural", v: 1.0 }, { n: "Desenho", v: 1.15 }, { n: "Bem agudo", v: 1.3 }].map((t) => (
-                <button key={t.n} type="button" disabled={ouvindoVoz || gerandoClipe} onClick={() => setTomVoz(t.v)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${Math.abs(tomVoz - t.v) < 0.001 ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{t.n}</button>
-              ))}
-            </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <button type="button" disabled={ouvindoVoz || gerandoClipe} onClick={ouvirVoz} className="rounded-md border border-[#a855f7]/50 bg-[#a855f7]/15 px-3 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25 disabled:opacity-50">{ouvindoVoz ? "🔊 Gerando…" : "🔊 Ouvir amostra"}</button>
-              <button type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz(vozClipe)} className="rounded-md border border-[#a855f7]/50 bg-[#a855f7]/15 px-3 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25 disabled:opacity-50">{salvandoVoz ? "Salvando…" : "💾 Salvar voz"}</button>
-              {vozClipe && <button type="button" disabled={salvandoVoz || gerandoClipe} onClick={() => salvarVoz("")} className="text-[11px] font-semibold text-muted transition hover:text-white disabled:opacity-40">voltar ao padrão</button>}
-              {vozSalva && <span className="text-[11px] font-semibold text-emerald-400">✓ Voz salva!</span>}
-            </div>
-            <p className="mt-1.5 text-[10px] leading-snug text-muted/70">🔊 A amostra usa o <strong className="text-white/70">mesmo motor de voz dos vídeos do buffet</strong> (o que soa bem), com o tom mais agudo de desenho. No vídeo do mascote, a voz é criada pela IA de vídeo e <strong className="text-white/70">pode soar diferente</strong> — se quiser essa voz de desenho <strong className="text-white/70">exatamente dentro do vídeo</strong>, me avise que eu preparo isso. Escreva a fala acima pra ouvir com a sua frase.</p>
+          {/* lembrete da voz — a escolha/teste da voz agora fica na sub-aba "🎙️ Voz" */}
+          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-2.5">
+            <span className="text-[11px] text-muted">🎙️ Voz do castelinho: <strong className="text-white/80">{VOZES_CLIPE.find((v) => v.desc === vozClipe)?.nome ?? (vozClipe.trim() ? "personalizada" : "🎬 Desenho animado (padrão)")}</strong></span>
+            <button type="button" onClick={() => setSubAba("voz")} className="rounded-md border border-[#a855f7]/50 bg-[#a855f7]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25">trocar / ouvir voz →</button>
           </div>
 
           {/* duração do clipe */}
