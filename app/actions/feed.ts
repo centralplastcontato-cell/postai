@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { put } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca, guardaPublicacao } from "@/lib/acesso";
-import { publicarNasRedes, publicarStoryNasRedes, marcaConectada } from "@/lib/instagram";
+import { publicarNasRedes, publicarStoryNasRedes, marcaConectada, criarContainerReels, criarContainerStoryVideo, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, AGENTE } from "@/lib/config";
 import { TEMPLATES, type Template } from "@/lib/feed-templates";
@@ -860,6 +860,95 @@ export async function criarArtePronta(marcaId: string, imagemUrl: string, format
   return { ok: true as const, id: criado.id, dia };
 }
 
+// Cria a publicação de um VÍDEO ENVIADO pelo dono (aba "Minha arte" → vídeo). Feed vira Reels
+// (formato "reels"), Story vira Story de vídeo (formato "story" + videoUrl). O piloto automático
+// posta pelo container da Meta (igual os Reels de festa). template="arte-pronta" marca que é do dono.
+export async function criarArteVideo(marcaId: string, videoUrl: string, destino: "feed" | "story", dataYMD: string | undefined, hora: number | undefined, legenda: string, hashtags: string, rascunho = false, agora = false) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const cred = await checarCreditoTrial(g.sessao);
+  if (!cred.ok) return { ok: false as const, erro: cred.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  if (!videoUrl.startsWith("http")) return { ok: false as const, erro: "Envie o vídeo primeiro." };
+  const ehStory = destino === "story";
+  const plano = await planoDaMarca(marca.id);
+  if (plano && ehStory && !planoTemStory(plano)) return { ok: false as const, erro: "O Story está disponível a partir do pacote Profissional. Faça upgrade pra liberar." };
+  const horaFeed = typeof hora === "number" ? hora : marca.horaPost;
+  const semAgenda = rascunho || agora;
+  const data = agora ? new Date() : (dataYMD ? new Date(`${dataYMD}T${String(horaFeed).padStart(2, "0")}:00:00-03:00`) : (rascunho ? new Date() : await proximaDataFeed(marca)));
+  if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
+  const legendaFinal = [legenda.trim(), hashtags.trim()].filter(Boolean).join("\n\n").slice(0, 2000);
+  const slug = `${marca.slug}-artevideo-${Date.now().toString(36).slice(-6)}`;
+  const criado = await prisma.publicacao.create({
+    data: {
+      marcaId: marca.id, slug, data,
+      template: "arte-pronta",
+      titulo: "Vídeo enviado",
+      texto: "",
+      legenda: legendaFinal,
+      hashtags: "",
+      imagemUrl: "",
+      videoUrl,
+      extra: "{}",
+      tema: null,
+      categoria: categoriaDoTemplate("divulgacao"),
+      status: rascunho ? "rascunho" : "a_postar",
+      // Feed = Reels (vídeo no feed); Story = Story de vídeo. O piloto/postagem tratam pelo formato + videoUrl.
+      formato: ehStory ? "story" : "reels",
+    },
+  });
+  revalidatePath(`/painel/marcas/${marca.id}`);
+  return { ok: true as const, id: criado.id };
+}
+
+// POSTAR VÍDEO — FASE 1: cria o container na Meta (o vídeo entra em processamento, ~1min). A tela
+// consulta a FASE 2 até ficar pronto. Reels leva legenda; Story de vídeo não (a Meta ignora).
+export async function prepararPostArteVideo(id: string) {
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (ehTrial(g.sessao)) return { ok: false as const, erro: MSG_TRIAL_POSTAR };
+  const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
+  if (!p || p.template !== "arte-pronta" || !p.videoUrl) return { ok: false as const, erro: "Vídeo não encontrado." };
+  if (!marcaConectada(p.marca)) return { ok: false as const, erro: "Conecte o Instagram da marca primeiro." };
+  const conn = { igUserId: p.marca.igUserId as string, accessToken: p.marca.accessToken as string };
+  const c = p.formato === "story"
+    ? await criarContainerStoryVideo(conn, p.videoUrl)
+    : await criarContainerReels(conn, p.videoUrl, p.legenda.slice(0, 2200));
+  if (!c.ok) return { ok: false as const, erro: c.erro };
+  await prisma.publicacao.update({ where: { id }, data: { reelsContainerId: c.containerId } }).catch(() => {});
+  return { ok: true as const, containerId: c.containerId };
+}
+
+// POSTAR VÍDEO — FASE 2: confere o processamento. Enquanto processa → { pronto:false }. Quando fica
+// pronto, PUBLICA (com claim atômico pra nunca duplicar com o piloto) e marca como postado.
+export async function concluirPostArteVideo(id: string, containerId: string) {
+  const g = await guardaPublicacao(id);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const p = await prisma.publicacao.findUnique({ where: { id }, include: { marca: true } });
+  if (!p || !p.videoUrl) return { ok: false as const, erro: "Vídeo não encontrado." };
+  if (!marcaConectada(p.marca)) return { ok: false as const, erro: "Conecte o Instagram da marca primeiro." };
+  const conn = { igUserId: p.marca.igUserId as string, accessToken: p.marca.accessToken as string };
+  const st = await statusContainerReels(conn, containerId);
+  if (st === "IN_PROGRESS" || st === "UNKNOWN") return { ok: true as const, pronto: false as const };
+  if (st === "ERROR" || st === "EXPIRED") {
+    await prisma.publicacao.update({ where: { id }, data: { reelsContainerId: "" } }).catch(() => {}); // recria do zero
+    return { ok: false as const, erro: `A Meta não conseguiu processar o vídeo (${st}). Tente de novo.` };
+  }
+  // FINISHED → CLAIM: só publica se ainda não foi postado (evita duplicar com o piloto/outra aba).
+  const claim = await prisma.publicacao.updateMany({ where: { id, NOT: { status: "postado" } }, data: { status: "postado", postadoEm: new Date() } });
+  if (claim.count === 0) return { ok: true as const, pronto: true as const, permalink: null }; // já foi postado por outro caminho
+  const r = await publicarContainerReels(conn, containerId);
+  if (!r.ok) {
+    await prisma.publicacao.update({ where: { id }, data: { status: "a_postar", postadoEm: null, reelsContainerId: "" } }).catch(() => {});
+    return { ok: false as const, erro: r.erro };
+  }
+  await prisma.publicacao.update({ where: { id }, data: { mediaId: r.mediaId, reelsContainerId: "" } }).catch(() => {});
+  await registrarAtividade(AGENTE, `Postei o vídeo "${p.titulo}" no Instagram de ${p.marca.nome}.`, p.marcaId).catch(() => {});
+  revalidatePath(`/painel/marcas/${p.marcaId}`);
+  return { ok: true as const, pronto: true as const, permalink: r.permalink };
+}
+
 // Lista as artes prontas enviadas pela marca (pra a aba "Minha arte").
 export async function listarArtesProntas(marcaId: string) {
   const g = await guardaMarca(marcaId);
@@ -867,22 +956,24 @@ export async function listarArtesProntas(marcaId: string) {
   const arts = await prisma.publicacao.findMany({
     where: { marcaId, template: "arte-pronta" },
     orderBy: { data: "desc" }, take: 60,
-    select: { id: true, imagemUrl: true, formato: true, data: true, status: true, legenda: true, postadoEm: true },
+    select: { id: true, imagemUrl: true, videoUrl: true, formato: true, data: true, status: true, legenda: true, postadoEm: true },
   });
   return {
     ok: true as const,
-    artes: arts.map((a) => ({ id: a.id, imagemUrl: a.imagemUrl || "", formato: a.formato, dataISO: a.data.toISOString(), status: a.status, legenda: a.legenda, postado: a.status === "postado" })),
+    artes: arts.map((a) => ({ id: a.id, imagemUrl: a.imagemUrl || "", videoUrl: a.videoUrl || "", formato: a.formato, dataISO: a.data.toISOString(), status: a.status, legenda: a.legenda, postado: a.status === "postado" })),
   };
 }
-export type ArteProntaView = { id: string; imagemUrl: string; formato: string; dataISO: string; status: string; legenda: string; postado: boolean };
+export type ArteProntaView = { id: string; imagemUrl: string; videoUrl: string; formato: string; dataISO: string; status: string; legenda: string; postado: boolean };
 
 // Exclui uma arte pronta enviada (só some da agenda; não mexe no que já foi postado no Insta).
 export async function excluirArtePronta(id: string) {
   const g = await guardaPublicacao(id);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const p = await prisma.publicacao.findUnique({ where: { id }, select: { marcaId: true, template: true } });
+  const p = await prisma.publicacao.findUnique({ where: { id }, select: { marcaId: true, template: true, videoUrl: true } });
   if (!p || p.template !== "arte-pronta") return { ok: false as const, erro: "Arte não encontrada." };
   await prisma.publicacao.delete({ where: { id } });
+  // Se era um vídeo enviado, apaga o MP4 do Blob pra liberar espaço (best-effort).
+  if (p.videoUrl && p.videoUrl.startsWith("http")) { try { const { del } = await import("@vercel/blob"); await del(p.videoUrl); } catch {} }
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const };
 }

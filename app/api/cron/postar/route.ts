@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada, criarContainerReels, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
+import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada, criarContainerReels, criarContainerStoryVideo, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
 import { snapshotDeMarca, alertarTokenSeVencendo, coletarInsightsDaMarca } from "@/lib/metricas";
 import { acessoExpirado } from "@/lib/plano";
 import { registrarAtividade } from "@/lib/atividade";
@@ -178,6 +178,8 @@ async function postarStory(m: { id: string; nome: string; igUserId: string | nul
   try {
     const st = await prisma.publicacao.findFirst({ where: { marcaId: m.id, status: "a_postar", data: { lte: agora }, formato: "story" }, orderBy: { data: "asc" } });
     if (!st) return;
+    // Story de VÍDEO (enviado na "Minha arte") → posta pelo container da Meta (2 fases), não pelo render.
+    if (st.videoUrl && st.videoUrl.startsWith("http")) { await postarStoryVideo(m, st, out); return; }
     if (!(await claimPublicacao(st.id))) return;
 
     const r = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${st.id}?v=${tokenArte(st)}`);
@@ -195,6 +197,65 @@ async function postarStory(m: { id: string; nome: string; igUserId: string | nul
 }
 
 const dorme = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// PILOTO DO STORY DE VÍDEO (mesma lógica 2 fases do Reels): cria o container de Story de vídeo,
+// aguarda processar e publica quando FINISHED. Reaproveita reelsContainerId entre as passadas.
+async function postarStoryVideo(m: { id: string; nome: string; igUserId: string | null; accessToken: string | null }, st: { id: string; titulo: string; videoUrl: string | null; reelsContainerId: string }, out: Resultado[]) {
+  try {
+    if (!st.videoUrl) return;
+    const conn = { igUserId: m.igUserId as string, accessToken: m.accessToken as string };
+
+    // FASE 2 — container já criado numa passada anterior
+    if (st.reelsContainerId) {
+      const status = await statusContainerReels(conn, st.reelsContainerId);
+      if (status === "FINISHED") {
+        if (!(await claimPublicacao(st.id))) return; // já pego por outra execução
+        const r = await publicarContainerReels(conn, st.reelsContainerId);
+        if (r.ok) {
+          await registrarAtividade(AGENTE, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
+          await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.mediaId, reelsContainerId: "" } }).catch(() => {});
+        } else {
+          await prisma.publicacao.update({ where: { id: st.id }, data: { status: "a_postar", postadoEm: null, reelsContainerId: "" } }).catch(() => {});
+          await registrarAtividade(AGENTE, `Não consegui publicar o Story "${st.titulo}" de ${m.nome}: ${r.erro}`, m.id).catch(() => {});
+        }
+        out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: r.ok, erro: r.ok ? undefined : r.erro });
+      } else if (status === "ERROR" || status === "EXPIRED") {
+        await prisma.publicacao.update({ where: { id: st.id }, data: { reelsContainerId: "" } }).catch(() => {}); // recria na próxima
+        out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: false, erro: status });
+      }
+      return; // IN_PROGRESS/UNKNOWN → espera a próxima passada
+    }
+
+    // FASE 1 — cria o container e guarda; poll curto pra publicar já se ficar pronto rápido
+    const c = await criarContainerStoryVideo(conn, st.videoUrl);
+    if (!c.ok) { out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: false, erro: c.erro }); return; }
+    await prisma.publicacao.update({ where: { id: st.id }, data: { reelsContainerId: c.containerId } }).catch(() => {});
+    for (let i = 0; i < 5; i++) { // ~20s
+      await dorme(4000);
+      const s = await statusContainerReels(conn, c.containerId);
+      if (s === "FINISHED") {
+        if (!(await claimPublicacao(st.id))) return;
+        const r = await publicarContainerReels(conn, c.containerId);
+        if (r.ok) {
+          await registrarAtividade(AGENTE, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
+          await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.mediaId, reelsContainerId: "" } }).catch(() => {});
+        } else {
+          await prisma.publicacao.update({ where: { id: st.id }, data: { status: "a_postar", postadoEm: null, reelsContainerId: "" } }).catch(() => {});
+        }
+        out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: r.ok, erro: r.ok ? undefined : r.erro });
+        return;
+      }
+      if (s === "ERROR" || s === "EXPIRED") {
+        await prisma.publicacao.update({ where: { id: st.id }, data: { reelsContainerId: "" } }).catch(() => {});
+        out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: false, erro: s });
+        return;
+      }
+    }
+    out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: false, erro: "processando" }); // fica pra próxima passada
+  } catch (e) {
+    out.push({ marca: m.nome, tipo: "story", titulo: "(erro)", ok: false, erro: msg(e) });
+  }
+}
 
 // Publica um container de Reels JÁ pronto (FINISHED): claim atômico + media_publish + atividade.
 async function publicarReelsPronto(
@@ -288,7 +349,7 @@ async function arquivarReelsPostados(m: { id: string; nome: string }, agora: Dat
       // Reels TEMÁTICO (vídeo do buffet) é EVERGREEN: o mesmo MP4 é repostado em várias datas,
       // então nunca arquivamos — apagá-lo quebraria os reposts agendados. O vínculo é a coluna
       // videoTematicoId (não um prefixo de slug): null = Reels de festa, que arquiva normal.
-      where: { marcaId: m.id, formato: "reels", status: "postado", postadoEm: { lt: limite }, videoUrl: { startsWith: "http" }, videoTematicoId: null },
+      where: { marcaId: m.id, formato: { in: ["reels", "story"] }, status: "postado", postadoEm: { lt: limite }, videoUrl: { startsWith: "http" }, videoTematicoId: null },
       select: { id: true, videoUrl: true, titulo: true },
       take: 5, // no máx. 5 por passada — não estoura a janela de 60s do cron
     });

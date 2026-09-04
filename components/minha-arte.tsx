@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { gerarLegendaArte, criarArtePronta, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
+import { gerarLegendaArte, criarArtePronta, criarArteVideo, prepararPostArteVideo, concluirPostArteVideo, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
 import { InputDataBR } from "@/components/input-data-br";
 
 function dataBR(iso: string): string {
@@ -14,7 +14,9 @@ function dataBR(iso: string): string {
 // A arte vai EXATAMENTE como ele fez (o render mostra a imagem inteira, sem template por cima).
 export function MinhaArte({ marcaId }: { marcaId: string }) {
   const router = useRouter();
-  const [imagemUrl, setImagemUrl] = useState("");
+  const [imagemUrl, setImagemUrl] = useState(""); // URL da mídia enviada (imagem OU vídeo)
+  const [midia, setMidia] = useState<"imagem" | "video">("imagem"); // o que foi enviado
+  const [progresso, setProgresso] = useState(0); // % do upload do vídeo (arquivo grande)
   const [subindo, setSubindo] = useState(false);
   const [erro, setErro] = useState("");
   const [legenda, setLegenda] = useState("");
@@ -41,16 +43,48 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
 
   async function handleUpload(file?: File) {
     if (!file) return;
-    setErro(""); setOk(""); setSubindo(true);
+    const ehVideo = (file.type || "").startsWith("video/") || /\.(mp4|mov|m4v|webm)$/i.test(file.name);
+    setErro(""); setOk(""); setSubindo(true); setProgresso(0);
     try {
-      const form = new FormData();
-      form.append("file", file);
-      const resp = await fetch("/api/marketing/upload", { method: "POST", body: form });
-      const d = await resp.json();
-      if (d.ok && d.url) { setImagemUrl(d.url); setLegenda(""); setHashtags(""); setOpcoes([]); }
-      else setErro(d.erro || "Não consegui enviar a arte.");
-    } catch { setErro("Não consegui enviar a arte. Tente de novo."); }
-    setSubindo(false);
+      if (ehVideo) {
+        // Vídeo é grande demais pro upload normal (limite de 4,5MB das funções). Sobe DIRETO pro
+        // Blob a partir do navegador (client upload), que aguenta arquivos grandes.
+        const { upload } = await import("@vercel/blob/client");
+        const nome = (file.name || "video.mp4").replace(/[^a-zA-Z0-9.-]/g, "_");
+        const blob = await upload(`artes-video/${Date.now()}-${nome}`, file, {
+          access: "public",
+          handleUploadUrl: "/api/marketing/blob-upload",
+          contentType: file.type || "video/mp4",
+          onUploadProgress: (e) => setProgresso(Math.round(e.percentage)),
+        });
+        setImagemUrl(blob.url); setMidia("video"); setFormato("feed"); setLegenda(""); setHashtags(""); setOpcoes([]);
+      } else {
+        const form = new FormData();
+        form.append("file", file);
+        const resp = await fetch("/api/marketing/upload", { method: "POST", body: form });
+        const d = await resp.json();
+        if (d.ok && d.url) { setImagemUrl(d.url); setMidia("imagem"); setLegenda(""); setHashtags(""); setOpcoes([]); }
+        else setErro(d.erro || "Não consegui enviar a arte.");
+      }
+    } catch { setErro(ehVideo ? "Não consegui enviar o vídeo. Confira o tamanho (máx. 120MB) e tente de novo." : "Não consegui enviar a arte. Tente de novo."); }
+    setSubindo(false); setProgresso(0);
+  }
+
+  // Espera curta (usada no poll do vídeo).
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  // POSTAR VÍDEO AGORA (2 fases): inicia o container na Meta e fica consultando até publicar.
+  // Se ainda estiver processando depois de ~1min, retorna "processando" (o piloto termina sozinho).
+  async function postarVideoAgora(id: string): Promise<{ ok: boolean; erro?: string; processando?: boolean }> {
+    const prep = await prepararPostArteVideo(id).catch(() => ({ ok: false as const, erro: "Não consegui iniciar a postagem." }));
+    if (!prep.ok) return { ok: false, erro: prep.erro };
+    for (let i = 0; i < 16; i++) {
+      await sleep(4000);
+      const r = await concluirPostArteVideo(id, prep.containerId).catch(() => ({ ok: false as const, erro: "Falha ao checar o vídeo." }));
+      if (!r.ok) return { ok: false, erro: r.erro };
+      if (r.pronto) return { ok: true };
+    }
+    return { ok: false, processando: true };
   }
 
   async function lerArte() {
@@ -67,34 +101,50 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
 
   // modo: "rascunho" (só guarda, não posta nem agenda) | "agendar" (entra na agenda) | "postar" (posta já).
   // "ambos" = Feed + Story.
+  const rotuloFmt = (fmt: "feed" | "story") => fmt === "story" ? "Story" : (midia === "video" ? "Reels" : "Feed");
+
   async function salvar(modo: "rascunho" | "agendar" | "postar") {
-    if (!imagemUrl) { setErro("Envie a arte primeiro."); return; }
+    if (!imagemUrl) { setErro(midia === "video" ? "Envie o vídeo primeiro." : "Envie a arte primeiro."); return; }
     setErro(""); setOk(""); setSalvando(true);
     const legendaFinal = [legenda.trim(), hashtags.trim()].filter(Boolean).join("\n\n");
     const rascunho = modo === "rascunho";
     const postarAgora = modo === "postar";
     const alvos: ("feed" | "story")[] = formato === "ambos" ? ["feed", "story"] : [formato];
     const feitos: string[] = [];
-    let ultimoErro = "";
+    let ultimoErro = ""; let processando = false;
     for (const fmt of alvos) {
-      const r = await criarArtePronta(marcaId, imagemUrl, fmt, postarAgora ? undefined : (data || undefined), hora, legendaFinal, "", rascunho, postarAgora).catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
-      if (!r.ok) { ultimoErro = r.erro; continue; }
-      if (postarAgora) {
-        const post = await (fmt === "story" ? postarStory(r.id) : postarPublicacao(r.id)).catch(() => ({ ok: false as const, erro: "Salvei, mas não consegui postar agora." }));
-        if (post.ok) feitos.push(fmt === "story" ? "Story" : "Feed");
-        else ultimoErro = post.erro;
+      if (midia === "video") {
+        const r = await criarArteVideo(marcaId, imagemUrl, fmt, postarAgora ? undefined : (data || undefined), hora, legenda, hashtags, rascunho, postarAgora).catch(() => ({ ok: false as const, erro: "Não consegui salvar o vídeo agora." }));
+        if (!r.ok) { ultimoErro = r.erro; continue; }
+        if (postarAgora) {
+          const pr = await postarVideoAgora(r.id);
+          if (pr.ok) feitos.push(rotuloFmt(fmt));
+          else if (pr.processando) processando = true;
+          else ultimoErro = pr.erro || "Não consegui postar o vídeo.";
+        } else feitos.push(rotuloFmt(fmt));
       } else {
-        feitos.push(fmt === "story" ? "Story" : "Feed");
+        const r = await criarArtePronta(marcaId, imagemUrl, fmt, postarAgora ? undefined : (data || undefined), hora, legendaFinal, "", rascunho, postarAgora).catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
+        if (!r.ok) { ultimoErro = r.erro; continue; }
+        if (postarAgora) {
+          const post = await (fmt === "story" ? postarStory(r.id) : postarPublicacao(r.id)).catch(() => ({ ok: false as const, erro: "Salvei, mas não consegui postar agora." }));
+          if (post.ok) feitos.push(rotuloFmt(fmt));
+          else ultimoErro = post.erro;
+        } else feitos.push(rotuloFmt(fmt));
       }
     }
     setSalvando(false);
-    if (feitos.length) {
-      setOk(
-        postarAgora ? `Publicado no Instagram: ${feitos.join(" + ")}! 🎉`
-        : rascunho ? `Arte salva (${feitos.join(" + ")})! Fica guardada em "Suas artes" pra postar quando quiser. 💾`
-        : (data ? `Agendado (${feitos.join(" + ")}) pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : `Agendado: ${feitos.join(" + ")} (próxima data livre)! 📅`)
-      );
-      setImagemUrl(""); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
+    if (feitos.length || processando) {
+      let msg = "";
+      if (postarAgora) {
+        if (feitos.length) msg = `Publicado no Instagram: ${feitos.join(" + ")}! 🎉`;
+        if (processando) msg = `${msg ? msg + " " : ""}O vídeo está sendo processado pela Meta e será postado automaticamente em instantes — pode fechar a tela. ⏳`;
+      } else if (rascunho) {
+        msg = `Salvo (${feitos.join(" + ")})! Fica guardado em "Suas artes" pra postar quando quiser. 💾`;
+      } else {
+        msg = data ? `Agendado (${feitos.join(" + ")}) pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : `Agendado: ${feitos.join(" + ")} (próxima data livre)! 📅`;
+      }
+      setOk(msg);
+      setImagemUrl(""); setMidia("imagem"); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
     }
     if (ultimoErro) setErro(ultimoErro);
     recarregar();
@@ -103,6 +153,15 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
 
   async function postarArte(a: ArteProntaView) {
     setProc(a.id); setResultado(null);
+    if (a.videoUrl) {
+      const pr = await postarVideoAgora(a.id);
+      setProc("");
+      if (pr.ok) setResultado({ tipo: "ok", txt: "Vídeo publicado! 🎉" });
+      else if (pr.processando) setResultado({ tipo: "ok", txt: "Vídeo em processamento na Meta — será postado automaticamente em instantes. ⏳" });
+      else setResultado({ tipo: "erro", txt: pr.erro || "Não consegui postar o vídeo." });
+      recarregar(); router.refresh();
+      return;
+    }
     const post = await (a.formato === "story" ? postarStory(a.id) : postarPublicacao(a.id)).catch(() => ({ ok: false as const, erro: "Não consegui postar agora." }));
     setProc("");
     setResultado(post.ok ? { tipo: "ok", txt: a.formato === "story" ? "Story postado! 🎉" : "Post publicado! 🎉" } : { tipo: "erro", txt: post.erro });
@@ -120,7 +179,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
       <div className="mb-5 rounded-xl border border-[#7c3aed]/40 bg-[#7c3aed]/5 p-4 sm:p-5">
         <p className="text-sm font-semibold text-white">🖼️ Minha arte</p>
         <p className="mt-1 text-xs text-muted">
-          Já tem uma arte pronta (uma <strong className="text-white/80">promoção</strong>, um convite, algo feito no Canva)? Suba aqui e poste <strong className="text-white/80">exatamente como você fez</strong> — a plataforma não mexe nela. A <strong className="text-white/80">Bia lê a arte</strong> e escreve a legenda combinando. 🤖
+          Já tem uma arte pronta — uma <strong className="text-white/80">imagem</strong> (promoção, convite, algo do Canva) ou um <strong className="text-white/80">vídeo</strong>? Suba aqui e poste <strong className="text-white/80">exatamente como você fez</strong> — a plataforma não mexe nela. Vídeo vai como <strong className="text-white/80">Reels</strong> (feed) ou <strong className="text-white/80">Story</strong>. A <strong className="text-white/80">Bia lê a arte</strong> e escreve a legenda combinando. 🤖
         </p>
       </div>
 
@@ -129,22 +188,27 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
 
       {/* 1) Enviar a arte */}
       <div className="mb-4 rounded-xl border border-linha bg-preto-card p-4">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted">1 · Envie a arte</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted">1 · Envie a arte ou o vídeo</p>
         {imagemUrl ? (
           <div className="mt-2 flex flex-wrap items-start gap-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={imagemUrl} alt="Arte" className="max-h-72 w-auto rounded-lg border border-linha object-contain" />
+            {midia === "video" ? (
+              /* eslint-disable-next-line jsx-a11y/media-has-caption */
+              <video src={imagemUrl} controls playsInline className="max-h-72 w-auto rounded-lg border border-linha bg-black object-contain" />
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={imagemUrl} alt="Arte" className="max-h-72 w-auto rounded-lg border border-linha object-contain" />
+            )}
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-linha px-3 py-2 text-xs text-muted transition hover:border-white/30 hover:text-white">
-              🔄 Trocar arte
-              <input type="file" accept="image/*" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0])} />
+              🔄 Trocar
+              <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0])} />
             </label>
           </div>
         ) : (
           <label className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-linha bg-preto p-8 text-center text-sm text-muted transition hover:border-[#7c3aed]">
             <span className="text-2xl">📤</span>
-            <span className="font-semibold text-white/80">{subindo ? "Enviando…" : "Toque pra enviar a arte"}</span>
-            <span className="text-[11px] text-muted/70">Pro Story faça a arte em 9:16 (vertical); pro Feed em 4:5. Assim ela cabe inteira, sem cortar.</span>
-            <input type="file" accept="image/*" className="hidden" disabled={subindo} onChange={(e) => handleUpload(e.target.files?.[0])} />
+            <span className="font-semibold text-white/80">{subindo ? (progresso > 0 ? `Enviando vídeo… ${progresso}%` : "Enviando…") : "Toque pra enviar imagem ou vídeo"}</span>
+            <span className="text-[11px] text-muted/70">Imagem: Story em 9:16, Feed em 4:5. Vídeo (MP4, até 120MB): 9:16 pro Story/Reels. Assim cabe inteiro, sem cortar.</span>
+            <input type="file" accept="image/*,video/*" className="hidden" disabled={subindo} onChange={(e) => handleUpload(e.target.files?.[0])} />
           </label>
         )}
       </div>
@@ -155,8 +219,9 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
           <div className="mb-4 rounded-xl border border-linha bg-preto-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">2 · Legenda</p>
-              <button type="button" onClick={lerArte} disabled={lendoArte} className="rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50">{lendoArte ? "🤖 Lendo a arte…" : opcoes.length ? "🔄 Gerar de novo" : "🤖 A Bia lê a arte e escreve"}</button>
+              {midia === "imagem" && <button type="button" onClick={lerArte} disabled={lendoArte} className="rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50">{lendoArte ? "🤖 Lendo a arte…" : opcoes.length ? "🔄 Gerar de novo" : "🤖 A Bia lê a arte e escreve"}</button>}
             </div>
+            {midia === "video" && <p className="mt-1 text-[10px] text-muted/70">🎬 No vídeo, escreva a legenda você mesmo (a Bia lê imagem, não vídeo). No Story a legenda não aparece.</p>}
 
             {/* 3 opções da Bia — toque na que gostar (ela cai no campo abaixo, e dá pra ajustar) */}
             {opcoes.length > 0 && (
@@ -184,7 +249,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
             <p className="text-xs font-semibold uppercase tracking-wider text-muted">3 · Onde e quando</p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button type="button" onClick={() => setFormato("story")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${formato === "story" ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>📲 Story (9:16)</button>
-              <button type="button" onClick={() => setFormato("feed")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${formato === "feed" ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>🖼️ Feed (4:5)</button>
+              <button type="button" onClick={() => setFormato("feed")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${formato === "feed" ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>{midia === "video" ? "🎬 Reels (feed)" : "🖼️ Feed (4:5)"}</button>
               <button type="button" onClick={() => setFormato("ambos")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${formato === "ambos" ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>📲🖼️ Os dois</button>
             </div>
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -204,7 +269,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
               <button type="button" onClick={() => salvar("agendar")} disabled={salvando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 disabled:opacity-50">{salvando ? "…" : "📅 Agendar"}</button>
               <button type="button" onClick={() => salvar("postar")} disabled={salvando} className="rounded-lg bg-[#C13584] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50">{salvando ? "Postando…" : "📲 Postar agora"}</button>
             </div>
-            <p className="mt-2 text-[10px] leading-snug text-muted/70">A arte vai <strong className="text-white/70">exatamente como você enviou</strong>. No Story a legenda não aparece na imagem (o Instagram não mostra legenda em Story).</p>
+            <p className="mt-2 text-[10px] leading-snug text-muted/70">A arte vai <strong className="text-white/70">exatamente como você enviou</strong>. No Story a legenda não aparece (o Instagram não mostra legenda em Story).{midia === "video" && <> Vídeo demora <strong className="text-white/70">~1 min</strong> pra processar na Meta ao postar.</>}</p>
           </div>
         </>
       )}
@@ -221,11 +286,18 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {artes.map((a) => (
               <div key={a.id} className="overflow-hidden rounded-xl border border-linha bg-preto-card">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={a.imagemUrl} alt="" className={`w-full bg-black object-contain ${a.formato === "story" ? "aspect-[9/16]" : "aspect-[4/5]"}`} />
+                {a.videoUrl ? (
+                  /* eslint-disable-next-line jsx-a11y/media-has-caption */
+                  <video src={a.videoUrl} controls playsInline className={`w-full bg-black object-contain ${a.formato === "story" ? "aspect-[9/16]" : "aspect-[4/5]"}`} />
+                ) : a.imagemUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={a.imagemUrl} alt="" className={`w-full bg-black object-contain ${a.formato === "story" ? "aspect-[9/16]" : "aspect-[4/5]"}`} />
+                ) : (
+                  <div className={`flex w-full items-center justify-center bg-black text-center text-[10px] text-muted/70 ${a.formato === "story" ? "aspect-[9/16]" : "aspect-[4/5]"}`}>🎬 Vídeo postado<br />(arquivado)</div>
+                )}
                 <div className="p-2">
                   <div className="flex items-center justify-between gap-1 text-[10px]">
-                    <span className="font-semibold text-white/80">{a.formato === "story" ? "📲 Story" : "🖼️ Feed"}</span>
+                    <span className="font-semibold text-white/80">{a.formato === "story" ? "📲 Story" : a.videoUrl ? "🎬 Reels" : "🖼️ Feed"}</span>
                     <span className={`rounded-full px-1.5 py-0.5 font-bold ${a.postado ? "bg-sky-600 text-white" : a.status === "rascunho" ? "bg-[#7c3aed]/25 text-[#d6c6ff]" : "bg-amber-500/20 text-amber-300"}`}>{a.postado ? "📮 Postado" : a.status === "rascunho" ? "💾 Salvo" : `⏰ ${dataBR(a.dataISO)}`}</span>
                   </div>
                   <div className="mt-1.5 flex items-center gap-1.5">
