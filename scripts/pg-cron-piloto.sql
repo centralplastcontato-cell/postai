@@ -13,16 +13,16 @@
 -- 1) (opcional) Ver os jobs e o nome exato:
 --    select jobid, jobname, schedule, active from cron.job;
 
--- 2) Deixar a cada 15 minutos:
+-- 2) Deixar de 30 em 30 minutos (nos minutos :00 e :30 — redondo):
 select cron.alter_job(
   (select jobid from cron.job where jobname = 'postai-piloto'),
-  '*/15 * * * *'
+  '0,30 * * * *'
 );
 
 -- 3) Conferir que pegou:
 select jobid, jobname, schedule, active from cron.job where jobname = 'postai-piloto';
 
 -- Outras opções de frequência (troque a linha do passo 2):
+--   a cada 15 min → '*/15 * * * *'
 --   a cada 10 min → '*/10 * * * *'
---   a cada 5 min  → '*/5 * * * *'
 --   voltar 1x/h   → '0 * * * *'
