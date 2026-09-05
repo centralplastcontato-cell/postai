@@ -217,6 +217,22 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
     setProc("");
     recarregar(); router.refresh();
   }
+  // REUSAR: joga a MESMA mídia (vídeo ou imagem) de volta no formulário lá em cima, pra postar de
+  // novo (ex: o vídeo que foi só pro Reels agora vai pro Story) — sem precisar subir tudo outra vez.
+  function usarDeNovo(a: ArteProntaView) {
+    const url = a.videoUrl || a.imagemUrl;
+    if (!url) return;
+    setImagemUrl(url);
+    setMidia(a.videoUrl ? "video" : "imagem");
+    setPosterUrl("");
+    setBriefVideo("");
+    setLegenda(a.legenda || "");
+    setHashtags("");
+    setOpcoes([]);
+    setFormato(a.videoUrl ? "feed" : "story");
+    setErro(""); setOk("");
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch {}
+  }
 
   return (
     <div>
@@ -350,8 +366,9 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
                     <span className="font-semibold text-white/80">{a.formato === "story" ? "📲 Story" : a.videoUrl ? "🎬 Reels" : "🖼️ Feed"}</span>
                     <span className={`rounded-full px-1.5 py-0.5 font-bold ${a.postado ? "bg-sky-600 text-white" : a.status === "rascunho" ? "bg-[#7c3aed]/25 text-[#d6c6ff]" : "bg-amber-500/20 text-amber-300"}`}>{a.postado ? "📮 Postado" : a.status === "rascunho" ? "💾 Salvo" : `⏰ ${dataBR(a.dataISO)}`}</span>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-1.5">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {!a.postado && <button type="button" onClick={() => postarArte(a)} disabled={proc === a.id} className="flex-1 rounded-md bg-[#C13584] px-2 py-1 text-[10px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">{proc === a.id ? "…" : "📲 Postar agora"}</button>}
+                    {(a.videoUrl || a.imagemUrl) && <button type="button" onClick={() => usarDeNovo(a)} title="Reusar essa mídia pra postar de novo (ex: mandar pro Story)" className="flex-1 rounded-md border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-2 py-1 text-[10px] font-bold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25">↻ Usar de novo</button>}
                     <button type="button" onClick={() => excluir(a)} disabled={proc === a.id} title="Excluir" className="rounded-md border border-red-900/60 px-2 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕</button>
                   </div>
                 </div>
