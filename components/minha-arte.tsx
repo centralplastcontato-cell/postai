@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { gerarLegendaArte, gerarLegendaVideo, criarArtePronta, criarArteVideo, prepararPostArteVideo, concluirPostArteVideo, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
+import { gerarLegendaArte, gerarLegendaVideo, gerarVideoImagemMusica, criarArtePronta, criarArteVideo, prepararPostArteVideo, concluirPostArteVideo, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
 import { InputDataBR } from "@/components/input-data-br";
 import { opcoesHora10 } from "@/lib/horarios";
 
@@ -15,13 +15,19 @@ function dataBR(iso: string): string {
 // 🖼️ MINHA ARTE — o dono sobe uma arte PRONTA (feita fora, ex: promoção no Canva), a Bia lê a
 // imagem e escreve a legenda combinando, e ele posta como Story/Feed (na hora ou agendado).
 // A arte vai EXATAMENTE como ele fez (o render mostra a imagem inteira, sem template por cima).
-export function MinhaArte({ marcaId }: { marcaId: string }) {
+export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string; bibliotecaMusicas?: { url: string; nome: string }[] }) {
   const router = useRouter();
   const [imagemUrl, setImagemUrl] = useState(""); // URL da mídia enviada (imagem OU vídeo)
   const [midia, setMidia] = useState<"imagem" | "video">("imagem"); // o que foi enviado
   const [posterUrl, setPosterUrl] = useState(""); // quadro (foto) tirado do vídeo — vira miniatura (best-effort)
   const [briefVideo, setBriefVideo] = useState(""); // 1 linha "do que é o vídeo" — a Bia usa pra escrever a legenda
   const [duracaoVideo, setDuracaoVideo] = useState(0); // duração do vídeo enviado (s) — pra avisar do limite de 60s do Story
+  // 🎵 IMAGEM + MÚSICA (vira videozinho): só pra quando a mídia é IMAGEM
+  const [comMusica, setComMusica] = useState(false);
+  const [musicaUrl, setMusicaUrl] = useState("");
+  const [musicaNome, setMusicaNome] = useState("");
+  const [segMusica, setSegMusica] = useState(15); // 10 | 15 | 30
+  const [subindoMusica, setSubindoMusica] = useState(false);
   const [progresso, setProgresso] = useState(0); // % do upload do vídeo (arquivo grande)
   const [subindo, setSubindo] = useState(false);
   const [erro, setErro] = useState("");
@@ -112,6 +118,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   // Tira a mídia carregada (imagem/vídeo) e volta pra tela de enviar — pra quando o dono desiste dela.
   function limparEnvio() {
     setImagemUrl(""); setMidia("imagem"); setPosterUrl(""); setBriefVideo(""); setDuracaoVideo(0);
+    setComMusica(false); setMusicaUrl(""); setMusicaNome("");
     setLegenda(""); setHashtags(""); setOpcoes([]); setErro(""); setOk("");
     limparPendente();
   }
@@ -150,10 +157,21 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   }
   function usarOpcao(o: OpcaoLegenda) { setLegenda(o.legenda); setHashtags(o.hashtags); }
 
-  // modo: "rascunho" (só guarda, não posta nem agenda) | "agendar" (entra na agenda) | "postar" (posta já).
-  // "ambos" = Feed + Story.
-  const rotuloFmt = (fmt: "feed" | "story") => fmt === "story" ? "Story" : (midia === "video" ? "Reels" : "Feed");
+  // Envia uma MÚSICA (mp3/áudio) pro Blob — pra usar de fundo quando a arte é uma imagem.
+  async function handleUploadMusica(file?: File) {
+    if (!file) return;
+    setErro(""); setSubindoMusica(true);
+    try {
+      const form = new FormData(); form.append("file", file);
+      const resp = await fetch("/api/marketing/upload?tipo=musica", { method: "POST", body: form });
+      const d = await resp.json();
+      if (d.ok && d.url) { setMusicaUrl(d.url); setMusicaNome(d.nome || file.name); }
+      else setErro(d.erro || "Não consegui enviar a música.");
+    } catch { setErro("Não consegui enviar a música. Tente de novo."); }
+    setSubindoMusica(false);
+  }
 
+  // modo: "rascunho" (só guarda, não posta nem agenda) | "agendar" (entra na agenda) | "postar" (posta já).
   async function salvar(modo: "rascunho" | "agendar" | "postar") {
     if (!imagemUrl) { setErro(midia === "video" ? "Envie o vídeo primeiro." : "Envie a arte primeiro."); return; }
     setErro(""); setOk(""); setSalvando(true);
@@ -161,26 +179,41 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
     const rascunho = modo === "rascunho";
     const postarAgora = modo === "postar";
     const alvos: ("feed" | "story")[] = formato === "ambos" ? ["feed", "story"] : [formato];
+
+    // IMAGEM + MÚSICA: gera o videozinho UMA vez (motor) e trata como VÍDEO daqui pra frente.
+    let urlMidia = imagemUrl;
+    let ehVideoAgora = midia === "video";
+    let posterFinal = posterUrl;
+    if (midia === "imagem" && comMusica) {
+      if (!musicaUrl) { setErro("Escolha ou envie uma música (ou desligue a musiquinha)."); setSalvando(false); return; }
+      setOk("🎬 Montando o videozinho com a música… (uns segundos)");
+      const rv = await gerarVideoImagemMusica(marcaId, imagemUrl, musicaUrl, segMusica).catch(() => ({ ok: false as const, erro: "Não consegui montar o videozinho agora." }));
+      setOk("");
+      if (!rv.ok) { setErro(rv.erro); setSalvando(false); return; }
+      urlMidia = rv.videoUrl; ehVideoAgora = true; posterFinal = imagemUrl; // a arte vira a miniatura
+    }
+    const rot = (fmt: "feed" | "story") => fmt === "story" ? "Story" : (ehVideoAgora ? "Reels" : "Feed");
+
     const feitos: string[] = [];
     let ultimoErro = ""; let processando = false;
     for (const fmt of alvos) {
-      if (midia === "video") {
-        const r = await criarArteVideo(marcaId, imagemUrl, fmt, postarAgora ? undefined : (data || undefined), hora, legenda, hashtags, rascunho, postarAgora, posterUrl).catch(() => ({ ok: false as const, erro: "Não consegui salvar o vídeo agora." }));
+      if (ehVideoAgora) {
+        const r = await criarArteVideo(marcaId, urlMidia, fmt, postarAgora ? undefined : (data || undefined), hora, legenda, hashtags, rascunho, postarAgora, posterFinal).catch(() => ({ ok: false as const, erro: "Não consegui salvar o vídeo agora." }));
         if (!r.ok) { ultimoErro = r.erro; continue; }
         if (postarAgora) {
           const pr = await postarVideoAgora(r.id);
-          if (pr.ok) feitos.push(rotuloFmt(fmt));
+          if (pr.ok) feitos.push(rot(fmt));
           else if (pr.processando) processando = true;
           else ultimoErro = pr.erro || "Não consegui postar o vídeo.";
-        } else feitos.push(rotuloFmt(fmt));
+        } else feitos.push(rot(fmt));
       } else {
-        const r = await criarArtePronta(marcaId, imagemUrl, fmt, postarAgora ? undefined : (data || undefined), hora, legendaFinal, "", rascunho, postarAgora).catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
+        const r = await criarArtePronta(marcaId, urlMidia, fmt, postarAgora ? undefined : (data || undefined), hora, legendaFinal, "", rascunho, postarAgora).catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
         if (!r.ok) { ultimoErro = r.erro; continue; }
         if (postarAgora) {
           const post = await (fmt === "story" ? postarStory(r.id) : postarPublicacao(r.id)).catch(() => ({ ok: false as const, erro: "Salvei, mas não consegui postar agora." }));
-          if (post.ok) feitos.push(rotuloFmt(fmt));
+          if (post.ok) feitos.push(rot(fmt));
           else ultimoErro = post.erro;
-        } else feitos.push(rotuloFmt(fmt));
+        } else feitos.push(rot(fmt));
       }
     }
     setSalvando(false);
@@ -196,6 +229,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
       }
       setOk(msg);
       setImagemUrl(""); setPosterUrl(""); setBriefVideo(""); setMidia("imagem"); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
+      setComMusica(false); setMusicaUrl(""); setMusicaNome("");
       limparPendente();
     }
     if (ultimoErro) setErro(ultimoErro);
@@ -323,6 +357,43 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
             <textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} rows={4} placeholder="Escreva a legenda (ou toque em 'A Bia lê a arte' pra ela escrever combinando com a imagem)" className="input-base mt-2 resize-y" />
             <textarea value={hashtags} onChange={(e) => setHashtags(e.target.value)} rows={2} placeholder="#hashtags (opcional)" className="input-base mt-2 resize-y text-[#c7b2ff]" />
           </div>
+          )}
+
+          {/* Música de fundo — só pra IMAGEM: vira um videozinho com a arte parada + a musiquinha */}
+          {midia === "imagem" && (
+            <div className="mb-4 rounded-xl border border-linha bg-preto-card p-4">
+              <label className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-white">
+                <input type="checkbox" checked={comMusica} onChange={(e) => setComMusica(e.target.checked)} className="h-4 w-4 accent-[#7c3aed]" />
+                🎵 Transformar em vídeo com musiquinha de fundo
+              </label>
+              <p className="mt-1 text-[11px] text-muted/70">A sua arte vira um videozinho (parada, com a música por cima) — aí dá pra postar no Story/Reels <strong className="text-white/70">com som</strong>, sem ficar mudo.</p>
+              {comMusica && (
+                <div className="mt-3 space-y-3">
+                  {bibliotecaMusicas.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-muted">Escolha uma música da sua lista:</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {bibliotecaMusicas.map((m) => (
+                          <button key={m.url} type="button" onClick={() => { setMusicaUrl(m.url); setMusicaNome(m.nome); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${musicaUrl === m.url ? "border-[#7c3aed] bg-[#7c3aed]/25 text-white" : "border-linha bg-preto text-muted hover:text-white"}`}>🎵 {m.nome}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-linha px-3 py-1.5 text-xs text-muted transition hover:border-white/30 hover:text-white">
+                    {subindoMusica ? "Enviando…" : "⬆️ Enviar uma música (MP3)"}
+                    <input type="file" accept="audio/*" className="hidden" disabled={subindoMusica} onChange={(e) => handleUploadMusica(e.target.files?.[0])} />
+                  </label>
+                  {musicaUrl && <p className="text-[11px] font-semibold text-emerald-400">✓ Música escolhida: {musicaNome || "ok"}</p>}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] font-semibold text-muted">Duração:</span>
+                    {[10, 15, 30].map((s) => (
+                      <button key={s} type="button" onClick={() => setSegMusica(s)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${segMusica === s ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:text-white"}`}>{s}s{s === 15 ? " ⭐" : ""}</button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] leading-snug text-muted/70">🎧 Prefira músicas <strong className="text-white/70">livres de direitos</strong> — o Instagram pode silenciar músicas famosas.</p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* 3) Formato + data */}

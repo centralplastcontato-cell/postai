@@ -188,7 +188,7 @@ export function MarcaHub({
       <div className="mt-6">
         {aba === "redes" && <RedesSociais marcaId={marca.id} posts={posts} publicacoes={publicacoes} stories={stories} reels={reels} festasComVideo={festasComVideo} diasCarrossel={marca.diasCarrossel} diasFeed={marca.diasFeed} horaPost={marca.horaPost} horaCarrossel={marca.horaCarrossel} paleta={marca.paleta} temFacebook={Boolean(marca.fbPageId)} espelharStoryPadrao={marca.espelharStory} sugestao={sugestao} feedArtes={marca.feedArtes ?? []} temMascote={Boolean(marca.mascoteUrl)} temLogo={Boolean(marca.logoUrl)} />}
         {aba === "imagens" && <BancoImagens marcaId={marca.id} imagens={imagens} />}
-        {aba === "arte" && <MinhaArte marcaId={marca.id} />}
+        {aba === "arte" && <MinhaArte marcaId={marca.id} bibliotecaMusicas={marca.musicas ?? []} />}
         {aba === "festas" && <FestasPainel marcaId={marca.id} linkBase={linkBase} token={tokenFotos} festas={festas} />}
         {aba === "video-buffet" && <VideoPainel secao="buffet" marcaId={marca.id} festas={festas} tematicos={videosTematicos} corMarca={marca.corPrimaria} capasBanco={marca.capasArte ?? []} mascoteUrl={marca.mascoteUrl ?? ""} logoUrl={marca.logoUrl ?? ""} bibliotecaMusicas={marca.musicas ?? []} />}
         {aba === "video-festa" && <VideoPainel secao="festas" marcaId={marca.id} festas={festas} tematicos={videosTematicos} corMarca={marca.corPrimaria} capasBanco={marca.capasArte ?? []} mascoteUrl={marca.mascoteUrl ?? ""} logoUrl={marca.logoUrl ?? ""} bibliotecaMusicas={marca.musicas ?? []} />}

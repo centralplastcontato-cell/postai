@@ -51,3 +51,25 @@ export async function dispararMotorReels(opts: PedidoReels): Promise<{ ok: true 
 export function motorConfigurado(): boolean {
   return Boolean(MOTOR_URL && process.env.GOOGLE_SA_KEY_B64);
 }
+
+// IMAGEM + MÚSICA → videozinho (9:16). Chama o motor no modo SÍNCRONO (é rápido: 1 imagem parada +
+// áudio curto) e devolve a URL do MP4. Usado pra postar uma arte estática COM musiquinha (Story/Reels).
+export async function montarImagemMusica(imagemUrl: string, musicaUrl: string, segundos: number): Promise<{ ok: true; videoUrl: string; duracaoSegundos: number } | { ok: false; erro: string }> {
+  if (!MOTOR_URL) return { ok: false, erro: "Motor de vídeo não configurado (VIDEO_ENGINE_URL)." };
+  try {
+    const auth = new GoogleAuth({ credentials: credenciais() });
+    const client = await auth.getIdTokenClient(MOTOR_URL);
+    const r = await client.request({
+      url: `${MOTOR_URL}/imagem-musica`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: { imagemUrl, musicaUrl, segundos },
+      timeout: 55000,
+    });
+    const d = r.data as { ok?: boolean; videoUrl?: string; duracaoSegundos?: number; erro?: string } | undefined;
+    if (d?.ok && d.videoUrl) return { ok: true, videoUrl: d.videoUrl, duracaoSegundos: d.duracaoSegundos ?? segundos };
+    return { ok: false, erro: d?.erro || "O motor não conseguiu montar o videozinho." };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "Erro ao falar com o motor de vídeo." };
+  }
+}

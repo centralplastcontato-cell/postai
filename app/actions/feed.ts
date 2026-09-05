@@ -918,6 +918,21 @@ export async function criarArtePronta(marcaId: string, imagemUrl: string, format
   return { ok: true as const, id: criado.id, dia };
 }
 
+// IMAGEM + MÚSICA → gera um videozinho (via motor) e devolve a URL do MP4. A tela então posta/
+// agenda esse vídeo pelo fluxo normal de vídeo (criarArteVideo). Pra arte estática virar Reels/Story
+// COM musiquinha (o Instagram não deixa colar música em foto parada via automação).
+export async function gerarVideoImagemMusica(marcaId: string, imagemUrl: string, musicaUrl: string, segundos: number) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (!imagemUrl.startsWith("http")) return { ok: false as const, erro: "Envie a arte primeiro." };
+  if (!musicaUrl || !musicaUrl.startsWith("http")) return { ok: false as const, erro: "Escolha ou envie uma música primeiro." };
+  const seg = [10, 15, 30].includes(segundos) ? segundos : 15;
+  const { montarImagemMusica } = await import("@/lib/video-engine");
+  const r = await montarImagemMusica(imagemUrl, musicaUrl, seg).catch(() => ({ ok: false as const, erro: "Não consegui montar o videozinho agora." }));
+  if (!r.ok) return { ok: false as const, erro: r.erro };
+  return { ok: true as const, videoUrl: r.videoUrl, segundos: r.duracaoSegundos };
+}
+
 // Cria a publicação de um VÍDEO ENVIADO pelo dono (aba "Minha arte" → vídeo). Feed vira Reels
 // (formato "reels"), Story vira Story de vídeo (formato "story" + videoUrl). O piloto automático
 // posta pelo container da Meta (igual os Reels de festa). template="arte-pronta" marca que é do dono.
