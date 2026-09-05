@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { gerarLegendaArte, criarArtePronta, criarArteVideo, prepararPostArteVideo, concluirPostArteVideo, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
+import { gerarLegendaArte, gerarLegendaVideo, criarArtePronta, criarArteVideo, prepararPostArteVideo, concluirPostArteVideo, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
 import { InputDataBR } from "@/components/input-data-br";
 
 function dataBR(iso: string): string {
@@ -16,7 +16,8 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   const router = useRouter();
   const [imagemUrl, setImagemUrl] = useState(""); // URL da mídia enviada (imagem OU vídeo)
   const [midia, setMidia] = useState<"imagem" | "video">("imagem"); // o que foi enviado
-  const [posterUrl, setPosterUrl] = useState(""); // quadro (foto) tirado do vídeo — a Bia lê ele + vira miniatura
+  const [posterUrl, setPosterUrl] = useState(""); // quadro (foto) tirado do vídeo — vira miniatura (best-effort)
+  const [briefVideo, setBriefVideo] = useState(""); // 1 linha "do que é o vídeo" — a Bia usa pra escrever a legenda
   const [progresso, setProgresso] = useState(0); // % do upload do vídeo (arquivo grande)
   const [subindo, setSubindo] = useState(false);
   const [erro, setErro] = useState("");
@@ -58,6 +59,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
         setImagemUrl(p.imagemUrl);
         setMidia(p.midia === "video" ? "video" : "imagem");
         setPosterUrl(typeof p.posterUrl === "string" ? p.posterUrl : "");
+        setBriefVideo(typeof p.briefVideo === "string" ? p.briefVideo : "");
         setLegenda(typeof p.legenda === "string" ? p.legenda : "");
         setHashtags(typeof p.hashtags === "string" ? p.hashtags : "");
         if (p.formato === "story" || p.formato === "feed" || p.formato === "ambos") setFormato(p.formato);
@@ -67,42 +69,11 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   // Salva/limpa o rascunho do envio sempre que a mídia (ou os campos) mudam.
   useEffect(() => {
     try {
-      if (imagemUrl) localStorage.setItem(LS_KEY, JSON.stringify({ imagemUrl, midia, posterUrl, legenda, hashtags, formato }));
+      if (imagemUrl) localStorage.setItem(LS_KEY, JSON.stringify({ imagemUrl, midia, posterUrl, briefVideo, legenda, hashtags, formato }));
       else localStorage.removeItem(LS_KEY);
     } catch {}
-  }, [LS_KEY, imagemUrl, midia, posterUrl, legenda, hashtags, formato]);
+  }, [LS_KEY, imagemUrl, midia, posterUrl, briefVideo, legenda, hashtags, formato]);
   const limparPendente = () => { try { localStorage.removeItem(LS_KEY); } catch {} };
-
-  // Captura um QUADRO (foto) do vídeo a partir do arquivo LOCAL (object URL — sem problema de CORS),
-  // pra a Bia "ler" o vídeo e virar a miniatura. Retorna um File JPEG ou null se não der.
-  function capturarQuadro(file: File): Promise<File | null> {
-    return new Promise((resolve) => {
-      try {
-        const url = URL.createObjectURL(file);
-        const v = document.createElement("video");
-        v.muted = true; v.playsInline = true; v.preload = "auto"; v.src = url;
-        // No iOS o frame só "renderiza" se o <video> estiver no DOM — coloca fora da tela durante a captura.
-        v.style.cssText = "position:fixed;left:-9999px;top:0;width:2px;height:2px;opacity:0;pointer-events:none";
-        document.body.appendChild(v);
-        let feito = false;
-        const encerrar = (r: File | null) => { if (feito) return; feito = true; try { URL.revokeObjectURL(url); } catch {} try { v.remove(); } catch {} resolve(r); };
-        const capturar = () => {
-          try {
-            const c = document.createElement("canvas");
-            c.width = v.videoWidth || 720; c.height = v.videoHeight || 1280;
-            const ctx = c.getContext("2d");
-            if (!ctx || !v.videoWidth) return encerrar(null);
-            ctx.drawImage(v, 0, 0, c.width, c.height);
-            c.toBlob((b) => encerrar(b ? new File([b], "quadro.jpg", { type: "image/jpeg" }) : null), "image/jpeg", 0.85);
-          } catch { encerrar(null); }
-        };
-        v.addEventListener("loadeddata", () => { try { v.currentTime = Math.min(0.5, (v.duration || 1) / 3); } catch { capturar(); } });
-        v.addEventListener("seeked", capturar);
-        v.addEventListener("error", () => encerrar(null));
-        setTimeout(() => encerrar(null), 8000); // não trava se o navegador não decodificar
-      } catch { resolve(null); }
-    });
-  }
 
   async function handleUpload(file?: File) {
     if (!file) return;
@@ -114,25 +85,14 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
         // Blob a partir do navegador (client upload), que aguenta arquivos grandes.
         const { upload } = await import("@vercel/blob/client");
         const nome = (file.name || "video.mp4").replace(/[^a-zA-Z0-9.-]/g, "_");
-        // 1) tira um quadro do vídeo (pra a Bia ler e virar miniatura) — best-effort, do arquivo local.
-        let poster = "";
-        const quadro = await capturarQuadro(file).catch(() => null);
-        if (quadro) {
-          try {
-            const fd = new FormData(); fd.append("file", quadro);
-            const rp = await fetch("/api/marketing/upload", { method: "POST", body: fd });
-            const dp = await rp.json();
-            if (dp.ok && dp.url) poster = dp.url;
-          } catch {}
-        }
-        // 2) sobe o vídeo direto pro Blob (aguenta arquivo grande).
+        // Sobe o vídeo direto pro Blob (aguenta arquivo grande).
         const blob = await upload(`artes-video/${Date.now()}-${nome}`, file, {
           access: "public",
           handleUploadUrl: "/api/marketing/blob-upload",
           contentType: file.type || "video/mp4",
           onUploadProgress: (e) => setProgresso(Math.round(e.percentage)),
         });
-        setImagemUrl(blob.url); setPosterUrl(poster); setMidia("video"); setFormato("feed"); setLegenda(""); setHashtags(""); setOpcoes([]);
+        setImagemUrl(blob.url); setPosterUrl(""); setMidia("video"); setFormato("feed"); setLegenda(""); setHashtags(""); setOpcoes([]); setBriefVideo("");
       } else {
         const form = new FormData();
         form.append("file", file);
@@ -163,11 +123,14 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   }
 
   async function lerArte() {
-    // Pra vídeo, a Bia lê o QUADRO capturado; pra imagem, lê a própria imagem.
-    const alvo = midia === "video" ? posterUrl : imagemUrl;
-    if (!alvo) { setErro(midia === "video" ? "Não consegui pegar um quadro desse vídeo pra Bia ler — escreva a legenda você mesmo." : "Envie a arte primeiro."); return; }
+    if (midia === "video" && !briefVideo.trim()) { setErro("Escreva em uma linha do que é o vídeo (ex: promoção de aniversário) pra a Bia criar a legenda."); return; }
+    if (midia === "imagem" && !imagemUrl) { setErro("Envie a arte primeiro."); return; }
     setErro(""); setLendoArte(true);
-    const r = await gerarLegendaArte(marcaId, alvo).catch(() => ({ ok: false as const, erro: "Não consegui ler agora." }));
+    // Vídeo: a Bia escreve a partir da sua descrição (o navegador do celular não deixa ela "ver" o vídeo).
+    // Imagem: a Bia LÊ a imagem (visão).
+    const r = midia === "video"
+      ? await gerarLegendaVideo(marcaId, briefVideo).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }))
+      : await gerarLegendaArte(marcaId, imagemUrl).catch(() => ({ ok: false as const, erro: "Não consegui ler agora." }));
     setLendoArte(false);
     if (!r.ok) { setErro(r.erro); return; }
     setOpcoes(r.opcoes);
@@ -221,7 +184,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
         msg = data ? `Agendado (${feitos.join(" + ")}) pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : `Agendado: ${feitos.join(" + ")} (próxima data livre)! 📅`;
       }
       setOk(msg);
-      setImagemUrl(""); setPosterUrl(""); setMidia("imagem"); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
+      setImagemUrl(""); setPosterUrl(""); setBriefVideo(""); setMidia("imagem"); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
       limparPendente();
     }
     if (ultimoErro) setErro(ultimoErro);
@@ -297,9 +260,15 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
           <div className="mb-4 rounded-xl border border-linha bg-preto-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">2 · Legenda</p>
-              <button type="button" onClick={lerArte} disabled={lendoArte} className="rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50">{lendoArte ? "🤖 Lendo…" : opcoes.length ? "🔄 Gerar de novo" : midia === "video" ? "🤖 A Bia vê o vídeo e escreve" : "🤖 A Bia lê a arte e escreve"}</button>
+              <button type="button" onClick={lerArte} disabled={lendoArte} className="rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-3 py-1.5 text-xs font-bold text-white transition hover:brightness-110 disabled:opacity-50">{lendoArte ? "🤖 Escrevendo…" : opcoes.length ? "🔄 Gerar de novo" : midia === "video" ? "🤖 A Bia escreve a legenda" : "🤖 A Bia lê a arte e escreve"}</button>
             </div>
-            {midia === "video" && <p className="mt-1 text-[10px] text-muted/70">🎬 A Bia lê um quadro do vídeo pra escrever a legenda. No Story a legenda não aparece.</p>}
+            {midia === "video" && (
+              <div className="mt-2">
+                <label className="block text-[11px] font-semibold text-white/80">🎬 Do que é o vídeo? <span className="font-normal text-muted/70">(1 linha — a Bia escreve a legenda a partir disso)</span></label>
+                <input type="text" value={briefVideo} onChange={(e) => setBriefVideo(e.target.value)} maxLength={200} placeholder="Ex: tour pelo buffet / promoção de aniversário / festa da Manu" className="input-base mt-1" />
+                <p className="mt-1 text-[10px] text-muted/70">A Bia não consegue “assistir” ao vídeo pelo celular — por isso ela escreve a partir do que você contar aqui. No Story a legenda não aparece.</p>
+              </div>
+            )}
 
             {/* 3 opções da Bia — toque na que gostar (ela cai no campo abaixo, e dá pra ajustar) */}
             {opcoes.length > 0 && (

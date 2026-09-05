@@ -815,6 +815,50 @@ Cada versão com 4 a 8 hashtags relevantes (buffet infantil, festa, aniversário
 }
 export type OpcaoLegenda = { nivel: string; legenda: string; hashtags: string };
 
+// MINHA ARTE (VÍDEO): a Bia não "vê" o vídeo (o navegador do celular nem sempre deixa pegar um
+// quadro). Então ela escreve a legenda a partir de UMA DESCRIÇÃO curta que o dono digita ("do que
+// é o vídeo"). Texto puro (sem visão) — funciona sempre. Mesmo formato de 3 opções.
+export async function gerarLegendaVideo(marcaId: string, descricao: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId } });
+  if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
+  const desc = (descricao || "").trim().slice(0, 400);
+  if (!desc) return { ok: false as const, erro: "Escreva em uma linha do que é o vídeo pra a Bia criar a legenda." };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "A chave da OpenAI não está configurada." };
+  const sys = `Você é o social media do buffet infantil "${marca.nome}". O dono vai postar um VÍDEO no Instagram e te contar em poucas palavras do que é o vídeo. Escreva TRÊS versões de legenda que combinem com esse vídeo, com tom alegre e acolhedor de festa infantil. NUNCA invente preço, data ou condições que o dono não tenha dito. Os três níveis:
+1) "Simples": curta e direta, 1 a 2 linhas, poucas palavras, 1 emoji.
+2) "Caprichada": calorosa e convidativa, 2 a 3 linhas, 2 a 3 emojis, com chamada pra ação.
+3) "Top": mais elaborada e envolvente, 3 a 5 linhas, com um toque de emoção, emojis e uma chamada pra ação forte.
+Cada versão com 4 a 8 hashtags relevantes (buffet infantil, festa, aniversário). Responda SÓ em JSON: {"opcoes":[{"nivel":"Simples","legenda":"...","hashtags":"#... #..."},{"nivel":"Caprichada","legenda":"...","hashtags":"..."},{"nivel":"Top","legenda":"...","hashtags":"..."}]}`;
+  let content: string;
+  try {
+    content = await chatOpenAI(key, {
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: sys },
+        { role: "user", content: `O vídeo é sobre: ${desc}` },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 900,
+    });
+  } catch (e) {
+    return { ok: false as const, erro: e instanceof ErroOpenAI ? e.message : "Não consegui escrever agora. Tente de novo." };
+  }
+  try {
+    const o = JSON.parse(content) as { opcoes?: { nivel?: string; legenda?: string; hashtags?: string }[]; legenda?: string; hashtags?: string };
+    const opcoes = (Array.isArray(o.opcoes) ? o.opcoes : [])
+      .map((x) => ({ nivel: String(x.nivel || "Opção").slice(0, 40), legenda: String(x.legenda || "").slice(0, 2000), hashtags: String(x.hashtags || "").slice(0, 500) }))
+      .filter((x) => x.legenda);
+    if (opcoes.length) return { ok: true as const, opcoes };
+    if (o.legenda) return { ok: true as const, opcoes: [{ nivel: "Opção", legenda: String(o.legenda).slice(0, 2000), hashtags: String(o.hashtags || "").slice(0, 500) }] };
+    return { ok: false as const, erro: "Não consegui montar as opções. Tente de novo." };
+  } catch {
+    return { ok: true as const, opcoes: [{ nivel: "Opção", legenda: content.slice(0, 2000), hashtags: "" }] };
+  }
+}
+
 // Cria a publicação de uma ARTE PRONTA: entra na agenda como qualquer post, mas o render
 // (/api/feed|story/[id]) mostra a imagem enviada COMO ELA É (template "arte-pronta"), sem overlay.
 export async function criarArtePronta(marcaId: string, imagemUrl: string, formato: "feed" | "story", dataYMD: string | undefined, hora: number | undefined, legenda: string, hashtags: string, rascunho = false, agora = false) {
