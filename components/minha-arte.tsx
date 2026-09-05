@@ -56,6 +56,8 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
   const [hora, setHora] = useState("10:00"); // HH:MM (permite escolher os minutos também)
   const [salvando, setSalvando] = useState(false);
   const [ok, setOk] = useState("");
+  const [faseMsg, setFaseMsg] = useState(""); // o que está acontecendo agora (montando/postando…)
+  const [postSeg, setPostSeg] = useState(0); // cronômetro (segundos) enquanto posta
   // artes já enviadas
   const [artes, setArtes] = useState<ArteProntaView[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -68,6 +70,15 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
     if (r && r.ok) setArtes(r.artes);
   }, [marcaId]);
   useEffect(() => { recarregar(); }, [recarregar]);
+
+  // Cronômetro: enquanto está salvando/postando (aqui em cima ou num card), conta os segundos.
+  const ocupado = salvando || Boolean(proc);
+  useEffect(() => {
+    if (!ocupado) { setPostSeg(0); return; }
+    const t = setInterval(() => setPostSeg((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [ocupado]);
+  const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   // PERSISTÊNCIA do envio em andamento: se o dono sobe uma mídia (principalmente um vídeo, que é
   // trabalhoso de reenviar) e SAI sem salvar/postar, ao voltar a mídia continua aqui. Guarda no
@@ -190,7 +201,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
   // modo: "rascunho" (só guarda, não posta nem agenda) | "agendar" (entra na agenda) | "postar" (posta já).
   async function salvar(modo: "rascunho" | "agendar" | "postar") {
     if (!imagemUrl) { setErro(midia === "video" ? "Envie o vídeo primeiro." : "Envie a arte primeiro."); return; }
-    setErro(""); setOk(""); setSalvando(true);
+    setErro(""); setOk(""); setSalvando(true); setFaseMsg(modo === "postar" ? "Preparando…" : "Salvando…");
     const legendaFinal = [legenda.trim(), hashtags.trim()].filter(Boolean).join("\n\n");
     const rascunho = modo === "rascunho";
     const postarAgora = modo === "postar";
@@ -202,9 +213,8 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
     let posterFinal = posterUrl;
     if (midia === "imagem" && comMusica) {
       if (!musicaUrl) { setErro("Escolha ou envie uma música (ou desligue a musiquinha)."); setSalvando(false); return; }
-      setOk("🎬 Montando o videozinho com a música… (uns segundos)");
+      setFaseMsg("🎬 Montando o videozinho com a música…");
       const rv = await gerarVideoImagemMusica(marcaId, imagemUrl, musicaUrl, segMusica).catch(() => ({ ok: false as const, erro: "Não consegui montar o videozinho agora." }));
-      setOk("");
       if (!rv.ok) { setErro(rv.erro); setSalvando(false); return; }
       urlMidia = rv.videoUrl; ehVideoAgora = true; posterFinal = imagemUrl; // a arte vira a miniatura
     }
@@ -217,6 +227,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
         const r = await criarArteVideo(marcaId, urlMidia, fmt, postarAgora ? undefined : (data || undefined), hora, legenda, hashtags, rascunho, postarAgora, posterFinal).catch(() => ({ ok: false as const, erro: "Não consegui salvar o vídeo agora." }));
         if (!r.ok) { ultimoErro = r.erro; continue; }
         if (postarAgora) {
+          setFaseMsg(`📲 Postando no Instagram${alvos.length > 1 ? ` (${rot(fmt)})` : ""}… o vídeo processa ~1 min`);
           const pr = await postarVideoAgora(r.id);
           if (pr.ok) feitos.push(rot(fmt));
           else if (pr.processando) processando = true;
@@ -232,7 +243,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
         } else feitos.push(rot(fmt));
       }
     }
-    setSalvando(false);
+    setSalvando(false); setFaseMsg("");
     if (feitos.length || processando) {
       let msg = "";
       if (postarAgora) {
@@ -445,6 +456,13 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
               <button type="button" onClick={() => salvar("agendar")} disabled={salvando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 disabled:opacity-50">{salvando ? "…" : "📅 Agendar"}</button>
               <button type="button" onClick={() => salvar("postar")} disabled={salvando} className="rounded-lg bg-[#C13584] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50">{salvando ? "Postando…" : "📲 Postar agora"}</button>
             </div>
+            {salvando && (
+              <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/10 p-2.5 text-xs text-[#d6c6ff]">
+                <span className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[#7c3aed]/30 border-t-[#d6c6ff]" />
+                <span className="font-semibold">{faseMsg || "Trabalhando…"}</span>
+                <span className="ml-auto font-mono tabular-nums text-white">{mmss(postSeg)}</span>
+              </div>
+            )}
             <p className="mt-2 text-[10px] leading-snug text-muted/70">A arte vai <strong className="text-white/70">exatamente como você enviou</strong>. No Story a legenda não aparece (o Instagram não mostra legenda em Story).{midia === "video" && <> Vídeo demora <strong className="text-white/70">~1 min</strong> pra processar na Meta ao postar.</>}</p>
           </div>
         </>
@@ -480,7 +498,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
                     <span className={`rounded-full px-1.5 py-0.5 font-bold ${a.postado ? "bg-sky-600 text-white" : a.status === "rascunho" ? "bg-[#7c3aed]/25 text-[#d6c6ff]" : "bg-amber-500/20 text-amber-300"}`}>{a.postado ? "📮 Postado" : a.status === "rascunho" ? "💾 Salvo" : `⏰ ${dataBR(a.dataISO)}`}</span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {!a.postado && <button type="button" onClick={() => postarArte(a)} disabled={proc === a.id} className="flex-1 rounded-md bg-[#C13584] px-2 py-1 text-[10px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">{proc === a.id ? "…" : "📲 Postar agora"}</button>}
+                    {!a.postado && <button type="button" onClick={() => postarArte(a)} disabled={proc === a.id} className="flex-1 rounded-md bg-[#C13584] px-2 py-1 text-[10px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">{proc === a.id ? `⏳ ${mmss(postSeg)}` : "📲 Postar agora"}</button>}
                     {(a.videoUrl || a.imagemUrl) && <button type="button" onClick={() => usarDeNovo(a)} title="Reusar essa mídia pra postar de novo (ex: mandar pro Story)" className="flex-1 rounded-md border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-2 py-1 text-[10px] font-bold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25">↻ Usar de novo</button>}
                     <button type="button" onClick={() => excluir(a)} disabled={proc === a.id} title="Excluir" className="rounded-md border border-red-900/60 px-2 py-1 text-[10px] font-semibold text-red-400 transition hover:bg-red-950/40 disabled:opacity-40">✕</button>
                   </div>
