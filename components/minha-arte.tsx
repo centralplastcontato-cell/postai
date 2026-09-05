@@ -460,16 +460,19 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
           <p className="rounded-lg border border-dashed border-linha bg-preto p-6 text-center text-xs text-muted">Nenhuma arte enviada ainda. Suba a primeira acima. 👆</p>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {artes.map((a) => (
+            {artes.map((a) => {
+              // Vídeo (Reels/Story de vídeo) e Story de imagem são 9:16 (vertical); só imagem de FEED é 4:5.
+              const asp = (a.videoUrl || a.formato === "story") ? "aspect-[9/16]" : "aspect-[4/5]";
+              return (
               <div key={a.id} className="overflow-hidden rounded-xl border border-linha bg-preto-card">
                 {a.videoUrl ? (
                   /* eslint-disable-next-line jsx-a11y/media-has-caption */
-                  <video src={a.videoUrl} controls playsInline className={`w-full bg-black object-contain ${a.formato === "story" ? "aspect-[9/16]" : "aspect-[4/5]"}`} />
+                  <video src={a.videoUrl} controls playsInline className={`w-full bg-black object-contain ${asp}`} />
                 ) : a.imagemUrl ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={a.imagemUrl} alt="" className={`w-full bg-black object-contain ${a.formato === "story" ? "aspect-[9/16]" : "aspect-[4/5]"}`} />
+                  <img src={a.imagemUrl} alt="" className={`w-full bg-black object-contain ${asp}`} />
                 ) : (
-                  <div className={`flex w-full items-center justify-center bg-black text-center text-[10px] text-muted/70 ${a.formato === "story" ? "aspect-[9/16]" : "aspect-[4/5]"}`}>🎬 Vídeo postado<br />(arquivado)</div>
+                  <div className={`flex w-full items-center justify-center bg-black text-center text-[10px] text-muted/70 ${asp}`}>🎬 Vídeo postado<br />(arquivado)</div>
                 )}
                 <div className="p-2">
                   <div className="flex items-center justify-between gap-1 text-[10px]">
@@ -483,7 +486,8 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
