@@ -595,7 +595,7 @@ export async function atualizarReels(pubId: string, dataYMD: string, horaSel: nu
 export async function postarReelsAgora(pubId: string) {
   const pub = await prisma.publicacao.findUnique({
     where: { id: pubId },
-    select: { marcaId: true, formato: true, status: true, videoUrl: true, legenda: true, marca: { select: { igUserId: true, accessToken: true } } },
+    select: { marcaId: true, formato: true, status: true, videoUrl: true, legenda: true, marca: { select: { igUserId: true, accessToken: true, fbPageId: true } } },
   });
   if (!pub) return { ok: false as const, erro: "Reels não encontrado." };
   if (pub.formato !== "reels") return { ok: false as const, erro: "Não é um Reels." };
@@ -614,8 +614,11 @@ export async function postarReelsAgora(pubId: string) {
     return { ok: false as const, erro: r.ig.erro };
   }
   await prisma.publicacao.update({ where: { id: pubId }, data: { mediaId: r.ig.mediaId } });
+  // Espelha no Facebook (best-effort) se a marca tiver Facebook conectado.
+  const { espelharVideoFacebook } = await import("@/lib/facebook");
+  const fb = await espelharVideoFacebook(pub.marca, pub.videoUrl, pub.legenda).catch(() => undefined);
   revalidatePath(`/painel/marcas/${pub.marcaId}`);
-  return { ok: true as const, permalink: r.ig.permalink };
+  return { ok: true as const, permalink: r.ig.permalink, facebook: fb ? fb.ok : null };
 }
 
 // "Postar agora" em 2 FASES (igual o piloto): postar tudo de uma vez estourava o limite de 60s da
@@ -644,7 +647,7 @@ export async function prepararReelsAgora(pubId: string) {
 export async function concluirReelsAgora(pubId: string, containerId: string) {
   const pub = await prisma.publicacao.findUnique({
     where: { id: pubId },
-    select: { marcaId: true, status: true, marca: { select: { igUserId: true, accessToken: true } } },
+    select: { marcaId: true, status: true, videoUrl: true, legenda: true, marca: { select: { igUserId: true, accessToken: true, fbPageId: true } } },
   });
   if (!pub) return { ok: false as const, erro: "Reels não encontrado." };
   const g = await guardaMarca(pub.marcaId);
@@ -664,8 +667,15 @@ export async function concluirReelsAgora(pubId: string, containerId: string) {
     return { ok: false as const, erro: r.erro };
   }
   await prisma.publicacao.update({ where: { id: pubId }, data: { mediaId: r.mediaId } });
+  // Espelha no Facebook (best-effort) se a marca tiver Facebook conectado.
+  let facebook: boolean | null = null;
+  if (pub.videoUrl) {
+    const { espelharVideoFacebook } = await import("@/lib/facebook");
+    const fb = await espelharVideoFacebook(pub.marca, pub.videoUrl, pub.legenda || "").catch(() => undefined);
+    if (fb) facebook = fb.ok;
+  }
   revalidatePath(`/painel/marcas/${pub.marcaId}`);
-  return { ok: true as const, pronto: true as const, permalink: r.permalink };
+  return { ok: true as const, pronto: true as const, permalink: r.permalink, facebook };
 }
 
 // Dispara o MOTOR DE VÍDEO pra gerar o Reels da festa (botão "⚡ Gerar vídeo"). Marca a festa

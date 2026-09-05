@@ -103,6 +103,36 @@ export async function publicarFacebook(
   }
 }
 
+/** Publica um VÍDEO na Página do Facebook (POST /{pageId}/videos com file_url). O vídeo já está no
+ *  Blob (URL pública) — a Meta baixa e processa. Usado pra espelhar os Reels/vídeos no Facebook. */
+export async function publicarVideoFacebook(
+  pageId: string,
+  userToken: string,
+  videoUrl: string,
+  descricao: string
+): Promise<ResultadoFB> {
+  if (!pageId || !userToken) return { ok: false, erro: "Sem conexão com o Facebook (falta a Página ou o token)." };
+  if (!videoUrl || !videoUrl.startsWith("http")) return { ok: false, erro: "Sem vídeo pra postar." };
+  const token = await obterPageToken(pageId, userToken);
+  try {
+    const j = await fbPostRetry(`${pageId}/videos`, { file_url: videoUrl, description: descricao.slice(0, 2200) }, token);
+    const postId = String(j.id ?? "");
+    return { ok: true, postId, permalink: postId ? `https://www.facebook.com/${postId}` : null };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "Erro desconhecido na Meta API (Facebook vídeo)." };
+  }
+}
+
+/** Espelha um vídeo na Página do Facebook SE a marca tiver Facebook conectado (best-effort). */
+export async function espelharVideoFacebook(
+  marca: { fbPageId?: string | null; accessToken?: string | null },
+  videoUrl: string,
+  descricao: string
+): Promise<ResultadoFB | undefined> {
+  if (!marcaTemFacebook({ fbPageId: marca.fbPageId ?? undefined, accessToken: marca.accessToken ?? undefined })) return undefined;
+  return publicarVideoFacebook(marca.fbPageId as string, marca.accessToken as string, videoUrl, descricao);
+}
+
 /** Lista as Páginas que o token administra (id + nome) — pra escolher na conexão. */
 export async function listarPaginas(userToken: string): Promise<{ id: string; nome: string }[]> {
   const r = await fetch(`${GRAPH}/me/accounts?fields=id,name&limit=100&access_token=${userToken}`, { cache: "no-store" });

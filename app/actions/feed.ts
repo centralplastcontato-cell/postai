@@ -1022,9 +1022,16 @@ export async function concluirPostArteVideo(id: string, containerId: string) {
     return { ok: false as const, erro: r.erro };
   }
   await prisma.publicacao.update({ where: { id }, data: { mediaId: r.mediaId, reelsContainerId: "" } }).catch(() => {});
-  await registrarAtividade(AGENTE, `Postei o vídeo "${p.titulo}" no Instagram de ${p.marca.nome}.`, p.marcaId).catch(() => {});
+  // Espelha o vídeo no Facebook (best-effort) — só o vídeo de FEED/Reels (Story de vídeo no FB é instável).
+  let facebook: boolean | null = null;
+  if (p.formato !== "story" && p.videoUrl) {
+    const { espelharVideoFacebook } = await import("@/lib/facebook");
+    const fb = await espelharVideoFacebook(p.marca, p.videoUrl, p.legenda).catch(() => undefined);
+    if (fb) facebook = fb.ok;
+  }
+  await registrarAtividade(AGENTE, `Postei o vídeo "${p.titulo}" no Instagram${facebook ? " + Facebook" : ""} de ${p.marca.nome}.`, p.marcaId).catch(() => {});
   revalidatePath(`/painel/marcas/${p.marcaId}`);
-  return { ok: true as const, pronto: true as const, permalink: r.permalink };
+  return { ok: true as const, pronto: true as const, permalink: r.permalink, facebook };
 }
 
 // Lista as artes prontas enviadas pela marca (pra a aba "Minha arte").

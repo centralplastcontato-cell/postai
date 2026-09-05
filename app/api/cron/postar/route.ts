@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { publicarNasRedes, publicarStoryNasRedes, urlsAbsolutas, marcaConectada, criarContainerReels, criarContainerStoryVideo, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
+import { espelharVideoFacebook } from "@/lib/facebook";
 import { snapshotDeMarca, alertarTokenSeVencendo, coletarInsightsDaMarca } from "@/lib/metricas";
 import { acessoExpirado } from "@/lib/plano";
 import { registrarAtividade } from "@/lib/atividade";
@@ -259,8 +260,8 @@ async function postarStoryVideo(m: { id: string; nome: string; igUserId: string 
 
 // Publica um container de Reels JÁ pronto (FINISHED): claim atômico + media_publish + atividade.
 async function publicarReelsPronto(
-  m: { id: string; nome: string; igUserId: string | null; accessToken: string | null },
-  p: { id: string; titulo: string },
+  m: { id: string; nome: string; igUserId: string | null; accessToken: string | null; fbPageId?: string | null },
+  p: { id: string; titulo: string; videoUrl?: string | null; legenda?: string },
   containerId: string,
   out: Resultado[],
 ): Promise<boolean> {
@@ -268,7 +269,10 @@ async function publicarReelsPronto(
   const conn = { igUserId: m.igUserId as string, accessToken: m.accessToken as string };
   const r = await publicarContainerReels(conn, containerId);
   if (r.ok) {
-    await registrarAtividade(AGENTE, `Postei o Reels "${p.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
+    // Espelha o vídeo no Facebook (best-effort) — se a marca tiver Facebook conectado.
+    let fbOk = false;
+    if (p.videoUrl) { const fb = await espelharVideoFacebook(m, p.videoUrl, p.legenda || "").catch(() => undefined); fbOk = Boolean(fb?.ok); }
+    await registrarAtividade(AGENTE, `Postei o Reels "${p.titulo}" no Instagram${fbOk ? " + Facebook" : ""} de ${m.nome} (auto).`, m.id).catch(() => {});
     await prisma.publicacao.update({ where: { id: p.id }, data: { mediaId: r.mediaId } }).catch(() => {});
   } else {
     // volta a "a_postar" e zera o container (recria do zero na próxima passada)
@@ -283,7 +287,7 @@ async function publicarReelsPronto(
 //  • Fase 1 (sem container): cria o vídeo na Meta + poll CURTO (~20s) — se ficar pronto, publica já.
 //  • Fase 2 (já tem container): confere o processamento e publica quando FINISHED.
 // O container fica guardado em Publicacao.reelsContainerId entre as passadas; ERROR/EXPIRED zera pra recriar.
-async function postarReels(m: { id: string; nome: string; igUserId: string | null; accessToken: string | null }, agora: Date, out: Resultado[]) {
+async function postarReels(m: { id: string; nome: string; igUserId: string | null; accessToken: string | null; fbPageId?: string | null }, agora: Date, out: Resultado[]) {
   try {
     const p = await prisma.publicacao.findFirst({ where: { marcaId: m.id, status: "a_postar", data: { lte: agora }, formato: "reels" }, orderBy: { data: "asc" } });
     if (!p) return;
