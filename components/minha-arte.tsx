@@ -109,6 +109,13 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
     setSubindo(false); setProgresso(0);
   }
 
+  // Tira a mídia carregada (imagem/vídeo) e volta pra tela de enviar — pra quando o dono desiste dela.
+  function limparEnvio() {
+    setImagemUrl(""); setMidia("imagem"); setPosterUrl(""); setBriefVideo(""); setDuracaoVideo(0);
+    setLegenda(""); setHashtags(""); setOpcoes([]); setErro(""); setOk("");
+    limparPendente();
+  }
+
   // Espera curta (usada no poll do vídeo).
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -259,10 +266,13 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={imagemUrl} alt="Arte" className="max-h-72 w-auto rounded-lg border border-linha object-contain" />
             )}
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-linha px-3 py-2 text-xs text-muted transition hover:border-white/30 hover:text-white">
-              🔄 Trocar
-              <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0])} />
-            </label>
+            <div className="flex flex-wrap gap-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-linha px-3 py-2 text-xs text-muted transition hover:border-white/30 hover:text-white">
+                🔄 Trocar
+                <input type="file" accept="image/*,video/*" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0])} />
+              </label>
+              <button type="button" onClick={limparEnvio} className="inline-flex items-center gap-1 rounded-md border border-red-900/60 px-3 py-2 text-xs font-semibold text-red-400 transition hover:bg-red-950/40">✕ Remover</button>
+            </div>
           </div>
         ) : (
           <label className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-linha bg-preto p-8 text-center text-sm text-muted transition hover:border-[#7c3aed]">
