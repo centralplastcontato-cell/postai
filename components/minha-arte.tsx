@@ -286,7 +286,10 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
 
       {imagemUrl && (
         <>
-          {/* 2) Legenda (a Bia lê a arte) */}
+          {/* 2) Legenda (a Bia lê a arte) — escondida quando é SÓ Story (Story não usa legenda) */}
+          {formato === "story" ? (
+            <div className="mb-4 rounded-xl border border-linha bg-preto-card p-3 text-xs text-muted">📲 <strong className="text-white/80">Story não usa legenda</strong> — pode pular essa parte. Se quiser legenda, escolha <strong className="text-white/80">Reels (feed)</strong> ou <strong className="text-white/80">Os dois</strong> lá embaixo.</div>
+          ) : (
           <div className="mb-4 rounded-xl border border-linha bg-preto-card p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted">2 · Legenda</p>
@@ -320,6 +323,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
             <textarea value={legenda} onChange={(e) => setLegenda(e.target.value)} rows={4} placeholder="Escreva a legenda (ou toque em 'A Bia lê a arte' pra ela escrever combinando com a imagem)" className="input-base mt-2 resize-y" />
             <textarea value={hashtags} onChange={(e) => setHashtags(e.target.value)} rows={2} placeholder="#hashtags (opcional)" className="input-base mt-2 resize-y text-[#c7b2ff]" />
           </div>
+          )}
 
           {/* 3) Formato + data */}
           <div className="mb-4 rounded-xl border border-linha bg-preto-card p-4">
