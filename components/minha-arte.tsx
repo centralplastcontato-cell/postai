@@ -28,6 +28,22 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
   const [musicaNome, setMusicaNome] = useState("");
   const [segMusica, setSegMusica] = useState(15); // 10 | 15 | 30
   const [subindoMusica, setSubindoMusica] = useState(false);
+  const [tocandoMusica, setTocandoMusica] = useState(false); // prévia da música tocando
+  const musicaAudioRef = useRef<HTMLAudioElement | null>(null);
+  function pararMusica() { try { musicaAudioRef.current?.pause(); } catch {} setTocandoMusica(false); }
+  function ouvirMusica() {
+    if (tocandoMusica) { pararMusica(); return; }
+    if (!musicaUrl) return;
+    const a = musicaAudioRef.current ?? new Audio();
+    musicaAudioRef.current = a;
+    try {
+      a.src = musicaUrl;
+      a.onended = () => setTocandoMusica(false);
+      a.play().then(() => setTocandoMusica(true)).catch(() => setTocandoMusica(false));
+    } catch { setTocandoMusica(false); }
+  }
+  // trocar/escolher música: para a prévia atual e seleciona a nova
+  function escolherMusica(url: string, nome: string) { pararMusica(); setMusicaUrl(url); setMusicaNome(nome); }
   const [progresso, setProgresso] = useState(0); // % do upload do vídeo (arquivo grande)
   const [subindo, setSubindo] = useState(false);
   const [erro, setErro] = useState("");
@@ -118,7 +134,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
   // Tira a mídia carregada (imagem/vídeo) e volta pra tela de enviar — pra quando o dono desiste dela.
   function limparEnvio() {
     setImagemUrl(""); setMidia("imagem"); setPosterUrl(""); setBriefVideo(""); setDuracaoVideo(0);
-    setComMusica(false); setMusicaUrl(""); setMusicaNome("");
+    pararMusica(); setComMusica(false); setMusicaUrl(""); setMusicaNome("");
     setLegenda(""); setHashtags(""); setOpcoes([]); setErro(""); setOk("");
     limparPendente();
   }
@@ -165,7 +181,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
       const form = new FormData(); form.append("file", file);
       const resp = await fetch("/api/marketing/upload?tipo=musica", { method: "POST", body: form });
       const d = await resp.json();
-      if (d.ok && d.url) { setMusicaUrl(d.url); setMusicaNome(d.nome || file.name); }
+      if (d.ok && d.url) { escolherMusica(d.url, d.nome || file.name); }
       else setErro(d.erro || "Não consegui enviar a música.");
     } catch { setErro("Não consegui enviar a música. Tente de novo."); }
     setSubindoMusica(false);
@@ -229,7 +245,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
       }
       setOk(msg);
       setImagemUrl(""); setPosterUrl(""); setBriefVideo(""); setMidia("imagem"); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
-      setComMusica(false); setMusicaUrl(""); setMusicaNome("");
+      pararMusica(); setComMusica(false); setMusicaUrl(""); setMusicaNome("");
       limparPendente();
     }
     if (ultimoErro) setErro(ultimoErro);
@@ -374,7 +390,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
                       <p className="text-[11px] font-semibold text-muted">Escolha uma música da sua lista:</p>
                       <div className="mt-1 flex flex-wrap gap-1.5">
                         {bibliotecaMusicas.map((m) => (
-                          <button key={m.url} type="button" onClick={() => { setMusicaUrl(m.url); setMusicaNome(m.nome); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${musicaUrl === m.url ? "border-[#7c3aed] bg-[#7c3aed]/25 text-white" : "border-linha bg-preto text-muted hover:text-white"}`}>🎵 {m.nome}</button>
+                          <button key={m.url} type="button" onClick={() => escolherMusica(m.url, m.nome)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${musicaUrl === m.url ? "border-[#7c3aed] bg-[#7c3aed]/25 text-white" : "border-linha bg-preto text-muted hover:text-white"}`}>🎵 {m.nome}</button>
                         ))}
                       </div>
                     </div>
@@ -383,7 +399,12 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
                     {subindoMusica ? "Enviando…" : "⬆️ Enviar uma música (MP3)"}
                     <input type="file" accept="audio/*" className="hidden" disabled={subindoMusica} onChange={(e) => handleUploadMusica(e.target.files?.[0])} />
                   </label>
-                  {musicaUrl && <p className="text-[11px] font-semibold text-emerald-400">✓ Música escolhida: {musicaNome || "ok"}</p>}
+                  {musicaUrl && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[11px] font-semibold text-emerald-400">✓ {musicaNome || "Música escolhida"}</p>
+                      <button type="button" onClick={ouvirMusica} className="rounded-md border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25">{tocandoMusica ? "⏸ Parar" : "▶ Ouvir"}</button>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[11px] font-semibold text-muted">Duração:</span>
                     {[10, 15, 30].map((s) => (
