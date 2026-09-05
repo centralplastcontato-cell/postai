@@ -492,7 +492,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
               <div key={a.id} className="overflow-hidden rounded-xl border border-linha bg-preto-card">
                 {a.videoUrl ? (
                   /* eslint-disable-next-line jsx-a11y/media-has-caption */
-                  <video src={a.videoUrl} controls playsInline className={`w-full bg-black object-contain ${asp}`} />
+                  <video src={a.videoUrl} poster={a.imagemUrl || undefined} preload="metadata" controls playsInline className={`w-full bg-black object-contain ${asp}`} />
                 ) : a.imagemUrl ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img src={a.imagemUrl} alt="" className={`w-full bg-black object-contain ${asp}`} />
