@@ -289,16 +289,23 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
   // REUSAR: joga a MESMA mídia (vídeo ou imagem) de volta no formulário lá em cima, pra postar de
   // novo (ex: o vídeo que foi só pro Reels agora vai pro Story) — sem precisar subir tudo outra vez.
   function usarDeNovo(a: ArteProntaView) {
-    const url = a.videoUrl || a.imagemUrl;
+    // Videozinho feito de IMAGEM + MÚSICA (tem a arte guardada como miniatura): volta a ARTE pra
+    // você poder TROCAR a música. Vídeo enviado por você (sem arte guardada): reusa o próprio vídeo.
+    const ehVideoDeImagem = Boolean(a.videoUrl && a.imagemUrl);
+    const url = ehVideoDeImagem ? a.imagemUrl : (a.videoUrl || a.imagemUrl);
     if (!url) return;
+    pararMusica();
     setImagemUrl(url);
-    setMidia(a.videoUrl ? "video" : "imagem");
+    setMidia(a.videoUrl && !ehVideoDeImagem ? "video" : "imagem");
     setPosterUrl("");
     setBriefVideo("");
     setLegenda(a.legenda || "");
     setHashtags("");
     setOpcoes([]);
-    setFormato(a.videoUrl ? "feed" : "story");
+    // se era imagem+música, já abre o seletor de música (sem nada escolhido, pra você trocar)
+    setComMusica(ehVideoDeImagem);
+    setMusicaUrl(""); setMusicaNome("");
+    setFormato(a.formato === "story" ? "story" : "feed");
     setErro(""); setOk("");
     try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch {}
   }
