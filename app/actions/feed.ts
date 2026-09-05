@@ -861,7 +861,21 @@ Cada versão com 4 a 8 hashtags relevantes (buffet infantil, festa, aniversário
 
 // Cria a publicação de uma ARTE PRONTA: entra na agenda como qualquer post, mas o render
 // (/api/feed|story/[id]) mostra a imagem enviada COMO ELA É (template "arte-pronta"), sem overlay.
-export async function criarArtePronta(marcaId: string, imagemUrl: string, formato: "feed" | "story", dataYMD: string | undefined, hora: number | undefined, legenda: string, hashtags: string, rascunho = false, agora = false) {
+// Converte a hora escolhida em "HH:MM". Aceita número (hora cheia, ex: 10 → "10:00") OU string
+// "HH:MM" (ex: "11:10") — assim o dono pode agendar com MINUTOS. Fora do intervalo → usa o padrão.
+function horaParaHHMM(hora: number | string | undefined, padraoHora: number): string {
+  if (typeof hora === "string") {
+    const m = hora.match(/^(\d{1,2}):(\d{2})$/);
+    if (m) {
+      const h = Number(m[1]), min = Number(m[2]);
+      if (h >= 0 && h <= 23 && min >= 0 && min <= 59) return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+    }
+  }
+  if (typeof hora === "number" && hora >= 0 && hora <= 23) return `${String(hora).padStart(2, "0")}:00`;
+  return `${String(padraoHora).padStart(2, "0")}:00`;
+}
+
+export async function criarArtePronta(marcaId: string, imagemUrl: string, formato: "feed" | "story", dataYMD: string | undefined, hora: number | string | undefined, legenda: string, hashtags: string, rascunho = false, agora = false) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const cred = await checarCreditoTrial(g.sessao);
@@ -872,10 +886,10 @@ export async function criarArtePronta(marcaId: string, imagemUrl: string, format
   const ehStory = formato === "story";
   const plano = await planoDaMarca(marca.id);
   if (plano && ehStory && !planoTemStory(plano)) return { ok: false as const, erro: "O Story está disponível a partir do pacote Profissional. Faça upgrade pra liberar." };
-  const horaFeed = typeof hora === "number" ? hora : marca.horaPost;
+  const hhmm = horaParaHHMM(hora, marca.horaPost);
   // Rascunho ou "postar agora": não ocupa slot da agenda — a data é AGORA (posta na hora / só guarda).
   const semAgenda = rascunho || agora;
-  const data = agora ? new Date() : (dataYMD ? new Date(`${dataYMD}T${String(horaFeed).padStart(2, "0")}:00:00-03:00`) : (rascunho ? new Date() : await proximaDataFeed(marca)));
+  const data = agora ? new Date() : (dataYMD ? new Date(`${dataYMD}T${hhmm}:00-03:00`) : (rascunho ? new Date() : await proximaDataFeed(marca)));
   if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
   if (!semAgenda && plano && !ehStory) {
     const lim = await checarLimiteFeed(marca.id, data, plano);
@@ -907,7 +921,7 @@ export async function criarArtePronta(marcaId: string, imagemUrl: string, format
 // Cria a publicação de um VÍDEO ENVIADO pelo dono (aba "Minha arte" → vídeo). Feed vira Reels
 // (formato "reels"), Story vira Story de vídeo (formato "story" + videoUrl). O piloto automático
 // posta pelo container da Meta (igual os Reels de festa). template="arte-pronta" marca que é do dono.
-export async function criarArteVideo(marcaId: string, videoUrl: string, destino: "feed" | "story", dataYMD: string | undefined, hora: number | undefined, legenda: string, hashtags: string, rascunho = false, agora = false, posterUrl = "") {
+export async function criarArteVideo(marcaId: string, videoUrl: string, destino: "feed" | "story", dataYMD: string | undefined, hora: number | string | undefined, legenda: string, hashtags: string, rascunho = false, agora = false, posterUrl = "") {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const cred = await checarCreditoTrial(g.sessao);
@@ -918,9 +932,9 @@ export async function criarArteVideo(marcaId: string, videoUrl: string, destino:
   const ehStory = destino === "story";
   const plano = await planoDaMarca(marca.id);
   if (plano && ehStory && !planoTemStory(plano)) return { ok: false as const, erro: "O Story está disponível a partir do pacote Profissional. Faça upgrade pra liberar." };
-  const horaFeed = typeof hora === "number" ? hora : marca.horaPost;
+  const hhmm = horaParaHHMM(hora, marca.horaPost);
   const semAgenda = rascunho || agora;
-  const data = agora ? new Date() : (dataYMD ? new Date(`${dataYMD}T${String(horaFeed).padStart(2, "0")}:00:00-03:00`) : (rascunho ? new Date() : await proximaDataFeed(marca)));
+  const data = agora ? new Date() : (dataYMD ? new Date(`${dataYMD}T${hhmm}:00-03:00`) : (rascunho ? new Date() : await proximaDataFeed(marca)));
   if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
   const legendaFinal = [legenda.trim(), hashtags.trim()].filter(Boolean).join("\n\n").slice(0, 2000);
   const slug = `${marca.slug}-artevideo-${Date.now().toString(36).slice(-6)}`;

@@ -27,7 +27,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   const [opcoes, setOpcoes] = useState<OpcaoLegenda[]>([]); // 3 níveis de legenda que a Bia sugere
   const [formato, setFormato] = useState<"story" | "feed" | "ambos">("story");
   const [data, setData] = useState("");
-  const [hora, setHora] = useState(10);
+  const [hora, setHora] = useState("10:00"); // HH:MM (permite escolher os minutos também)
   const [salvando, setSalvando] = useState(false);
   const [ok, setOk] = useState("");
   // artes já enviadas
@@ -306,9 +306,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
               </label>
               <label className="text-xs text-muted sm:w-36 sm:shrink-0">
                 Hora <span className="text-muted/70">(BRT)</span>
-                <select value={hora} onChange={(e) => setHora(Number(e.target.value))} style={{ WebkitAppearance: "none", appearance: "none", minWidth: 0, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23b9b9b9' stroke-width='1.5'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 0.6rem center", paddingRight: "1.6rem" }} className="input-base mt-1 w-full">
-                  {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>)}
-                </select>
+                <input type="time" value={hora} onChange={(e) => setHora(e.target.value || "10:00")} step={60} style={{ colorScheme: "dark" }} className="input-base mt-1 w-full" />
               </label>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
