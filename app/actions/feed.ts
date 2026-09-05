@@ -933,6 +933,17 @@ export async function gerarVideoImagemMusica(marcaId: string, imagemUrl: string,
   return { ok: true as const, videoUrl: r.videoUrl, segundos: r.duracaoSegundos };
 }
 
+// CAPA (miniatura) de um vídeo enviado — usa o motor pra tirar um quadro. Best-effort.
+export async function gerarCapaVideo(marcaId: string, videoUrl: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (!videoUrl.startsWith("http")) return { ok: false as const, erro: "Vídeo inválido." };
+  const { capaDoVideo } = await import("@/lib/video-engine");
+  const r = await capaDoVideo(videoUrl).catch(() => ({ ok: false as const, erro: "Falha ao tirar a capa." }));
+  if (!r.ok) return { ok: false as const, erro: r.erro };
+  return { ok: true as const, posterUrl: r.posterUrl };
+}
+
 // Cria a publicação de um VÍDEO ENVIADO pelo dono (aba "Minha arte" → vídeo). Feed vira Reels
 // (formato "reels"), Story vira Story de vídeo (formato "story" + videoUrl). O piloto automático
 // posta pelo container da Meta (igual os Reels de festa). template="arte-pronta" marca que é do dono.

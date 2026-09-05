@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { gerarLegendaArte, gerarLegendaVideo, gerarVideoImagemMusica, criarArtePronta, criarArteVideo, prepararPostArteVideo, concluirPostArteVideo, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
+import { gerarLegendaArte, gerarLegendaVideo, gerarVideoImagemMusica, gerarCapaVideo, criarArtePronta, criarArteVideo, prepararPostArteVideo, concluirPostArteVideo, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
 import { InputDataBR } from "@/components/input-data-br";
 import { opcoesHora10 } from "@/lib/horarios";
 
@@ -130,6 +130,8 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
           onUploadProgress: (e) => setProgresso(Math.round(e.percentage)),
         });
         setImagemUrl(blob.url); setPosterUrl(""); setMidia("video"); setFormato("feed"); setLegenda(""); setHashtags(""); setOpcoes([]); setBriefVideo("");
+        // gera a CAPA (miniatura) do vídeo em segundo plano — pra não ficar preto na galeria.
+        gerarCapaVideo(marcaId, blob.url).then((c) => { if (c.ok) setPosterUrl(c.posterUrl); }).catch(() => {});
       } else {
         const form = new FormData();
         form.append("file", file);

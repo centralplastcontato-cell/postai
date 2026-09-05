@@ -52,6 +52,27 @@ export function motorConfigurado(): boolean {
   return Boolean(MOTOR_URL && process.env.GOOGLE_SA_KEY_B64);
 }
 
+// CAPA (miniatura) de um vídeo enviado — tira um quadro do vídeo (motor/ffmpeg) e devolve a URL do JPEG.
+export async function capaDoVideo(videoUrl: string): Promise<{ ok: true; posterUrl: string } | { ok: false; erro: string }> {
+  if (!MOTOR_URL) return { ok: false, erro: "Motor de vídeo não configurado." };
+  try {
+    const auth = new GoogleAuth({ credentials: credenciais() });
+    const client = await auth.getIdTokenClient(MOTOR_URL);
+    const r = await client.request({
+      url: `${MOTOR_URL}/capa-video`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: { videoUrl },
+      timeout: 45000,
+    });
+    const d = r.data as { ok?: boolean; posterUrl?: string; erro?: string } | undefined;
+    if (d?.ok && d.posterUrl) return { ok: true, posterUrl: d.posterUrl };
+    return { ok: false, erro: d?.erro || "Não consegui tirar a capa." };
+  } catch (e) {
+    return { ok: false, erro: e instanceof Error ? e.message : "Erro ao falar com o motor." };
+  }
+}
+
 // IMAGEM + MÚSICA → videozinho (9:16). Chama o motor no modo SÍNCRONO (é rápido: 1 imagem parada +
 // áudio curto) e devolve a URL do MP4. Usado pra postar uma arte estática COM musiquinha (Story/Reels).
 export async function montarImagemMusica(imagemUrl: string, musicaUrl: string, segundos: number): Promise<{ ok: true; videoUrl: string; duracaoSegundos: number } | { ok: false; erro: string }> {
