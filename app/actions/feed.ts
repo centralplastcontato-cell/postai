@@ -863,7 +863,7 @@ export async function criarArtePronta(marcaId: string, imagemUrl: string, format
 // Cria a publicação de um VÍDEO ENVIADO pelo dono (aba "Minha arte" → vídeo). Feed vira Reels
 // (formato "reels"), Story vira Story de vídeo (formato "story" + videoUrl). O piloto automático
 // posta pelo container da Meta (igual os Reels de festa). template="arte-pronta" marca que é do dono.
-export async function criarArteVideo(marcaId: string, videoUrl: string, destino: "feed" | "story", dataYMD: string | undefined, hora: number | undefined, legenda: string, hashtags: string, rascunho = false, agora = false) {
+export async function criarArteVideo(marcaId: string, videoUrl: string, destino: "feed" | "story", dataYMD: string | undefined, hora: number | undefined, legenda: string, hashtags: string, rascunho = false, agora = false, posterUrl = "") {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const cred = await checarCreditoTrial(g.sessao);
@@ -888,7 +888,7 @@ export async function criarArteVideo(marcaId: string, videoUrl: string, destino:
       texto: "",
       legenda: legendaFinal,
       hashtags: "",
-      imagemUrl: "",
+      imagemUrl: posterUrl.startsWith("http") ? posterUrl : "", // miniatura (quadro do vídeo) — some se arquivar o MP4
       videoUrl,
       extra: "{}",
       tema: null,
