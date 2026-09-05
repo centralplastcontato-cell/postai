@@ -21,6 +21,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
   const [midia, setMidia] = useState<"imagem" | "video">("imagem"); // o que foi enviado
   const [posterUrl, setPosterUrl] = useState(""); // quadro (foto) tirado do vídeo — vira miniatura (best-effort)
   const [briefVideo, setBriefVideo] = useState(""); // 1 linha "do que é o vídeo" — a Bia usa pra escrever a legenda
+  const [duracaoVideo, setDuracaoVideo] = useState(0); // duração do vídeo enviado (s) — pra avisar do limite de 60s do Story
   const [progresso, setProgresso] = useState(0); // % do upload do vídeo (arquivo grande)
   const [subindo, setSubindo] = useState(false);
   const [erro, setErro] = useState("");
@@ -253,7 +254,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
           <div className="mt-2 flex flex-wrap items-start gap-4">
             {midia === "video" ? (
               /* eslint-disable-next-line jsx-a11y/media-has-caption */
-              <video src={imagemUrl} controls playsInline className="max-h-72 w-auto rounded-lg border border-linha bg-black object-contain" />
+              <video src={imagemUrl} controls playsInline onLoadedMetadata={(e) => setDuracaoVideo(e.currentTarget.duration || 0)} className="max-h-72 w-auto rounded-lg border border-linha bg-black object-contain" />
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img src={imagemUrl} alt="Arte" className="max-h-72 w-auto rounded-lg border border-linha object-contain" />
@@ -318,6 +319,9 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
               <button type="button" onClick={() => setFormato("feed")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${formato === "feed" ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>{midia === "video" ? "🎬 Reels (feed)" : "🖼️ Feed (4:5)"}</button>
               <button type="button" onClick={() => setFormato("ambos")} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${formato === "ambos" ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>📲🖼️ Os dois</button>
             </div>
+            {midia === "video" && duracaoVideo > 61 && (formato === "story" || formato === "ambos") && (
+              <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] leading-snug text-amber-300">⚠️ Esse vídeo tem ~{Math.round(duracaoVideo)}s. O <strong>Story</strong> do Instagram só aceita até <strong>60 segundos</strong> — nele o vídeo vai dar erro. No <strong>Reels</strong> funciona normal. Pro Story, use um vídeo de até 60s.</p>
+            )}
             <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start">
               <label className="min-w-0 flex-1 text-xs text-muted">
                 Dia <span className="text-muted/70">(vazio = próxima data livre)</span>

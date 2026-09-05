@@ -991,7 +991,12 @@ export async function concluirPostArteVideo(id: string, containerId: string) {
   if (st === "IN_PROGRESS" || st === "UNKNOWN") return { ok: true as const, pronto: false as const };
   if (st === "ERROR" || st === "EXPIRED") {
     await prisma.publicacao.update({ where: { id }, data: { reelsContainerId: "" } }).catch(() => {}); // recria do zero
-    return { ok: false as const, erro: `A Meta não conseguiu processar o vídeo (${st}). Tente de novo.` };
+    // Story de vídeo tem limite de 60s no Instagram — a causa mais comum desse ERROR quando o
+    // MESMO vídeo funciona no Reels. Dá uma dica clara em vez de só "ERROR".
+    const dicaStory = p.formato === "story"
+      ? " O Story de vídeo do Instagram só aceita até 60 segundos — se o vídeo for mais longo, ele funciona no Reels mas não no Story. Pro Story, use um vídeo de até 60s."
+      : " Confira se o vídeo é MP4 (9:16) e tente de novo.";
+    return { ok: false as const, erro: `A Meta não conseguiu processar o vídeo (${st}).${dicaStory}` };
   }
   // FINISHED → CLAIM: só publica se ainda não foi postado (evita duplicar com o piloto/outra aba).
   const claim = await prisma.publicacao.updateMany({ where: { id, NOT: { status: "postado" } }, data: { status: "postado", postadoEm: new Date() } });
