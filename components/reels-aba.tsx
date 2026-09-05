@@ -12,7 +12,9 @@ import { InputDataBR } from "./input-data-br";
 import { alternarAprovacao, excluirPublicacao } from "@/app/actions/feed";
 import { agendarReelsDaFesta, gerarLegendaReels, atualizarReels, prepararReelsAgora, concluirReelsAgora } from "@/app/actions/festas";
 import { agendarReelsTematico, gerarLegendaReelsTematico } from "@/app/actions/videos-tematicos";
-import { rotuloHora } from "@/lib/horarios";
+import { opcoesHora10 } from "@/lib/horarios";
+
+const HORAS_10 = opcoesHora10(); // opções de 10 em 10 min pros seletores de hora
 
 // Um vídeo pronto pra agendar: de uma FESTA ou TEMÁTICO (vídeo do buffet, evergreen).
 // O `tipo` diz de qual tabela o `id` veio — nada de prefixo mágico na string.
@@ -72,8 +74,13 @@ function historicoTema(f: FestaComVideo): string {
 function isoParaYMD(iso: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(iso));
 }
-function horaSP(iso: string): number {
-  return Number(new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }).format(new Date(iso))) % 24;
+// "HH:MM" (fuso SP) — pra preencher o seletor de hora ao editar um Reels agendado.
+function horaMinSP(iso: string): string {
+  const s = new Intl.DateTimeFormat("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
+  // arredonda pro múltiplo de 10 mais próximo, pra bater com as opções do seletor
+  const [h, m] = s.split(":").map(Number);
+  const m10 = Math.min(50, Math.round(m / 10) * 10);
+  return `${String(h).padStart(2, "0")}:${String(m10).padStart(2, "0")}`;
 }
 
 const POR_PAGINA = 8;
@@ -95,8 +102,9 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
   const [confExcluir, setConfExcluir] = useState<string | null>(null); // confirma "tirar da lista" (postado)
   // edição de um Reels JÁ agendado (data, hora, legenda)
   const [editando, setEditando] = useState<string | null>(null);
+  const hhmmPadrao = `${String(horaPadrao).padStart(2, "0")}:00`; // hora padrão da marca em HH:MM
   const [edData, setEdData] = useState("");
-  const [edHora, setEdHora] = useState(horaPadrao);
+  const [edHora, setEdHora] = useState(hhmmPadrao);
   const [edLegenda, setEdLegenda] = useState("");
   // postar agora
   const [confirmarPostar, setConfirmarPostar] = useState<string | null>(null);
@@ -107,7 +115,7 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
   // agendador
   const [festaId, setFestaId] = useState("");
   const [dataISO, setDataISO] = useState(dataAlvo ?? "");
-  const [hora, setHora] = useState(horaPadrao);
+  const [hora, setHora] = useState(hhmmPadrao);
   // se o dono está olhando um dia X na agenda, a data do Reels acompanha (e dá pra trocar).
   useEffect(() => { if (dataAlvo) setDataISO(dataAlvo); }, [dataAlvo]);
   const [legenda, setLegenda] = useState("");
@@ -187,7 +195,7 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
   function abrirEdicao(r: PublicacaoView) {
     setEditando(r.id);
     setEdData(isoParaYMD(r.data));
-    setEdHora(horaSP(r.data));
+    setEdHora(horaMinSP(r.data));
     setEdLegenda(r.legenda);
   }
   function salvarEdicao(id: string) {
@@ -271,8 +279,8 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
                 <label className="block text-xs font-semibold text-white">Data e hora do post</label>
                 <div className="mt-1 flex gap-2">
                   <InputDataBR value={dataISO} onChange={setDataISO} className="flex-1" />
-                  <select value={hora} onChange={(e) => setHora(Number(e.target.value))} className="input-base w-24 text-sm" aria-label="Hora do post">
-                    {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{rotuloHora(h)}</option>)}
+                  <select value={hora} onChange={(e) => setHora(e.target.value)} className="input-base w-24 text-sm" aria-label="Hora do post">
+                    {HORAS_10.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -344,8 +352,8 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
                     <div className="mt-2 space-y-2">
                       <div className="flex gap-2">
                         <InputDataBR value={edData} onChange={setEdData} className="flex-1" />
-                        <select value={edHora} onChange={(e) => setEdHora(Number(e.target.value))} className="input-base w-24 text-sm" aria-label="Hora">
-                          {Array.from({ length: 18 }, (_, i) => i + 6).map((h) => <option key={h} value={h}>{rotuloHora(h)}</option>)}
+                        <select value={edHora} onChange={(e) => setEdHora(e.target.value)} className="input-base w-24 text-sm" aria-label="Hora">
+                          {HORAS_10.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
                         </select>
                       </div>
                       <textarea value={edLegenda} onChange={(e) => setEdLegenda(e.target.value)} rows={3} className="input-base w-full text-xs" />

@@ -18,6 +18,7 @@ import { dispararMotorReels } from "@/lib/video-engine";
 import { musicaBuffet } from "@/lib/musica-buffet";
 import { baseUrl } from "@/lib/config";
 import { fotosDivulgaveis, type FotoDivulgavel } from "@/lib/fotos-divulgaveis";
+import { horaSelParaHHMM } from "@/lib/horarios";
 import { ranquearPorTema } from "@/lib/selecao-fotos";
 import { gerarNarracaoMp3 } from "@/lib/narracao";
 import { vozValida, VOZ_PADRAO, fotosParaDuracao } from "@/lib/vozes";
@@ -1135,7 +1136,7 @@ export async function gerarLegendaReelsTematico(videoId: string) {
 // AGENDA o Reels temático: cria a Publicacao formato="reels" pro piloto postar. Pode ser
 // chamado quantas vezes quiser (evergreen: reposta o MESMO vídeo em outras datas). O vínculo
 // videoTematicoId é o que protege o MP4 do arquivamento e da exclusão.
-export async function agendarReelsTematico(videoId: string, dataYMD: string, legendaManual?: string, horaSel?: number) {
+export async function agendarReelsTematico(videoId: string, dataYMD: string, legendaManual?: string, horaSel?: number | string) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
     include: { marca: { select: { nome: true, horaPost: true } } },
@@ -1145,9 +1146,8 @@ export async function agendarReelsTematico(videoId: string, dataYMD: string, leg
   if (!g.ok) return { ok: false as const, erro: g.erro };
   if (!v.videoUrl.startsWith("http")) return { ok: false as const, erro: "Esse vídeo ainda não foi gerado." };
 
-  const horaFinal = typeof horaSel === "number" && horaSel >= 0 && horaSel <= 23 ? horaSel : (v.marca.horaPost ?? 10);
-  const hh = String(horaFinal).padStart(2, "0");
-  const data = new Date(`${dataYMD}T${hh}:00:00-03:00`); // BRT
+  const hh = horaSelParaHHMM(horaSel, v.marca.horaPost ?? 10);
+  const data = new Date(`${dataYMD}T${hh}:00-03:00`); // BRT
   if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
 
   const legenda = (legendaManual && legendaManual.trim()) || (await legendaReelsTematicoIA(v.titulo, v.marca.nome));

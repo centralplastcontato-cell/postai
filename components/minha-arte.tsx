@@ -4,6 +4,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { gerarLegendaArte, gerarLegendaVideo, criarArtePronta, criarArteVideo, prepararPostArteVideo, concluirPostArteVideo, listarArtesProntas, excluirArtePronta, postarPublicacao, postarStory, type ArteProntaView, type OpcaoLegenda } from "@/app/actions/feed";
 import { InputDataBR } from "@/components/input-data-br";
+import { opcoesHora10 } from "@/lib/horarios";
+
+const HORAS_10 = opcoesHora10(); // opções de hora de 10 em 10 min
 
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -307,10 +310,7 @@ export function MinhaArte({ marcaId }: { marcaId: string }) {
               <label className="text-xs text-muted sm:w-36 sm:shrink-0">
                 Hora <span className="text-muted/70">(BRT)</span>
                 <select value={hora} onChange={(e) => setHora(e.target.value)} style={{ WebkitAppearance: "none", appearance: "none", minWidth: 0, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23b9b9b9' stroke-width='1.5'/%3E%3C/svg%3E\")", backgroundRepeat: "no-repeat", backgroundPosition: "right 0.6rem center", paddingRight: "1.6rem" }} className="input-base mt-1 w-full">
-                  {Array.from({ length: 18 }, (_, i) => i + 6).flatMap((h) => [0, 30].map((m) => {
-                    const v = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-                    return <option key={v} value={v}>{v}</option>;
-                  }))}
+                  {HORAS_10.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
                 </select>
               </label>
             </div>

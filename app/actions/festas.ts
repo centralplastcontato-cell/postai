@@ -10,6 +10,7 @@ import { normalizarMomento, categoriaDoMomento, LIMITE_FOTOS_MOMENTO, LIMITE_FOT
 import { descreverImagem } from "@/lib/imagem-ia";
 import { publicarReelsNasRedes, criarContainerReels, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
 import { dispararMotorReels } from "@/lib/video-engine";
+import { horaSelParaHHMM } from "@/lib/horarios";
 import { musicaBuffet } from "@/lib/musica-buffet";
 import { baseUrl } from "@/lib/config";
 
@@ -393,7 +394,7 @@ export async function removerMusicaDoBanco(festaId: string, url: string) {
 // Cria um POST DE REELS agendado a partir do vídeo JÁ montado da festa. Entra na Agenda como
 // Publicacao formato="reels" (status a_postar), pronto pra revisar e ser postado pelo piloto.
 // TRAVA LGPD: festa sem autorização dos pais NUNCA vira divulgação pública.
-export async function agendarReelsDaFesta(festaId: string, dataYMD: string, legendaManual?: string, horaSel?: number) {
+export async function agendarReelsDaFesta(festaId: string, dataYMD: string, legendaManual?: string, horaSel?: number | string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
     select: { marcaId: true, videoUrl: true, autorizacao: true, tema: true, aniversariante: true, aniversariantes: true, instagramAnfitriao: true, marca: { select: { nome: true, horaPost: true } } },
@@ -404,9 +405,8 @@ export async function agendarReelsDaFesta(festaId: string, dataYMD: string, lege
   if (festa.autorizacao !== "autorizada") return { ok: false as const, erro: "Esta festa não tem autorização de uso de imagem — não pode ser divulgada." };
   if (!festa.videoUrl) return { ok: false as const, erro: "Esta festa ainda não tem vídeo gerado." };
 
-  const horaFinal = (typeof horaSel === "number" && horaSel >= 0 && horaSel <= 23) ? horaSel : (festa.marca.horaPost ?? 10);
-  const hh = String(horaFinal).padStart(2, "0");
-  const data = new Date(`${dataYMD}T${hh}:00:00-03:00`); // BRT
+  const hh = horaSelParaHHMM(horaSel, festa.marca.horaPost ?? 10);
+  const data = new Date(`${dataYMD}T${hh}:00-03:00`); // BRT
   if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
 
   const nome = festa.aniversariante || "a criança";
@@ -574,15 +574,15 @@ export async function gerarTituloCapaVideo(festaId: string) {
 }
 
 // Edita um Reels JÁ agendado (data, hora e legenda) — só enquanto NÃO foi postado.
-export async function atualizarReels(pubId: string, dataYMD: string, horaSel: number, legenda: string) {
+export async function atualizarReels(pubId: string, dataYMD: string, horaSel: number | string, legenda: string) {
   const pub = await prisma.publicacao.findUnique({ where: { id: pubId }, select: { marcaId: true, formato: true, status: true } });
   if (!pub) return { ok: false as const, erro: "Reels não encontrado." };
   if (pub.formato !== "reels") return { ok: false as const, erro: "Não é um Reels." };
   if (pub.status === "postado") return { ok: false as const, erro: "Esse Reels já foi postado." };
   const g = await guardaMarca(pub.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const hh = String((horaSel >= 0 && horaSel <= 23) ? horaSel : 10).padStart(2, "0");
-  const data = new Date(`${dataYMD}T${hh}:00:00-03:00`); // BRT
+  const hh = horaSelParaHHMM(horaSel, 10);
+  const data = new Date(`${dataYMD}T${hh}:00-03:00`); // BRT
   if (isNaN(data.getTime())) return { ok: false as const, erro: "Data inválida." };
   await prisma.publicacao.update({ where: { id: pubId }, data: { data, legenda: legenda.trim() ? legenda.trim() : undefined } });
   revalidatePath(`/painel/marcas/${pub.marcaId}`);
