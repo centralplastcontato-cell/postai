@@ -9,6 +9,8 @@ SaaS de postagem automática no Instagram (Next.js 16 + Prisma + Supabase + Open
 - README/comentários ainda citam Neon — DESATUALIZADO: o banco é Supabase (migrado).
 - O usuário (Victor) é não-técnico e fala pt-BR: executar por ele e explicar simples, sem jargão.
 
+- **`npm run build` local roda `prisma db push` no banco de PRODUÇÃO** (script `scripts/db-push.mjs`, é o que a Vercel roda no deploy). Sem mudança no schema é inofensivo, mas nunca rode build com schema alterado sem revisar antes.
+
 ## Rodar local
 
 ```
@@ -20,5 +22,5 @@ Se o `.env` sumir: backup das variáveis com o Victor; `POSTGRES_PRISMA_URL` = a
 ## Produção
 
 - Deploy: push na `main` → Vercel (projeto victorprojetos/postai) → https://www.meupostai.com.br
-- O piloto automático roda na NUVEM (pg_cron no Supabase, job `postai-piloto`, chama `/api/cron/postar` com `CRON_SECRET`) — não depende de máquina local. Batimento na tabela `Heartbeat`. A FREQUÊNCIA (padrão de hora em hora) é setada no pg_cron do Supabase, não no `vercel.json` (que hoje NÃO tem `crons`); pra mudar, use `scripts/pg-cron-piloto.sql` no SQL Editor do Supabase. Como é hora em hora, um post agendado pras 11:20 só sai na passada seguinte (~12:00).
+- O piloto automático roda na NUVEM (pg_cron no Supabase, job `postai-piloto`, chama `/api/cron/postar` com `CRON_SECRET`) — não depende de máquina local. Batimento na tabela `Heartbeat`. A FREQUÊNCIA é setada no pg_cron do Supabase, não no `vercel.json` (que hoje NÃO tem `crons`); pra mudar, use `scripts/pg-cron-piloto.sql` no SQL Editor do Supabase. Em 05/09/2026 o job estava em `*/10 * * * *` (a cada 10 min) — um post agendado sai na passada seguinte ao horário (até ~10 min depois). Pra conferir: `select jobname, schedule from cron.job;`.
 - Reels postados há +24h têm o MP4 arquivado (videoUrl="") — o card usa a capa da festa (`capaReel`).
