@@ -258,25 +258,27 @@ function CardVideo({ f, onAbrirSeletor, onExcluir, onZerar }: { f: FestaView; on
       </div>
 
       {/* ações */}
-      <div className="flex items-stretch gap-1.5 p-2">
-        {pronto ? (
-          <>
-            <button onClick={() => setVer(true)} className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-green-500">▶ Ver vídeo</button>
-            <button onClick={onAbrirSeletor} title="Refazer: escolher as fotos e gerar o vídeo de novo (mantém as escolhas)" aria-label="Refazer vídeo" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25">🔄</button>
-          </>
-        ) : emGeracao ? (
-          <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
-        ) : arquivado ? (
-          <button onClick={onAbrirSeletor} title="Esse vídeo já foi postado e arquivado. Gere um novo com as fotos (continuam guardadas)." className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">🔄 Gerar de novo</button>
-        ) : (
-          <button onClick={onAbrirSeletor} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">⚡ Gerar vídeo</button>
-        )}
-        {/* Recomeçar: zera TUDO do vídeo (mantém a festa e as fotos). Só quando há algo pra zerar. */}
+      <div className="p-2">
+        <div className="flex items-stretch gap-1.5">
+          {pronto ? (
+            <>
+              <button onClick={() => setVer(true)} className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-green-500">▶ Ver vídeo</button>
+              <button onClick={onAbrirSeletor} title="Refazer: escolher as fotos e gerar o vídeo de novo (mantém as escolhas)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25">🔄 Refazer</button>
+            </>
+          ) : emGeracao ? (
+            <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
+          ) : arquivado ? (
+            <button onClick={onAbrirSeletor} title="Esse vídeo já foi postado e arquivado. Gere um novo com as fotos (continuam guardadas)." className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">🔄 Gerar de novo</button>
+          ) : (
+            <button onClick={onAbrirSeletor} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">⚡ Gerar vídeo</button>
+          )}
+          {/* Excluir a festa (útil pra tirar festas repetidas). A confirmação avisa que apaga as fotos. */}
+          <button type="button" onClick={onExcluir} title="Excluir esta festa (e as fotos dela)" aria-label="Excluir festa" className="shrink-0 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500 hover:bg-red-900/20">✕</button>
+        </div>
+        {/* Recomeçar: zera TUDO do vídeo (mantém a festa e as fotos). Linha própria pra achar fácil. */}
         {podeZerar && (
-          <button type="button" onClick={onZerar} title="Recomeçar o vídeo do zero (apaga o vídeo e as escolhas; mantém a festa e as fotos)" aria-label="Recomeçar vídeo" className="shrink-0 rounded-lg border border-amber-500/30 px-2.5 py-1.5 text-xs font-semibold text-amber-300 transition hover:border-amber-500 hover:bg-amber-900/20">↺</button>
+          <button type="button" onClick={onZerar} title="Apaga o vídeo e as escolhas; a festa e as fotos continuam" className="mt-1.5 w-full rounded-lg border border-amber-500/30 px-2 py-1.5 text-xs font-semibold text-amber-300 transition hover:border-amber-500 hover:bg-amber-900/20">↺ Recomeçar do zero</button>
         )}
-        {/* Excluir a festa (útil pra tirar festas repetidas). A confirmação avisa que apaga as fotos. */}
-        <button type="button" onClick={onExcluir} title="Excluir esta festa (e as fotos dela)" className="shrink-0 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500 hover:bg-red-900/20">✕</button>
       </div>
 
       {ver && pronto && <PlayerModal url={f.videoUrl} nome={nomes} capaImgUrl={`/api/capa-festa/${f.id}`} onFechar={() => setVer(false)} />}
@@ -354,25 +356,28 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir, onZerar }: { v: V
         </div>
       </div>
 
-      <div className="flex items-stretch gap-1.5 p-2">
-        {pronto ? (
-          <>
-            <button onClick={() => setVer(true)} className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-green-500">▶ Ver vídeo</button>
-            <button onClick={onAbrirSeletor} disabled={ocupado} title="Escolher as fotos e gerar de novo (substitui o vídeo atual)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25 disabled:opacity-50">🔄</button>
-          </>
-        ) : emGeracao ? (
-          <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
-        ) : (
-          <button onClick={onAbrirSeletor} disabled={ocupado} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{ocupado ? "Abrindo…" : "⚡ Fotos & gerar"}</button>
-        )}
+      <div className="p-2">
+        <div className="flex items-stretch gap-1.5">
+          {pronto ? (
+            <>
+              <button onClick={() => setVer(true)} className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-green-500">▶ Ver vídeo</button>
+              <button onClick={onAbrirSeletor} disabled={ocupado} title="Escolher as fotos e gerar de novo (substitui o vídeo atual)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25 disabled:opacity-50">🔄 Refazer</button>
+            </>
+          ) : emGeracao ? (
+            <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
+          ) : (
+            <button onClick={onAbrirSeletor} disabled={ocupado} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{ocupado ? "Abrindo…" : "⚡ Fotos & gerar"}</button>
+          )}
+          {!emGeracao && (confirmaExcluir ? (
+            <button onClick={() => { onExcluir(); setConfirmaExcluir(false); }} className="shrink-0 rounded-lg bg-red-700 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-600">Excluir?</button>
+          ) : (
+            <button onClick={() => setConfirmaExcluir(true)} title="Excluir este vídeo temático" aria-label="Excluir vídeo" className="shrink-0 rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 transition hover:bg-red-950/40">✕</button>
+          ))}
+        </div>
+        {/* Recomeçar: zera TUDO do vídeo (mantém o tema e o acervo). Linha própria pra achar fácil. */}
         {podeZerar && !confirmaExcluir && (
-          <button type="button" onClick={onZerar} title="Recomeçar o vídeo do zero (apaga o vídeo e as escolhas; mantém o tema e o acervo)" aria-label="Recomeçar vídeo" className="shrink-0 rounded-lg border border-amber-500/30 px-2.5 py-1.5 text-xs font-semibold text-amber-300 transition hover:border-amber-500 hover:bg-amber-900/20">↺</button>
+          <button type="button" onClick={onZerar} title="Apaga o vídeo e as escolhas; o tema e o acervo continuam" className="mt-1.5 w-full rounded-lg border border-amber-500/30 px-2 py-1.5 text-xs font-semibold text-amber-300 transition hover:border-amber-500 hover:bg-amber-900/20">↺ Recomeçar do zero</button>
         )}
-        {!emGeracao && (confirmaExcluir ? (
-          <button onClick={() => { onExcluir(); setConfirmaExcluir(false); }} className="shrink-0 rounded-lg bg-red-700 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-600">Excluir?</button>
-        ) : (
-          <button onClick={() => setConfirmaExcluir(true)} title="Excluir este vídeo temático" className="shrink-0 rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs text-red-400 transition hover:bg-red-950/40">✕</button>
-        ))}
       </div>
 
       {ver && pronto && <PlayerModal url={v.videoUrl} nome={v.titulo} capaImgUrl={`/api/quadro-tema/${v.id}/0.jpg`} onFechar={() => setVer(false)} />}
