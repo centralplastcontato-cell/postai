@@ -105,6 +105,7 @@ model VideoTematico {
   videoMusica     String   @default("") // trilha escolhida (URL do MP3); "" = jingle do buffet. Vale quando NÃO há narração.
   videoClipes     String   @default("[]") // JSON de URLs de clipes de vídeo pra intercalar com as fotos (mudos)
   videoClipesPos  String   @default("espalhados") // onde os clipes entram: "espalhados" | "comeco" | "fim"
+  videoClipesDur  String   @default("completo") // quanto de cada clipe toca: "curto" | "medio" | "completo"
   videoUrl        String   @default("")
   // Quando o MP4 FICOU PRONTO (o motor avisou). Diferente de `criadoEm`: o vídeo do buffet é
   // remontado várias vezes (troca de fotos, narração nova) e o dono precisa saber a idade do
@@ -211,6 +212,7 @@ model Festa {
   // narração + música mandam no som). "[]" = só fotos.
   videoClipes    String   @default("[]")
   videoClipesPos String   @default("espalhados") // onde os clipes entram: "espalhados" | "comeco" | "fim"
+  videoClipesDur String   @default("completo") // quanto de cada clipe toca: "curto" | "medio" | "completo"
   // URL do VÍDEO/Reels já montado desta festa (no Blob). "" = ainda não gerado.
   videoUrl       String   @default("")
   // O gerente liga/desliga o card "Avalie no Google" no álbum dos pais (por festa).

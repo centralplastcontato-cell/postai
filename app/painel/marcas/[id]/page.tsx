@@ -126,6 +126,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoMusica: f.videoMusica || "",
       videoClipes: (() => { try { return (JSON.parse(f.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch { return []; } })(),
       videoClipesPos: f.videoClipesPos || "espalhados",
+      videoClipesDur: f.videoClipesDur || "completo",
       mascoteCanto: f.mascoteCanto || "",
       mascoteTam: f.mascoteTam || "m",
       videoUrl: f.videoUrl || "",
@@ -302,6 +303,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoMusica: v.videoMusica || "",
       videoClipes: (() => { try { return (JSON.parse(v.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch { return []; } })(),
       videoClipesPos: v.videoClipesPos || "espalhados",
+      videoClipesDur: v.videoClipesDur || "completo",
       videoTextos: (() => { try { const m = JSON.parse(v.videoTextos || "{}"); return m && typeof m === "object" && !Array.isArray(m) ? (m as Record<string, string>) : {}; } catch { return {}; } })(),
       narracao: { texto: v.narracaoTexto, voz: v.narracaoVoz, estilo: v.narracaoEstilo, url: v.narracaoUrl, segundos: v.narracaoSeg },
       capaUrl: (() => {

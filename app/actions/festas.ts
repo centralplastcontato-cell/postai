@@ -392,14 +392,15 @@ export async function removerMusicaDoBanco(festaId: string, url: string) {
 }
 
 // CLIPES DE VÍDEO da festa (URLs no Blob) — intercalam com as fotos no vídeo (entram mudos). Máx 6.
-export async function definirClipesFesta(festaId: string, clipes: string[], posicao?: string) {
+export async function definirClipesFesta(festaId: string, clipes: string[], posicao?: string, duracao?: string) {
   const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
   if (!f) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(f.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const urls = (Array.isArray(clipes) ? clipes : []).filter((u) => typeof u === "string" && u.startsWith("http")).slice(0, 6);
-  const data: { videoClipes: string; videoClipesPos?: string } = { videoClipes: JSON.stringify(urls) };
+  const data: { videoClipes: string; videoClipesPos?: string; videoClipesDur?: string } = { videoClipes: JSON.stringify(urls) };
   if (posicao && ["espalhados", "comeco", "fim"].includes(posicao)) data.videoClipesPos = posicao;
+  if (duracao && ["curto", "medio", "completo"].includes(duracao)) data.videoClipesDur = duracao;
   await prisma.festa.update({ where: { id: festaId }, data });
   revalidatePath(`/painel/marcas/${f.marcaId}`);
   return { ok: true as const, clipes: urls };
@@ -708,7 +709,7 @@ export async function statusVideoFesta(festaId: string) {
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoClipes: true, videoClipesPos: true, videoUrl: true, mascoteCanto: true, mascoteTam: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true, mascoteUrl: true } }, fotos: { select: { id: true, url: true } } },
+    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoClipes: true, videoClipesPos: true, videoClipesDur: true, videoUrl: true, mascoteCanto: true, mascoteTam: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true, mascoteUrl: true } }, fotos: { select: { id: true, url: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -757,6 +758,7 @@ export async function gerarVideoDaFesta(festaId: string) {
     fotos,
     clipes,
     posicaoClipes: festa.videoClipesPos || "espalhados",
+    duracaoClipes: festa.videoClipesDur || "completo",
     // vídeo da festa NÃO usa narração — a música é o som; se ela for curta, REPETE pra não cortar o vídeo.
     naoCortarVideo: true,
     capaUrl: capaDesenhada,
