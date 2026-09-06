@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { criarContainerReels, criarContainerStoryVideo, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
+import { modoClipe, cenaClipe } from "@/lib/mascote-modos";
 
 // ESTÚDIO DO MASCOTE (Fase 1): gera opções de mascote em 3D fofo com FUNDO TRANSPARENTE
 // (PNG), pra depois "colar" o MESMO mascote nos posts/vídeos e ele ficar sempre idêntico.
@@ -348,7 +349,13 @@ async function quadroPartidaMascote(mascotePng: Buffer, fundo: { cor: string } |
 }
 
 // FASE 1 — inicia a geração do clipe e devolve o id do job (rápido).
-export async function gerarClipeMascote(marcaId: string, descricao?: string, segundos?: number, fundo?: string, fundoFotoUrl?: string, fala?: string, aventura?: boolean) {
+// opts.modo: historia | divulgacao | abertura | fecho | livre (papel/roteiro/uso do clipe).
+// opts.cena: id de um cenário curado (CENAS_CLIPE) — sempre "buffet infantil" e consistente. A FOTO
+// do buffet (fundoFotoUrl), se houver, tem prioridade (é o cenário mais compatível de todos).
+export async function gerarClipeMascote(marcaId: string, opts: { modo?: string; descricao?: string; segundos?: number; fundo?: string; fundoFotoUrl?: string; fala?: string; cena?: string } = {}) {
+  const { descricao, segundos, fundo, fundoFotoUrl, fala, cena } = opts;
+  const modo = modoClipe(opts.modo || "livre");
+  const cenaSel = cena ? cenaClipe(cena) : null;
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true, mascoteVoz: true } });
@@ -356,7 +363,7 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string, seg
   if (!marca.mascoteUrl) return { ok: false as const, erro: "Escolha o mascote oficial primeiro." };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
-  const dur = [4, 8, 12].includes(segundos ?? 0) ? String(segundos) : "8"; // padrão 8s
+  const dur = [4, 8, 12].includes(segundos ?? 0) ? String(segundos) : String(modo.seg); // padrão = o do modo
   // Cor do fundo escolhida pelo dono (hex). Sem escolha → branco (limpo, o mascote azul se destaca).
   const corFundo = /^#[0-9a-fA-F]{6}$/.test(fundo || "") ? (fundo as string) : "#FFFFFF";
 
@@ -379,7 +386,7 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string, seg
     const buf = Buffer.from(await rr.arrayBuffer());
     const partida = await quadroPartidaMascote(buf, fotoFundoBuf ? { foto: fotoFundoBuf } : { cor: corFundo });
 
-    const acao = (descricao || "").trim().slice(0, 400) || "acenando feliz, dando boas-vindas, com um sorriso alegre";
+    const acao = (descricao || "").trim().slice(0, 400) || modo.acaoSugestao || "acenando feliz, dando boas-vindas, com um sorriso alegre";
     // Se o dono escreveu uma FALA, o mascote FALA (lip sync + voz de personagem fofo). Senão, só música.
     const falaTxt = (fala || "").trim().slice(0, 160);
     // Voz DEFINIDA do castelinho (o dono escolhe uma vez e fica salva) — dá personalidade consistente.
@@ -387,15 +394,28 @@ export async function gerarClipeMascote(marcaId: string, descricao?: string, seg
     const audio = falaTxt
       ? `ÁUDIO: o mascote FALA, em português do Brasil, com a BOCA sincronizada (lip sync), a frase: "${falaTxt}". Voz ${vozDesc}. A fala tem que estar CLARA e bem sincronizada com a boca. Uma musiquinha bem baixinha por trás, sem competir com a voz.`
       : `ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
-    // AVENTURA: cena animada de verdade (o cenário ganha vida, o mascote é o protagonista).
-    // AÇÃO (padrão): o mascote se mexe sobre um fundo parado (cor sólida ou foto real do buffet).
-    const prompt = aventura
-      ? (fotoFundoBuf
-          ? `Crie uma CENA divertida em que o MESMO personagem mascote 3D fofo da imagem de referência ${acao}, DENTRO do espaço real de buffet infantil que está no fundo da imagem. O mascote se movimenta pela cena de forma natural, alegre e fofa, mantendo EXATAMENTE o mesmo desenho, cores e proporções; o cenário real continua coerente, com um leve movimento de câmera acompanhando a ação. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ${audio}`
-          : `Crie uma CENA ANIMADA divertida e fofa, no estilo de DESENHO 3D infantil (clima alegre de festa de buffet infantil), protagonizada pelo MESMO personagem mascote da imagem de referência — mantendo EXATAMENTE o mesmo desenho, as mesmas cores e proporções dele. Na cena, o mascote está ${acao}. O CENÁRIO ao redor GANHA VIDA (parquinho colorido, salão de festa decorado, balões, confete) com movimento alegre, e a câmera tem um leve movimento cinematográfico acompanhando a ação. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ${audio}`)
-      : (fotoFundoBuf
-          ? `O personagem mascote 3D fofo da imagem de referência ${acao}, na frente de um CENÁRIO REAL de buffet infantil (o fundo da imagem). MANTENHA o cenário de fundo REAL e parado, sem distorcer, sem mudar — SÓ O PERSONAGEM se mexe, com movimento suave e natural, mantendo EXATAMENTE o mesmo desenho e cores do mascote. Câmera parada. Vídeo vertical 9:16. Sem texto, sem legendas. ${audio}`
-          : `O MESMO personagem mascote da imagem de referência, ${acao}. Animação 3D fofa e alegre, movimento suave e natural, mantendo EXATAMENTE o mesmo desenho, as mesmas cores e as mesmas proporções do personagem da imagem. Câmera parada, personagem centralizado. FUNDO: uma cor SÓLIDA, LISA e UNIFORME EXATAMENTE igual à da imagem de referência (${corFundo}) — NÃO mude a cor do fundo, NÃO escureça, NÃO coloque cenário, objetos nem gradiente. Vídeo vertical 9:16. Sem texto, sem legendas na imagem. ${audio}`);
+
+    // TRAVA DE IDENTIDADE — vai em TODO clipe: o personagem é EXATAMENTE o da referência (mesma cara,
+    // cores, coroa/bandeira, proporções). É o que mantém o castelinho consistente entre um vídeo e outro.
+    const identidade = "O personagem é EXATAMENTE o mesmo da imagem de referência: mesmíssima cara, mesmas cores, mesma coroa/bandeira e acessórios, mesmas proporções e mesmo estilo 3D fofo. NÃO redesenhe o personagem, NÃO invente detalhes novos, NÃO mude as cores dele.";
+    // PAPEL do clipe conforme o modo (o que ele está fazendo/comunicando).
+    const papel: Record<string, string> = {
+      historia: "É um clipe em que o mascote CONTA UMA HISTORINHA divertida pras crianças, com carisma e expressão.",
+      divulgacao: "É um clipe de DIVULGAÇÃO: o mascote convida, animado, as famílias a agendarem uma festa no buffet.",
+      abertura: "É a ABERTURA de um vídeo de festa: o mascote dá as boas-vindas de um jeito rápido, animado e chamativo.",
+      fecho: "É o ENCERRAMENTO de um vídeo de festa: o mascote se despede com carinho e convida a agendar a festa.",
+      livre: "",
+    };
+    const papelTxt = papel[modo.id] || "";
+    // CENÁRIO — na ordem de compatibilidade: (1) FOTO REAL do buffet; (2) CENÁRIO CURADO (sempre
+    // "buffet infantil", descrito igual sempre — nada aleatório); (3) COR SÓLIDA lisa.
+    const cenarioTxt = fotoFundoBuf
+      ? `CENÁRIO: o mascote está na frente do CENÁRIO REAL de buffet infantil que aparece no fundo da imagem de referência. MANTENHA esse cenário real coerente e sem distorcer; o mascote se movimenta de forma natural dentro dele, com um leve movimento de câmera acompanhando.`
+      : cenaSel
+        ? `CENÁRIO: o mascote está ${cenaSel.prompt}. Cenário em estilo desenho 3D infantil, caprichado, coerente e alegre (nada aleatório fora do clima de buffet infantil), com um leve movimento de câmera.`
+        : `CENÁRIO: NÃO crie cenário. FUNDO em uma cor SÓLIDA, LISA e UNIFORME EXATAMENTE igual à da imagem de referência (${corFundo}) — não escureça, não coloque objetos nem gradiente. Câmera parada, personagem centralizado.`;
+
+    const prompt = `${papelTxt} Anime o personagem mascote da imagem de referência: ele está ${acao}, com movimento suave, fofo e natural. ${identidade} ${cenarioTxt} Vídeo vertical 9:16, sem nenhum texto ou legenda na imagem. ${audio}`.replace(/\s+/g, " ").trim();
 
     const form = new FormData();
     form.append("model", CLIPE_MODELO);
@@ -461,16 +481,45 @@ export async function statusClipeMascote(marcaId: string, jobId: string) {
   }
 }
 
-// Apaga um clipe da galeria (e libera o espaço no Blob).
+// Apaga um clipe da galeria (e libera o espaço no Blob). Se esse clipe estava definido como a
+// ABERTURA ou o FECHO dos Reels, também tira essa marcação (senão apontaria pra um vídeo que sumiu).
 export async function excluirClipeMascote(marcaId: string, url: string) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true, mascoteAbertura: true, mascoteFecho: true } });
   const restantes = lerListaUrls(marca?.mascoteClipes ?? "[]").filter((u) => u !== url);
-  await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(restantes) } });
+  await prisma.marca.update({
+    where: { id: marcaId },
+    data: {
+      mascoteClipes: JSON.stringify(restantes),
+      ...(marca?.mascoteAbertura === url ? { mascoteAbertura: "" } : {}),
+      ...(marca?.mascoteFecho === url ? { mascoteFecho: "" } : {}),
+    },
+  });
   try { const { del } = await import("@vercel/blob"); await del(url); } catch {}
   revalidatePath(`/painel/marcas/${marcaId}`);
   return { ok: true as const, clipes: restantes };
+}
+
+// Define (ou tira) qual clipe é a ABERTURA / o FECHO dos Reels das festas. url="" tira a marcação.
+// O clipe precisa estar na galeria da marca (não dá pra apontar pra um vídeo de fora).
+export async function definirAberturaMascote(marcaId: string, url: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
+  const novo = url && lerListaUrls(marca?.mascoteClipes ?? "[]").includes(url) ? url : "";
+  await prisma.marca.update({ where: { id: marcaId }, data: { mascoteAbertura: novo } });
+  revalidatePath(`/painel/marcas/${marcaId}`);
+  return { ok: true as const, abertura: novo };
+}
+export async function definirFechoMascote(marcaId: string, url: string) {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
+  const novo = url && lerListaUrls(marca?.mascoteClipes ?? "[]").includes(url) ? url : "";
+  await prisma.marca.update({ where: { id: marcaId }, data: { mascoteFecho: novo } });
+  revalidatePath(`/painel/marcas/${marcaId}`);
+  return { ok: true as const, fecho: novo };
 }
 
 // ── POSTAR O CLIPE do mascote direto no Instagram (Reels ou Story), em 2 fases (o vídeo processa na

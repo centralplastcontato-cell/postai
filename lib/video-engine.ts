@@ -18,6 +18,8 @@ export type PedidoReels = {
   posicaoClipes?: string; // onde os clipes entram: "espalhados" (padrão) | "comeco" | "fim"
   duracaoClipes?: string; // quanto de cada clipe toca: "curto" (~4s) | "medio" (~8s) | "completo" (inteiro)
   naoCortarVideo?: boolean; // true = música curta REPETE pra o vídeo manter o tempo cheio
+  aberturaUrl?: string; // clipe do mascote (COM voz/som próprio) colado no COMEÇO do vídeo
+  fechoUrl?: string; // clipe do mascote (COM voz/som próprio) colado no FIM do vídeo
   capaUrl?: string; // foto da CAPA (nítida + texto por cima). Sem isso, o motor usa a 1ª foto.
   moldura?: string; // moldura das fotos: "nenhuma" | "branca" | "grossa" | "marca"
   corMoldura?: string; // cor (hex) usada quando moldura="marca"

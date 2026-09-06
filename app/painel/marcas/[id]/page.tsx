@@ -380,6 +380,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     mascotesArte: (() => { try { const a = JSON.parse(marca.mascotesArte || "[]"); return Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string" && x.startsWith("http")) : []; } catch { return []; } })(),
     mascoteFicha3d: marca.mascoteFicha3d,
     mascoteClipes: (() => { try { const a = JSON.parse(marca.mascoteClipes || "[]"); return Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string" && x.startsWith("http")) : []; } catch { return []; } })(),
+    mascoteAbertura: marca.mascoteAbertura ?? "",
+    mascoteFecho: marca.mascoteFecho ?? "",
     mascoteVoz: marca.mascoteVoz,
     musicas: (() => { try { const a = JSON.parse(marca.musicas || "[]"); return Array.isArray(a) ? a.filter((m: unknown): m is { url: string; nome: string; wav?: string } => Boolean(m) && typeof (m as { url?: unknown }).url === "string" && (m as { url: string }).url.startsWith("http")) : []; } catch { return []; } })(),
     paleta: marca.paleta,

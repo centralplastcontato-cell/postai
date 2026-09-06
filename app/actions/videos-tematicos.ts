@@ -587,7 +587,7 @@ export async function renomearVideoTematico(videoId: string, titulo: string) {
 export async function gerarVideoTematico(videoId: string) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
-    include: { marca: { select: { logoUrl: true, slug: true, corPrimaria: true, corFundo: true, site: true, mascoteUrl: true } } },
+    include: { marca: { select: { logoUrl: true, slug: true, corPrimaria: true, corFundo: true, site: true, mascoteUrl: true, mascoteAbertura: true, mascoteFecho: true } } },
   });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
@@ -730,6 +730,9 @@ export async function gerarVideoTematico(videoId: string) {
     clipes: clipesTema,
     posicaoClipes: v.videoClipesPos || "espalhados",
     duracaoClipes: v.videoClipesDur || "completo",
+    // Abertura/fecho do castelinho (da marca) colam no começo/fim, se o dono tiver definido.
+    aberturaUrl: v.marca.mascoteAbertura || undefined,
+    fechoUrl: v.marca.mascoteFecho || undefined,
     // COM narração a VOZ manda no tamanho (cortar no fim da voz é o certo). SEM narração é só música:
     // se ela for curta, REPETE pra o vídeo manter o tempo cheio em vez de encolher no tamanho da música.
     naoCortarVideo: !temNarracao,

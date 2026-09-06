@@ -779,7 +779,7 @@ export async function statusVideoFesta(festaId: string) {
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoClipes: true, videoClipesPos: true, videoClipesDur: true, videoUrl: true, mascoteCanto: true, mascoteTam: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true, mascoteUrl: true } }, fotos: { select: { id: true, url: true } } },
+    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoClipes: true, videoClipesPos: true, videoClipesDur: true, videoUrl: true, mascoteCanto: true, mascoteTam: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true, mascoteUrl: true, mascoteAbertura: true, mascoteFecho: true } }, fotos: { select: { id: true, url: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -831,6 +831,9 @@ export async function gerarVideoDaFesta(festaId: string) {
     duracaoClipes: festa.videoClipesDur || "completo",
     // vídeo da festa NÃO usa narração — a música é o som; se ela for curta, REPETE pra não cortar o vídeo.
     naoCortarVideo: true,
+    // Abertura/fecho do castelinho (da marca) colam no começo/fim, se o dono tiver definido.
+    aberturaUrl: festa.marca.mascoteAbertura || undefined,
+    fechoUrl: festa.marca.mascoteFecho || undefined,
     capaUrl: capaDesenhada,
     moldura: festa.videoMoldura || "branca",
     corMoldura: festa.marca.corPrimaria || "#FFFFFF",

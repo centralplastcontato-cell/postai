@@ -2,8 +2,9 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote, ouvirAmostraVoz } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote, ouvirAmostraVoz, definirAberturaMascote, definirFechoMascote } from "@/app/actions/mascote";
 import { imagensDoBanco } from "@/app/actions/imagens";
+import { MODOS_CLIPE, CENAS_CLIPE, modoClipe, type ModoClipe } from "@/lib/mascote-modos";
 
 // Ações prontas pro clipe do mascote (1 toque preenche a descrição, sem digitar).
 const ACOES_CLIPE = [
@@ -13,16 +14,6 @@ const ACOES_CLIPE = [
   { emoji: "😘", nome: "Beijo", desc: "soprando um beijo carinhoso e piscando o olho" },
   { emoji: "💃", nome: "Dançar", desc: "dançando animado, balançando o corpo com alegria" },
   { emoji: "👍", nome: "Joinha", desc: "fazendo joinha (positivo) com as duas mãos e piscando" },
-];
-
-// 🎬 AVENTURAS — cenas animadas de verdade (o cenário ganha vida, o castelinho é o protagonista).
-const AVENTURAS_CLIPE = [
-  { emoji: "🛝", nome: "Escorregador", desc: "escorregando por um tobogã colorido de parquinho, rindo de alegria" },
-  { emoji: "🎂", nome: "Velinhas", desc: "soprando as velinhas de um bolo de aniversário enorme e colorido" },
-  { emoji: "🎈", nome: "Boas-vindas", desc: "recebendo a criançada na porta do buffet, cercado de balões coloridos" },
-  { emoji: "🫧", nome: "Piscina de bolinhas", desc: "pulando e se divertindo numa piscina de bolinhas coloridas" },
-  { emoji: "🦸", nome: "Super-herói", desc: "voando como um super-herói pelo céu, com uma capinha esvoaçante" },
-  { emoji: "🎉", nome: "Festa", desc: "no meio de uma festa animada, dançando com confetes caindo do teto" },
 ];
 
 // 🎙️ VOZES do castelinho — o dono escolhe uma e ela fica salva, usada em todos os clipes com fala.
@@ -78,6 +69,8 @@ export function MascoteEstudio({
   clipes,
   corMarca,
   voz,
+  abertura,
+  fecho,
 }: {
   marcaId: string;
   mascoteUrl: string; // mascote oficial atual ("" = nenhum)
@@ -86,6 +79,8 @@ export function MascoteEstudio({
   clipes?: string[]; // clipes animados (IA de vídeo) já gerados
   corMarca?: string; // cor primária da marca (opção de fundo do clipe)
   voz?: string; // voz definida do castelinho ("" = padrão)
+  abertura?: string; // clipe usado no começo dos Reels das festas ("" = nenhum)
+  fecho?: string; // clipe usado no fim dos Reels das festas ("" = nenhum)
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -219,12 +214,36 @@ export function MascoteEstudio({
       setErro("O aparelho bloqueou o áudio. Toque em 🔊 Ouvir amostra de novo.");
     }
   }
-  const [descClipe, setDescClipe] = useState("");
-  const [ehAventura, setEhAventura] = useState(false); // cena animada (aventura) x ação simples
-  const [falaClipe, setFalaClipe] = useState(""); // o que o mascote FALA no clipe ("" = só música)
-  const [durClipe, setDurClipe] = useState(8); // duração do clipe: 4 | 8 | 12
-  const [fundoClipe, setFundoClipe] = useState("#FFFFFF"); // cor do fundo do clipe
-  const [fundoFoto, setFundoFoto] = useState(""); // foto do buffet como fundo ("" = usa a cor)
+  // MODO do clipe (historia/divulgacao/abertura/fecho/livre) — define papel, duração e sugestões.
+  const [modoSel, setModoSel] = useState<ModoClipe>("historia");
+  const [descClipe, setDescClipe] = useState(MODOS_CLIPE[0].acaoSugestao);
+  const [falaClipe, setFalaClipe] = useState(MODOS_CLIPE[0].falaSugestao); // o que o mascote FALA ("" = só música)
+  const [durClipe, setDurClipe] = useState(MODOS_CLIPE[0].seg); // duração do clipe: 4 | 8 | 12
+  // CENÁRIO: "" = cor sólida · id de CENAS_CLIPE (salao, bolo…) · "foto" = foto do buffet (fundoFoto).
+  const [cenaSel, setCenaSel] = useState<string>("salao");
+  const [fundoClipe, setFundoClipe] = useState("#FFFFFF"); // cor do fundo (quando cenaSel = "")
+  const [fundoFoto, setFundoFoto] = useState(""); // foto do buffet como fundo (quando cenaSel = "foto")
+  // Escolhe um MODO: ajusta a duração e joga as sugestões (editáveis) de fala/ação daquele modo.
+  function escolherModo(id: ModoClipe) {
+    setModoSel(id);
+    const m = modoClipe(id);
+    setDurClipe(m.seg);
+    setFalaClipe(m.falaSugestao);
+    setDescClipe(m.acaoSugestao);
+  }
+  // Abertura/fecho dos Reels (marca) — qual clipe está definido pra cada um.
+  const [aberturaSel, setAberturaSel] = useState(abertura ?? "");
+  const [fechoSel, setFechoSel] = useState(fecho ?? "");
+  async function alternarAbertura(url: string) {
+    const novo = aberturaSel === url ? "" : url;
+    setAberturaSel(novo);
+    await definirAberturaMascote(marcaId, novo).catch(() => {});
+  }
+  async function alternarFecho(url: string) {
+    const novo = fechoSel === url ? "" : url;
+    setFechoSel(novo);
+    await definirFechoMascote(marcaId, novo).catch(() => {});
+  }
   const [abrirFotos, setAbrirFotos] = useState(false); // seletor de foto aberto
   const [fotosBanco, setFotosBanco] = useState<{ id: string; url: string; categoria: string }[]>([]);
   const [carregandoFotos, setCarregandoFotos] = useState(false);
@@ -277,7 +296,17 @@ export function MascoteEstudio({
     setErro(null);
     setGerandoClipe(true);
     setStatusClipe("🎬 Preparando o mascote…");
-    const ini = await gerarClipeMascote(marcaId, descClipe.trim() || undefined, durClipe, fundoClipe, fundoFoto || undefined, falaClipe.trim() || undefined, ehAventura).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
+    const usaFoto = cenaSel === "foto" && !!fundoFoto;
+    const usaCena = cenaSel !== "foto" && cenaSel !== "";
+    const ini = await gerarClipeMascote(marcaId, {
+      modo: modoSel,
+      descricao: descClipe.trim() || undefined,
+      segundos: durClipe,
+      fundo: fundoClipe,
+      fundoFotoUrl: usaFoto ? fundoFoto : undefined,
+      cena: usaCena ? cenaSel : undefined,
+      fala: falaClipe.trim() || undefined,
+    }).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
     if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
     await acompanharClipe(ini.jobId);
   }
@@ -606,34 +635,35 @@ export function MascoteEstudio({
         <div className="mt-7 rounded-xl border border-[#ec4899]/40 bg-[#ec4899]/5 p-4 sm:p-5">
           <p className="text-sm font-semibold text-white">🎬 Dar vida ao mascote <span className="ml-1 rounded-full border border-[#ec4899]/40 bg-[#ec4899]/15 px-2 py-0.5 text-[10px] font-semibold text-[#f9a8d4]">novo · beta</span></p>
           <p className="mt-1 text-xs text-muted">
-            A IA <strong className="text-white/80">anima o seu mascote</strong> num clipe curto — <strong className="text-white/80">já com música e efeitos</strong> 🎵. Escolha uma ação (ou descreva), gere, e depois dá pra <strong className="text-white/80">postar como Story ou Reels</strong>.
+            A IA <strong className="text-white/80">anima o seu mascote</strong> num clipe curto — <strong className="text-white/80">com voz, música e efeitos</strong> 🎵. Escolha um <strong className="text-white/80">modo</strong>, ajuste a fala e o cenário, e gere. O castelinho sai <strong className="text-white/80">sempre igual</strong> (parte da ficha oficial).
           </p>
 
-          {/* ações prontas — 1 toque preenche a descrição (fundo parado, o mascote se mexe) */}
-          <label className="mt-3 block text-[10px] font-semibold text-muted">Ação rápida <span className="font-normal text-muted/70">(o mascote se mexe num fundo parado)</span></label>
+          {/* MODO — define o papel/roteiro, a duração e onde o clipe é usado. */}
+          <label className="mt-3 block text-[10px] font-semibold text-muted">Modo do clipe</label>
+          <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
+            {MODOS_CLIPE.map((m) => (
+              <button key={m.id} type="button" disabled={gerandoClipe} onClick={() => escolherModo(m.id)} className={`rounded-lg border p-2 text-center transition disabled:opacity-40 ${modoSel === m.id ? "border-[#ec4899] bg-[#ec4899]/15" : "border-linha bg-preto hover:border-white/30"}`}>
+                <div className="text-base leading-none">{m.ic}</div>
+                <div className={`mt-1 text-[11px] font-semibold ${modoSel === m.id ? "text-[#f9a8d4]" : "text-white"}`}>{m.label}</div>
+                <div className="text-[9px] leading-tight text-muted/70">{m.desc}</div>
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[10px] leading-snug text-muted/70">
+            {modoSel === "abertura" || modoSel === "fecho"
+              ? <>🎬 Depois de gerar, <strong className="text-white/70">marque o clipe como {modoSel === "abertura" ? "Abertura" : "Fecho"}</strong> na galeria abaixo — aí ele entra sozinho no {modoSel === "abertura" ? "começo" : "fim"} dos Reels das festas.</>
+              : <>📤 Vídeo pra <strong className="text-white/70">postar sozinho</strong> (Story/Reels), depois de gerar.</>}
+          </p>
+
+          {/* ações rápidas — 1 toque preenche "o que o mascote faz" (descrição, editável) */}
+          <label className="mt-3 block text-[10px] font-semibold text-muted">O que ele faz <span className="font-normal text-muted/70">(toque pra preencher, dá pra editar embaixo)</span></label>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {ACOES_CLIPE.map((a) => (
-              <button key={a.nome} type="button" disabled={gerandoClipe} onClick={() => { setDescClipe(a.desc); setEhAventura(false); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${descClipe === a.desc && !ehAventura ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+              <button key={a.nome} type="button" disabled={gerandoClipe} onClick={() => setDescClipe(a.desc)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${descClipe === a.desc ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
                 {a.emoji} {a.nome}
               </button>
             ))}
           </div>
-
-          {/* aventuras — cena animada de verdade (o cenário ganha vida) */}
-          <label className="mt-3 block text-[10px] font-semibold text-muted">🎬 Aventuras <span className="font-normal text-muted/70">(cena animada — o cenário ganha vida)</span></label>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {AVENTURAS_CLIPE.map((a) => (
-              <button key={a.nome} type="button" disabled={gerandoClipe} onClick={() => { setDescClipe(a.desc); setEhAventura(true); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${descClipe === a.desc && ehAventura ? "border-[#a855f7] bg-[#a855f7]/25 text-[#d6c6ff]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
-                {a.emoji} {a.nome}
-              </button>
-            ))}
-          </div>
-
-          {/* liga/desliga o modo aventura (vale também pro texto que você escrever) */}
-          <label className="mt-2 flex cursor-pointer items-center gap-2 text-[11px] text-muted">
-            <input type="checkbox" checked={ehAventura} disabled={gerandoClipe} onChange={(e) => setEhAventura(e.target.checked)} className="h-3.5 w-3.5 accent-[#a855f7]" />
-            <span>🎬 <strong className="text-white/80">Modo aventura</strong> — deixa a IA criar uma cena animada ao redor do castelinho (em vez de fundo parado).</span>
-          </label>
 
           <textarea
             value={descClipe}
@@ -672,46 +702,75 @@ export function MascoteEstudio({
             <span className="text-[10px] text-muted/60">(mais longo = mais demorado)</span>
           </div>
 
-          {/* fundo do clipe: cor OU foto do buffet */}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold text-muted">Fundo:</span>
-            {FUNDOS_CLIPE.map((f) => (
-              <button
-                key={f.cor}
-                type="button"
-                disabled={gerandoClipe}
-                onClick={() => { setFundoClipe(f.cor); setFundoFoto(""); }}
-                title={f.nome}
-                aria-label={`Fundo ${f.nome}`}
-                className={`h-7 w-7 rounded-full border-2 transition disabled:opacity-40 ${!fundoFoto && fundoClipe.toUpperCase() === f.cor.toUpperCase() ? "border-[#ec4899] ring-2 ring-[#ec4899]/40" : "border-white/20 hover:border-white/50"}`}
-                style={{ background: f.cor }}
-              />
+          {/* CENÁRIO — sempre compatível: foto real do buffet (melhor), um cenário curado, ou cor sólida. */}
+          <label className="mt-3 block text-[10px] font-semibold text-muted">Cenário <span className="font-normal text-muted/70">(a foto do buffet é a mais realista)</span></label>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            <button type="button" disabled={gerandoClipe} onClick={() => { setCenaSel("foto"); abrirSeletorFotos(); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${cenaSel === "foto" ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>📷 Foto do buffet</button>
+            {CENAS_CLIPE.map((c) => (
+              <button key={c.id} type="button" disabled={gerandoClipe} onClick={() => setCenaSel(c.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${cenaSel === c.id ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{c.ic} {c.label}</button>
             ))}
-            <button type="button" disabled={gerandoClipe} onClick={abrirSeletorFotos} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${fundoFoto ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>📷 Foto do buffet</button>
+            <button type="button" disabled={gerandoClipe} onClick={() => setCenaSel("")} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${cenaSel === "" ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>🎨 Cor sólida</button>
           </div>
-          {fundoFoto && (
-            <div className="mt-2 flex items-center gap-2 rounded-md border border-[#ec4899]/30 bg-[#ec4899]/5 p-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={fundoFoto} alt="" className="h-12 w-12 rounded object-cover" />
-              <span className="text-[11px] text-muted">Fundo: foto do seu espaço. <button type="button" onClick={() => setFundoFoto("")} className="font-semibold text-[#f9a8d4] hover:underline">trocar por cor</button></span>
+          {cenaSel === "" && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {FUNDOS_CLIPE.map((f) => (
+                <button
+                  key={f.cor}
+                  type="button"
+                  disabled={gerandoClipe}
+                  onClick={() => setFundoClipe(f.cor)}
+                  title={f.nome}
+                  aria-label={`Fundo ${f.nome}`}
+                  className={`h-7 w-7 rounded-full border-2 transition disabled:opacity-40 ${fundoClipe.toUpperCase() === f.cor.toUpperCase() ? "border-[#ec4899] ring-2 ring-[#ec4899]/40" : "border-white/20 hover:border-white/50"}`}
+                  style={{ background: f.cor }}
+                />
+              ))}
             </div>
+          )}
+          {cenaSel === "foto" && (
+            fundoFoto ? (
+              <div className="mt-2 flex items-center gap-2 rounded-md border border-[#ec4899]/30 bg-[#ec4899]/5 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={fundoFoto} alt="" className="h-12 w-12 rounded object-cover" />
+                <span className="text-[11px] text-muted">Cenário: foto do seu espaço. <button type="button" onClick={abrirSeletorFotos} className="font-semibold text-[#f9a8d4] hover:underline">trocar foto</button></span>
+              </div>
+            ) : (
+              <button type="button" onClick={abrirSeletorFotos} className="mt-2 rounded-md border border-dashed border-[#ec4899]/40 bg-[#ec4899]/5 px-3 py-2 text-[11px] font-semibold text-[#f9a8d4]">📷 Escolher a foto do buffet</button>
+            )
           )}
 
           {clipesUrls.length > 0 && (
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {clipesUrls.map((url) => (
-                <div key={url} className="overflow-hidden rounded-lg border border-linha bg-black">
-                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                  <video src={url} controls playsInline loop className="aspect-[9/16] w-full bg-black object-contain" />
-                  <div className="flex flex-wrap items-center gap-1.5 px-2 py-2">
-                    <button type="button" onClick={() => { setResultadoPost(null); setConfirmPost({ url, tipo: "story" }); }} disabled={postandoClipe} className="rounded-md bg-gradient-to-r from-[#f58529] via-[#dd2a7b] to-[#8134af] px-2 py-1 text-[10px] font-bold text-white transition hover:brightness-110 disabled:opacity-50">📲 Story</button>
-                    <button type="button" onClick={() => { setResultadoPost(null); setConfirmPost({ url, tipo: "reels" }); }} disabled={postandoClipe} className="rounded-md bg-[#C13584] px-2 py-1 text-[10px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">🎬 Reels</button>
-                    <a href={url} target="_blank" rel="noopener noreferrer" download className="ml-auto text-[10px] font-semibold text-[#f9a8d4] hover:underline">⬇</a>
-                    <button type="button" onClick={() => handleExcluirClipe(url)} disabled={proc === url || isPending} className="text-[10px] font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-40">{proc === url ? "…" : "✕"}</button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <>
+              <p className="mt-4 text-[10px] leading-snug text-muted/70">Seus clipes. Poste solto (Story/Reels) ou <strong className="text-white/70">marque um como ⭐ Abertura / 🏁 Fecho</strong> pra entrar automático no começo/fim dos Reels das festas.</p>
+              <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {clipesUrls.map((url) => {
+                  const ehAbertura = aberturaSel === url;
+                  const ehFecho = fechoSel === url;
+                  return (
+                    <div key={url} className={`overflow-hidden rounded-lg border bg-black ${ehAbertura || ehFecho ? "border-[#ec4899]" : "border-linha"}`}>
+                      <div className="relative">
+                        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                        <video src={url} controls playsInline loop className="aspect-[9/16] w-full bg-black object-contain" />
+                        {(ehAbertura || ehFecho) && (
+                          <span className="absolute left-1 top-1 rounded-full bg-[#ec4899] px-2 py-0.5 text-[9px] font-bold text-white">{ehAbertura ? "⭐ Abertura" : "🏁 Fecho"}</span>
+                        )}
+                      </div>
+                      {/* marcar como abertura/fecho dos Reels */}
+                      <div className="flex items-center gap-1.5 px-2 pt-2">
+                        <button type="button" onClick={() => alternarAbertura(url)} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold transition ${ehAbertura ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha text-muted hover:border-white/30 hover:text-white"}`}>{ehAbertura ? "⭐ Abertura ✓" : "⭐ Abertura"}</button>
+                        <button type="button" onClick={() => alternarFecho(url)} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold transition ${ehFecho ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha text-muted hover:border-white/30 hover:text-white"}`}>{ehFecho ? "🏁 Fecho ✓" : "🏁 Fecho"}</button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 px-2 py-2">
+                        <button type="button" onClick={() => { setResultadoPost(null); setConfirmPost({ url, tipo: "story" }); }} disabled={postandoClipe} className="rounded-md bg-gradient-to-r from-[#f58529] via-[#dd2a7b] to-[#8134af] px-2 py-1 text-[10px] font-bold text-white transition hover:brightness-110 disabled:opacity-50">📲 Story</button>
+                        <button type="button" onClick={() => { setResultadoPost(null); setConfirmPost({ url, tipo: "reels" }); }} disabled={postandoClipe} className="rounded-md bg-[#C13584] px-2 py-1 text-[10px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">🎬 Reels</button>
+                        <a href={url} target="_blank" rel="noopener noreferrer" download className="ml-auto text-[10px] font-semibold text-[#f9a8d4] hover:underline">⬇</a>
+                        <button type="button" onClick={() => handleExcluirClipe(url)} disabled={proc === url || isPending} className="text-[10px] font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-40">{proc === url ? "…" : "✕"}</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
