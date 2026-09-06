@@ -108,6 +108,7 @@ export async function festaPorToken(token: string) {
         autorizacao: true,
         motivoNaoAutoriza: true,
         mostrarAvaliacao: true,
+        videoClipes: true, // clipes de vídeo que o gerente sobe na festa (entram no Reels; não vão pro álbum)
         marca: { select: { nome: true, logoUrl: true, corPrimaria: true } },
       },
     });

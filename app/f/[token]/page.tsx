@@ -41,6 +41,7 @@ export default async function FestaPublicaPage({ params }: { params: Promise<{ t
       videoTextoFinal: "",
       videoTituloCapa: "",
       videoMusica: "",
+      videoClipes: (() => { try { return (JSON.parse(festa.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch { return []; } })(),
       mascoteCanto: "",
       mascoteTam: "m",
       videoUrl: "",

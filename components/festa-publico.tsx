@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta, salvarAutorizacaoFesta, salvarMostrarAvaliacao, editarFestaPublica } from "@/app/actions/festas";
+import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta, salvarAutorizacaoFesta, salvarMostrarAvaliacao, editarFestaPublica, adicionarClipeFestaPublico, removerClipeFestaPublico } from "@/app/actions/festas";
 import { QRCodeSVG } from "qrcode.react";
 import { InputDataBR } from "@/components/input-data-br";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
@@ -22,6 +22,11 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
 
   const [subindo, setSubindo] = useState<string | null>(null); // momento recebendo fotos
   const [erroUp, setErroUp] = useState<string | null>(null);
+  // VÍDEOS da festa (viram os CLIPES do Reels; não vão pro álbum dos pais). Máx 5.
+  const MAX_CLIPES = 5;
+  const [clipes, setClipes] = useState<string[]>(Array.isArray(festa.videoClipes) ? festa.videoClipes : []);
+  const [subindoClipe, setSubindoClipe] = useState(false);
+  const [erroClipe, setErroClipe] = useState<string | null>(null);
   const [fotoSel, setFotoSel] = useState<FotoView | null>(null);
   const [removendo, setRemovendo] = useState(false);
   const [movendo, setMovendo] = useState(false);
@@ -131,6 +136,32 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
     } finally {
       setSubindo(null);
     }
+  }
+
+  // Sobe um VÍDEO da festa direto pro Blob (client upload — aguenta arquivo grande) e guarda como
+  // clipe do Reels. Um de cada vez, pra não travar o celular do gerente.
+  async function subirClipe(file?: File | null) {
+    if (!file) return;
+    if (clipes.length >= MAX_CLIPES) { setErroClipe(`Você já adicionou ${MAX_CLIPES} vídeos (o máximo).`); return; }
+    setErroClipe(null);
+    setSubindoClipe(true);
+    try {
+      const { upload } = await import("@vercel/blob/client");
+      const nome = (file.name || "video.mp4").replace(/[^a-zA-Z0-9.-]/g, "_");
+      const blob = await upload(`clipes/${Date.now()}-${nome}`, file, { access: "public", handleUploadUrl: `/api/f/${token}/clipe-upload`, contentType: file.type || "video/mp4" });
+      const r = await adicionarClipeFestaPublico(token, blob.url);
+      if (!r.ok) { setErroClipe(r.erro || "Não consegui salvar o vídeo."); return; }
+      setClipes(r.clipes);
+    } catch {
+      setErroClipe("Não consegui subir o vídeo. Confira a internet e tente de novo.");
+    } finally {
+      setSubindoClipe(false);
+    }
+  }
+  async function removerClipe(url: string) {
+    setErroClipe(null);
+    const r = await removerClipeFestaPublico(token, url).catch(() => null);
+    if (r?.ok) setClipes(r.clipes);
   }
 
   function abrirFoto(foto: FotoView) { setFotoSel(foto); setErroModal(null); }
@@ -449,6 +480,35 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
               </div>
             );
           })}
+
+          {/* VÍDEOS da festa → viram os clipes do Reels. Ficam SÓ pro vídeo; não vão pro álbum dos pais. */}
+          <div className="rounded-lg border border-[#ec4899]/30 bg-[#ec4899]/[0.06] p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold text-white">🎬 Vídeos da festa</span>
+              <span className={`shrink-0 text-xs font-semibold ${clipes.length >= MAX_CLIPES ? "text-green-400" : "text-muted"}`}>{clipes.length >= MAX_CLIPES ? "✓ " : ""}{clipes.length}/{MAX_CLIPES}</span>
+            </div>
+            <p className="mt-0.5 text-[11px] leading-snug text-muted">Uns clipinhos curtos (a criança soprando a vela, a galera dançando…). Eles entram <strong className="text-white/80">no vídeo/Reels</strong> da festa, junto com as fotos. <strong className="text-white/80">Não aparecem no álbum dos pais</strong> — são só pra o vídeo. 🎥</p>
+
+            {clipes.length < MAX_CLIPES && (
+              <label className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-white transition active:opacity-80 ${subindoClipe ? "opacity-70" : "cursor-pointer"}`} style={{ backgroundColor: "#ec4899" }}>
+                {subindoClipe ? "Subindo o vídeo…" : "🎬 Adicionar vídeo"}
+                <input type="file" accept="video/*" className="hidden" disabled={subindoClipe} onChange={(e) => { subirClipe(e.target.files?.[0]); e.target.value = ""; }} />
+              </label>
+            )}
+            {erroClipe && <p className="mt-2 text-[11px] font-semibold text-vermelho">{erroClipe}</p>}
+
+            {clipes.length > 0 && (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {clipes.map((c) => (
+                  <div key={c} className="relative overflow-hidden rounded-lg border border-linha bg-black">
+                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                    <video src={`${c}#t=0.3`} preload="metadata" muted playsInline controls className="aspect-[9/16] w-full object-cover" />
+                    <button type="button" onClick={() => removerClipe(c)} aria-label="Tirar este vídeo" title="Tirar este vídeo" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-red-300 transition hover:bg-red-900/70">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Finalizar / reabrir o envio da festa */}
           {festa.finalizadaEm ? (

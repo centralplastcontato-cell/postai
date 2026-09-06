@@ -219,6 +219,36 @@ export async function removerFotoPublica(festaToken: string, fotoId: string) {
   return { ok: true as const };
 }
 
+// VÍDEOS DA FESTA pelo GERENTE (link da festa, sem login — o token é a autorização). Ficam guardados
+// como CLIPES do Reels daquela festa (entram intercalados com as fotos). NÃO vão pro álbum dos pais
+// (o álbum mostra só as fotos/ImagemMarca). Máx 5 pelo gerente.
+const MAX_CLIPES_GERENTE = 5;
+export async function adicionarClipeFestaPublico(festaToken: string, url: string) {
+  const f = await festaPorToken(festaToken);
+  if (!f) return { ok: false as const, erro: "Link inválido ou desativado." };
+  if (typeof url !== "string" || !url.startsWith("http")) return { ok: false as const, erro: "Vídeo inválido." };
+  let atuais: string[] = [];
+  try { atuais = (JSON.parse(f.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+  if (atuais.includes(url)) return { ok: true as const, clipes: atuais };
+  if (atuais.length >= MAX_CLIPES_GERENTE) return { ok: false as const, erro: `Você já adicionou ${MAX_CLIPES_GERENTE} vídeos (o máximo).` };
+  const novos = [...atuais, url].slice(0, MAX_CLIPES_GERENTE);
+  await prisma.festa.update({ where: { id: f.id }, data: { videoClipes: JSON.stringify(novos) } });
+  revalidatePath(`/f/${festaToken}`);
+  return { ok: true as const, clipes: novos };
+}
+export async function removerClipeFestaPublico(festaToken: string, url: string) {
+  const f = await festaPorToken(festaToken);
+  if (!f) return { ok: false as const, erro: "Link inválido ou desativado." };
+  let atuais: string[] = [];
+  try { atuais = (JSON.parse(f.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+  const novos = atuais.filter((c) => c !== url);
+  await prisma.festa.update({ where: { id: f.id }, data: { videoClipes: JSON.stringify(novos) } });
+  // Tira o vídeo do Blob (best-effort) — ele só servia pra montar o Reels, ninguém mais usa.
+  if (typeof url === "string" && url.startsWith("http")) import("@vercel/blob").then(({ del }) => del(url)).catch(() => {});
+  revalidatePath(`/f/${festaToken}`);
+  return { ok: true as const, clipes: novos };
+}
+
 // O gerente registra o NOME dele (quem está documentando a festa). Pelo link da festa.
 export async function salvarGerenteFesta(festaToken: string, nome: string) {
   const f = await festaPorToken(festaToken);
