@@ -15,6 +15,8 @@ function credenciais(): Record<string, unknown> {
 export type PedidoReels = {
   fotos: string[];
   clipes?: string[]; // clipes de VÍDEO (URLs) pra intercalar com as fotos — entram mudos
+  posicaoClipes?: string; // onde os clipes entram: "espalhados" (padrão) | "comeco" | "fim"
+  naoCortarVideo?: boolean; // true = música curta REPETE pra o vídeo manter o tempo cheio
   capaUrl?: string; // foto da CAPA (nítida + texto por cima). Sem isso, o motor usa a 1ª foto.
   moldura?: string; // moldura das fotos: "nenhuma" | "branca" | "grossa" | "marca"
   corMoldura?: string; // cor (hex) usada quando moldura="marca"

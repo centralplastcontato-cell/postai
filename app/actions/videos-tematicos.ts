@@ -320,13 +320,15 @@ export async function removerMusicaDoBancoTema(videoId: string, url: string) {
 // Guarda o WAV (24kHz mono, preparado no navegador) de uma trilha da biblioteca — pra ela poder
 // entrar como fundo da NARRAÇÃO (sob a voz). Casa pela URL do MP3.
 // CLIPES DE VÍDEO do vídeo do buffet (temático) — URLs no Blob, intercalam com as fotos (mudos). Máx 6.
-export async function definirClipesTematico(videoId: string, clipes: string[]) {
+export async function definirClipesTematico(videoId: string, clipes: string[], posicao?: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const urls = (Array.isArray(clipes) ? clipes : []).filter((u) => typeof u === "string" && u.startsWith("http")).slice(0, 6);
-  await prisma.videoTematico.update({ where: { id: videoId }, data: { videoClipes: JSON.stringify(urls) } });
+  const data: { videoClipes: string; videoClipesPos?: string } = { videoClipes: JSON.stringify(urls) };
+  if (posicao && ["espalhados", "comeco", "fim"].includes(posicao)) data.videoClipesPos = posicao;
+  await prisma.videoTematico.update({ where: { id: videoId }, data });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, clipes: urls };
 }
@@ -683,6 +685,10 @@ export async function gerarVideoTematico(videoId: string) {
   const r = await dispararMotorReels({
     fotos: fotosMotor,
     clipes: clipesTema,
+    posicaoClipes: v.videoClipesPos || "espalhados",
+    // COM narração a VOZ manda no tamanho (cortar no fim da voz é o certo). SEM narração é só música:
+    // se ela for curta, REPETE pra o vídeo manter o tempo cheio em vez de encolher no tamanho da música.
+    naoCortarVideo: !temNarracao,
     capaUrl: capaFinal,
     moldura: temLegenda || mascoteOn || logoOn ? "nenhuma" : v.videoMoldura || "branca",
     corMoldura: v.marca.corPrimaria || "#FFFFFF",

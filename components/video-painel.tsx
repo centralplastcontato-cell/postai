@@ -33,6 +33,7 @@ export type VideoTematicoView = {
   logoTam: string; // tamanho do logo quando posicionado por nós: p | m | g
   videoMusica: string; // trilha escolhida (URL) — "" = jingle do buffet
   videoClipes?: string[]; // clipes de vídeo (URLs) pra intercalar com as fotos
+  videoClipesPos?: string; // onde os clipes entram: "espalhados" | "comeco" | "fim"
   videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
   narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
   capaUrl: string | null; // thumb do card (capa escolhida ou 1ª foto)
@@ -503,6 +504,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           tituloCapaAuto={tituloCapaFesta(seletor.aniversariantes, rotuloAniversariantes(seletor.aniversariantes))}
           musicaInicial={seletor.videoMusica}
           clipesInicial={seletor.videoClipes ?? []}
+          clipesPosInicial={seletor.videoClipesPos ?? "espalhados"}
           musicasBanco={musicasBanco}
           mascoteCantoInicial={seletor.mascoteCanto}
           mascoteTamInicial={seletor.mascoteTam}
@@ -540,6 +542,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           capasBanco={capasBanco}
           musicaInicial={seletorTema.video.videoMusica}
           clipesInicial={seletorTema.video.videoClipes ?? []}
+          clipesPosInicial={seletorTema.video.videoClipesPos ?? "espalhados"}
           musicasBanco={musicasBanco}
           corMarca={corMarca}
           jaTemVideo={seletorTema.video.videoUrl.startsWith("http")}

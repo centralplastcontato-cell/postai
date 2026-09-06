@@ -151,7 +151,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", clipesInicial = [], musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", logoCantoInicial = "", logoTamInicial = "m", logoUrlMarca = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, gerente = "", onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", clipesInicial = [], clipesPosInicial = "espalhados", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", logoCantoInicial = "", logoTamInicial = "m", logoUrlMarca = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, gerente = "", onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -167,6 +167,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   narracao?: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz do vídeo
   musicaInicial?: string;
   clipesInicial?: string[]; // clipes de vídeo já salvos na festa (URLs) — intercalam com as fotos
+  clipesPosInicial?: string; // onde os clipes entram: "espalhados" | "comeco" | "fim"
   musicasBanco?: { url: string; nome: string; wav?: string }[];
   fundoInicial?: string; // fundo do quadro do vídeo temático: "" (foto borrada) | "cheia" | "cor"
   fundoCorInicial?: string; // cor do fundo "cor" (hex); "" = cor da marca
@@ -398,7 +399,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [subindoMusica, setSubindoMusica] = useState(false); // enviando o MP3
   const [clipes, setClipes] = useState<string[]>(Array.isArray(clipesInicial) ? clipesInicial : []); // clipes de vídeo
   const [subindoClipe, setSubindoClipe] = useState(false);
-  const salvarClipes = (novos: string[]) => (tematicoId ? definirClipesTematico(tematicoId, novos) : definirClipesFesta(festaId, novos)).catch(() => {});
+  const [posClipes, setPosClipes] = useState<string>(clipesPosInicial || "espalhados"); // onde os clipes entram
+  const salvarClipes = (novos: string[], pos?: string) => (tematicoId ? definirClipesTematico(tematicoId, novos, pos) : definirClipesFesta(festaId, novos, pos)).catch(() => {});
+  function mudarPosClipes(pos: string) {
+    setPosClipes(pos);
+    salvarClipes(clipes, pos);
+  }
   async function enviarClipe(file?: File) {
     if (!file || (!festaId && !tematicoId)) return;
     setSubindoClipe(true);
@@ -1290,6 +1296,24 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                           <button type="button" onClick={() => excluirClipe(c)} title="Tirar este clipe" aria-label="Tirar clipe" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-red-300 transition hover:bg-red-900/70">✕</button>
                         </div>
                       ))}
+                    </div>
+                  )}
+                  {clipes.length > 0 && (
+                    <div className="mt-4">
+                      <span className="text-[11px] font-semibold text-white">📍 Onde os clipes entram</span>
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        {[
+                          { id: "espalhados", ic: "🔀", label: "Espalhados", desc: "no meio das fotos" },
+                          { id: "comeco", ic: "⬆️", label: "No começo", desc: "logo após a capa" },
+                          { id: "fim", ic: "⬇️", label: "No fim", desc: "antes do final" },
+                        ].map((o) => (
+                          <button key={o.id} type="button" onClick={() => mudarPosClipes(o.id)} className={`rounded-lg border p-2 text-center transition ${posClipes === o.id ? "border-[#ec4899] bg-[#ec4899]/15" : "border-linha bg-preto hover:border-[#ec4899]/50"}`}>
+                            <div className="text-base">{o.ic}</div>
+                            <div className="text-[11px] font-semibold text-white">{o.label}</div>
+                            <div className="text-[9px] leading-tight text-muted/70">{o.desc}</div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
