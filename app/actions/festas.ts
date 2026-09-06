@@ -406,6 +406,46 @@ export async function definirClipesFesta(festaId: string, clipes: string[], posi
   return { ok: true as const, clipes: urls };
 }
 
+// ZERA o vídeo da festa: volta TODAS as escolhas do vídeo ao começo (fotos, capa, moldura, mascote,
+// música, clipes, textos) e apaga o MP4 montado — como se o vídeo nunca tivesse sido feito. A FESTA
+// e as FOTOS do álbum NÃO são tocadas. Usado pro botão "Recomeçar vídeo".
+export async function zerarVideoFesta(festaId: string) {
+  const festa = await prisma.festa.findUnique({
+    where: { id: festaId },
+    select: { marcaId: true, videoUrl: true, videoClipes: true },
+  });
+  if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(festa.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (festa.videoUrl === "gerando") return { ok: false as const, erro: "O vídeo está sendo montado agora — espere terminar pra recomeçar." };
+
+  // Volta tudo do vídeo ao padrão (mantém a festa e as fotos).
+  await prisma.festa.update({
+    where: { id: festaId },
+    data: {
+      videoFotos: "[]", videoCapa: "", videoMoldura: "branca", mascoteCanto: "", mascoteTam: "m",
+      videoTextoFinal: "", videoTituloCapa: "", videoMusica: "", videoClipes: "[]",
+      videoClipesPos: "espalhados", videoClipesDur: "completo", videoUrl: "",
+    },
+  });
+
+  // Limpa o Blob (best-effort, em segundo plano): os CLIPES (só entram no motor, ninguém mais usa)
+  // e o MP4 montado — este só se NENHUM post agendado ainda apontar pra ele (o post guarda a mesma
+  // URL). A música NÃO é apagada (pode estar na biblioteca da marca).
+  import("@vercel/blob").then(async ({ del }) => {
+    let clipes: string[] = [];
+    try { clipes = (JSON.parse(festa.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+    for (const c of clipes) del(c).catch(() => {});
+    if (festa.videoUrl?.startsWith("http")) {
+      const emUso = await prisma.publicacao.count({ where: { status: "a_postar", videoUrl: festa.videoUrl } });
+      if (emUso === 0) del(festa.videoUrl).catch(() => {});
+    }
+  }).catch(() => {});
+
+  revalidatePath(`/painel/marcas/${festa.marcaId}`);
+  return { ok: true as const };
+}
+
 // Cria um POST DE REELS agendado a partir do vídeo JÁ montado da festa. Entra na Agenda como
 // Publicacao formato="reels" (status a_postar), pronto pra revisar e ser postado pelo piloto.
 // TRAVA LGPD: festa sem autorização dos pais NUNCA vira divulgação pública.

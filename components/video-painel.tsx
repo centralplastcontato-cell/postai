@@ -9,8 +9,8 @@ import { useRouter } from "next/navigation";
 import { type FestaView, type FotoView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes, tituloCapaFesta } from "@/lib/aniversariantes";
 import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
-import { criarVideoTematico, excluirVideoTematico, fotosDoVideoTematico } from "@/app/actions/videos-tematicos";
-import { excluirFesta } from "@/app/actions/festas";
+import { criarVideoTematico, excluirVideoTematico, fotosDoVideoTematico, zerarVideoTematico } from "@/app/actions/videos-tematicos";
+import { excluirFesta, zerarVideoFesta } from "@/app/actions/festas";
 
 // Vídeo TEMÁTICO do buffet (Reels institucional do acervo, sem festa) — view do painel.
 export type VideoTematicoView = {
@@ -158,7 +158,7 @@ function PlayerModal({ url, nome, capaImgUrl, onFechar }: { url: string; nome?: 
   );
 }
 
-function CardVideo({ f, onAbrirSeletor, onExcluir }: { f: FestaView; onAbrirSeletor: () => void; onExcluir: () => void }) {
+function CardVideo({ f, onAbrirSeletor, onExcluir, onZerar }: { f: FestaView; onAbrirSeletor: () => void; onExcluir: () => void; onZerar: () => void }) {
   const [ver, setVer] = useState(false);
 
   const pronto = f.videoUrl.startsWith("http");
@@ -171,6 +171,10 @@ function CardVideo({ f, onAbrirSeletor, onExcluir }: { f: FestaView; onAbrirSele
   const agendadoEm = f.videoAgendadoEm || null;
   const nomes = rotuloAniversariantes(f.aniversariantes) || "Festa";
   const capa = f.fotos[0]?.url;
+  // Dá pra "Recomeçar" (zerar tudo do vídeo) sempre que houver o quê zerar: um vídeo montado/postado
+  // OU escolhas já feitas (fotos, clipes, música, capa, textos). Não aparece no meio da geração.
+  const temEscolhas = f.videoFotos.length > 0 || (f.videoClipes?.length ?? 0) > 0 || !!f.videoMusica || !!f.videoCapa || !!f.videoTextoFinal || !!f.videoTituloCapa || !!f.mascoteCanto;
+  const podeZerar = !emGeracao && (pronto || arquivado || temEscolhas);
 
   // Postado vem ANTES de "Pronto": se o Reels já foi ao ar (na hora ou arquivado em 24h), mostra "Postado".
   const badge = arquivado || (pronto && postado)
@@ -258,7 +262,7 @@ function CardVideo({ f, onAbrirSeletor, onExcluir }: { f: FestaView; onAbrirSele
         {pronto ? (
           <>
             <button onClick={() => setVer(true)} className="flex-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-green-500">▶ Ver vídeo</button>
-            <button onClick={onAbrirSeletor} title="Escolher as fotos e gerar o vídeo de novo (substitui o atual)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25">🔄 Refazer</button>
+            <button onClick={onAbrirSeletor} title="Refazer: escolher as fotos e gerar o vídeo de novo (mantém as escolhas)" aria-label="Refazer vídeo" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25">🔄</button>
           </>
         ) : emGeracao ? (
           <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
@@ -266,6 +270,10 @@ function CardVideo({ f, onAbrirSeletor, onExcluir }: { f: FestaView; onAbrirSele
           <button onClick={onAbrirSeletor} title="Esse vídeo já foi postado e arquivado. Gere um novo com as fotos (continuam guardadas)." className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">🔄 Gerar de novo</button>
         ) : (
           <button onClick={onAbrirSeletor} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9]">⚡ Gerar vídeo</button>
+        )}
+        {/* Recomeçar: zera TUDO do vídeo (mantém a festa e as fotos). Só quando há algo pra zerar. */}
+        {podeZerar && (
+          <button type="button" onClick={onZerar} title="Recomeçar o vídeo do zero (apaga o vídeo e as escolhas; mantém a festa e as fotos)" aria-label="Recomeçar vídeo" className="shrink-0 rounded-lg border border-amber-500/30 px-2.5 py-1.5 text-xs font-semibold text-amber-300 transition hover:border-amber-500 hover:bg-amber-900/20">↺</button>
         )}
         {/* Excluir a festa (útil pra tirar festas repetidas). A confirmação avisa que apaga as fotos. */}
         <button type="button" onClick={onExcluir} title="Excluir esta festa (e as fotos dela)" className="shrink-0 rounded-lg border border-red-500/30 px-2.5 py-1.5 text-xs font-semibold text-red-400 transition hover:border-red-500 hover:bg-red-900/20">✕</button>
@@ -285,12 +293,14 @@ function nomeDaMusica(url: string): string {
 }
 
 // Card de um vídeo TEMÁTICO do buffet — mesma cara do card de festa, sem LGPD/aniversariante.
-function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTematicoView; ocupado: boolean; onAbrirSeletor: () => void; onExcluir: () => void }) {
+function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir, onZerar }: { v: VideoTematicoView; ocupado: boolean; onAbrirSeletor: () => void; onExcluir: () => void; onZerar: () => void }) {
   const [ver, setVer] = useState(false);
   const [confirmaExcluir, setConfirmaExcluir] = useState(false);
 
   const pronto = v.videoUrl.startsWith("http");
   const emGeracao = v.videoUrl === "gerando";
+  const temEscolhas = v.videoFotos.length > 0 || (v.videoClipes?.length ?? 0) > 0 || !!v.videoMusica;
+  const podeZerar = !emGeracao && (pronto || temEscolhas);
   const postado = pronto && v.postadoVezes > 0; // já foi ao ar (mas segue guardado pra repostar)
   // Postado vem ANTES de "Pronto": se o vídeo do buffet já foi postado, o selo mostra isso.
   const badge = postado
@@ -355,6 +365,9 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir }: { v: VideoTemat
         ) : (
           <button onClick={onAbrirSeletor} disabled={ocupado} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{ocupado ? "Abrindo…" : "⚡ Fotos & gerar"}</button>
         )}
+        {podeZerar && !confirmaExcluir && (
+          <button type="button" onClick={onZerar} title="Recomeçar o vídeo do zero (apaga o vídeo e as escolhas; mantém o tema e o acervo)" aria-label="Recomeçar vídeo" className="shrink-0 rounded-lg border border-amber-500/30 px-2.5 py-1.5 text-xs font-semibold text-amber-300 transition hover:border-amber-500 hover:bg-amber-900/20">↺</button>
+        )}
         {!emGeracao && (confirmaExcluir ? (
           <button onClick={() => { onExcluir(); setConfirmaExcluir(false); }} className="shrink-0 rounded-lg bg-red-700 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-600">Excluir?</button>
         ) : (
@@ -379,6 +392,9 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
   // Exclusão de FESTA (pra tirar festas repetidas) — abre um aviso claro antes de apagar de vez.
   const [apagarFesta, setApagarFesta] = useState<FestaView | null>(null);
   const [apagando, setApagando] = useState(false);
+  // "Recomeçar vídeo" (zerar TUDO do vídeo, mantendo a festa/o acervo) — confirma antes.
+  const [zerarAlvo, setZerarAlvo] = useState<{ tipo: "festa" | "tema"; id: string; nome: string } | null>(null);
+  const [zerando, setZerando] = useState(false);
   // "Banco" de trilhas pra reusar. Fonte principal = BIBLIOTECA salva da marca (dá pra excluir dela).
   // Completa com trilhas que festas usam mas ainda não estão na biblioteca (pra não sumir nada).
   const musicasBanco = (() => {
@@ -433,6 +449,18 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
     if (!r.ok) { setMsgTema({ tipo: "erro", txt: r.erro || "Não deu pra excluir." }); return; }
     router.refresh();
   }
+  // Confirma e ZERA o vídeo (mantém a festa/o acervo). Fecha qualquer seletor aberto e recarrega.
+  async function confirmarZerar() {
+    if (!zerarAlvo) return;
+    setZerando(true); setMsgTema(null);
+    const r = await (zerarAlvo.tipo === "festa" ? zerarVideoFesta(zerarAlvo.id) : zerarVideoTematico(zerarAlvo.id))
+      .catch(() => ({ ok: false as const, erro: "Não deu pra recomeçar agora." }));
+    setZerando(false);
+    if (!r.ok) { setMsgTema({ tipo: "erro", txt: r.erro || "Não deu pra recomeçar." }); setZerarAlvo(null); return; }
+    setZerarAlvo(null);
+    setSeletor(null); setSeletorTema(null); // se estava editando esse vídeo, fecha (as escolhas mudaram)
+    router.refresh();
+  }
 
   const mostraBuffet = secao !== "festas";
   const mostraFestas = secao !== "buffet";
@@ -460,7 +488,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
       {tematicos.length > 0 && (
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {tematicos.map((v) => (
-            <CardTematico key={v.id} v={v} ocupado={carregandoTema === v.id} onAbrirSeletor={() => abrirSeletorTema(v)} onExcluir={() => excluirTema(v.id)} />
+            <CardTematico key={v.id} v={v} ocupado={carregandoTema === v.id} onAbrirSeletor={() => abrirSeletorTema(v)} onExcluir={() => excluirTema(v.id)} onZerar={() => setZerarAlvo({ tipo: "tema", id: v.id, nome: v.titulo })} />
           ))}
         </div>
       )}
@@ -485,7 +513,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {festas.map((f) => (
-            <CardVideo key={f.id} f={f} onAbrirSeletor={() => setSeletor(f)} onExcluir={() => setApagarFesta(f)} />
+            <CardVideo key={f.id} f={f} onAbrirSeletor={() => setSeletor(f)} onExcluir={() => setApagarFesta(f)} onZerar={() => setZerarAlvo({ tipo: "festa", id: f.id, nome: rotuloAniversariantes(f.aniversariantes) || "Festa" })} />
           ))}
         </div>
       )}
@@ -564,6 +592,22 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
             <div className="mt-4 flex gap-2">
               <button onClick={() => setApagarFesta(null)} disabled={apagando} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-muted transition hover:text-white disabled:opacity-50">Cancelar</button>
               <button onClick={confirmarApagarFesta} disabled={apagando} className="flex-1 rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-600 disabled:opacity-60">{apagando ? "Excluindo…" : "Sim, excluir festa"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMAÇÃO de RECOMEÇAR o vídeo (zera o vídeo e as escolhas; a festa/o acervo continuam). */}
+      {zerarAlvo && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4" onClick={() => !zerando && setZerarAlvo(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-sm rounded-2xl border border-amber-500/40 bg-preto-card p-5">
+            <p className="text-sm font-bold text-white">Recomeçar o vídeo de {zerarAlvo.nome}?</p>
+            <p className="mt-2 text-xs text-muted">
+              Volta o vídeo <strong className="text-white">ao começo, em branco</strong>: apaga o vídeo montado e todas as escolhas dele (fotos, clipes, música, textos{zerarAlvo.tipo === "tema" ? ", narração" : ""}). {zerarAlvo.tipo === "festa" ? <>A <strong className="text-white">festa e as fotos do álbum continuam</strong> intactas.</> : <>O <strong className="text-white">tema e o acervo de fotos continuam</strong> intactos.</>} <strong className="text-amber-300">Não dá pra desfazer.</strong>
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button onClick={() => setZerarAlvo(null)} disabled={zerando} className="flex-1 rounded-lg border border-linha px-3 py-2 text-xs font-semibold text-muted transition hover:text-white disabled:opacity-50">Cancelar</button>
+              <button onClick={confirmarZerar} disabled={zerando} className="flex-1 rounded-lg bg-amber-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-amber-500 disabled:opacity-60">{zerando ? "Recomeçando…" : "Sim, recomeçar"}</button>
             </div>
           </div>
         </div>

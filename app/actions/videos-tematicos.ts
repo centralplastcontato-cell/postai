@@ -334,6 +334,48 @@ export async function definirClipesTematico(videoId: string, clipes: string[], p
   return { ok: true as const, clipes: urls };
 }
 
+// ZERA o vídeo do buffet: volta TODAS as escolhas ao começo (fotos, legendas, capa, moldura, fundo,
+// mascote, logo, música, clipes, narração) e apaga o MP4 montado — como se nunca tivesse sido feito.
+// O TÍTULO/tema do vídeo continua (é a identidade dele). Usado pro botão "Recomeçar vídeo".
+export async function zerarVideoTematico(videoId: string) {
+  const v = await prisma.videoTematico.findUnique({
+    where: { id: videoId },
+    select: { marcaId: true, videoUrl: true, videoClipes: true, narracaoUrl: true, capaIaUrl: true, capaRecorteUrl: true },
+  });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (v.videoUrl === "gerando") return { ok: false as const, erro: "O vídeo está sendo montado agora — espere terminar pra recomeçar." };
+
+  await prisma.videoTematico.update({
+    where: { id: videoId },
+    data: {
+      videoFotos: "[]", videoTextos: "{}", videoCapa: "", videoMoldura: "branca", videoMolduraCor: "",
+      videoTextoFinal: "", videoFundo: "", videoFundoCor: "", capaEstilo: "", capaIaUrl: "", capaRecorteUrl: "",
+      mascoteCanto: "", mascoteTam: "m", logoCanto: "", logoTam: "m", videoMusica: "",
+      videoClipes: "[]", videoClipesPos: "espalhados", videoClipesDur: "completo", videoUrl: "",
+      narracaoTexto: "", narracaoVoz: "", narracaoEstilo: "", narracaoUrl: "", narracaoSeg: 0,
+    },
+  });
+
+  // Limpa o Blob (best-effort): clipes, narração, capa da IA e recorte (só entram no motor/na capa,
+  // ninguém mais usa) + o MP4 montado (só se nenhum post agendado ainda apontar pra ele). A música
+  // NÃO é apagada (pode estar na biblioteca da marca).
+  import("@vercel/blob").then(async ({ del }) => {
+    let clipes: string[] = [];
+    try { clipes = (JSON.parse(v.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+    for (const c of clipes) del(c).catch(() => {});
+    for (const u of [v.narracaoUrl, v.capaIaUrl, v.capaRecorteUrl]) if (u?.startsWith("http")) del(u).catch(() => {});
+    if (v.videoUrl?.startsWith("http")) {
+      const emUso = await prisma.publicacao.count({ where: { status: "a_postar", videoUrl: v.videoUrl } });
+      if (emUso === 0) del(v.videoUrl).catch(() => {});
+    }
+  }).catch(() => {});
+
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function definirWavMusicaTema(videoId: string, url: string, wav: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
