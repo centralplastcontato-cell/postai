@@ -319,6 +319,18 @@ export async function removerMusicaDoBancoTema(videoId: string, url: string) {
 
 // Guarda o WAV (24kHz mono, preparado no navegador) de uma trilha da biblioteca — pra ela poder
 // entrar como fundo da NARRAÇÃO (sob a voz). Casa pela URL do MP3.
+// CLIPES DE VÍDEO do vídeo do buffet (temático) — URLs no Blob, intercalam com as fotos (mudos). Máx 6.
+export async function definirClipesTematico(videoId: string, clipes: string[]) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const urls = (Array.isArray(clipes) ? clipes : []).filter((u) => typeof u === "string" && u.startsWith("http")).slice(0, 6);
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { videoClipes: JSON.stringify(urls) } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const, clipes: urls };
+}
+
 export async function definirWavMusicaTema(videoId: string, url: string, wav: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
@@ -664,8 +676,13 @@ export async function gerarVideoTematico(videoId: string) {
   // próximo vídeo do mesmo tema — perderíamos cenas boas sem elas nunca terem aparecido.
   const usadas = [...new Set([...idsSlideshow, ...(v.videoCapa && mapa.has(v.videoCapa) ? [v.videoCapa] : [])])];
   if (usadas.length) await prisma.imagemMarca.updateMany({ where: { id: { in: usadas } }, data: { usos: { increment: 1 } } }).catch(() => {});
+  // clipes de vídeo (opcional) — entram MUDOS, intercalados com as fotos.
+  let clipesTema: string[] = [];
+  try { clipesTema = (JSON.parse(v.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+
   const r = await dispararMotorReels({
     fotos: fotosMotor,
+    clipes: clipesTema,
     capaUrl: capaFinal,
     moldura: temLegenda || mascoteOn || logoOn ? "nenhuma" : v.videoMoldura || "branca",
     corMoldura: v.marca.corPrimaria || "#FFFFFF",

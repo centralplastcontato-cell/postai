@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { salvarFotosVideo, gerarVideoDaFesta, statusVideoFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, removerMusicaDoBanco, definirMascoteFesta, definirClipesFesta } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, statusVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, removerMusicaDoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideoTematico, gerarVideoTematico, statusVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, removerMusicaDoBancoTema, definirWavMusicaTema, definirClipesTematico, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
 const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
@@ -398,8 +398,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [subindoMusica, setSubindoMusica] = useState(false); // enviando o MP3
   const [clipes, setClipes] = useState<string[]>(Array.isArray(clipesInicial) ? clipesInicial : []); // clipes de vídeo
   const [subindoClipe, setSubindoClipe] = useState(false);
+  const salvarClipes = (novos: string[]) => (tematicoId ? definirClipesTematico(tematicoId, novos) : definirClipesFesta(festaId, novos)).catch(() => {});
   async function enviarClipe(file?: File) {
-    if (!file || !festaId) return;
+    if (!file || (!festaId && !tematicoId)) return;
     setSubindoClipe(true);
     try {
       const { upload } = await import("@vercel/blob/client");
@@ -407,14 +408,14 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
       const blob = await upload(`clipes/${Date.now()}-${nome}`, file, { access: "public", handleUploadUrl: "/api/marketing/blob-upload", contentType: file.type || "video/mp4" });
       const novos = [...clipes, blob.url].slice(0, 6);
       setClipes(novos);
-      await definirClipesFesta(festaId, novos).catch(() => {});
+      await salvarClipes(novos);
     } catch {}
     setSubindoClipe(false);
   }
   async function excluirClipe(url: string) {
     const novos = clipes.filter((c) => c !== url);
     setClipes(novos);
-    if (festaId) await definirClipesFesta(festaId, novos).catch(() => {});
+    await salvarClipes(novos);
   }
   const [banco, setBanco] = useState<{ url: string; nome: string; wav?: string }[]>(musicasBanco); // biblioteca de trilhas da marca
   const [tocando, setTocando] = useState<string>(""); // URL da música tocando agora ("" = nenhuma)
@@ -868,7 +869,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // Ordem: visual (Fotos+Estilo) → palavras (Textos) → som (Música+Narração, música antes da voz).
   const ABAS: { id: string; ic: string; label: string }[] = [
     { id: "fotos", ic: "📷", label: "Fotos" },
-    ...(!tematicoId ? [{ id: "clipes", ic: "🎬", label: "Clipes" }] : []),
+    { id: "clipes", ic: "🎬", label: "Clipes" },
     ...(tematicoId ? [{ id: "capa", ic: "🎯", label: "Capa" }] : []),
     { id: "estilo", ic: "🎨", label: "Estilo" },
     { id: "texto", ic: "✍️", label: tematicoId ? "Textos" : "Capa" },
@@ -1267,8 +1268,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                 </div>
               )}
 
-              {/* ============ ABA CLIPES (só festa) — vídeos que intercalam com as fotos ============ */}
-              {aba === "clipes" && festaId && !tematicoId && (
+              {/* ============ ABA CLIPES — vídeos que intercalam com as fotos ============ */}
+              {aba === "clipes" && (
                 <div>
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-white">🎬 Clipes de vídeo <span className="font-normal text-muted/70">(opcional)</span></span>

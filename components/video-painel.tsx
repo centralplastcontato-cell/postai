@@ -539,6 +539,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           logoUrlMarca={logoUrl}
           capasBanco={capasBanco}
           musicaInicial={seletorTema.video.videoMusica}
+          clipesInicial={seletorTema.video.videoClipes ?? []}
           musicasBanco={musicasBanco}
           corMarca={corMarca}
           jaTemVideo={seletorTema.video.videoUrl.startsWith("http")}
