@@ -492,14 +492,25 @@ export function MascoteEstudio({
 
       {erro && <p className="mb-4 rounded-md border border-red-900 bg-red-950/40 p-3 text-sm text-red-300">{erro}</p>}
 
-      {/* SUB-ABAS: separa Criar/Escolher o mascote · Ficha 3D · Dar vida (vídeos). Ficha e Dar vida
-          só aparecem quando já existe um mascote oficial escolhido. */}
-      <div className="mb-5 flex flex-wrap gap-2">
+      {/* SUB-ABAS (controle segmentado): Meu mascote → Vídeos → Voz → Ficha 3D. As 3 últimas só
+          aparecem quando já existe um mascote oficial (a base de tudo). */}
+      <div className="mb-5 grid grid-cols-2 gap-1.5 rounded-xl border border-linha bg-preto-card p-1.5 sm:flex">
         {([
-          { id: "criar", rotulo: "🦸 Meu mascote" },
-          ...(mascoteUrl ? [{ id: "voz", rotulo: "🎙️ Voz" }, { id: "vida", rotulo: "🎬 Dar vida" }, { id: "ficha", rotulo: "🧊 Ficha 3D" }] : []),
-        ] as { id: "criar" | "ficha" | "vida" | "voz"; rotulo: string }[]).map((t) => (
-          <button key={t.id} type="button" onClick={() => setSubAba(t.id)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${subAba === t.id ? "bg-[#7c3aed] text-white" : "border border-linha text-muted hover:text-white"}`}>{t.rotulo}</button>
+          { id: "criar", ic: "🏰", rotulo: "Meu mascote" },
+          ...(mascoteUrl ? [
+            { id: "vida", ic: "🎬", rotulo: "Vídeos" },
+            { id: "voz", ic: "🎙️", rotulo: "Voz" },
+            { id: "ficha", ic: "🧊", rotulo: "Ficha 3D" },
+          ] : []),
+        ] as { id: "criar" | "ficha" | "vida" | "voz"; ic: string; rotulo: string }[]).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setSubAba(t.id)}
+            className={`flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold transition sm:flex-1 ${subAba === t.id ? "bg-[#7c3aed] text-white shadow" : "text-muted hover:bg-white/5 hover:text-white"}`}
+          >
+            <span className="text-sm leading-none">{t.ic}</span> {t.rotulo}
+          </button>
         ))}
       </div>
 
@@ -699,7 +710,7 @@ export function MascoteEstudio({
       {/* FASE 5 — DAR VIDA: anima o mascote com IA de vídeo (só quando há mascote oficial) */}
       {subAba === "vida" && mascoteUrl && (
         <div className="mt-7 rounded-xl border border-[#ec4899]/40 bg-[#ec4899]/5 p-4 sm:p-5">
-          <p className="text-sm font-semibold text-white">🎬 Dar vida ao mascote <span className="ml-1 rounded-full border border-[#ec4899]/40 bg-[#ec4899]/15 px-2 py-0.5 text-[10px] font-semibold text-[#f9a8d4]">novo · beta</span></p>
+          <p className="text-sm font-semibold text-white">🎬 Vídeos do mascote <span className="ml-1 rounded-full border border-[#ec4899]/40 bg-[#ec4899]/15 px-2 py-0.5 text-[10px] font-semibold text-[#f9a8d4]">novo · beta</span></p>
           <p className="mt-1 text-xs text-muted">
             A IA <strong className="text-white/80">anima o seu mascote</strong> num clipe curto — <strong className="text-white/80">com voz, música e efeitos</strong> 🎵. Escolha um <strong className="text-white/80">modo</strong>, ajuste a fala e o cenário, e gere. O castelinho sai <strong className="text-white/80">sempre igual</strong> (parte da ficha oficial).
           </p>
