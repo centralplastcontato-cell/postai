@@ -543,22 +543,35 @@ export async function escreverCenasHistoria(marcaId: string, briefing: string, n
   if (!key) return { ok: false, erro: "OPENAI_API_KEY não configurada." };
   const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { nome: true } });
   const n = Math.max(2, Math.min(5, Math.round(numCenas || 3)));
-  const tema = (briefing || "").trim().slice(0, 300) || "o castelinho dando boas-vindas, mostrando a diversão do buffet e convidando pra fazer a festa lá";
+  const tema = (briefing || "").trim().slice(0, 800) || "o castelinho dando boas-vindas, mostrando a diversão do buffet e convidando pra fazer a festa lá";
+  const sistema = [
+    `Você é ROTEIRISTA de uma série de vídeos curtos e encantadores do mascote (o "castelinho") de um buffet infantil chamado "${marca?.nome || "o buffet"}". Escreve como um bom roteirista de DESENHO ANIMADO infantil (estilo Pixar/Disney): carismático, divertido, com emoção e ritmo.`,
+    `Sua tarefa: escrever UMA historinha em EXATAMENTE ${n} cenas, em português do Brasil.`,
+    ``,
+    `REGRAS IMPORTANTES:`,
+    `1. SIGA FIELMENTE o pedido do dono (o "PEDIDO" abaixo) — é a instrução principal. Respeite a IDEIA, o CLIMA e o FORMATO que ele pediu. Se ele pedir um "episódio" ou "série de aventuras", trate como um EPISÓDIO: comece com uma introdução/apresentação e vá desenvolvendo a aventura.`,
+    `2. As ${n} cenas formam UMA história CONTÍNUA e INTERLIGADA (começo, meio e fim): a fala/ação de uma cena PUXA a próxima, como capítulos do mesmo episódio. Nada de cenas soltas ou repetitivas.`,
+    `3. NÃO force convite pra agendar festa. Só termine com um convite ao buffet se combinar de verdade com a história pedida; caso contrário, feche com um gancho gostoso (ex: "e a aventura continua no próximo episódio!") ou um final divertido e caloroso.`,
+    `4. Cada "fala" é CURTA mas EXPRESSIVA e cheia de personalidade (até ~18 palavras — cabe em poucos segundos de vídeo). Nada genérico ou publicitário demais; fale como o personagem, com emoção.`,
+    `5. "acao" = o que o mascote FAZ e SENTE naquela cena (movimento, expressão, reação ao que acontece), específico pra CADA cena — não descreva câmera, iluminação nem cenário.`,
+    ``,
+    `Responda SÓ em JSON, no formato {"cenas":[{"acao":"...","fala":"..."}]}, com EXATAMENTE ${n} itens, na ordem da história.`,
+  ].join("\n");
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "gpt-4o-mini",
-        temperature: 0.8,
-        max_tokens: 700,
+        temperature: 0.85,
+        max_tokens: 1200,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: `Você é roteirista de vídeos curtos e fofos do mascote (o "castelinho") de um buffet infantil chamado "${marca?.nome || "o buffet"}". Escreva uma historinha ENCANTADORA dividida em EXATAMENTE ${n} cenas curtas, em português do Brasil, tom alegre de desenho animado pra crianças e famílias. Para CADA cena, dê: "acao" = o que o mascote faz na cena (movimento/expressão, sem falar de câmera), curto; "fala" = a frase que o mascote FALA na cena, CURTA (no máximo ~12 palavras, cabe em poucos segundos), encadeando a história de uma cena pra outra (começo, meio e fim), e a ÚLTIMA cena deve convidar a agendar a festa no buffet. Responda SÓ em JSON no formato {"cenas":[{"acao":"...","fala":"..."}]} com ${n} itens.` },
-          { role: "user", content: `Tema da historinha: ${tema}` },
+          { role: "system", content: sistema },
+          { role: "user", content: `PEDIDO do dono (siga à risca):\n${tema}` },
         ],
       }),
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(35000),
     });
     if (!resp.ok) return { ok: false, erro: "Não consegui escrever as cenas agora. Tente de novo." };
     const data = await resp.json();
@@ -569,7 +582,7 @@ export async function escreverCenasHistoria(marcaId: string, briefing: string, n
       const arr = Array.isArray(parsed?.cenas) ? parsed.cenas : [];
       cenas = arr.map((c: unknown) => ({
         acao: String((c as { acao?: unknown })?.acao || "").trim().slice(0, 300),
-        fala: String((c as { fala?: unknown })?.fala || "").trim().slice(0, 160),
+        fala: String((c as { fala?: unknown })?.fala || "").trim().slice(0, 220),
       })).filter((c: CenaHistoria) => c.acao || c.fala).slice(0, n);
     } catch { return { ok: false, erro: "A Bia respondeu num formato inesperado. Tente de novo." }; }
     if (cenas.length < 2) return { ok: false, erro: "Não consegui montar as cenas. Tente escrever o tema de outro jeito." };

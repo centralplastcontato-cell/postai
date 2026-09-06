@@ -727,10 +727,10 @@ export function MascoteEstudio({
               <textarea
                 value={briefingHist}
                 onChange={(e) => setBriefingHist(e.target.value)}
-                rows={2}
-                maxLength={300}
+                rows={4}
+                maxLength={800}
                 disabled={gerandoClipe || escrevendoBia}
-                placeholder="Tema da história (ex: o castelinho mostrando os brinquedos e chamando pra fazer a festa aqui)"
+                placeholder="Conte o que você quer, com detalhes. Ex: primeiro episódio da série de aventuras do castelinho — ele se apresenta e chama os amiguinhos pra viver aventuras. As 4 cenas se interligam. Sem forçar convite pra festa."
                 className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50"
               />
               <div className="mt-2 flex flex-wrap items-center gap-2">
