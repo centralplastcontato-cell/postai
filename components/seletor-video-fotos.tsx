@@ -868,6 +868,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // Ordem: visual (Fotos+Estilo) → palavras (Textos) → som (Música+Narração, música antes da voz).
   const ABAS: { id: string; ic: string; label: string }[] = [
     { id: "fotos", ic: "📷", label: "Fotos" },
+    ...(!tematicoId ? [{ id: "clipes", ic: "🎬", label: "Clipes" }] : []),
     ...(tematicoId ? [{ id: "capa", ic: "🎯", label: "Capa" }] : []),
     { id: "estilo", ic: "🎨", label: "Estilo" },
     { id: "texto", ic: "✍️", label: tematicoId ? "Textos" : "Capa" },
@@ -1263,28 +1264,31 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <p className="mt-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-300/90">⚠️ No vídeo do buffet, a música escolhida vale quando o vídeo <strong>não tem narração (voz)</strong>. Com narração, ela entra <strong>por baixo da voz</strong> (aba 🎙️ Narração).</p>
                   )}
 
-                  {/* CLIPES DE VÍDEO (só festa) — intercalam com as fotos, mudos */}
-                  {festaId && !tematicoId && (
-                    <div className="mt-4 border-t border-linha pt-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-white">🎬 Clipes de vídeo <span className="font-normal text-muted/70">(opcional)</span></span>
-                        <label className={`rounded-lg border border-[#ec4899]/40 bg-[#ec4899]/15 px-2.5 py-1 text-[11px] font-semibold text-[#f9a8d4] transition hover:bg-[#ec4899]/25 ${subindoClipe || clipes.length >= 6 ? "opacity-60" : "cursor-pointer"}`}>
-                          {subindoClipe ? "🎬 enviando…" : "➕ Enviar clipe"}
-                          <input type="file" accept="video/*" className="hidden" disabled={subindoClipe || clipes.length >= 6} onChange={(e) => enviarClipe(e.target.files?.[0])} />
-                        </label>
-                      </div>
-                      <p className="mt-1 text-[10px] leading-snug text-muted/70">Sobe uns clipinhos curtos da festa que o vídeo <strong className="text-white/70">intercala com as fotos</strong>. Entram <strong className="text-white/70">sem som</strong> (a música/narração continua por cima). Máx 6 — cada um usa ~4s.</p>
-                      {clipes.length > 0 && (
-                        <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
-                          {clipes.map((c) => (
-                            <div key={c} className="relative overflow-hidden rounded-lg border border-linha bg-black">
-                              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                              <video src={`${c}#t=0.3`} preload="metadata" muted playsInline className="aspect-[9/16] w-full object-cover" />
-                              <button type="button" onClick={() => excluirClipe(c)} title="Tirar este clipe" aria-label="Tirar clipe" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-red-300 transition hover:bg-red-900/70">✕</button>
-                            </div>
-                          ))}
+                </div>
+              )}
+
+              {/* ============ ABA CLIPES (só festa) — vídeos que intercalam com as fotos ============ */}
+              {aba === "clipes" && festaId && !tematicoId && (
+                <div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-white">🎬 Clipes de vídeo <span className="font-normal text-muted/70">(opcional)</span></span>
+                    <label className={`rounded-lg border border-[#ec4899]/40 bg-[#ec4899]/15 px-2.5 py-1 text-[11px] font-semibold text-[#f9a8d4] transition hover:bg-[#ec4899]/25 ${subindoClipe || clipes.length >= 6 ? "opacity-60" : "cursor-pointer"}`}>
+                      {subindoClipe ? "🎬 enviando…" : "➕ Enviar clipe"}
+                      <input type="file" accept="video/*" className="hidden" disabled={subindoClipe || clipes.length >= 6} onChange={(e) => enviarClipe(e.target.files?.[0])} />
+                    </label>
+                  </div>
+                  <p className="mt-1 text-[11px] leading-snug text-muted/70">Sobe uns clipinhos curtos da festa e o vídeo <strong className="text-white/80">intercala eles com as fotos</strong>. Entram <strong className="text-white/80">sem som</strong> (a música/narração continua por cima). Máx 6 — cada um usa ~4s.</p>
+                  {clipes.length === 0 ? (
+                    <p className="mt-3 rounded-lg border border-dashed border-linha bg-preto p-6 text-center text-xs text-muted">Nenhum clipe ainda. Toque em <strong className="text-white/70">➕ Enviar clipe</strong> pra adicionar. 👆</p>
+                  ) : (
+                    <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                      {clipes.map((c) => (
+                        <div key={c} className="relative overflow-hidden rounded-lg border border-linha bg-black">
+                          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                          <video src={`${c}#t=0.3`} preload="metadata" muted playsInline controls className="aspect-[9/16] w-full object-cover" />
+                          <button type="button" onClick={() => excluirClipe(c)} title="Tirar este clipe" aria-label="Tirar clipe" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-red-300 transition hover:bg-red-900/70">✕</button>
                         </div>
-                      )}
+                      ))}
                     </div>
                   )}
                 </div>
