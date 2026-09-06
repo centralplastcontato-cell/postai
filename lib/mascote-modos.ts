@@ -60,3 +60,49 @@ export const CENAS_CLIPE: { id: string; ic: string; label: string; prompt: strin
 export function cenaClipe(id: string): (typeof CENAS_CLIPE)[number] | null {
   return CENAS_CLIPE.find((c) => c.id === id) || null;
 }
+
+// MODELOS DE HISTÓRIA prontos (só pra o modo "História") — agrupados por TIPO. Cada opção é um
+// briefing já escrito que o dono toca pra usar de base (e edita/ajusta antes de mandar pra Bia).
+// `cenas` sugere quantas cenas combinam com aquela ideia. É só ponto de partida — a Bia escreve.
+export const MODELOS_HISTORIA: {
+  id: string; ic: string; tipo: string;
+  opcoes: { titulo: string; briefing: string; cenas: number }[];
+}[] = [
+  {
+    id: "aventura", ic: "🗺️", tipo: "Aventura (série)",
+    opcoes: [
+      { titulo: "1º episódio da série", cenas: 4, briefing: "Primeiro episódio da série de aventuras do castelinho: ele se apresenta com muita energia e chama os amiguinhos pra embarcar em aventuras dentro do castelo. As cenas se interligam como um episódio, começando com uma introdução e terminando com um gancho pro próximo episódio. Não force convite pra festa." },
+      { titulo: "A caça ao tesouro", cenas: 4, briefing: "O castelinho encontra um mapa do tesouro escondido e sai numa caça ao tesouro pelos cantinhos do castelo, seguindo pistas divertidas. Cenas interligadas, clima de aventura, final com um gancho gostoso." },
+      { titulo: "A porta mágica", cenas: 3, briefing: "O castelinho descobre uma porta mágica no castelo que leva a um mundo cheio de diversão; ele entra, explora e se encanta com o que vê. Cenas interligadas, tom mágico e fofo." },
+    ],
+  },
+  {
+    id: "boas", ic: "👋", tipo: "Boas-vindas",
+    opcoes: [
+      { titulo: "Oi, eu sou o castelinho", cenas: 3, briefing: "O castelinho se apresenta pras crianças: quem ele é, do que ele gosta e o clima mágico do castelo. Tom caloroso e acolhedor, cenas interligadas, final simpático." },
+      { titulo: "Tour de boas-vindas", cenas: 3, briefing: "O castelinho dá as boas-vindas e faz um tourzinho animado apresentando o castelo, como um anfitrião fofo. Cenas interligadas, final acolhedor." },
+    ],
+  },
+  {
+    id: "convite", ic: "🎉", tipo: "Convite pra festa",
+    opcoes: [
+      { titulo: "Como é uma festa aqui", cenas: 4, briefing: "O castelinho conta, do começo ao fim, como é uma festa no castelo — a chegada, a diversão, o bolo — e só no fim convida a família a marcar a festa dela. Cenas interligadas e animadas." },
+      { titulo: "Vem fazer sua festa", cenas: 3, briefing: "O castelinho, super empolgado, convida as famílias a comemorarem o aniversário no castelo, mostrando por que é inesquecível. Fecho com um convite caloroso pra agendar." },
+    ],
+  },
+  {
+    id: "datas", ic: "📅", tipo: "Datas especiais",
+    opcoes: [
+      { titulo: "Dia das Crianças", cenas: 3, briefing: "Especial de Dia das Crianças: o castelinho comemora o dia mais divertido do ano no castelo, cheio de surpresas e alegria. Cenas interligadas, bem festivo." },
+      { titulo: "Especial de Natal", cenas: 3, briefing: "Especial de Natal: o castelinho decora o castelo, espalha magia natalina e deseja boas festas às famílias. Tom natalino, fofo e emocionante." },
+      { titulo: "Chegaram as férias", cenas: 3, briefing: "O castelinho comemora a chegada das férias com um monte de brincadeiras no castelo e chama a criançada pra aproveitar cada dia. Animado e alegre." },
+    ],
+  },
+  {
+    id: "espaco", ic: "🧸", tipo: "Nosso espaço",
+    opcoes: [
+      { titulo: "Tour pelos brinquedos", cenas: 4, briefing: "O castelinho faz um tour mostrando os brinquedos e cantinhos mais divertidos do castelo, reagindo com alegria a cada um. Cenas interligadas, uma por atração." },
+      { titulo: "Os cantinhos secretos", cenas: 3, briefing: "O castelinho revela os cantinhos mais legais e 'secretos' do castelo, um por cena, com curiosidade e muita diversão. Final com um gancho." },
+    ],
+  },
+];

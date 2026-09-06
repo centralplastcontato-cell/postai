@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote, ouvirAmostraVoz, definirAberturaMascote, definirFechoMascote, escreverCenasHistoria, emendarHistoriaMascote, type CenaHistoria } from "@/app/actions/mascote";
 import { imagensDoBanco } from "@/app/actions/imagens";
-import { MODOS_CLIPE, CENAS_CLIPE, modoClipe, type ModoClipe } from "@/lib/mascote-modos";
+import { MODOS_CLIPE, CENAS_CLIPE, modoClipe, MODELOS_HISTORIA, type ModoClipe } from "@/lib/mascote-modos";
 
 // Ações prontas pro clipe do mascote (1 toque preenche a descrição, sem digitar).
 const ACOES_CLIPE = [
@@ -247,6 +247,7 @@ export function MascoteEstudio({
   // HISTÓRIA EM CENAS (modo "história"): a Bia escreve N cenas (ação + fala); a tela gera um clipe
   // por cena e o motor emenda tudo num vídeo só (passa dos 12s do clipe único).
   const [briefingHist, setBriefingHist] = useState(""); // o tema que o dono dá pra Bia
+  const [tipoHist, setTipoHist] = useState(MODELOS_HISTORIA[0].id); // categoria de modelos aberta
   const [numCenas, setNumCenas] = useState(3); // quantas cenas (2 a 4)
   const [durCena, setDurCena] = useState(8); // duração de CADA cena
   const [cenas, setCenas] = useState<CenaHistoria[]>([]); // o roteiro em cenas
@@ -724,6 +725,26 @@ export function MascoteEstudio({
             <div className="mt-3 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-3">
               <p className="text-[11px] font-semibold text-white">📖 Roteiro em cenas <span className="font-normal text-muted/70">(passa dos 12s)</span></p>
               <p className="mt-0.5 text-[10px] leading-snug text-muted/70">A Bia divide a historinha em várias cenas curtas e a gente <strong className="text-white/70">emenda tudo num vídeo só</strong>. O castelinho fala em cada cena.</p>
+
+              {/* IDEIAS PRONTAS — modelos por tipo de história; toca numa pra usar de base (e edita). */}
+              <label className="mt-3 block text-[10px] font-semibold text-muted">💡 Ideias prontas <span className="font-normal text-muted/70">(toque numa pra usar de base)</span></label>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {MODELOS_HISTORIA.map((m) => (
+                  <button key={m.id} type="button" disabled={gerandoClipe || escrevendoBia} onClick={() => setTipoHist(m.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${tipoHist === m.id ? "border-[#a855f7] bg-[#a855f7]/20 text-[#d6c6ff]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{m.ic} {m.tipo}</button>
+                ))}
+              </div>
+              <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
+                {(MODELOS_HISTORIA.find((m) => m.id === tipoHist)?.opcoes ?? []).map((o) => {
+                  const ativa = briefingHist.trim() === o.briefing;
+                  return (
+                    <button key={o.titulo} type="button" disabled={gerandoClipe || escrevendoBia} onClick={() => { setBriefingHist(o.briefing); setNumCenas(o.cenas); }} className={`rounded-lg border p-2 text-left transition disabled:opacity-40 ${ativa ? "border-[#a855f7] bg-[#a855f7]/15" : "border-linha bg-preto hover:border-white/30"}`}>
+                      <div className={`text-[11px] font-semibold ${ativa ? "text-[#d6c6ff]" : "text-white"}`}>{o.titulo} <span className="font-normal text-muted/60">· {o.cenas} cenas</span></div>
+                      <div className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted/70">{o.briefing}</div>
+                    </button>
+                  );
+                })}
+              </div>
+
               <textarea
                 value={briefingHist}
                 onChange={(e) => setBriefingHist(e.target.value)}
