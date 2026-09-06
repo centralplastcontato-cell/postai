@@ -32,6 +32,7 @@ export type VideoTematicoView = {
   logoCanto: string; // logo posicionado por nós: "" (padrão do motor) | dir | esq | cima-dir | cima-esq
   logoTam: string; // tamanho do logo quando posicionado por nós: p | m | g
   videoMusica: string; // trilha escolhida (URL) — "" = jingle do buffet
+  videoClipes?: string[]; // clipes de vídeo (URLs) pra intercalar com as fotos
   videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
   narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
   capaUrl: string | null; // thumb do card (capa escolhida ou 1ª foto)
@@ -501,6 +502,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           tituloCapaInicial={seletor.videoTituloCapa}
           tituloCapaAuto={tituloCapaFesta(seletor.aniversariantes, rotuloAniversariantes(seletor.aniversariantes))}
           musicaInicial={seletor.videoMusica}
+          clipesInicial={seletor.videoClipes ?? []}
           musicasBanco={musicasBanco}
           mascoteCantoInicial={seletor.mascoteCanto}
           mascoteTamInicial={seletor.mascoteTam}

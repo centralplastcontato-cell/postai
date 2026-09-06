@@ -391,6 +391,18 @@ export async function removerMusicaDoBanco(festaId: string, url: string) {
   return { ok: true as const, musicas: lista };
 }
 
+// CLIPES DE VÍDEO da festa (URLs no Blob) — intercalam com as fotos no vídeo (entram mudos). Máx 6.
+export async function definirClipesFesta(festaId: string, clipes: string[]) {
+  const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
+  if (!f) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(f.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const urls = (Array.isArray(clipes) ? clipes : []).filter((u) => typeof u === "string" && u.startsWith("http")).slice(0, 6);
+  await prisma.festa.update({ where: { id: festaId }, data: { videoClipes: JSON.stringify(urls) } });
+  revalidatePath(`/painel/marcas/${f.marcaId}`);
+  return { ok: true as const, clipes: urls };
+}
+
 // Cria um POST DE REELS agendado a partir do vídeo JÁ montado da festa. Entra na Agenda como
 // Publicacao formato="reels" (status a_postar), pronto pra revisar e ser postado pelo piloto.
 // TRAVA LGPD: festa sem autorização dos pais NUNCA vira divulgação pública.
@@ -694,7 +706,7 @@ export async function statusVideoFesta(festaId: string) {
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoUrl: true, mascoteCanto: true, mascoteTam: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true, mascoteUrl: true } }, fotos: { select: { id: true, url: true } } },
+    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoClipes: true, videoUrl: true, mascoteCanto: true, mascoteTam: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true, mascoteUrl: true } }, fotos: { select: { id: true, url: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -734,9 +746,14 @@ export async function gerarVideoDaFesta(festaId: string) {
   const versaoCapa = hashCurto([festa.aniversariantes, festa.aniversariante, festa.videoTituloCapa, festa.videoCapa, capaUrl, festa.marca.corPrimaria, festa.mascoteCanto, festa.mascoteTam, festa.marca.mascoteUrl].join("|"));
   const capaDesenhada = `${base}/api/capa-festa/${festaId}.jpg?v=${versaoCapa}`;
 
+  // clipes de vídeo (opcional) — entram MUDOS, intercalados com as fotos.
+  let clipes: string[] = [];
+  try { clipes = (JSON.parse(festa.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+
   await prisma.festa.update({ where: { id: festaId }, data: { videoUrl: "gerando" } });
   const r = await dispararMotorReels({
     fotos,
+    clipes,
     capaUrl: capaDesenhada,
     moldura: festa.videoMoldura || "branca",
     corMoldura: festa.marca.corPrimaria || "#FFFFFF",

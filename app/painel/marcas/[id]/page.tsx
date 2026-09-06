@@ -124,6 +124,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoTextoFinal: f.videoTextoFinal || "",
       videoTituloCapa: f.videoTituloCapa || "",
       videoMusica: f.videoMusica || "",
+      videoClipes: (() => { try { return (JSON.parse(f.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch { return []; } })(),
       mascoteCanto: f.mascoteCanto || "",
       mascoteTam: f.mascoteTam || "m",
       videoUrl: f.videoUrl || "",

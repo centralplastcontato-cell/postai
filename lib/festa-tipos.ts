@@ -24,6 +24,7 @@ export type FestaView = {
   videoTextoFinal: string; // mensagem do slide final do vídeo ("" = padrão "Muito obrigado!")
   videoTituloCapa: string; // título da capa escrito à mão ("" = automático "Fulano fez X aninhos")
   videoMusica: string; // trilha própria da festa (URL do MP3) — "" = música padrão do buffet
+  videoClipes?: string[]; // clipes de vídeo (URLs) pra intercalar com as fotos no vídeo
   mascoteCanto: string; // mascote na CAPA do vídeo da festa: "" (não) | dir | esq | cima-dir | cima-esq
   mascoteTam: string; // tamanho do mascote na capa: p | m | g
   videoUrl: string; // URL do vídeo/Reels já montado ("" = ainda não gerado)

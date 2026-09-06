@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { salvarFotosVideo, gerarVideoDaFesta, statusVideoFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, removerMusicaDoBanco, definirMascoteFesta } from "@/app/actions/festas";
+import { salvarFotosVideo, gerarVideoDaFesta, statusVideoFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, removerMusicaDoBanco, definirMascoteFesta, definirClipesFesta } from "@/app/actions/festas";
 import { salvarFotosVideoTematico, gerarVideoTematico, statusVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, removerMusicaDoBancoTema, definirWavMusicaTema, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
@@ -151,7 +151,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", logoCantoInicial = "", logoTamInicial = "m", logoUrlMarca = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, gerente = "", onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", clipesInicial = [], musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", logoCantoInicial = "", logoTamInicial = "m", logoUrlMarca = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, gerente = "", onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -166,6 +166,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   textosIniciais?: Record<string, string>; // legendas por foto (só no modo temático)
   narracao?: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz do vídeo
   musicaInicial?: string;
+  clipesInicial?: string[]; // clipes de vídeo já salvos na festa (URLs) — intercalam com as fotos
   musicasBanco?: { url: string; nome: string; wav?: string }[];
   fundoInicial?: string; // fundo do quadro do vídeo temático: "" (foto borrada) | "cheia" | "cor"
   fundoCorInicial?: string; // cor do fundo "cor" (hex); "" = cor da marca
@@ -395,6 +396,26 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [msgVoz, setMsgVoz] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
   const [musica, setMusica] = useState<string>(musicaInicial || ""); // trilha da festa ("" = música do buffet)
   const [subindoMusica, setSubindoMusica] = useState(false); // enviando o MP3
+  const [clipes, setClipes] = useState<string[]>(Array.isArray(clipesInicial) ? clipesInicial : []); // clipes de vídeo
+  const [subindoClipe, setSubindoClipe] = useState(false);
+  async function enviarClipe(file?: File) {
+    if (!file || !festaId) return;
+    setSubindoClipe(true);
+    try {
+      const { upload } = await import("@vercel/blob/client");
+      const nome = (file.name || "clipe.mp4").replace(/[^a-zA-Z0-9.-]/g, "_");
+      const blob = await upload(`clipes/${Date.now()}-${nome}`, file, { access: "public", handleUploadUrl: "/api/marketing/blob-upload", contentType: file.type || "video/mp4" });
+      const novos = [...clipes, blob.url].slice(0, 6);
+      setClipes(novos);
+      await definirClipesFesta(festaId, novos).catch(() => {});
+    } catch {}
+    setSubindoClipe(false);
+  }
+  async function excluirClipe(url: string) {
+    const novos = clipes.filter((c) => c !== url);
+    setClipes(novos);
+    if (festaId) await definirClipesFesta(festaId, novos).catch(() => {});
+  }
   const [banco, setBanco] = useState<{ url: string; nome: string; wav?: string }[]>(musicasBanco); // biblioteca de trilhas da marca
   const [tocando, setTocando] = useState<string>(""); // URL da música tocando agora ("" = nenhuma)
   const [buffetUrl, setBuffetUrl] = useState<string>(""); // link da música padrão do buffet (pra dar play)
@@ -1240,6 +1261,31 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   <p className="mt-2 text-[10px] leading-snug text-muted/70">Baixe trilhas grátis em <a href="https://pixabay.com/music/" target="_blank" rel="noopener noreferrer" className="font-semibold text-[#c7b2ff] underline">Pixabay Music</a> (botão <strong className="text-white/70">🔎 Buscar</strong>) e toque em <strong className="text-white/70">➕ Enviar</strong>. Use o <strong className="text-white/70">▶️</strong> pra ouvir antes — as enviadas ficam guardadas aqui pra reusar. Toque no <strong className="text-white/70">✕</strong> pra tirar uma repetida da lista.</p>
                   {tematicoId && (
                     <p className="mt-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-[10px] leading-snug text-amber-300/90">⚠️ No vídeo do buffet, a música escolhida vale quando o vídeo <strong>não tem narração (voz)</strong>. Com narração, ela entra <strong>por baixo da voz</strong> (aba 🎙️ Narração).</p>
+                  )}
+
+                  {/* CLIPES DE VÍDEO (só festa) — intercalam com as fotos, mudos */}
+                  {festaId && !tematicoId && (
+                    <div className="mt-4 border-t border-linha pt-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-white">🎬 Clipes de vídeo <span className="font-normal text-muted/70">(opcional)</span></span>
+                        <label className={`rounded-lg border border-[#ec4899]/40 bg-[#ec4899]/15 px-2.5 py-1 text-[11px] font-semibold text-[#f9a8d4] transition hover:bg-[#ec4899]/25 ${subindoClipe || clipes.length >= 6 ? "opacity-60" : "cursor-pointer"}`}>
+                          {subindoClipe ? "🎬 enviando…" : "➕ Enviar clipe"}
+                          <input type="file" accept="video/*" className="hidden" disabled={subindoClipe || clipes.length >= 6} onChange={(e) => enviarClipe(e.target.files?.[0])} />
+                        </label>
+                      </div>
+                      <p className="mt-1 text-[10px] leading-snug text-muted/70">Sobe uns clipinhos curtos da festa que o vídeo <strong className="text-white/70">intercala com as fotos</strong>. Entram <strong className="text-white/70">sem som</strong> (a música/narração continua por cima). Máx 6 — cada um usa ~4s.</p>
+                      {clipes.length > 0 && (
+                        <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                          {clipes.map((c) => (
+                            <div key={c} className="relative overflow-hidden rounded-lg border border-linha bg-black">
+                              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                              <video src={`${c}#t=0.3`} preload="metadata" muted playsInline className="aspect-[9/16] w-full object-cover" />
+                              <button type="button" onClick={() => excluirClipe(c)} title="Tirar este clipe" aria-label="Tirar clipe" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-red-300 transition hover:bg-red-900/70">✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
