@@ -246,6 +246,7 @@ export function MascoteEstudio({
   }
   // HISTÓRIA EM CENAS (modo "história"): a Bia escreve N cenas (ação + fala); a tela gera um clipe
   // por cena e o motor emenda tudo num vídeo só (passa dos 12s do clipe único).
+  const [galeriaAberta, setGaleriaAberta] = useState(false); // galeria de clipes recolhida por padrão (deixa o botão de gerar mais pra cima)
   const [briefingHist, setBriefingHist] = useState(""); // o tema que o dono dá pra Bia
   const [tipoHist, setTipoHist] = useState(MODELOS_HISTORIA[0].id); // categoria de modelos aberta
   const [numCenas, setNumCenas] = useState(3); // quantas cenas (2 a 4)
@@ -880,7 +881,14 @@ export function MascoteEstudio({
 
           {clipesUrls.length > 0 && (
             <>
-              <p className="mt-4 text-[10px] leading-snug text-muted/70">Seus clipes. Poste solto (Story/Reels) ou <strong className="text-white/70">marque um como ⭐ Abertura / 🏁 Fecho</strong> pra entrar automático no começo/fim dos Reels das festas.</p>
+              {/* cabeçalho da galeria — COLAPSÁVEL (recolhido por padrão) pra o botão de gerar ficar mais pra cima */}
+              <button type="button" onClick={() => setGaleriaAberta((v) => !v)} className="mt-4 flex w-full items-center justify-between rounded-lg border border-linha bg-preto px-3 py-2 text-left transition hover:border-white/30">
+                <span className="text-[11px] font-semibold text-white">🎬 Meus clipes <span className="font-normal text-muted/70">({clipesUrls.length})</span></span>
+                <span className="text-xs text-muted">{galeriaAberta ? "▲ recolher" : "▼ ver"}</span>
+              </button>
+              {galeriaAberta && (
+              <>
+              <p className="mt-2 text-[10px] leading-snug text-muted/70">Poste solto (Story/Reels) ou <strong className="text-white/70">marque um como ⭐ Abertura / 🏁 Fecho</strong> pra entrar automático no começo/fim dos Reels das festas.</p>
               <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 {clipesUrls.map((url) => {
                   const ehAbertura = aberturaSel === url;
@@ -909,6 +917,8 @@ export function MascoteEstudio({
                   );
                 })}
               </div>
+              </>
+              )}
             </>
           )}
 
