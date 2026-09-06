@@ -99,7 +99,10 @@ export async function emendarClipes(clipes: string[], nomeArquivo?: string): Pro
     if (d?.ok && d.videoUrl) return { ok: true, videoUrl: d.videoUrl, duracaoSegundos: d.duracaoSegundos ?? 0 };
     return { ok: false, erro: d?.erro || "O motor não conseguiu emendar as cenas." };
   } catch (e) {
-    return { ok: false, erro: e instanceof Error ? e.message : "Erro ao falar com o motor de vídeo." };
+    // 404 = o motor no ar ainda NÃO tem o /emendar (falta reimplantar o motor). Aviso claro em vez do HTML cru.
+    const status = (e as { response?: { status?: number } })?.response?.status;
+    if (status === 404) return { ok: false, erro: "O motor de vídeo ainda não foi atualizado pra juntar as cenas. Reimplante o motor (pelo Cloud Shell) e tente o \"Gerar história\" de novo — as cenas em si já funcionam." };
+    return { ok: false, erro: e instanceof Error ? e.message.slice(0, 200) : "Erro ao falar com o motor de vídeo." };
   }
 }
 

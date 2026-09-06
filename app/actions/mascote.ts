@@ -600,7 +600,11 @@ export async function emendarHistoriaMascote(marcaId: string, urls: string[]): P
   const cenas = (Array.isArray(urls) ? urls : []).filter((u) => typeof u === "string" && u.startsWith("http"));
   if (cenas.length < 2) return { ok: false, erro: "Preciso de pelo menos 2 cenas." };
   const r = await emendarClipes(cenas, `historia-${marcaId}`);
-  if (!r.ok) return { ok: false, erro: r.erro };
+  if (!r.ok) {
+    // Falhou (ex: motor sem /emendar ainda) → as cenas eram temporárias, tira do Blob pra não virar lixo.
+    import("@vercel/blob").then(({ del }) => Promise.all(cenas.map((c) => del(c).catch(() => {})))).catch(() => {});
+    return { ok: false, erro: r.erro };
+  }
   const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
   const novos = [r.videoUrl, ...lerListaUrls(marca?.mascoteClipes ?? "[]")].slice(0, 30);
   await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(novos) } });
