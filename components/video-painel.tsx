@@ -214,10 +214,15 @@ function CardVideo({ f, onAbrirSeletor, onExcluir, onZerar }: { f: FestaView; on
           )}
         </div>
 
-        {/* contador de fotos do vídeo (topo dir.) */}
-        {f.videoFotos.length > 0 && (
-          <span className="absolute right-2 top-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">🎬 {f.videoFotos.length}</span>
-        )}
+        {/* contadores (topo dir.): fotos escolhidas pro vídeo (🎬) e vídeos/clipes já subidos (🎥). */}
+        <div className="absolute right-2 top-2 flex flex-col items-end gap-1">
+          {f.videoFotos.length > 0 && (
+            <span title="Fotos escolhidas pro vídeo" className="rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">🎬 {f.videoFotos.length}</span>
+          )}
+          {(f.videoClipes?.length ?? 0) > 0 && (
+            <span title="Vídeos da festa (viram clipes do Reels)" className="rounded-full bg-[#ec4899] px-2 py-0.5 text-[10px] font-semibold text-white">🎥 {f.videoClipes!.length}</span>
+          )}
+        </div>
 
         {/* play central (pronto e AINDA não postado) */}
         {pronto && !postado && (
