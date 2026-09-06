@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { criarContainerReels, criarContainerStoryVideo, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
 import { modoClipe, cenaClipe } from "@/lib/mascote-modos";
+import { emendarClipes } from "@/lib/video-engine";
 
 // ESTÚDIO DO MASCOTE (Fase 1): gera opções de mascote em 3D fofo com FUNDO TRANSPARENTE
 // (PNG), pra depois "colar" o MESMO mascote nos posts/vídeos e ele ficar sempre idêntico.
@@ -445,7 +446,9 @@ export async function gerarClipeMascote(marcaId: string, opts: { modo?: string; 
 
 // FASE 2 — a tela consulta de tempos em tempos. Enquanto processa → { pronto:false }. Quando fica
 // pronto, baixa o MP4, guarda no Blob e adiciona na galeria de clipes da marca.
-export async function statusClipeMascote(marcaId: string, jobId: string) {
+// salvarGaleria=false (usado nas CENAS de uma história): guarda o MP4 no Blob e devolve a URL, mas
+// NÃO joga na galeria (as cenas soltas são temporárias — só a história emendada vai pra galeria).
+export async function statusClipeMascote(marcaId: string, jobId: string, salvarGaleria = true) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const key = process.env.OPENAI_API_KEY;
@@ -470,10 +473,12 @@ export async function statusClipeMascote(marcaId: string, jobId: string) {
     const bytes = Buffer.from(await cont.arrayBuffer());
     const blob = await put(`${marcaId}/mascote-clipe-${Date.now()}.mp4`, bytes, { access: "public", contentType: "video/mp4" });
 
-    const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
-    const novos = [blob.url, ...lerListaUrls(marca?.mascoteClipes ?? "[]")].slice(0, 30);
-    await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(novos) } });
-    revalidatePath(`/painel/marcas/${marcaId}`);
+    if (salvarGaleria) {
+      const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
+      const novos = [blob.url, ...lerListaUrls(marca?.mascoteClipes ?? "[]")].slice(0, 30);
+      await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(novos) } });
+      revalidatePath(`/painel/marcas/${marcaId}`);
+    }
     return { ok: true as const, pronto: true as const, url: blob.url };
   } catch (e) {
     console.error("Erro ao finalizar o clipe do mascote:", e);
@@ -520,6 +525,76 @@ export async function definirFechoMascote(marcaId: string, url: string) {
   await prisma.marca.update({ where: { id: marcaId }, data: { mascoteFecho: novo } });
   revalidatePath(`/painel/marcas/${marcaId}`);
   return { ok: true as const, fecho: novo };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HISTÓRIA EM CENAS: a Bia escreve um roteiro dividido em CENAS (cada uma com o que o mascote FAZ e
+// o que ele FALA). A tela gera um clipe por cena e, no fim, o motor EMENDA tudo num vídeo só — assim
+// dá pra passar dos 12s do clipe único e contar uma historinha de verdade.
+// ─────────────────────────────────────────────────────────────────────────────
+export type CenaHistoria = { acao: string; fala: string };
+
+// A Bia escreve as cenas a partir de um briefing curto do dono (ex: "o castelinho mostrando os
+// brinquedos e chamando pra festa"). Devolve `numCenas` cenas, cada uma com ação + fala curta.
+export async function escreverCenasHistoria(marcaId: string, briefing: string, numCenas: number): Promise<{ ok: true; cenas: CenaHistoria[] } | { ok: false; erro: string }> {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false, erro: g.erro };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false, erro: "OPENAI_API_KEY não configurada." };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { nome: true } });
+  const n = Math.max(2, Math.min(5, Math.round(numCenas || 3)));
+  const tema = (briefing || "").trim().slice(0, 300) || "o castelinho dando boas-vindas, mostrando a diversão do buffet e convidando pra fazer a festa lá";
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        temperature: 0.8,
+        max_tokens: 700,
+        response_format: { type: "json_object" },
+        messages: [
+          { role: "system", content: `Você é roteirista de vídeos curtos e fofos do mascote (o "castelinho") de um buffet infantil chamado "${marca?.nome || "o buffet"}". Escreva uma historinha ENCANTADORA dividida em EXATAMENTE ${n} cenas curtas, em português do Brasil, tom alegre de desenho animado pra crianças e famílias. Para CADA cena, dê: "acao" = o que o mascote faz na cena (movimento/expressão, sem falar de câmera), curto; "fala" = a frase que o mascote FALA na cena, CURTA (no máximo ~12 palavras, cabe em poucos segundos), encadeando a história de uma cena pra outra (começo, meio e fim), e a ÚLTIMA cena deve convidar a agendar a festa no buffet. Responda SÓ em JSON no formato {"cenas":[{"acao":"...","fala":"..."}]} com ${n} itens.` },
+          { role: "user", content: `Tema da historinha: ${tema}` },
+        ],
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!resp.ok) return { ok: false, erro: "Não consegui escrever as cenas agora. Tente de novo." };
+    const data = await resp.json();
+    const content = data?.choices?.[0]?.message?.content;
+    let cenas: CenaHistoria[] = [];
+    try {
+      const parsed = JSON.parse(String(content || "{}"));
+      const arr = Array.isArray(parsed?.cenas) ? parsed.cenas : [];
+      cenas = arr.map((c: unknown) => ({
+        acao: String((c as { acao?: unknown })?.acao || "").trim().slice(0, 300),
+        fala: String((c as { fala?: unknown })?.fala || "").trim().slice(0, 160),
+      })).filter((c: CenaHistoria) => c.acao || c.fala).slice(0, n);
+    } catch { return { ok: false, erro: "A Bia respondeu num formato inesperado. Tente de novo." }; }
+    if (cenas.length < 2) return { ok: false, erro: "Não consegui montar as cenas. Tente escrever o tema de outro jeito." };
+    return { ok: true, cenas };
+  } catch {
+    return { ok: false, erro: "Não consegui escrever as cenas agora. Tente de novo." };
+  }
+}
+
+// Depois que a tela gerou o clipe de CADA cena (URLs temporárias, fora da galeria), o motor EMENDA
+// tudo num vídeo só. Salva a HISTÓRIA final na galeria e apaga as cenas soltas do Blob.
+export async function emendarHistoriaMascote(marcaId: string, urls: string[]): Promise<{ ok: true; url: string } | { ok: false; erro: string }> {
+  const g = await guardaMarca(marcaId);
+  if (!g.ok) return { ok: false, erro: g.erro };
+  const cenas = (Array.isArray(urls) ? urls : []).filter((u) => typeof u === "string" && u.startsWith("http"));
+  if (cenas.length < 2) return { ok: false, erro: "Preciso de pelo menos 2 cenas." };
+  const r = await emendarClipes(cenas, `historia-${marcaId}`);
+  if (!r.ok) return { ok: false, erro: r.erro };
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
+  const novos = [r.videoUrl, ...lerListaUrls(marca?.mascoteClipes ?? "[]")].slice(0, 30);
+  await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(novos) } });
+  // As cenas soltas eram temporárias — tira do Blob (a história final já tem tudo).
+  import("@vercel/blob").then(({ del }) => Promise.all(cenas.map((c) => del(c).catch(() => {})))).catch(() => {});
+  revalidatePath(`/painel/marcas/${marcaId}`);
+  return { ok: true, url: r.videoUrl };
 }
 
 // ── POSTAR O CLIPE do mascote direto no Instagram (Reels ou Story), em 2 fases (o vídeo processa na

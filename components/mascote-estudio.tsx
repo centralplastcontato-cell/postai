@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote, ouvirAmostraVoz, definirAberturaMascote, definirFechoMascote } from "@/app/actions/mascote";
+import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote, ouvirAmostraVoz, definirAberturaMascote, definirFechoMascote, escreverCenasHistoria, emendarHistoriaMascote, type CenaHistoria } from "@/app/actions/mascote";
 import { imagensDoBanco } from "@/app/actions/imagens";
 import { MODOS_CLIPE, CENAS_CLIPE, modoClipe, type ModoClipe } from "@/lib/mascote-modos";
 
@@ -243,6 +243,70 @@ export function MascoteEstudio({
     const novo = fechoSel === url ? "" : url;
     setFechoSel(novo);
     await definirFechoMascote(marcaId, novo).catch(() => {});
+  }
+  // HISTÓRIA EM CENAS (modo "história"): a Bia escreve N cenas (ação + fala); a tela gera um clipe
+  // por cena e o motor emenda tudo num vídeo só (passa dos 12s do clipe único).
+  const [briefingHist, setBriefingHist] = useState(""); // o tema que o dono dá pra Bia
+  const [numCenas, setNumCenas] = useState(3); // quantas cenas (2 a 4)
+  const [durCena, setDurCena] = useState(8); // duração de CADA cena
+  const [cenas, setCenas] = useState<CenaHistoria[]>([]); // o roteiro em cenas
+  const [escrevendoBia, setEscrevendoBia] = useState(false);
+  async function biaEscreveCenas() {
+    setErro(null); setEscrevendoBia(true);
+    const r = await escreverCenasHistoria(marcaId, briefingHist.trim(), numCenas).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }));
+    setEscrevendoBia(false);
+    if (!r.ok) { setErro(r.erro); return; }
+    setCenas(r.cenas);
+  }
+  function setCena(i: number, campo: "acao" | "fala", val: string) {
+    setCenas((cs) => cs.map((c, idx) => (idx === i ? { ...c, [campo]: val } : c)));
+  }
+  async function gerarHistoria() {
+    const cs = cenas.filter((c) => (c.acao || c.fala).trim());
+    if (cs.length < 2) { setErro("Escreva pelo menos 2 cenas (ou peça pra Bia escrever)."); return; }
+    setErro(null); setGerandoClipe(true);
+    setStatusClipe("🎬 Preparando as cenas…");
+    const usaFoto = cenaSel === "foto" && !!fundoFoto;
+    const usaCena = cenaSel !== "foto" && cenaSel !== "";
+    try {
+      // 1) dispara um job de vídeo por cena (em paralelo — mais rápido no relógio).
+      const jobs: string[] = [];
+      for (let i = 0; i < cs.length; i++) {
+        const ini = await gerarClipeMascote(marcaId, {
+          modo: "livre",
+          descricao: cs[i].acao || undefined,
+          segundos: durCena,
+          fundo: fundoClipe,
+          fundoFotoUrl: usaFoto ? fundoFoto : undefined,
+          cena: usaCena ? cenaSel : undefined,
+          fala: cs[i].fala || undefined,
+        }).catch(() => ({ ok: false as const, erro: "Não consegui iniciar uma cena." }));
+        if (!ini.ok) { setErro(`Cena ${i + 1}: ${ini.erro}`); setGerandoClipe(false); setStatusClipe(""); return; }
+        jobs.push(ini.jobId);
+      }
+      // 2) acompanha todas até cada uma ficar pronta (URL temporária, fora da galeria).
+      const urls: string[] = new Array(jobs.length).fill("");
+      for (let round = 0; round < 84; round++) { // ~14 min
+        await new Promise((r) => setTimeout(r, 10000));
+        let prontas = 0;
+        for (let i = 0; i < jobs.length; i++) {
+          if (urls[i]) { prontas++; continue; }
+          const st = await statusClipeMascote(marcaId, jobs[i], false).catch(() => null);
+          if (st && !st.ok) { setErro(`Cena ${i + 1}: ${st.erro}`); setGerandoClipe(false); setStatusClipe(""); return; }
+          if (st && st.pronto && st.url) { urls[i] = st.url; prontas++; }
+        }
+        setStatusClipe(`🎬 Gerando as cenas… ${prontas}/${jobs.length} prontas`);
+        if (prontas === jobs.length) break;
+      }
+      if (urls.some((u) => !u)) { setErro("Algumas cenas demoraram demais. Tente com menos cenas ou de novo."); setGerandoClipe(false); setStatusClipe(""); return; }
+      // 3) o motor junta as cenas num vídeo só (a história vai pra galeria).
+      setStatusClipe("🎬 Juntando as cenas na história…");
+      const em = await emendarHistoriaMascote(marcaId, urls).catch(() => ({ ok: false as const, erro: "Não consegui juntar as cenas." }));
+      if (!em.ok) { setErro(em.erro); setGerandoClipe(false); setStatusClipe(""); return; }
+      setGerandoClipe(false); setStatusClipe(""); router.refresh();
+    } catch {
+      setErro("Não consegui gerar a história agora."); setGerandoClipe(false); setStatusClipe("");
+    }
   }
   const [abrirFotos, setAbrirFotos] = useState(false); // seletor de foto aberto
   const [fotosBanco, setFotosBanco] = useState<{ id: string; url: string; categoria: string }[]>([]);
@@ -655,51 +719,105 @@ export function MascoteEstudio({
               : <>📤 Vídeo pra <strong className="text-white/70">postar sozinho</strong> (Story/Reels), depois de gerar.</>}
           </p>
 
-          {/* ações rápidas — 1 toque preenche "o que o mascote faz" (descrição, editável) */}
-          <label className="mt-3 block text-[10px] font-semibold text-muted">O que ele faz <span className="font-normal text-muted/70">(toque pra preencher, dá pra editar embaixo)</span></label>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {ACOES_CLIPE.map((a) => (
-              <button key={a.nome} type="button" disabled={gerandoClipe} onClick={() => setDescClipe(a.desc)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${descClipe === a.desc ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
-                {a.emoji} {a.nome}
-              </button>
-            ))}
-          </div>
+          {modoSel === "historia" ? (
+            /* HISTÓRIA EM CENAS — a Bia escreve o roteiro; cada cena vira um clipe e a gente emenda tudo. */
+            <div className="mt-3 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-3">
+              <p className="text-[11px] font-semibold text-white">📖 Roteiro em cenas <span className="font-normal text-muted/70">(passa dos 12s)</span></p>
+              <p className="mt-0.5 text-[10px] leading-snug text-muted/70">A Bia divide a historinha em várias cenas curtas e a gente <strong className="text-white/70">emenda tudo num vídeo só</strong>. O castelinho fala em cada cena.</p>
+              <textarea
+                value={briefingHist}
+                onChange={(e) => setBriefingHist(e.target.value)}
+                rows={2}
+                maxLength={300}
+                disabled={gerandoClipe || escrevendoBia}
+                placeholder="Tema da história (ex: o castelinho mostrando os brinquedos e chamando pra fazer a festa aqui)"
+                className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-semibold text-muted">Cenas:</span>
+                {[2, 3, 4].map((n) => (
+                  <button key={n} type="button" disabled={gerandoClipe || escrevendoBia} onClick={() => setNumCenas(n)} className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${numCenas === n ? "border-[#a855f7] bg-[#a855f7]/20 text-[#d6c6ff]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{n}</button>
+                ))}
+                <button type="button" disabled={gerandoClipe || escrevendoBia} onClick={biaEscreveCenas} className="ml-auto rounded-md bg-[#a855f7] px-3 py-1.5 text-[11px] font-bold text-white transition hover:bg-[#9333ea] disabled:opacity-50">{escrevendoBia ? "✍️ Escrevendo…" : "✍️ Bia escreve as cenas"}</button>
+              </div>
 
-          <textarea
-            value={descClipe}
-            onChange={(e) => setDescClipe(e.target.value)}
-            rows={2}
-            maxLength={400}
-            placeholder="Ex: acenando feliz na porta do buffet, dando boas-vindas"
-            className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none"
-          />
+              {cenas.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {cenas.map((c, i) => (
+                    <div key={i} className="rounded-md border border-linha bg-preto p-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-[#d6c6ff]">🎬 Cena {i + 1}</span>
+                        <button type="button" disabled={gerandoClipe} onClick={() => setCenas((cs) => cs.filter((_, idx) => idx !== i))} aria-label="Tirar cena" className="text-[11px] font-semibold text-red-400 transition hover:text-red-300 disabled:opacity-40">✕</button>
+                      </div>
+                      <label className="mt-1.5 block text-[9px] font-semibold text-muted">O que faz</label>
+                      <input type="text" value={c.acao} disabled={gerandoClipe} onChange={(e) => setCena(i, "acao", e.target.value)} maxLength={300} placeholder="Ex: abrindo os bracinhos apresentando os brinquedos" className="mt-0.5 w-full rounded border border-linha bg-black px-2 py-1.5 text-[12px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+                      <label className="mt-1.5 block text-[9px] font-semibold text-muted">🗣️ Fala</label>
+                      <input type="text" value={c.fala} disabled={gerandoClipe} onChange={(e) => setCena(i, "fala", e.target.value)} maxLength={160} placeholder="Ex: Olha quanta diversão te espera aqui!" className="mt-0.5 w-full rounded border border-linha bg-black px-2 py-1.5 text-[12px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+                    </div>
+                  ))}
+                  {cenas.length < 4 && (
+                    <button type="button" disabled={gerandoClipe} onClick={() => setCenas((cs) => [...cs, { acao: "", fala: "" }])} className="text-[11px] font-semibold text-[#d6c6ff] transition hover:underline disabled:opacity-40">+ Adicionar cena</button>
+                  )}
+                </div>
+              )}
 
-          {/* voz do mascote — o que ele FALA (lip sync) */}
-          <label className="mt-3 block text-[10px] font-semibold text-muted">🗣️ O que o mascote fala? <span className="font-normal text-muted/70">(opcional — se preencher, ele fala com a boquinha mexendo)</span></label>
-          <input
-            type="text"
-            value={falaClipe}
-            onChange={(e) => setFalaClipe(e.target.value)}
-            maxLength={160}
-            disabled={gerandoClipe}
-            placeholder="Ex: Venha comemorar sua festa aqui no Castelo!"
-            className="mt-1 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none disabled:opacity-50"
-          />
-          <p className="mt-1 text-[10px] leading-snug text-muted/70">A IA cria a voz na hora e sincroniza com a boca. Frases curtas ({durClipe}s dá pra ~{Math.max(4, durClipe * 2)} palavras) saem melhor. Deixe vazio pra ter só uma musiquinha.</p>
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-muted">Cada cena:</span>
+                {[4, 8, 12].map((s) => (
+                  <button key={s} type="button" disabled={gerandoClipe} onClick={() => setDurCena(s)} className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${durCena === s ? "border-[#a855f7] bg-[#a855f7]/20 text-[#d6c6ff]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{s}s</button>
+                ))}
+                {cenas.length > 0 && <span className="text-[10px] text-muted/60">≈ {cenas.length * durCena}s no total</span>}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* ações rápidas — 1 toque preenche "o que o mascote faz" (descrição, editável) */}
+              <label className="mt-3 block text-[10px] font-semibold text-muted">O que ele faz <span className="font-normal text-muted/70">(toque pra preencher, dá pra editar embaixo)</span></label>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {ACOES_CLIPE.map((a) => (
+                  <button key={a.nome} type="button" disabled={gerandoClipe} onClick={() => setDescClipe(a.desc)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${descClipe === a.desc ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
+                    {a.emoji} {a.nome}
+                  </button>
+                ))}
+              </div>
 
-          {/* lembrete da voz — a escolha/teste da voz agora fica na sub-aba "🎙️ Voz" */}
+              <textarea
+                value={descClipe}
+                onChange={(e) => setDescClipe(e.target.value)}
+                rows={2}
+                maxLength={400}
+                placeholder="Ex: acenando feliz na porta do buffet, dando boas-vindas"
+                className="mt-2 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none"
+              />
+
+              {/* voz do mascote — o que ele FALA (lip sync) */}
+              <label className="mt-3 block text-[10px] font-semibold text-muted">🗣️ O que o mascote fala? <span className="font-normal text-muted/70">(opcional — se preencher, ele fala com a boquinha mexendo)</span></label>
+              <input
+                type="text"
+                value={falaClipe}
+                onChange={(e) => setFalaClipe(e.target.value)}
+                maxLength={160}
+                disabled={gerandoClipe}
+                placeholder="Ex: Venha comemorar sua festa aqui no Castelo!"
+                className="mt-1 w-full rounded-md border border-linha bg-preto px-2.5 py-2 text-[13px] leading-relaxed text-white placeholder:text-muted/40 focus:border-[#ec4899] focus:outline-none disabled:opacity-50"
+              />
+              <p className="mt-1 text-[10px] leading-snug text-muted/70">A IA cria a voz na hora e sincroniza com a boca. Frases curtas ({durClipe}s dá pra ~{Math.max(4, durClipe * 2)} palavras) saem melhor. Deixe vazio pra ter só uma musiquinha.</p>
+
+              {/* duração do clipe */}
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-[10px] font-semibold text-muted">Duração:</span>
+                {[4, 8, 12].map((s) => (
+                  <button key={s} type="button" disabled={gerandoClipe} onClick={() => setDurClipe(s)} className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${durClipe === s ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{s}s</button>
+                ))}
+                <span className="text-[10px] text-muted/60">(mais longo = mais demorado)</span>
+              </div>
+            </>
+          )}
+
+          {/* lembrete da voz — a escolha/teste da voz fica na sub-aba "🎙️ Voz" (vale pros dois modos) */}
           <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#a855f7]/30 bg-[#a855f7]/5 p-2.5">
             <span className="text-[11px] text-muted">🎙️ Voz do castelinho: <strong className="text-white/80">{VOZES_CLIPE.find((v) => v.desc === vozClipe)?.nome ?? (vozClipe.trim() ? "personalizada" : "🎬 Desenho animado (padrão)")}</strong></span>
             <button type="button" onClick={() => setSubAba("voz")} className="rounded-md border border-[#a855f7]/50 bg-[#a855f7]/15 px-2.5 py-1 text-[11px] font-semibold text-[#d6c6ff] transition hover:bg-[#a855f7]/25">trocar / ouvir voz →</button>
-          </div>
-
-          {/* duração do clipe */}
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-[10px] font-semibold text-muted">Duração:</span>
-            {[4, 8, 12].map((s) => (
-              <button key={s} type="button" disabled={gerandoClipe} onClick={() => setDurClipe(s)} className={`rounded-md border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${durClipe === s ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{s}s</button>
-            ))}
-            <span className="text-[10px] text-muted/60">(mais longo = mais demorado)</span>
           </div>
 
           {/* CENÁRIO — sempre compatível: foto real do buffet (melhor), um cenário curado, ou cor sólida. */}
@@ -774,18 +892,30 @@ export function MascoteEstudio({
           )}
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleGerarClipe}
-              disabled={gerandoClipe || isPending}
-              className="rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-4 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
-            >
-              {gerandoClipe ? "🎬 Animando…" : clipesUrls.length ? "🎬 Gerar outro clipe" : "🎬 Gerar clipe animado"}
-            </button>
+            {modoSel === "historia" ? (
+              <button
+                type="button"
+                onClick={gerarHistoria}
+                disabled={gerandoClipe || isPending || cenas.filter((c) => (c.acao || c.fala).trim()).length < 2}
+                className="rounded-lg bg-gradient-to-r from-[#a855f7] to-[#ec4899] px-4 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
+              >
+                {gerandoClipe ? "🎬 Montando a história…" : "🎬 Gerar história"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleGerarClipe}
+                disabled={gerandoClipe || isPending}
+                className="rounded-lg bg-gradient-to-r from-[#ec4899] to-[#a855f7] px-4 py-2 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-50"
+              >
+                {gerandoClipe ? "🎬 Animando…" : clipesUrls.length ? "🎬 Gerar outro clipe" : "🎬 Gerar clipe animado"}
+              </button>
+            )}
             {gerandoClipe && statusClipe && <span className="text-[11px] font-semibold text-[#f9a8d4]">{statusClipe}</span>}
           </div>
-          {gerandoClipe && <p className="mt-2 text-[10px] leading-snug text-muted/70">⏳ A animação por IA leva de <strong className="text-white/70">1 a 2 minutos</strong> — pode deixar essa tela aberta. Não feche enquanto estiver "Animando…".</p>}
-          {!gerandoClipe && <p className="mt-2 text-[10px] leading-snug text-muted/70">Cada clipe é gerado por IA de vídeo (pode variar um pouco). Se não gostar, é só gerar de novo com outra descrição.</p>}
+          {gerandoClipe && modoSel === "historia" && <p className="mt-2 text-[10px] leading-snug text-muted/70">⏳ Cada cena leva de 1 a 2 min e elas geram juntas — a história inteira pode levar <strong className="text-white/70">alguns minutos</strong>. Deixe essa tela aberta até terminar.</p>}
+          {gerandoClipe && modoSel !== "historia" && <p className="mt-2 text-[10px] leading-snug text-muted/70">⏳ A animação por IA leva de <strong className="text-white/70">1 a 2 minutos</strong> — pode deixar essa tela aberta. Não feche enquanto estiver "Animando…".</p>}
+          {!gerandoClipe && <p className="mt-2 text-[10px] leading-snug text-muted/70">Cada clipe é gerado por IA de vídeo (pode variar um pouco). Se não gostar, é só gerar de novo.</p>}
         </div>
       )}
 
