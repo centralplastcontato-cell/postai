@@ -171,6 +171,10 @@ export function MascoteEstudio({
   // DAR VIDA (Fase 5): anima o mascote com IA de vídeo. Em 2 fases (a IA leva 1-2 min): inicia o
   // job e fica consultando até o clipe ficar pronto.
   const clipesUrls = clipes ?? [];
+  // Espelho da contagem de clipes (atualiza a cada render) — usado pra detectar quando a HISTÓRIA
+  // emendada apareceu na galeria (o motor a salva em segundo plano e o router.refresh traz ela).
+  const clipesCountRef = useRef(clipesUrls.length);
+  useEffect(() => { clipesCountRef.current = clipesUrls.length; }, [clipesUrls.length]);
   const [subAba, setSubAba] = useState<"criar" | "ficha" | "vida" | "voz">("criar"); // sub-abas do estúdio
   const [vozClipe, setVozClipe] = useState(voz ?? ""); // voz definida do castelinho
   const [salvandoVoz, setSalvandoVoz] = useState(false);
@@ -301,11 +305,22 @@ export function MascoteEstudio({
         if (prontas === jobs.length) break;
       }
       if (urls.some((u) => !u)) { setErro("Algumas cenas demoraram demais. Tente com menos cenas ou de novo."); setGerandoClipe(false); setStatusClipe(""); return; }
-      // 3) o motor junta as cenas num vídeo só (a história vai pra galeria).
+      // 3) dispara a junção das cenas (roda em SEGUNDO PLANO no motor — não trava o site).
       setStatusClipe("🎬 Juntando as cenas na história…");
       const em = await emendarHistoriaMascote(marcaId, urls).catch(() => ({ ok: false as const, erro: "Não consegui juntar as cenas." }));
       if (!em.ok) { setErro(em.erro); setGerandoClipe(false); setStatusClipe(""); return; }
-      setGerandoClipe(false); setStatusClipe(""); router.refresh();
+      // 4) o motor está montando em background e vai avisar quando terminar; acompanha a galeria crescer.
+      setGaleriaAberta(true);
+      setStatusClipe("🎬 Juntando as cenas… (a história aparece na galeria em 1-2 min)");
+      const antes = clipesCountRef.current;
+      let apareceu = false;
+      for (let i = 0; i < 18; i++) { // ~3,5 min
+        await new Promise((r) => setTimeout(r, 12000));
+        router.refresh();
+        if (clipesCountRef.current > antes) { apareceu = true; break; }
+      }
+      setGerandoClipe(false); setStatusClipe("");
+      if (!apareceu) setErro("A história está demorando mais que o normal pra ficar pronta. Ela deve aparecer na galeria (🎬 Meus clipes) daqui a pouco — atualize a página se precisar.");
     } catch {
       setErro("Não consegui gerar a história agora."); setGerandoClipe(false); setStatusClipe("");
     }

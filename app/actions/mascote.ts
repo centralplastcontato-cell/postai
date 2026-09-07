@@ -7,7 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { guardaMarca } from "@/lib/acesso";
 import { criarContainerReels, criarContainerStoryVideo, statusContainerReels, publicarContainerReels } from "@/lib/instagram";
 import { modoClipe, cenaClipe } from "@/lib/mascote-modos";
-import { emendarClipes } from "@/lib/video-engine";
+import { dispararEmendaAsync } from "@/lib/video-engine";
+import { baseUrl } from "@/lib/config";
 
 // ESTÚDIO DO MASCOTE (Fase 1): gera opções de mascote em 3D fofo com FUNDO TRANSPARENTE
 // (PNG), pra depois "colar" o MESMO mascote nos posts/vídeos e ele ficar sempre idêntico.
@@ -593,25 +594,28 @@ export async function escreverCenasHistoria(marcaId: string, briefing: string, n
 }
 
 // Depois que a tela gerou o clipe de CADA cena (URLs temporárias, fora da galeria), o motor EMENDA
-// tudo num vídeo só. Salva a HISTÓRIA final na galeria e apaga as cenas soltas do Blob.
-export async function emendarHistoriaMascote(marcaId: string, urls: string[]): Promise<{ ok: true; url: string } | { ok: false; erro: string }> {
+// tudo num vídeo só EM SEGUNDO PLANO (a emenda re-encoda e pode passar dos 60s). Aqui a gente só
+// dispara e volta na hora ({ pendente:true }); quando o motor termina, ele avisa em /api/mascote-
+// pronto, que salva a história na galeria e apaga as cenas soltas.
+export async function emendarHistoriaMascote(marcaId: string, urls: string[]): Promise<{ ok: true; pendente: true } | { ok: false; erro: string }> {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false, erro: g.erro };
   const cenas = (Array.isArray(urls) ? urls : []).filter((u) => typeof u === "string" && u.startsWith("http"));
   if (cenas.length < 2) return { ok: false, erro: "Preciso de pelo menos 2 cenas." };
-  const r = await emendarClipes(cenas, `historia-${marcaId}`);
+
+  let base = baseUrl();
+  try { if (process.env.VIDEO_CALLBACK_URL) base = new URL(process.env.VIDEO_CALLBACK_URL).origin; } catch {}
+  base = base.replace(/\/$/, "");
+  const callbackUrl = `${base}/api/mascote-pronto`;
+  const token = process.env.VIDEO_CALLBACK_SECRET || "";
+
+  const r = await dispararEmendaAsync(cenas, marcaId, callbackUrl, token);
   if (!r.ok) {
-    // Falhou (ex: motor sem /emendar ainda) → as cenas eram temporárias, tira do Blob pra não virar lixo.
+    // Nem começou (ex: motor sem /emendar ainda) → as cenas eram temporárias, tira do Blob pra não virar lixo.
     import("@vercel/blob").then(({ del }) => Promise.all(cenas.map((c) => del(c).catch(() => {})))).catch(() => {});
     return { ok: false, erro: r.erro };
   }
-  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
-  const novos = [r.videoUrl, ...lerListaUrls(marca?.mascoteClipes ?? "[]")].slice(0, 30);
-  await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(novos) } });
-  // As cenas soltas eram temporárias — tira do Blob (a história final já tem tudo).
-  import("@vercel/blob").then(({ del }) => Promise.all(cenas.map((c) => del(c).catch(() => {})))).catch(() => {});
-  revalidatePath(`/painel/marcas/${marcaId}`);
-  return { ok: true, url: r.videoUrl };
+  return { ok: true, pendente: true };
 }
 
 // ── POSTAR O CLIPE do mascote direto no Instagram (Reels ou Story), em 2 fases (o vídeo processa na

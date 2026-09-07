@@ -106,6 +106,32 @@ export async function emendarClipes(clipes: string[], nomeArquivo?: string): Pro
   }
 }
 
+// EMENDA em SEGUNDO PLANO: dispara a junção das cenas no motor e espera só o "aceitei" (rápido). A
+// emenda re-encoda tudo e pode passar dos 60s, então o motor monta em background e avisa no
+// callbackUrl (rota /api/mascote-pronto) quando termina — igual os vídeos de festa.
+export async function dispararEmendaAsync(clipes: string[], marcaId: string, callbackUrl: string, callbackToken: string): Promise<{ ok: true } | { ok: false; erro: string }> {
+  if (!MOTOR_URL) return { ok: false, erro: "Motor de vídeo não configurado (VIDEO_ENGINE_URL)." };
+  const urls = (Array.isArray(clipes) ? clipes : []).filter((u) => typeof u === "string" && u.startsWith("http"));
+  if (urls.length < 2) return { ok: false, erro: "Preciso de pelo menos 2 cenas pra emendar." };
+  try {
+    const auth = new GoogleAuth({ credentials: credenciais() });
+    const client = await auth.getIdTokenClient(MOTOR_URL);
+    const r = await client.request({
+      url: `${MOTOR_URL}/emendar`,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: { clipes: urls, nomeArquivo: `historia-${marcaId}`, callbackUrl, callbackToken, marcaId, cenas: urls },
+      timeout: 30000,
+    });
+    const d = r.data as { ok?: boolean } | undefined;
+    return d?.ok ? { ok: true } : { ok: false, erro: "O motor não aceitou a emenda." };
+  } catch (e) {
+    const status = (e as { response?: { status?: number } })?.response?.status;
+    if (status === 404) return { ok: false, erro: "O motor de vídeo ainda não foi atualizado pra juntar as cenas. Reimplante o motor (pelo Cloud Shell) e tente o \"Gerar história\" de novo — as cenas em si já funcionam." };
+    return { ok: false, erro: e instanceof Error ? e.message.slice(0, 200) : "Erro ao falar com o motor de vídeo." };
+  }
+}
+
 // IMAGEM + MÚSICA → videozinho (9:16). Chama o motor no modo SÍNCRONO (é rápido: 1 imagem parada +
 // áudio curto) e devolve a URL do MP4. Usado pra postar uma arte estática COM musiquinha (Story/Reels).
 export async function montarImagemMusica(imagemUrl: string, musicaUrl: string, segundos: number): Promise<{ ok: true; videoUrl: string; duracaoSegundos: number } | { ok: false; erro: string }> {
