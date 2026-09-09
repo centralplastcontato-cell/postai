@@ -20,6 +20,7 @@ export type MarcaView = {
   mascoteAbertura?: string; // clipe usado no começo dos Reels das festas ("" = nenhum)
   mascoteFecho?: string; // clipe usado no fim dos Reels das festas ("" = nenhum)
   mascoteVoz?: string; // voz definida do castelinho nos clipes
+  musicaBuffetUrl?: string; // jingle padrão do buffet (URL) — opção nas músicas da "Minha arte"
   musicas?: { url: string; nome: string; wav?: string }[]; // biblioteca de trilhas enviadas, pra reusar
   paleta: string; // JSON array de hex
   logoTexto: string;

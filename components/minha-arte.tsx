@@ -15,7 +15,13 @@ function dataBR(iso: string): string {
 // 🖼️ MINHA ARTE — o dono sobe uma arte PRONTA (feita fora, ex: promoção no Canva), a Bia lê a
 // imagem e escreve a legenda combinando, e ele posta como Story/Feed (na hora ou agendado).
 // A arte vai EXATAMENTE como ele fez (o render mostra a imagem inteira, sem template por cima).
-export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string; bibliotecaMusicas?: { url: string; nome: string }[] }) {
+export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "" }: { marcaId: string; bibliotecaMusicas?: { url: string; nome: string }[]; musicaBuffetUrl?: string }) {
+  // Lista de músicas do picker: a MÚSICA DO BUFFET (padrão) sempre em 1º (se houver e não estiver
+  // já na biblioteca), depois as trilhas que o dono subiu.
+  const musicasLista = [
+    ...(musicaBuffetUrl && !bibliotecaMusicas.some((m) => m.url === musicaBuffetUrl) ? [{ url: musicaBuffetUrl, nome: "Música do buffet (padrão)" }] : []),
+    ...bibliotecaMusicas,
+  ];
   const router = useRouter();
   const [imagemUrl, setImagemUrl] = useState(""); // URL da mídia enviada (imagem OU vídeo)
   const [midia, setMidia] = useState<"imagem" | "video">("imagem"); // o que foi enviado
@@ -405,11 +411,11 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [] }: { marcaId: string
               <p className="mt-1 text-[11px] text-muted/70">A sua arte vira um videozinho (parada, com a música por cima) — aí dá pra postar no Story/Reels <strong className="text-white/70">com som</strong>, sem ficar mudo.</p>
               {comMusica && (
                 <div className="mt-3 space-y-3">
-                  {bibliotecaMusicas.length > 0 && (
+                  {musicasLista.length > 0 && (
                     <div>
                       <p className="text-[11px] font-semibold text-muted">Escolha uma música da sua lista:</p>
                       <div className="mt-1 flex flex-wrap gap-1.5">
-                        {bibliotecaMusicas.map((m) => (
+                        {musicasLista.map((m) => (
                           <button key={m.url} type="button" onClick={() => escolherMusica(m.url, m.nome)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${musicaUrl === m.url ? "border-[#7c3aed] bg-[#7c3aed]/25 text-white" : "border-linha bg-preto text-muted hover:text-white"}`}>🎵 {m.nome}</button>
                         ))}
                       </div>

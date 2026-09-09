@@ -13,6 +13,7 @@ import { type FestaView } from "@/lib/festa-tipos";
 import { parseAniversariantes } from "@/lib/aniversariantes";
 import { gerarTokenFesta, gerarTokenAlbum } from "@/lib/festa";
 import { baseUrl } from "@/lib/config";
+import { musicaBuffet } from "@/lib/musica-buffet";
 import { OnboardingMarca } from "@/components/onboarding-marca";
 import { analisarEngajamento, sugerirProximoPost, type AnaliseInsights } from "@/lib/inteligencia";
 
@@ -383,6 +384,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     mascoteAbertura: marca.mascoteAbertura ?? "",
     mascoteFecho: marca.mascoteFecho ?? "",
     mascoteVoz: marca.mascoteVoz,
+    musicaBuffetUrl: musicaBuffet(marca.slug) ?? "",
     musicas: (() => { try { const a = JSON.parse(marca.musicas || "[]"); return Array.isArray(a) ? a.filter((m: unknown): m is { url: string; nome: string; wav?: string } => Boolean(m) && typeof (m as { url?: unknown }).url === "string" && (m as { url: string }).url.startsWith("http")) : []; } catch { return []; } })(),
     paleta: marca.paleta,
     logoTexto: marca.logoTexto,
