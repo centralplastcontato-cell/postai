@@ -401,10 +401,24 @@ export function MascoteEstudio({
   // feito (clipesMeta[url]); se não tiver registro (clipe antigo), cai nas escolhas atuais da tela.
   const [melhorarUrl, setMelhorarUrl] = useState<string | null>(null); // qual clipe está com o campo aberto
   const [ajusteTxt, setAjusteTxt] = useState("");
+  const [melhorarDesc, setMelhorarDesc] = useState(""); // "o que faz" (editável) do clipe sendo melhorado
+  const [melhorarFala, setMelhorarFala] = useState(""); // a fala (editável) — pra NÃO mudar o texto sem querer
+  // Abre o painel "Melhorar" de um clipe já preenchendo a fala e o que ele faz (do registro, se houver).
+  function abrirMelhorar(url: string) {
+    if (melhorarUrl === url) { setMelhorarUrl(null); return; }
+    const m = clipesMeta && clipesMeta[url];
+    setMelhorarDesc(m?.descricao || "");
+    setMelhorarFala(m?.fala || "");
+    setAjusteTxt("");
+    setMelhorarUrl(url);
+  }
   async function melhorarClipe(url: string) {
     const nota = ajusteTxt.trim();
     if (!nota) { setErro("Escreva o que você quer melhorar."); return; }
-    const base: ClipeMeta = (clipesMeta && clipesMeta[url]) || { modo: modoSel, descricao: descClipe.trim(), fala: falaClipe.trim(), cena: cenaSel, fundo: fundoClipe, fundoFotoUrl: cenaSel === "foto" ? fundoFoto : "", segundos: durClipe };
+    // Estilo/cenário/duração vêm do registro do clipe (ou das escolhas atuais); a FALA e o que ele faz
+    // vêm dos campos que o dono VÊ e pode editar — assim o texto não muda sozinho.
+    const m: ClipeMeta = (clipesMeta && clipesMeta[url]) || { modo: modoSel, cena: cenaSel, fundo: fundoClipe, fundoFotoUrl: cenaSel === "foto" ? fundoFoto : "", segundos: durClipe };
+    const base: ClipeMeta = { ...m, descricao: melhorarDesc.trim(), fala: melhorarFala.trim() };
     setErro(null); setMelhorarUrl(null); setAjusteTxt("");
     setGerandoClipe(true); setStatusClipe("✨ Refazendo com o seu ajuste…");
     const usaFoto = base.cena === "foto" && !!base.fundoFotoUrl;
@@ -964,18 +978,26 @@ export function MascoteEstudio({
                         <button type="button" onClick={() => alternarAbertura(url)} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold transition ${ehAbertura ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha text-muted hover:border-white/30 hover:text-white"}`}>{ehAbertura ? "⭐ Abertura ✓" : "⭐ Abertura"}</button>
                         <button type="button" onClick={() => alternarFecho(url)} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold transition ${ehFecho ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha text-muted hover:border-white/30 hover:text-white"}`}>{ehFecho ? "🏁 Fecho ✓" : "🏁 Fecho"}</button>
                       </div>
-                      {/* ✨ Melhorar — refaz o clipe aplicando um ajuste que o dono descreve */}
+                      {/* ✨ Melhorar — refaz o clipe aplicando um ajuste; a fala/tema ficam à vista pra não mudarem sozinhos */}
                       <div className="px-2 pt-2">
-                        <button type="button" onClick={() => { setMelhorarUrl(melhorarUrl === url ? null : url); setAjusteTxt(""); }} disabled={gerandoClipe} className={`w-full rounded-md border px-2 py-1 text-[10px] font-semibold transition disabled:opacity-40 ${melhorarUrl === url ? "border-[#a855f7] bg-[#a855f7]/20 text-[#d6c6ff]" : "border-[#a855f7]/40 text-[#d6c6ff] hover:bg-[#a855f7]/15"}`}>✨ Melhorar este vídeo</button>
+                        <button type="button" onClick={() => abrirMelhorar(url)} disabled={gerandoClipe} className={`w-full rounded-md border px-2 py-1 text-[10px] font-semibold transition disabled:opacity-40 ${melhorarUrl === url ? "border-[#a855f7] bg-[#a855f7]/20 text-[#d6c6ff]" : "border-[#a855f7]/40 text-[#d6c6ff] hover:bg-[#a855f7]/15"}`}>✨ Melhorar este vídeo</button>
                       </div>
                       {melhorarUrl === url && (
                         <div className="px-2 pt-2">
-                          <textarea value={ajusteTxt} onChange={(e) => setAjusteTxt(e.target.value)} rows={2} maxLength={300} disabled={gerandoClipe} placeholder="O que ajustar? Ex: o mascote ficou pequeno, deixe ele maior e mais no centro; o cenário ficou escuro." className="w-full rounded border border-linha bg-black px-2 py-1.5 text-[11px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+                          {!(clipesMeta && clipesMeta[url]) && (
+                            <p className="mb-1 text-[9px] leading-tight text-amber-300/80">Esse clipe é antigo — não guardei o texto dele. Confira/escreva a fala e o que ele faz abaixo pra manter o tema.</p>
+                          )}
+                          <label className="block text-[9px] font-semibold text-muted">O que ele faz</label>
+                          <input type="text" value={melhorarDesc} onChange={(e) => setMelhorarDesc(e.target.value)} maxLength={300} disabled={gerandoClipe} placeholder="Ex: acenando feliz, dando boas-vindas" className="mt-0.5 w-full rounded border border-linha bg-black px-2 py-1.5 text-[11px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+                          <label className="mt-1.5 block text-[9px] font-semibold text-muted">🗣️ Fala <span className="font-normal text-muted/60">(o que ele diz — deixe vazio pra só música)</span></label>
+                          <input type="text" value={melhorarFala} onChange={(e) => setMelhorarFala(e.target.value)} maxLength={160} disabled={gerandoClipe} placeholder="Ex: Bem-vindos ao castelo da diversão!" className="mt-0.5 w-full rounded border border-linha bg-black px-2 py-1.5 text-[11px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+                          <label className="mt-1.5 block text-[9px] font-semibold text-[#d6c6ff]">✨ O que melhorar</label>
+                          <textarea value={ajusteTxt} onChange={(e) => setAjusteTxt(e.target.value)} rows={2} maxLength={300} disabled={gerandoClipe} placeholder="Ex: o mascote ficou pequeno, deixe ele maior e mais no centro; o cenário ficou escuro." className="mt-0.5 w-full rounded border border-linha bg-black px-2 py-1.5 text-[11px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
                           <div className="mt-1 flex gap-1.5">
                             <button type="button" onClick={() => melhorarClipe(url)} disabled={gerandoClipe || !ajusteTxt.trim()} className="flex-1 rounded-md bg-[#a855f7] px-2 py-1 text-[10px] font-bold text-white transition hover:bg-[#9333ea] disabled:opacity-50">✨ Refazer melhorando</button>
-                            <button type="button" onClick={() => { setMelhorarUrl(null); setAjusteTxt(""); }} className="rounded-md border border-linha px-2 py-1 text-[10px] font-semibold text-muted transition hover:text-white">Cancelar</button>
+                            <button type="button" onClick={() => setMelhorarUrl(null)} className="rounded-md border border-linha px-2 py-1 text-[10px] font-semibold text-muted transition hover:text-white">Cancelar</button>
                           </div>
-                          <p className="mt-1 text-[9px] leading-tight text-muted/60">Gera um vídeo NOVO (não apaga este). {clipesMeta && clipesMeta[url] ? "Mantém o mesmo estilo e fala." : "Usa as escolhas atuais da tela como base."}</p>
+                          <p className="mt-1 text-[9px] leading-tight text-muted/60">Gera um vídeo NOVO (não apaga este), mantendo a fala/tema acima + o seu ajuste.</p>
                         </div>
                       )}
                       <div className="flex flex-wrap items-center gap-1.5 px-2 py-2">
