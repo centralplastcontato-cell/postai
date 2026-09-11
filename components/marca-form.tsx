@@ -17,6 +17,7 @@ export type MarcaView = {
   mascotesArte?: string[]; // biblioteca de opções de mascote geradas pela IA
   mascoteFicha3d?: string; // ficha do personagem (frente/lado/costas) pra fazer o 3D
   mascoteClipes?: string[]; // clipes animados do mascote (IA de vídeo)
+  mascoteClipesMeta?: Record<string, { modo?: string; descricao?: string; fala?: string; cena?: string; fundo?: string; fundoFotoUrl?: string; segundos?: number }>; // como cada clipe foi feito (pro "✨ Melhorar")
   mascoteAbertura?: string; // clipe usado no começo dos Reels das festas ("" = nenhum)
   mascoteFecho?: string; // clipe usado no fim dos Reels das festas ("" = nenhum)
   mascoteVoz?: string; // voz definida do castelinho nos clipes

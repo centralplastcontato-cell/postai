@@ -354,8 +354,8 @@ async function quadroPartidaMascote(mascotePng: Buffer, fundo: { cor: string } |
 // opts.modo: historia | divulgacao | abertura | fecho | livre (papel/roteiro/uso do clipe).
 // opts.cena: id de um cenário curado (CENAS_CLIPE) — sempre "buffet infantil" e consistente. A FOTO
 // do buffet (fundoFotoUrl), se houver, tem prioridade (é o cenário mais compatível de todos).
-export async function gerarClipeMascote(marcaId: string, opts: { modo?: string; descricao?: string; segundos?: number; fundo?: string; fundoFotoUrl?: string; fala?: string; cena?: string } = {}) {
-  const { descricao, segundos, fundo, fundoFotoUrl, fala, cena } = opts;
+export async function gerarClipeMascote(marcaId: string, opts: { modo?: string; descricao?: string; segundos?: number; fundo?: string; fundoFotoUrl?: string; fala?: string; cena?: string; ajuste?: string } = {}) {
+  const { descricao, segundos, fundo, fundoFotoUrl, fala, cena, ajuste } = opts;
   const modo = modoClipe(opts.modo || "livre");
   const cenaSel = cena ? cenaClipe(cena) : null;
   const g = await guardaMarca(marcaId);
@@ -417,7 +417,10 @@ export async function gerarClipeMascote(marcaId: string, opts: { modo?: string; 
         ? `CENÁRIO: o mascote está ${cenaSel.prompt}. Cenário em estilo desenho 3D infantil, caprichado, coerente e alegre (nada aleatório fora do clima de buffet infantil), com um leve movimento de câmera.`
         : `CENÁRIO: NÃO crie cenário. FUNDO em uma cor SÓLIDA, LISA e UNIFORME EXATAMENTE igual à da imagem de referência (${corFundo}) — não escureça, não coloque objetos nem gradiente. Câmera parada, personagem centralizado.`;
 
-    const prompt = `${papelTxt} Anime o personagem mascote da imagem de referência: ele está ${acao}, com movimento suave, fofo e natural. ${identidade} ${cenarioTxt} Vídeo vertical 9:16, sem nenhum texto ou legenda na imagem. ${audio}`.replace(/\s+/g, " ").trim();
+    // AJUSTE do dono (quando ele toca em "✨ Melhorar" e diz o que corrigir da versão anterior).
+    const ajusteTxt = (ajuste || "").trim().slice(0, 300);
+    const ajustePart = ajusteTxt ? ` AJUSTE IMPORTANTE pedido pelo dono (corrija ISTO em relação à versão anterior, mantendo o resto): ${ajusteTxt}.` : "";
+    const prompt = `${papelTxt} Anime o personagem mascote da imagem de referência: ele está ${acao}, com movimento suave, fofo e natural. ${identidade} ${cenarioTxt}${ajustePart} Vídeo vertical 9:16, sem nenhum texto ou legenda na imagem. ${audio}`.replace(/\s+/g, " ").trim();
 
     const form = new FormData();
     form.append("model", CLIPE_MODELO);
@@ -449,7 +452,7 @@ export async function gerarClipeMascote(marcaId: string, opts: { modo?: string; 
 // pronto, baixa o MP4, guarda no Blob e adiciona na galeria de clipes da marca.
 // salvarGaleria=false (usado nas CENAS de uma história): guarda o MP4 no Blob e devolve a URL, mas
 // NÃO joga na galeria (as cenas soltas são temporárias — só a história emendada vai pra galeria).
-export async function statusClipeMascote(marcaId: string, jobId: string, salvarGaleria = true) {
+export async function statusClipeMascote(marcaId: string, jobId: string, salvarGaleria = true, meta?: { modo?: string; descricao?: string; fala?: string; cena?: string; fundo?: string; fundoFotoUrl?: string; segundos?: number }) {
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const key = process.env.OPENAI_API_KEY;
@@ -475,9 +478,15 @@ export async function statusClipeMascote(marcaId: string, jobId: string, salvarG
     const blob = await put(`${marcaId}/mascote-clipe-${Date.now()}.mp4`, bytes, { access: "public", contentType: "video/mp4" });
 
     if (salvarGaleria) {
-      const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true } });
+      const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteClipes: true, mascoteClipesMeta: true } });
       const novos = [blob.url, ...lerListaUrls(marca?.mascoteClipes ?? "[]")].slice(0, 30);
-      await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(novos) } });
+      // Guarda COMO o clipe foi feito (pro "✨ Melhorar" depois). Poda pros clipes que ainda existem.
+      let mapa: Record<string, unknown> = {};
+      try { const m = JSON.parse(marca?.mascoteClipesMeta ?? "{}"); if (m && typeof m === "object") mapa = m as Record<string, unknown>; } catch {}
+      if (meta) mapa[blob.url] = { modo: meta.modo || "livre", descricao: meta.descricao || "", fala: meta.fala || "", cena: meta.cena || "", fundo: meta.fundo || "", fundoFotoUrl: meta.fundoFotoUrl || "", segundos: meta.segundos || 8 };
+      const podado: Record<string, unknown> = {};
+      for (const u of novos) if (mapa[u]) podado[u] = mapa[u];
+      await prisma.marca.update({ where: { id: marcaId }, data: { mascoteClipes: JSON.stringify(novos), mascoteClipesMeta: JSON.stringify(podado) } });
       revalidatePath(`/painel/marcas/${marcaId}`);
     }
     return { ok: true as const, pronto: true as const, url: blob.url };

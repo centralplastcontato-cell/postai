@@ -42,6 +42,9 @@ const VOZES_CLIPE = [
 
 const FICHA_LABELS = ["Frente", "Lado", "Costas"];
 
+// Como um clipe foi feito — guardado por clipe pra o "✨ Melhorar" refazer com o mesmo estilo.
+type ClipeMeta = { modo?: string; descricao?: string; fala?: string; cena?: string; fundo?: string; fundoFotoUrl?: string; segundos?: number };
+
 // Um clipinho de SILÊNCIO (WAV ~0,1s) só pra "destravar" o áudio no iPhone/iPad dentro do toque —
 // depois disso o Safari deixa a amostra tocar mesmo chegando depois de uma espera.
 const SILENCIO_WAV = (() => {
@@ -67,6 +70,7 @@ export function MascoteEstudio({
   mascotes,
   ficha3d,
   clipes,
+  clipesMeta,
   corMarca,
   voz,
   abertura,
@@ -77,6 +81,7 @@ export function MascoteEstudio({
   mascotes: string[]; // biblioteca de opções geradas
   ficha3d?: string; // ficha do personagem (frente/lado/costas) pro 3D ("" = não gerada)
   clipes?: string[]; // clipes animados (IA de vídeo) já gerados
+  clipesMeta?: Record<string, ClipeMeta>; // como cada clipe foi feito (pro "✨ Melhorar")
   corMarca?: string; // cor primária da marca (opção de fundo do clipe)
   voz?: string; // voz definida do castelinho ("" = padrão)
   abertura?: string; // clipe usado no começo dos Reels das festas ("" = nenhum)
@@ -356,13 +361,13 @@ export function MascoteEstudio({
   const jobKey = `mascoteClipeJob:${marcaId}`;
   // Acompanha um clipe até ficar pronto. Guarda o id do job no navegador, então se você RECARREGAR
   // ou voltar pra aba, ele RETOMA sozinho (o clipe não se perde). Espera até ~12 min.
-  async function acompanharClipe(jobId: string) {
+  async function acompanharClipe(jobId: string, meta?: ClipeMeta) {
     setGerandoClipe(true);
     setStatusClipe("🎬 A IA está animando… (pode levar alguns minutos)");
     try { localStorage.setItem(jobKey, jobId); } catch {}
     for (let i = 0; i < 72; i++) { // ~12 min (10s cada)
       await new Promise((r) => setTimeout(r, 10000));
-      const st = await statusClipeMascote(marcaId, jobId).catch(() => null);
+      const st = await statusClipeMascote(marcaId, jobId, true, meta).catch(() => null);
       if (!st) continue;
       if (!st.ok) { try { localStorage.removeItem(jobKey); } catch {} setErro(st.erro); setGerandoClipe(false); setStatusClipe(""); return; }
       if (st.pronto) { try { localStorage.removeItem(jobKey); } catch {} setGerandoClipe(false); setStatusClipe(""); setDescClipe(""); setFalaClipe(""); router.refresh(); return; }
@@ -379,6 +384,7 @@ export function MascoteEstudio({
     setStatusClipe("🎬 Preparando o mascote…");
     const usaFoto = cenaSel === "foto" && !!fundoFoto;
     const usaCena = cenaSel !== "foto" && cenaSel !== "";
+    const meta: ClipeMeta = { modo: modoSel, descricao: descClipe.trim(), fala: falaClipe.trim(), cena: cenaSel, fundo: fundoClipe, fundoFotoUrl: usaFoto ? fundoFoto : "", segundos: durClipe };
     const ini = await gerarClipeMascote(marcaId, {
       modo: modoSel,
       descricao: descClipe.trim() || undefined,
@@ -389,7 +395,32 @@ export function MascoteEstudio({
       fala: falaClipe.trim() || undefined,
     }).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
     if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
-    await acompanharClipe(ini.jobId);
+    await acompanharClipe(ini.jobId, meta);
+  }
+  // "✨ MELHORAR" um clipe: refaz aplicando um ajuste do dono. Usa como base COMO aquele clipe foi
+  // feito (clipesMeta[url]); se não tiver registro (clipe antigo), cai nas escolhas atuais da tela.
+  const [melhorarUrl, setMelhorarUrl] = useState<string | null>(null); // qual clipe está com o campo aberto
+  const [ajusteTxt, setAjusteTxt] = useState("");
+  async function melhorarClipe(url: string) {
+    const nota = ajusteTxt.trim();
+    if (!nota) { setErro("Escreva o que você quer melhorar."); return; }
+    const base: ClipeMeta = (clipesMeta && clipesMeta[url]) || { modo: modoSel, descricao: descClipe.trim(), fala: falaClipe.trim(), cena: cenaSel, fundo: fundoClipe, fundoFotoUrl: cenaSel === "foto" ? fundoFoto : "", segundos: durClipe };
+    setErro(null); setMelhorarUrl(null); setAjusteTxt("");
+    setGerandoClipe(true); setStatusClipe("✨ Refazendo com o seu ajuste…");
+    const usaFoto = base.cena === "foto" && !!base.fundoFotoUrl;
+    const usaCena = base.cena !== "foto" && base.cena !== "";
+    const ini = await gerarClipeMascote(marcaId, {
+      modo: base.modo || "livre",
+      descricao: base.descricao || undefined,
+      segundos: base.segundos || 8,
+      fundo: base.fundo || "#FFFFFF",
+      fundoFotoUrl: usaFoto ? base.fundoFotoUrl : undefined,
+      cena: usaCena ? base.cena : undefined,
+      fala: base.fala || undefined,
+      ajuste: nota,
+    }).catch(() => ({ ok: false as const, erro: "Não consegui iniciar agora." }));
+    if (!ini.ok) { setErro(ini.erro); setGerandoClipe(false); setStatusClipe(""); return; }
+    await acompanharClipe(ini.jobId, base); // guarda a mesma base (pra melhorar de novo se precisar)
   }
   // Ao abrir a aba: se havia um clipe sendo gerado (guardado no navegador), RETOMA o acompanhamento.
   useEffect(() => {
@@ -933,6 +964,20 @@ export function MascoteEstudio({
                         <button type="button" onClick={() => alternarAbertura(url)} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold transition ${ehAbertura ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha text-muted hover:border-white/30 hover:text-white"}`}>{ehAbertura ? "⭐ Abertura ✓" : "⭐ Abertura"}</button>
                         <button type="button" onClick={() => alternarFecho(url)} className={`flex-1 rounded-md border px-1.5 py-1 text-[10px] font-semibold transition ${ehFecho ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha text-muted hover:border-white/30 hover:text-white"}`}>{ehFecho ? "🏁 Fecho ✓" : "🏁 Fecho"}</button>
                       </div>
+                      {/* ✨ Melhorar — refaz o clipe aplicando um ajuste que o dono descreve */}
+                      <div className="px-2 pt-2">
+                        <button type="button" onClick={() => { setMelhorarUrl(melhorarUrl === url ? null : url); setAjusteTxt(""); }} disabled={gerandoClipe} className={`w-full rounded-md border px-2 py-1 text-[10px] font-semibold transition disabled:opacity-40 ${melhorarUrl === url ? "border-[#a855f7] bg-[#a855f7]/20 text-[#d6c6ff]" : "border-[#a855f7]/40 text-[#d6c6ff] hover:bg-[#a855f7]/15"}`}>✨ Melhorar este vídeo</button>
+                      </div>
+                      {melhorarUrl === url && (
+                        <div className="px-2 pt-2">
+                          <textarea value={ajusteTxt} onChange={(e) => setAjusteTxt(e.target.value)} rows={2} maxLength={300} disabled={gerandoClipe} placeholder="O que ajustar? Ex: o mascote ficou pequeno, deixe ele maior e mais no centro; o cenário ficou escuro." className="w-full rounded border border-linha bg-black px-2 py-1.5 text-[11px] text-white placeholder:text-muted/40 focus:border-[#a855f7] focus:outline-none disabled:opacity-50" />
+                          <div className="mt-1 flex gap-1.5">
+                            <button type="button" onClick={() => melhorarClipe(url)} disabled={gerandoClipe || !ajusteTxt.trim()} className="flex-1 rounded-md bg-[#a855f7] px-2 py-1 text-[10px] font-bold text-white transition hover:bg-[#9333ea] disabled:opacity-50">✨ Refazer melhorando</button>
+                            <button type="button" onClick={() => { setMelhorarUrl(null); setAjusteTxt(""); }} className="rounded-md border border-linha px-2 py-1 text-[10px] font-semibold text-muted transition hover:text-white">Cancelar</button>
+                          </div>
+                          <p className="mt-1 text-[9px] leading-tight text-muted/60">Gera um vídeo NOVO (não apaga este). {clipesMeta && clipesMeta[url] ? "Mantém o mesmo estilo e fala." : "Usa as escolhas atuais da tela como base."}</p>
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center gap-1.5 px-2 py-2">
                         <button type="button" onClick={() => { setResultadoPost(null); setConfirmPost({ url, tipo: "story" }); }} disabled={postandoClipe} className="rounded-md bg-gradient-to-r from-[#f58529] via-[#dd2a7b] to-[#8134af] px-2 py-1 text-[10px] font-bold text-white transition hover:brightness-110 disabled:opacity-50">📲 Story</button>
                         <button type="button" onClick={() => { setResultadoPost(null); setConfirmPost({ url, tipo: "reels" }); }} disabled={postandoClipe} className="rounded-md bg-[#C13584] px-2 py-1 text-[10px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">🎬 Reels</button>

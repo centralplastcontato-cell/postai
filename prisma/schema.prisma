@@ -28,6 +28,7 @@ model Marca {
   mascotesArte String  @default("[]") // biblioteca de opções de mascote geradas pela IA (pra escolher/trocar): JSON [url,...]
   mascoteFicha3d String @default("") // FICHA do personagem (frente/lado/costas) em alta — referência pra fazer o 3D
   mascoteClipes String @default("[]") // CLIPES animados do mascote (IA de vídeo): JSON [url.mp4,...] — pra abertura/fecho dos Reels
+  mascoteClipesMeta String @default("{}") // como cada clipe foi feito: JSON { url: {modo,descricao,fala,cena,fundo,segundos} } — pra o "✨ Melhorar" refazer
   mascoteAbertura String @default("") // clipe (URL) do castelinho usado no COMEÇO dos Reels das festas ("" = não usa)
   mascoteFecho  String   @default("") // clipe (URL) do castelinho usado no FIM dos Reels das festas ("" = não usa)
   mascoteVoz  String   @default("") // VOZ definida do castelinho nos clipes (descrição do jeitão da voz p/ a IA); "" = padrão
