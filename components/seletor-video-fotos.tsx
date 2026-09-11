@@ -475,11 +475,19 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     if (pendente) garantirWav(pendente.url);
   }, [tematicoId, banco]); // eslint-disable-line react-hooks/exhaustive-deps
   // Toca/pausa uma trilha pra ouvir antes de escolher (um player só; tocar outra troca a fonte).
+  // Usa um objeto Audio() (mais confiável no iPhone/iPad que um <audio> escondido) e só marca como
+  // "tocando" se o play REALMENTE começar — assim o botão não fica em ⏸ mudo quando o iOS bloqueia.
   function ouvir(url: string) {
-    const a = audioRef.current;
-    if (!a) return;
-    if (tocando === url) { a.pause(); setTocando(""); return; }
-    a.src = url; a.currentTime = 0; a.play().catch(() => {}); setTocando(url);
+    const atual = audioRef.current;
+    if (tocando === url) { try { atual?.pause(); } catch {} setTocando(""); return; }
+    try { atual?.pause(); } catch {}
+    const a = audioRef.current ?? new Audio();
+    audioRef.current = a;
+    try {
+      a.src = url;
+      a.onended = () => setTocando("");
+      a.play().then(() => setTocando(url)).catch(() => setTocando(""));
+    } catch { setTocando(""); }
   }
 
   function toggle(id: string) {
@@ -1849,10 +1857,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
           )}
         </div>
       </div>
-
-      {/* player ÚNICO (escondido) que o ▶️/⏸ de cada trilha da aba Música controla */}
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <audio ref={audioRef} onEnded={() => setTocando("")} className="hidden" />
+      {/* A prévia da música toca por um objeto Audio() em memória (audioRef) — sem elemento no DOM. */}
 
       {/* VÍDEO PRONTO em tela cheia — assiste aqui mesmo, sem sair da edição. Fecha e ajusta se quiser. */}
       {verVideoPronto && videoProntoUrl && (
