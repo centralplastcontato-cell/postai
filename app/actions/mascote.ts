@@ -9,6 +9,7 @@ import { criarContainerReels, criarContainerStoryVideo, statusContainerReels, pu
 import { modoClipe, cenaClipe } from "@/lib/mascote-modos";
 import { dispararEmendaAsync } from "@/lib/video-engine";
 import { baseUrl } from "@/lib/config";
+import { contextoSegmento } from "@/lib/segmentos";
 
 // ESTÚDIO DO MASCOTE (Fase 1): gera opções de mascote em 3D fofo com FUNDO TRANSPARENTE
 // (PNG), pra depois "colar" o MESMO mascote nos posts/vídeos e ele ficar sempre idêntico.
@@ -360,9 +361,10 @@ export async function gerarClipeMascote(marcaId: string, opts: { modo?: string; 
   const cenaSel = cena ? cenaClipe(cena) : null;
   const g = await guardaMarca(marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true, mascoteVoz: true } });
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { mascoteUrl: true, corPrimaria: true, mascoteVoz: true, segmento: true } });
   if (!marca) return { ok: false as const, erro: "Marca não encontrada." };
   if (!marca.mascoteUrl) return { ok: false as const, erro: "Escolha o mascote oficial primeiro." };
+  const ctxSeg = contextoSegmento(marca.segmento);
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
   const dur = [4, 8, 12].includes(segundos ?? 0) ? String(segundos) : String(modo.seg); // padrão = o do modo
@@ -395,7 +397,7 @@ export async function gerarClipeMascote(marcaId: string, opts: { modo?: string; 
     const vozDesc = (marca.mascoteVoz || "").trim() || "de personagem de DESENHO ANIMADO estilo Disney/Pixar — MUITO expressiva, exagerada, teatral e cômica, cheia de emoção e energia, tom agudo e cantado (como um personagem clássico de filme de animação infantil)";
     const audio = falaTxt
       ? `ÁUDIO: o mascote FALA, em português do Brasil, com a BOCA sincronizada (lip sync), a frase: "${falaTxt}". Voz ${vozDesc}. A fala tem que estar CLARA e bem sincronizada com a boca. Uma musiquinha bem baixinha por trás, sem competir com a voz.`
-      : `ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (clima festivo de buffet infantil), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
+      : `ÁUDIO: uma MÚSICA instrumental alegre, animada e cativante de fundo (${ctxSeg.clima}), com efeitos sonoros fofos e divertidos combinando com o movimento. NINGUÉM falando, sem narração e sem voz humana — só a música e os efeitos.`;
 
     // TRAVA DE IDENTIDADE — vai em TODO clipe: o personagem é EXATAMENTE o da referência (mesma cara,
     // cores, coroa/bandeira, proporções). É o que mantém o castelinho consistente entre um vídeo e outro.
@@ -551,17 +553,18 @@ export async function escreverCenasHistoria(marcaId: string, briefing: string, n
   if (!g.ok) return { ok: false, erro: g.erro };
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false, erro: "OPENAI_API_KEY não configurada." };
-  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { nome: true } });
+  const marca = await prisma.marca.findUnique({ where: { id: marcaId }, select: { nome: true, segmento: true } });
+  const ctx = contextoSegmento(marca?.segmento);
   const n = Math.max(2, Math.min(5, Math.round(numCenas || 3)));
-  const tema = (briefing || "").trim().slice(0, 800) || "o castelinho dando boas-vindas, mostrando a diversão do buffet e convidando pra fazer a festa lá";
+  const tema = (briefing || "").trim().slice(0, 800) || `o mascote dando boas-vindas, mostrando ${ctx.negocio} e ${ctx.cta}`;
   const sistema = [
-    `Você é ROTEIRISTA de uma série de vídeos curtos e encantadores do mascote (o "castelinho") de um buffet infantil chamado "${marca?.nome || "o buffet"}". Escreve como um bom roteirista de DESENHO ANIMADO infantil (estilo Pixar/Disney): carismático, divertido, com emoção e ritmo.`,
+    `Você é ROTEIRISTA de uma série de vídeos curtos e encantadores do mascote de ${ctx.negocio} chamado "${marca?.nome || "a marca"}". Escreve como um bom roteirista de DESENHO ANIMADO (estilo Pixar/Disney): carismático, divertido, com emoção e ritmo, num tom ${ctx.tom}.`,
     `Sua tarefa: escrever UMA historinha em EXATAMENTE ${n} cenas, em português do Brasil.`,
     ``,
     `REGRAS IMPORTANTES:`,
     `1. SIGA FIELMENTE o pedido do dono (o "PEDIDO" abaixo) — é a instrução principal. Respeite a IDEIA, o CLIMA e o FORMATO que ele pediu. Se ele pedir um "episódio" ou "série de aventuras", trate como um EPISÓDIO: comece com uma introdução/apresentação e vá desenvolvendo a aventura.`,
     `2. As ${n} cenas formam UMA história CONTÍNUA e INTERLIGADA (começo, meio e fim): a fala/ação de uma cena PUXA a próxima, como capítulos do mesmo episódio. Nada de cenas soltas ou repetitivas.`,
-    `3. NÃO force convite pra agendar festa. Só termine com um convite ao buffet se combinar de verdade com a história pedida; caso contrário, feche com um gancho gostoso (ex: "e a aventura continua no próximo episódio!") ou um final divertido e caloroso.`,
+    `3. NÃO force chamada pra ação. Só termine com um convite (${ctx.cta}) se combinar de verdade com a história pedida; caso contrário, feche com um gancho gostoso (ex: "e a aventura continua no próximo episódio!") ou um final divertido.`,
     `4. Cada "fala" é CURTA mas EXPRESSIVA e cheia de personalidade (até ~18 palavras — cabe em poucos segundos de vídeo). Nada genérico ou publicitário demais; fale como o personagem, com emoção.`,
     `5. "acao" = o que o mascote FAZ e SENTE naquela cena (movimento, expressão, reação ao que acontece), específico pra CADA cena — não descreva câmera, iluminação nem cenário.`,
     ``,
