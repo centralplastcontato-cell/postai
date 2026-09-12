@@ -372,6 +372,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
 
   const marcaView: MarcaView = {
     id: marca.id,
+    segmento: marca.segmento ?? "buffet",
     nome: marca.nome,
     corPrimaria: marca.corPrimaria,
     corFundo: marca.corFundo,

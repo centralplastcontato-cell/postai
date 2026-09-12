@@ -82,6 +82,13 @@ export default async function PainelHome() {
               className="input-base"
             />
           </label>
+          <label className="text-xs text-muted sm:w-52">
+            Qual é o segmento?
+            <select name="segmento" defaultValue="buffet" className="input-base">
+              <option value="buffet">🏰 Buffet infantil</option>
+              <option value="jogo">🎮 Jogo / App</option>
+            </select>
+          </label>
           <button className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover">
             + Criar marca
           </button>

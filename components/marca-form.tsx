@@ -8,6 +8,7 @@ import { rotuloHora, HORAS_RECOMENDADAS } from "@/lib/horarios";
 
 export type MarcaView = {
   id: string;
+  segmento?: string; // ramo do perfil: "buffet" (padrão) | "jogo"
   nome: string;
   corPrimaria: string;
   corFundo: string;

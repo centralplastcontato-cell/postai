@@ -85,6 +85,8 @@ export function MarcaHub({
   sugestao: SugestaoBia | null;
 }) {
   const [aba, setAba] = useState<"redes" | "imagens" | "arte" | "festas" | "video-buffet" | "video-festa" | "mascote" | "instagram" | "paginas" | "campanhas" | "config">("redes");
+  // Segmento do perfil: "buffet" mostra TUDO (como sempre); "jogo" esconde as abas específicas de festa.
+  const ehBuffet = (marca.segmento ?? "buffet") === "buffet";
   const cls = (a: boolean) =>
     `rounded-lg px-4 py-2 text-sm font-semibold transition ${a ? "bg-vermelho text-white" : "border border-linha text-muted hover:text-white"}`;
   const stAssin = assinatura ? statusAssinatura(assinatura.acessoAte) : null;
@@ -174,13 +176,13 @@ export function MarcaHub({
         <button onClick={() => setAba("redes")} className={cls(aba === "redes")}>📱 Redes Sociais</button>
         <button onClick={() => setAba("imagens")} className={cls(aba === "imagens")}>🖼️ Imagens</button>
         <button onClick={() => setAba("arte")} className={cls(aba === "arte")}>🎨 Minha arte</button>
-        <button onClick={() => setAba("festas")} className={cls(aba === "festas")}>📸 Festas</button>
-        <button onClick={() => setAba("video-buffet")} className={cls(aba === "video-buffet")}>🏰 Vídeo do buffet</button>
-        <button onClick={() => setAba("video-festa")} className={cls(aba === "video-festa")}>🎬 Vídeo de festa</button>
+        {ehBuffet && <button onClick={() => setAba("festas")} className={cls(aba === "festas")}>📸 Festas</button>}
+        {ehBuffet && <button onClick={() => setAba("video-buffet")} className={cls(aba === "video-buffet")}>🏰 Vídeo do buffet</button>}
+        {ehBuffet && <button onClick={() => setAba("video-festa")} className={cls(aba === "video-festa")}>🎬 Vídeo de festa</button>}
         <button onClick={() => setAba("mascote")} className={cls(aba === "mascote")}>🦸 Mascote</button>
         <button onClick={() => setAba("instagram")} className={cls(aba === "instagram")}>📷 Instagram</button>
-        <button onClick={() => setAba("paginas")} className={cls(aba === "paginas")}>📄 Páginas</button>
-        <button onClick={() => setAba("campanhas")} className={cls(aba === "campanhas")}>🎈 Campanhas</button>
+        {ehBuffet && <button onClick={() => setAba("paginas")} className={cls(aba === "paginas")}>📄 Páginas</button>}
+        {ehBuffet && <button onClick={() => setAba("campanhas")} className={cls(aba === "campanhas")}>🎈 Campanhas</button>}
         <button onClick={() => setAba("config")} className={cls(aba === "config")}>{ehAdmin ? "⚙️ Configurações" : "✏️ Minha marca"}</button>
         {ehTrial && <div className="w-full sm:ml-auto sm:w-auto"><RegerarCalendario marcaId={marca.id} /></div>}
       </div>

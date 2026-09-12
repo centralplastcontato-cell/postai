@@ -34,9 +34,11 @@ export async function criarMarca(formData: FormData) {
   if (!g.ok) return;
   const nome = String(formData.get("nome") || "").trim();
   if (!nome) return;
+  const seg = String(formData.get("segmento") || "buffet");
+  const segmento = ["buffet", "jogo"].includes(seg) ? seg : "buffet";
   const slug = await slugUnico(nome);
   const m = await prisma.marca.create({
-    data: { nome, slug, logoTexto: nome.toUpperCase() },
+    data: { nome, slug, logoTexto: nome.toUpperCase(), segmento },
   });
   revalidatePath("/painel");
   redirect(`/painel/marcas/${m.id}`);

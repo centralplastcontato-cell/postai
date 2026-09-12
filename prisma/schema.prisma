@@ -14,6 +14,7 @@ datasource db {
 // Uma marca/cliente que posta pelo Postaí (ex: Castelo da Diversão).
 model Marca {
   id          String   @id @default(cuid())
+  segmento    String   @default("buffet") // ramo do perfil: "buffet" (padrão, tudo como hoje) | "jogo" (divulgação de jogo/app)
   slug        String   @unique
   nome        String
   // Identidade visual — cada marca com a sua cara nas artes
