@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { gerarMascote, definirMascote, removerMascote, excluirMascoteArte, usarImagemComoMascote, removerFundoMascote, gerarFicha3d, gerarClipeMascote, statusClipeMascote, excluirClipeMascote, prepararPostClipe, concluirPostClipe, definirVozMascote, ouvirAmostraVoz, definirAberturaMascote, definirFechoMascote, escreverCenasHistoria, emendarHistoriaMascote, type CenaHistoria } from "@/app/actions/mascote";
 import { imagensDoBanco } from "@/app/actions/imagens";
-import { MODOS_CLIPE, CENAS_CLIPE, modoClipe, MODELOS_HISTORIA, type ModoClipe } from "@/lib/mascote-modos";
+import { modosClipe, cenasClipe, modelosHistoria, modoClipe, type ModoClipe } from "@/lib/mascote-modos";
 
 // Ações prontas pro clipe do mascote (1 toque preenche a descrição, sem digitar).
 const ACOES_CLIPE = [
@@ -75,8 +75,10 @@ export function MascoteEstudio({
   voz,
   abertura,
   fecho,
+  segmento,
 }: {
   marcaId: string;
+  segmento?: string; // ramo do perfil: "buffet" (padrão) | "jogo" — muda modos/cenários/ideias
   mascoteUrl: string; // mascote oficial atual ("" = nenhum)
   mascotes: string[]; // biblioteca de opções geradas
   ficha3d?: string; // ficha do personagem (frente/lado/costas) pro 3D ("" = não gerada)
@@ -88,6 +90,10 @@ export function MascoteEstudio({
   fecho?: string; // clipe usado no fim dos Reels das festas ("" = nenhum)
 }) {
   const router = useRouter();
+  // Modos, cenários e ideias prontas conforme o SEGMENTO (buffet = padrão; jogo = versão gamer).
+  const MODOS = modosClipe(segmento);
+  const CENAS = cenasClipe(segmento);
+  const MODELOS = modelosHistoria(segmento);
   const [isPending, startTransition] = useTransition();
   const [gerando, setGerando] = useState(false);
   const [proc, setProc] = useState<string | null>(null);
@@ -225,17 +231,17 @@ export function MascoteEstudio({
   }
   // MODO do clipe (historia/divulgacao/abertura/fecho/livre) — define papel, duração e sugestões.
   const [modoSel, setModoSel] = useState<ModoClipe>("historia");
-  const [descClipe, setDescClipe] = useState(MODOS_CLIPE[0].acaoSugestao);
-  const [falaClipe, setFalaClipe] = useState(MODOS_CLIPE[0].falaSugestao); // o que o mascote FALA ("" = só música)
-  const [durClipe, setDurClipe] = useState(MODOS_CLIPE[0].seg); // duração do clipe: 4 | 8 | 12
-  // CENÁRIO: "" = cor sólida · id de CENAS_CLIPE (salao, bolo…) · "foto" = foto do buffet (fundoFoto).
-  const [cenaSel, setCenaSel] = useState<string>("salao");
+  const [descClipe, setDescClipe] = useState(MODOS[0].acaoSugestao);
+  const [falaClipe, setFalaClipe] = useState(MODOS[0].falaSugestao); // o que o mascote FALA ("" = só música)
+  const [durClipe, setDurClipe] = useState(MODOS[0].seg); // duração do clipe: 4 | 8 | 12
+  // CENÁRIO: "" = cor sólida · id de CENAS (salao, bolo, cena_jogo…) · "foto" = foto do buffet (fundoFoto).
+  const [cenaSel, setCenaSel] = useState<string>(CENAS[0]?.id ?? "");
   const [fundoClipe, setFundoClipe] = useState("#FFFFFF"); // cor do fundo (quando cenaSel = "")
   const [fundoFoto, setFundoFoto] = useState(""); // foto do buffet como fundo (quando cenaSel = "foto")
   // Escolhe um MODO: ajusta a duração e joga as sugestões (editáveis) de fala/ação daquele modo.
   function escolherModo(id: ModoClipe) {
     setModoSel(id);
-    const m = modoClipe(id);
+    const m = MODOS.find((x) => x.id === id) ?? modoClipe(id);
     setDurClipe(m.seg);
     setFalaClipe(m.falaSugestao);
     setDescClipe(m.acaoSugestao);
@@ -257,7 +263,7 @@ export function MascoteEstudio({
   // por cena e o motor emenda tudo num vídeo só (passa dos 12s do clipe único).
   const [galeriaAberta, setGaleriaAberta] = useState(false); // galeria de clipes recolhida por padrão (deixa o botão de gerar mais pra cima)
   const [briefingHist, setBriefingHist] = useState(""); // o tema que o dono dá pra Bia
-  const [tipoHist, setTipoHist] = useState(MODELOS_HISTORIA[0].id); // categoria de modelos aberta
+  const [tipoHist, setTipoHist] = useState(MODELOS[0].id); // categoria de modelos aberta
   const [numCenas, setNumCenas] = useState(3); // quantas cenas (2 a 4)
   const [durCena, setDurCena] = useState(8); // duração de CADA cena
   const [cenas, setCenas] = useState<CenaHistoria[]>([]); // o roteiro em cenas
@@ -778,7 +784,7 @@ export function MascoteEstudio({
           {/* MODO — define o papel/roteiro, a duração e onde o clipe é usado. */}
           <label className="mt-3 block text-[10px] font-semibold text-muted">Modo do clipe</label>
           <div className="mt-1.5 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
-            {MODOS_CLIPE.map((m) => (
+            {MODOS.map((m) => (
               <button key={m.id} type="button" disabled={gerandoClipe} onClick={() => escolherModo(m.id)} className={`rounded-lg border p-2 text-center transition disabled:opacity-40 ${modoSel === m.id ? "border-[#ec4899] bg-[#ec4899]/15" : "border-linha bg-preto hover:border-white/30"}`}>
                 <div className="text-base leading-none">{m.ic}</div>
                 <div className={`mt-1 text-[11px] font-semibold ${modoSel === m.id ? "text-[#f9a8d4]" : "text-white"}`}>{m.label}</div>
@@ -787,7 +793,7 @@ export function MascoteEstudio({
             ))}
           </div>
           <p className="mt-1.5 text-[10px] leading-snug text-muted/70">
-            {modoSel === "abertura" || modoSel === "fecho"
+            {(modoSel === "abertura" || modoSel === "fecho") && segmento !== "jogo"
               ? <>🎬 Depois de gerar, <strong className="text-white/70">marque o clipe como {modoSel === "abertura" ? "Abertura" : "Fecho"}</strong> na galeria abaixo — aí ele entra sozinho no {modoSel === "abertura" ? "começo" : "fim"} dos Reels das festas.</>
               : <>📤 Vídeo pra <strong className="text-white/70">postar sozinho</strong> (Story/Reels), depois de gerar.</>}
           </p>
@@ -801,12 +807,12 @@ export function MascoteEstudio({
               {/* IDEIAS PRONTAS — modelos por tipo de história; toca numa pra usar de base (e edita). */}
               <label className="mt-3 block text-[10px] font-semibold text-muted">💡 Ideias prontas <span className="font-normal text-muted/70">(toque numa pra usar de base)</span></label>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {MODELOS_HISTORIA.map((m) => (
+                {MODELOS.map((m) => (
                   <button key={m.id} type="button" disabled={gerandoClipe || escrevendoBia} onClick={() => setTipoHist(m.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${tipoHist === m.id ? "border-[#a855f7] bg-[#a855f7]/20 text-[#d6c6ff]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{m.ic} {m.tipo}</button>
                 ))}
               </div>
               <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
-                {(MODELOS_HISTORIA.find((m) => m.id === tipoHist)?.opcoes ?? []).map((o) => {
+                {(MODELOS.find((m) => m.id === tipoHist)?.opcoes ?? []).map((o) => {
                   const ativa = briefingHist.trim() === o.briefing;
                   return (
                     <button key={o.titulo} type="button" disabled={gerandoClipe || escrevendoBia} onClick={() => { setBriefingHist(o.briefing); setNumCenas(o.cenas); }} className={`rounded-lg border p-2 text-left transition disabled:opacity-40 ${ativa ? "border-[#a855f7] bg-[#a855f7]/15" : "border-linha bg-preto hover:border-white/30"}`}>
@@ -917,7 +923,7 @@ export function MascoteEstudio({
           <label className="mt-3 block text-[10px] font-semibold text-muted">Cenário <span className="font-normal text-muted/70">(a foto do buffet é a mais realista)</span></label>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             <button type="button" disabled={gerandoClipe} onClick={() => { setCenaSel("foto"); abrirSeletorFotos(); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${cenaSel === "foto" ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>📷 Foto do buffet</button>
-            {CENAS_CLIPE.map((c) => (
+            {CENAS.map((c) => (
               <button key={c.id} type="button" disabled={gerandoClipe} onClick={() => setCenaSel(c.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${cenaSel === c.id ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>{c.ic} {c.label}</button>
             ))}
             <button type="button" disabled={gerandoClipe} onClick={() => setCenaSel("")} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-40 ${cenaSel === "" ? "border-[#ec4899] bg-[#ec4899]/20 text-[#f9a8d4]" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>🎨 Cor sólida</button>

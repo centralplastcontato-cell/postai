@@ -57,8 +57,59 @@ export const CENAS_CLIPE: { id: string; ic: string; label: string; prompt: strin
   { id: "entrada", ic: "🚪", label: "Boas-vindas", prompt: "na entrada de um buffet infantil, embaixo de um arco de balões de boas-vindas, num clima acolhedor e festivo" },
 ];
 
-export function cenaClipe(id: string): (typeof CENAS_CLIPE)[number] | null {
-  return CENAS_CLIPE.find((c) => c.id === id) || null;
+export function cenaClipe(id: string): { id: string; ic: string; label: string; prompt: string } | null {
+  return [...CENAS_CLIPE, ...CENAS_CLIPE_JOGO].find((c) => c.id === id) || null;
+}
+
+// ─── Variações por SEGMENTO "jogo" ─────────────────────────────────────────────────────────────
+// O buffet usa os arrays acima (intocados). Um perfil de JOGO usa estes: mesmos modos, mas com a
+// COPY certa (nada de "festas"), cenários neutros/genéricos de jogo, e ideias prontas de jogo.
+
+const MODOS_CLIPE_JOGO: typeof MODOS_CLIPE = [
+  { id: "historia", ic: "📖", label: "História", seg: 12, desc: "O personagem conta uma historinha", usa: "Vídeo pra postar sozinho", falaSugestao: "E aí, galera! Deixa eu contar uma parada muito daora que rolou aqui no jogo…", acaoSugestao: "contando uma historinha, animado e expressivo, gesticulando com energia" },
+  { id: "divulgacao", ic: "📣", label: "Divulgação", seg: 8, desc: "Chama pra jogar / baixar", usa: "Vídeo pra postar sozinho", falaSugestao: "Vem jogar com a gente! Baixa agora e entra nessa aventura!", acaoSugestao: "convidando animado, chamando a galera pra jogar" },
+  { id: "abertura", ic: "🎬", label: "Abertura", seg: 4, desc: "Entra no COMEÇO dos seus vídeos", usa: "Início do vídeo", falaSugestao: "Fala, galera! Bem-vindos!", acaoSugestao: "dando as boas-vindas animado, com um sorrisão" },
+  { id: "fecho", ic: "🏁", label: "Fecho", seg: 4, desc: "Entra no FIM dos seus vídeos", usa: "Fim do vídeo", falaSugestao: "Segue o perfil e bora jogar!", acaoSugestao: "se despedindo animado, mandando um joinha" },
+  { id: "livre", ic: "✏️", label: "Livre", seg: 8, desc: "Você inventa do zero", usa: "Vídeo pra postar sozinho", falaSugestao: "", acaoSugestao: "" },
+];
+
+const CENAS_CLIPE_JOGO: typeof CENAS_CLIPE = [
+  { id: "cena_jogo", ic: "🎮", label: "Cenário do jogo", prompt: "num cenário vibrante e colorido estilo jogo/desenho animado, com elementos lúdicos e divertidos ao fundo" },
+  { id: "aventura_jogo", ic: "🗺️", label: "Aventura", prompt: "num cenário de aventura estilo jogo (paisagem fantástica, cores vivas, clima épico e divertido)" },
+  { id: "neon", ic: "🕹️", label: "Arcade neon", prompt: "num ambiente de arcade com luzes neon coloridas, clima retrô-gamer animado" },
+];
+
+const MODELOS_HISTORIA_JOGO: typeof MODELOS_HISTORIA = [
+  {
+    id: "personagem", ic: "🎮", tipo: "Apresentação",
+    opcoes: [
+      { titulo: "Quem é o personagem", cenas: 3, briefing: "O personagem/mascote do jogo se apresenta pra galera: quem ele é, o que faz no jogo e por que é divertido. Tom empolgante e descontraído, cenas interligadas." },
+      { titulo: "Bem-vindos ao jogo", cenas: 3, briefing: "O mascote dá as boas-vindas e mostra, animado, o clima do jogo, como um anfitrião gamer. Final chamando pra jogar." },
+    ],
+  },
+  {
+    id: "novidade", ic: "🆕", tipo: "Novidade",
+    opcoes: [
+      { titulo: "Novidade/atualização", cenas: 3, briefing: "O mascote anuncia, super empolgado, uma novidade/atualização do jogo (sem inventar detalhes específicos — deixe genérico pra eu editar), criando expectativa. Cenas interligadas." },
+      { titulo: "Vem aí…", cenas: 3, briefing: "O mascote cria um clima de suspense e expectativa sobre algo novo chegando no jogo, terminando com um gancho pro próximo vídeo." },
+    ],
+  },
+  {
+    id: "convite", ic: "📣", tipo: "Convite pra jogar",
+    opcoes: [
+      { titulo: "Bora jogar", cenas: 3, briefing: "O mascote convida a galera pra jogar/baixar o jogo, mostrando por que é divertido. Fecho com um convite animado pra baixar e seguir o perfil." },
+    ],
+  },
+];
+
+export function modosClipe(seg?: string): typeof MODOS_CLIPE {
+  return seg === "jogo" ? MODOS_CLIPE_JOGO : MODOS_CLIPE;
+}
+export function cenasClipe(seg?: string): typeof CENAS_CLIPE {
+  return seg === "jogo" ? CENAS_CLIPE_JOGO : CENAS_CLIPE;
+}
+export function modelosHistoria(seg?: string): typeof MODELOS_HISTORIA {
+  return seg === "jogo" ? MODELOS_HISTORIA_JOGO : MODELOS_HISTORIA;
 }
 
 // MODELOS DE HISTÓRIA prontos (só pra o modo "História") — agrupados por TIPO. Cada opção é um
