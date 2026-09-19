@@ -245,7 +245,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [capaCheia, setCapaCheia] = useState(false); // a CAPA em tela cheia (aba Capa)
   // Divisória AJUSTÁVEL entre o vídeo e o painel de abas (só no layout lado-a-lado das telas grandes).
   const [larguraPainel, setLarguraPainel] = useState(400); // largura do painel da direita, em px
-  const [ehLg, setEhLg] = useState<boolean>(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches);
+  // Duas colunas (prévia + abas) só a partir de 1280px (xl). Abaixo — inclusive iPad em pé (~820-1024px)
+  // — empilha (prévia em cima, abas embaixo), pra não ficar espremido/sobreposto.
+  const [ehLg, setEhLg] = useState<boolean>(() => typeof window !== "undefined" && window.matchMedia("(min-width: 1280px)").matches);
   const larguraRef = useRef(400);
   // Troca o estilo de fundo do vídeo temático (salva na hora; o vídeo usa no próximo "Gerar").
   function trocarFundo(novo: string) {
@@ -855,7 +857,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   // Sabe se está no layout lado-a-lado (telas grandes) e lembra a largura que o dono deixou.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(min-width: 1024px)");
+    const mq = window.matchMedia("(min-width: 1280px)");
     const upd = () => setEhLg(mq.matches);
     upd();
     mq.addEventListener("change", upd);
@@ -960,13 +962,13 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
         )}
 
         {/* ---------- MIOLO: prévia (player) à esquerda + abas à direita ---------- */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden xl:flex-row">
           {/* PLAYER — a prévia 9:16 da cena atual, do jeito que vai ficar no vídeo */}
-          <div className="flex shrink-0 flex-col items-center justify-center gap-2 p-3 lg:min-w-0 lg:flex-1 lg:gap-3 lg:p-4" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
+          <div className="flex shrink-0 flex-col items-center justify-center gap-2 p-3 xl:min-w-0 xl:flex-1 xl:gap-3 xl:p-4" style={{ background: "radial-gradient(circle at 50% 22%, rgba(168,85,247,0.14), transparent 62%)" }}>
             <div className="flex items-center gap-3">
               {/* controles À ESQUERDA da imagem (só celular): voltar */}
               {escolhidas.length > 0 && (
-                <div className="flex w-11 shrink-0 flex-col items-center gap-2 lg:hidden">
+                <div className="flex w-11 shrink-0 flex-col items-center gap-2 xl:hidden">
                   {escolhidas.length > 1 && (
                     <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition active:bg-white/15">◀</button>
                   )}
@@ -974,8 +976,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
               )}
             {/* LARGURA EXPLÍCITA (= altura × 9/16): dentro do flex o iOS Safari não estava derivando a
                 largura pelo aspect-ratio e a caixa colapsava numa linha fininha (a prévia não aparecia).
-                w-[14.6vh]/lg:w-[34.9vh] força a caixa 9:16 e shrink-0 impede o flex de espremer. */}
-            <div className="relative aspect-[9/16] h-[26vh] w-[14.6vh] max-w-full shrink-0 overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 lg:h-[62vh] lg:w-[34.9vh] lg:rounded-[22px]">
+                w-[14.6vh]/xl:w-[34.9vh] força a caixa 9:16 e shrink-0 impede o flex de espremer. */}
+            <div className="relative aspect-[9/16] h-[26vh] w-[14.6vh] max-w-full shrink-0 overflow-hidden rounded-[18px] bg-black shadow-[0_30px_70px_-20px_rgba(0,0,0,0.85)] ring-1 ring-white/10 xl:h-[62vh] xl:w-[34.9vh] xl:rounded-[22px]">
               {cenaFoto ? (
                 <>
                   {fundoCheia ? (
@@ -989,10 +991,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={cenaFoto.url} alt="" fetchPriority="high" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover blur-lg brightness-[0.45]" />
                       )}
-                      <div className="absolute inset-0 flex items-center justify-center p-3 lg:p-4">
+                      <div className="absolute inset-0 flex items-center justify-center p-3 xl:p-4">
                         <span className="block max-h-full max-w-full" style={estiloMoldura(moldura, corDaMoldura, 2)}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={cenaFoto.url} alt="" fetchPriority="high" decoding="async" className="block max-h-[21vh] w-auto max-w-full object-contain lg:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
+                          <img src={cenaFoto.url} alt="" fetchPriority="high" decoding="async" className="block max-h-[21vh] w-auto max-w-full object-contain xl:max-h-[55vh]" style={{ borderRadius: moldura === "nenhuma" ? 3 : 0 }} />
                         </span>
                       </div>
                     </>
@@ -1029,8 +1031,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                   )}
                   {/* texto sobre a cena (aproximação): título na capa / legenda nas outras */}
                   {legendaCena && (
-                    <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 lg:px-4 lg:pb-4 ${logoNoRodapePrev ? (legNaDireita ? "text-right" : "text-left") : "text-center"}`}>
-                      <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${logoNoRodapePrev ? "max-w-[62%]" : ""} ${ehCapaCena ? "text-sm lg:text-lg" : "text-[11px] lg:text-sm"}`}>{legendaCena}</span>
+                    <div className={`pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 xl:px-4 xl:pb-4 ${logoNoRodapePrev ? (legNaDireita ? "text-right" : "text-left") : "text-center"}`}>
+                      <span className={`inline-block font-black leading-tight text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] ${logoNoRodapePrev ? "max-w-[62%]" : ""} ${ehCapaCena ? "text-sm xl:text-lg" : "text-[11px] xl:text-sm"}`}>{legendaCena}</span>
                     </div>
                   )}
                   {/* selo do momento + nº da cena */}
@@ -1047,15 +1049,15 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     disabled={escolhidas.length < 2}
                     aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"}
                     title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas automaticamente"}
-                    className={`absolute left-1/2 top-1/2 z-10 hidden h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-2xl text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] backdrop-blur transition disabled:opacity-30 lg:flex ${tocandoPrev ? "bg-black/45 opacity-70 hover:opacity-100" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}
+                    className={`absolute left-1/2 top-1/2 z-10 hidden h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-2xl text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] backdrop-blur transition disabled:opacity-30 xl:flex ${tocandoPrev ? "bg-black/45 opacity-70 hover:opacity-100" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}
                   >
                     {tocandoPrev ? "❚❚" : "▶"}
                   </button>
                   {/* setas SOBRE a imagem (nas laterais) — não roubam altura embaixo nem espremem o vídeo */}
                   {escolhidas.length > 1 && (
                     <>
-                      <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="absolute left-1.5 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 lg:flex lg:h-11 lg:w-11">◀</button>
-                      <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="absolute right-1.5 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 lg:flex lg:h-11 lg:w-11">▶</button>
+                      <button type="button" onClick={() => irCena(-1)} aria-label="Cena anterior" className="absolute left-1.5 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 xl:flex xl:h-11 xl:w-11">◀</button>
+                      <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="absolute right-1.5 top-1/2 z-10 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/70 xl:flex xl:h-11 xl:w-11">▶</button>
                     </>
                   )}
                 </>
@@ -1069,7 +1071,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
             </div>
               {/* controles À DIREITA da imagem (só celular): tocar · avançar · ampliar */}
               {escolhidas.length > 0 && (
-                <div className="flex w-11 shrink-0 flex-col items-center gap-2 lg:hidden">
+                <div className="flex w-11 shrink-0 flex-col items-center gap-2 xl:hidden">
                   <button type="button" onClick={() => setTocandoPrev((p) => !p)} disabled={escolhidas.length < 2} aria-label={tocandoPrev ? "Pausar" : "Tocar prévia"} title={escolhidas.length < 2 ? "Adicione mais fotos pra tocar" : tocandoPrev ? "Pausar" : "Passar as cenas"} className={`flex h-11 w-11 items-center justify-center rounded-full text-base text-white shadow-[0_8px_22px_-6px_rgba(168,85,247,0.7)] transition disabled:opacity-30 ${tocandoPrev ? "bg-black/50" : "bg-gradient-to-br from-[#ec4899] to-[#a855f7]"}`}>{tocandoPrev ? "❚❚" : "▶"}</button>
                   {escolhidas.length > 1 && (
                     <button type="button" onClick={() => irCena(1)} aria-label="Próxima cena" className="flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white transition active:bg-white/15">▶</button>
@@ -1082,12 +1084,12 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
           </div>
 
           {/* DIVISÓRIA ajustável (só nas telas grandes): arraste pra dar mais espaço pra um lado */}
-          <div onPointerDown={iniciarArrasto} role="separator" aria-label="Arraste pra ajustar o tamanho do painel" title="Arraste pra ajustar o tamanho dos dois lados" className="hidden shrink-0 cursor-col-resize touch-none select-none items-center justify-center border-x border-white/10 bg-black/20 transition hover:bg-[#a855f7]/40 lg:flex lg:w-2.5">
+          <div onPointerDown={iniciarArrasto} role="separator" aria-label="Arraste pra ajustar o tamanho do painel" title="Arraste pra ajustar o tamanho dos dois lados" className="hidden shrink-0 cursor-col-resize touch-none select-none items-center justify-center border-x border-white/10 bg-black/20 transition hover:bg-[#a855f7]/40 xl:flex xl:w-2.5">
             <span className="h-10 w-0.5 rounded-full bg-white/40" />
           </div>
 
           {/* PAINEL LATERAL — abas com todas as opções */}
-          <div style={ehLg ? { width: larguraPainel } : undefined} className="flex min-h-0 flex-1 flex-col border-t border-white/10 bg-[#12111c] lg:flex-none lg:border-t-0">
+          <div style={ehLg ? { width: larguraPainel } : undefined} className="flex min-h-0 flex-1 flex-col border-t border-white/10 bg-[#12111c] xl:flex-none xl:border-t-0">
             {/* as abas */}
             <div className="flex shrink-0 overflow-x-auto border-b border-white/10 bg-black/20">
               {ABAS.map((a) => (
