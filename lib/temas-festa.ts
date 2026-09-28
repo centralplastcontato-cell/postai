@@ -38,8 +38,15 @@ const TEMAS: Def[] = [
     cfg: { nome: "Hot Wheels", cores: ["#D62828", "#F77F00", "#1A1A1A"], acento: "#D62828", icone: "🏁", emojis: ["🏎️", "🏁", "🔥", "🏆", "⚡"], padrao: "checkered" },
   },
   {
-    chaves: ["frozen", "gelo", "neve", "elsa", "olaf", "rainha do gelo"],
+    // "neve" sozinha NÃO entra aqui: ela casaria com "Branca de Neve" também (bug real que já
+    // aconteceu — o álbum ficou com a cara de Frozen numa festa de Branca de Neve). "gelo" continua
+    // porque não colide com mais nada da lista.
+    chaves: ["frozen", "gelo", "elsa", "olaf", "rainha do gelo", "reino do gelo"],
     cfg: { nome: "Frozen", cores: ["#2E6FB0", "#4FA3DD", "#7FCBEF"], acento: "#2E6FB0", icone: "❄️", emojis: ["❄️", "⛄", "✨", "🩵", "👑"] },
+  },
+  {
+    chaves: ["branca de neve", "branca-de-neve", "snow white", "sete anoes", "sete anões"],
+    cfg: { nome: "Branca de Neve", cores: ["#1E3A8A", "#DC2626", "#FBBF24"], acento: "#DC2626", icone: "🍎", emojis: ["🍎", "🌹", "👑", "🦌", "🐿️"] },
   },
   {
     chaves: ["princesa", "princesas", "realeza", "castelo", "coroa", "reino"],
