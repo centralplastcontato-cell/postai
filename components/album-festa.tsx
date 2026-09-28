@@ -42,6 +42,7 @@ export type AlbumData = {
   } | null;
   expiraEm: string | null; // ISO: prazo pra baixar as fotos (15 dias após a festa). Vira contagem regressiva.
   preview: boolean;
+  videosPublicos?: string[]; // clipes que o gerente marcou pra também aparecer aqui (vazio = nenhum)
 };
 
 function linkWhats(tel: string): string {
@@ -344,6 +345,27 @@ export function AlbumFesta({ dados }: { dados: AlbumData }) {
             </div>
           </section>
         ))}
+
+        {/* VÍDEOS que o gerente marcou pra também aparecer aqui (opcional, fica a critério dele) */}
+        {dados.videosPublicos && dados.videosPublicos.length > 0 && (
+          <section className="mb-10">
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-lg" style={{ background: `${acento}1f` }}>
+                🎬
+              </span>
+              <h2 className="font-titulo min-w-0 text-xl font-extrabold text-zinc-800 sm:text-2xl">Vídeos da festa</h2>
+              <span className="ml-auto shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold" style={{ background: `${acento}14`, color: acento }}>
+                {dados.videosPublicos.length} {dados.videosPublicos.length === 1 ? "vídeo" : "vídeos"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {dados.videosPublicos.map((url) => (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video key={url} src={`${url}#t=0.3`} preload="metadata" controls playsInline className="aspect-[9/16] w-full rounded-2xl bg-black object-cover shadow-sm ring-1 ring-black/5" />
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Banner de CAMPANHA — oferta da próxima festa no pico do encantamento (recompra) */}
         {dados.campanha && (

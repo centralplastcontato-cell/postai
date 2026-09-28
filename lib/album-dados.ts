@@ -38,6 +38,7 @@ export function montarDadosAlbum(
     instagram?: string | null;
     campanha?: AlbumData["campanha"];
     musicaUrl?: string | null;
+    videosPublicos?: string[];
   },
 ): AlbumData {
   // Agrupa as fotos por momento, na ordem natural da festa.
@@ -93,5 +94,6 @@ export function montarDadosAlbum(
     // (nudge pros pais baixarem logo). ISO — os dias são calculados no cliente (hora do visitante).
     expiraEm: new Date(festa.data.getTime() + 15 * 24 * 60 * 60 * 1000).toISOString(),
     preview: extras.preview,
+    videosPublicos: extras.videosPublicos ?? [],
   };
 }

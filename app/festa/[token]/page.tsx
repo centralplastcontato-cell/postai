@@ -52,11 +52,20 @@ export default async function FestaAlbumPage({ params }: { params: Promise<{ tok
   });
   const campanha = campAtiva ? bannerDaCampanha(campAtiva, festa.marca.telefone) : null;
 
+  // Só os clipes que o gerente marcou pra aparecer aqui (interseção: precisa estar nos dois — se ele
+  // remover um clipe do vídeo, some daqui também, mesmo que ainda estivesse marcado como público).
+  let clipesUrls: string[] = [];
+  try { clipesUrls = (JSON.parse(festa.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string"); } catch {}
+  let clipesPublicos: string[] = [];
+  try { clipesPublicos = (JSON.parse(festa.videoClipesPublico || "[]") as unknown[]).filter((u): u is string => typeof u === "string"); } catch {}
+  const videosPublicos = clipesUrls.filter((u) => clipesPublicos.includes(u));
+
   const dados = montarDadosAlbum(festa, fotos, {
     preview: false,
     campanha,
     googleReviewUrl: festa.mostrarAvaliacao ? linkAvaliacaoGoogle(festa.marca.slug, festa.marca.nome) : null,
     musicaUrl: musicaBuffet(festa.marca.slug),
+    videosPublicos,
   });
   return <AlbumFesta dados={dados} />;
 }

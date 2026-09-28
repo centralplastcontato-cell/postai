@@ -220,8 +220,9 @@ export async function removerFotoPublica(festaToken: string, fotoId: string) {
 }
 
 // VÍDEOS DA FESTA pelo GERENTE (link da festa, sem login — o token é a autorização). Ficam guardados
-// como CLIPES do Reels daquela festa (entram intercalados com as fotos). NÃO vão pro álbum dos pais
-// (o álbum mostra só as fotos/ImagemMarca). Máx 5 pelo gerente.
+// como CLIPES do Reels daquela festa (entram intercalados com as fotos). Por PADRÃO não vão pro
+// álbum dos pais — mas o gerente pode marcar um vídeo (definirClipePublicoFesta) pra também
+// aparecer lá. Máx 5 pelo gerente.
 const MAX_CLIPES_GERENTE = 5;
 export async function adicionarClipeFestaPublico(festaToken: string, url: string) {
   const f = await festaPorToken(festaToken);
@@ -242,11 +243,31 @@ export async function removerClipeFestaPublico(festaToken: string, url: string) 
   let atuais: string[] = [];
   try { atuais = (JSON.parse(f.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
   const novos = atuais.filter((c) => c !== url);
-  await prisma.festa.update({ where: { id: f.id }, data: { videoClipes: JSON.stringify(novos) } });
+  // Tira também do "público pros pais" (senão sobraria uma referência a um vídeo que já era).
+  let publicosAtuais: string[] = [];
+  try { publicosAtuais = (JSON.parse(f.videoClipesPublico || "[]") as unknown[]).filter((u): u is string => typeof u === "string"); } catch {}
+  const novosPublicos = publicosAtuais.filter((u) => u !== url);
+  await prisma.festa.update({ where: { id: f.id }, data: { videoClipes: JSON.stringify(novos), videoClipesPublico: JSON.stringify(novosPublicos) } });
   // Tira o vídeo do Blob (best-effort) — ele só servia pra montar o Reels, ninguém mais usa.
   if (typeof url === "string" && url.startsWith("http")) import("@vercel/blob").then(({ del }) => del(url)).catch(() => {});
   revalidatePath(`/f/${festaToken}`);
   return { ok: true as const, clipes: novos };
+}
+
+// O gerente decide, vídeo por vídeo, se ele TAMBÉM aparece no álbum público dos pais (por padrão
+// não aparece — só entra como matéria-prima do Reels). `publico` liga/desliga pra ESSE vídeo.
+export async function definirClipePublicoFesta(festaToken: string, url: string, publico: boolean) {
+  const f = await festaPorToken(festaToken);
+  if (!f) return { ok: false as const, erro: "Link inválido ou desativado." };
+  let clipes: string[] = [];
+  try { clipes = (JSON.parse(f.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string"); } catch {}
+  if (!clipes.includes(url)) return { ok: false as const, erro: "Vídeo não encontrado." };
+  let publicos: string[] = [];
+  try { publicos = (JSON.parse(f.videoClipesPublico || "[]") as unknown[]).filter((u): u is string => typeof u === "string"); } catch {}
+  const novos = publico ? Array.from(new Set([...publicos, url])) : publicos.filter((u) => u !== url);
+  await prisma.festa.update({ where: { id: f.id }, data: { videoClipesPublico: JSON.stringify(novos) } });
+  revalidatePath(`/f/${festaToken}`);
+  return { ok: true as const, publicos: novos };
 }
 
 // O gerente registra o NOME dele (quem está documentando a festa). Pelo link da festa.
@@ -423,20 +444,24 @@ export async function removerMusicaDoBanco(festaId: string, url: string) {
 
 // CLIPES DE VÍDEO da festa (URLs no Blob) — intercalam com as fotos no vídeo (entram mudos). Máx 6.
 export async function definirClipesFesta(festaId: string, clipes: string[], posicao?: string, duracao?: string) {
-  const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true, videoClipesDurMeta: true } });
+  const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true, videoClipesDurMeta: true, videoClipesPublico: true } });
   if (!f) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(f.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const urls = (Array.isArray(clipes) ? clipes : []).filter((u) => typeof u === "string" && u.startsWith("http")).slice(0, 6);
-  const data: { videoClipes: string; videoClipesPos?: string; videoClipesDur?: string; videoClipesDurMeta?: string } = { videoClipes: JSON.stringify(urls) };
+  const data: { videoClipes: string; videoClipesPos?: string; videoClipesDur?: string; videoClipesDurMeta?: string; videoClipesPublico?: string } = { videoClipes: JSON.stringify(urls) };
   if (posicao && ["espalhados", "comeco", "fim"].includes(posicao)) data.videoClipesPos = posicao;
   if (duracao && ["curto", "medio", "completo"].includes(duracao)) data.videoClipesDur = duracao;
-  // Poda o mapa de duração POR CLIPE: tira entradas de clipes que não existem mais na lista.
+  // Poda o mapa de duração POR CLIPE e o "público pros pais": tira entradas de clipes que não
+  // existem mais na lista.
   let mapaDur: Record<string, string> = {};
   try { const m = JSON.parse(f.videoClipesDurMeta || "{}"); if (m && typeof m === "object") mapaDur = m; } catch {}
   const podado: Record<string, string> = {};
   for (const u of urls) if (mapaDur[u]) podado[u] = mapaDur[u];
   data.videoClipesDurMeta = JSON.stringify(podado);
+  let publicos: string[] = [];
+  try { publicos = (JSON.parse(f.videoClipesPublico || "[]") as unknown[]).filter((u): u is string => typeof u === "string"); } catch {}
+  data.videoClipesPublico = JSON.stringify(publicos.filter((u) => urls.includes(u)));
   await prisma.festa.update({ where: { id: festaId }, data });
   revalidatePath(`/painel/marcas/${f.marcaId}`);
   return { ok: true as const, clipes: urls };
@@ -479,7 +504,8 @@ export async function zerarVideoFesta(festaId: string) {
     data: {
       videoFotos: "[]", videoCapa: "", videoMoldura: "branca", mascoteCanto: "", mascoteTam: "m",
       videoTextoFinal: "", videoTituloCapa: "", videoMusica: "", videoClipes: "[]",
-      videoClipesPos: "espalhados", videoClipesDur: "completo", videoClipesDurMeta: "{}", videoUrl: "",
+      videoClipesPos: "espalhados", videoClipesDur: "completo", videoClipesDurMeta: "{}",
+      videoClipesPublico: "[]", videoUrl: "",
     },
   });
 

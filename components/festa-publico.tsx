@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta, salvarAutorizacaoFesta, salvarMostrarAvaliacao, editarFestaPublica, adicionarClipeFestaPublico, removerClipeFestaPublico } from "@/app/actions/festas";
+import { removerFotoPublica, moverFotoMomento, finalizarFestaPublica, salvarGerenteFesta, salvarAutorizacaoFesta, salvarMostrarAvaliacao, editarFestaPublica, adicionarClipeFestaPublico, removerClipeFestaPublico, definirClipePublicoFesta } from "@/app/actions/festas";
 import { QRCodeSVG } from "qrcode.react";
 import { InputDataBR } from "@/components/input-data-br";
 import { rotuloAniversariantes } from "@/lib/aniversariantes";
@@ -27,6 +27,9 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
   const [clipes, setClipes] = useState<string[]>(Array.isArray(festa.videoClipes) ? festa.videoClipes : []);
   const [subindoClipe, setSubindoClipe] = useState(false);
   const [erroClipe, setErroClipe] = useState<string | null>(null);
+  // Quais vídeos o gerente marcou pra TAMBÉM aparecer no álbum público dos pais (por padrão nenhum).
+  const [publicos, setPublicos] = useState<string[]>(Array.isArray(festa.videoClipesPublico) ? festa.videoClipesPublico : []);
+  const [mudandoPublico, setMudandoPublico] = useState<string | null>(null); // url em transição
   const [fotoSel, setFotoSel] = useState<FotoView | null>(null);
   const [removendo, setRemovendo] = useState(false);
   const [movendo, setMovendo] = useState(false);
@@ -161,7 +164,17 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
   async function removerClipe(url: string) {
     setErroClipe(null);
     const r = await removerClipeFestaPublico(token, url).catch(() => null);
-    if (r?.ok) setClipes(r.clipes);
+    if (r?.ok) { setClipes(r.clipes); setPublicos((ps) => ps.filter((u) => u !== url)); }
+  }
+  // Liga/desliga "mostrar pros pais também" PRA ESSE vídeo específico (os outros não mudam).
+  async function alternarPublico(url: string) {
+    const ligar = !publicos.includes(url);
+    setMudandoPublico(url);
+    setPublicos((ps) => (ligar ? [...ps, url] : ps.filter((u) => u !== url))); // otimista
+    const r = await definirClipePublicoFesta(token, url, ligar).catch(() => null);
+    if (r?.ok) setPublicos(r.publicos);
+    else setPublicos((ps) => (ligar ? ps.filter((u) => u !== url) : [...ps, url])); // desfaz se falhou
+    setMudandoPublico(null);
   }
 
   function abrirFoto(foto: FotoView) { setFotoSel(foto); setErroModal(null); }
@@ -481,13 +494,14 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
             );
           })}
 
-          {/* VÍDEOS da festa → viram os clipes do Reels. Ficam SÓ pro vídeo; não vão pro álbum dos pais. */}
+          {/* VÍDEOS da festa → viram os clipes do Reels. Por padrão só entram no vídeo; o gerente pode marcar
+              individualmente pra TAMBÉM aparecer no álbum dos pais (toggle "Mostrar pros pais"). */}
           <div className="rounded-lg border border-[#ec4899]/30 bg-[#ec4899]/[0.06] p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold text-white">🎬 Vídeos da festa</span>
               <span className={`shrink-0 text-xs font-semibold ${clipes.length >= MAX_CLIPES ? "text-green-400" : "text-muted"}`}>{clipes.length >= MAX_CLIPES ? "✓ " : ""}{clipes.length}/{MAX_CLIPES}</span>
             </div>
-            <p className="mt-0.5 text-[11px] leading-snug text-muted">Uns clipinhos curtos (a criança soprando a vela, a galera dançando…). Eles entram <strong className="text-white/80">no vídeo/Reels</strong> da festa, junto com as fotos. <strong className="text-white/80">Não aparecem no álbum dos pais</strong> — são só pra o vídeo. 🎥</p>
+            <p className="mt-0.5 text-[11px] leading-snug text-muted">Uns clipinhos curtos (a criança soprando a vela, a galera dançando…). Eles entram <strong className="text-white/80">no vídeo/Reels</strong> da festa, junto com as fotos. Se quiser, você também pode marcar <strong className="text-white/80">"Mostrar pros pais"</strong> em cada um pra ele aparecer no álbum. 🎥</p>
 
             {clipes.length < MAX_CLIPES && (
               <label className={`mt-3 flex w-full items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold text-white transition active:opacity-80 ${subindoClipe ? "opacity-70" : "cursor-pointer"}`} style={{ backgroundColor: "#ec4899" }}>
@@ -499,13 +513,27 @@ export function FestaPublico({ token, marca, festa, linkAlbum }: { token: string
 
             {clipes.length > 0 && (
               <div className="mt-3 grid grid-cols-3 gap-2">
-                {clipes.map((c) => (
-                  <div key={c} className="relative overflow-hidden rounded-lg border border-linha bg-black">
-                    {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                    <video src={`${c}#t=0.3`} preload="metadata" muted playsInline controls className="aspect-[9/16] w-full object-cover" />
-                    <button type="button" onClick={() => removerClipe(c)} aria-label="Tirar este vídeo" title="Tirar este vídeo" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-red-300 transition hover:bg-red-900/70">✕</button>
-                  </div>
-                ))}
+                {clipes.map((c) => {
+                  const publico = publicos.includes(c);
+                  const mudando = mudandoPublico === c;
+                  return (
+                    <div key={c} className="relative overflow-hidden rounded-lg border border-linha bg-black">
+                      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                      <video src={`${c}#t=0.3`} preload="metadata" muted playsInline controls className="aspect-[9/16] w-full object-cover" />
+                      <button type="button" onClick={() => removerClipe(c)} aria-label="Tirar este vídeo" title="Tirar este vídeo" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-red-300 transition hover:bg-red-900/70">✕</button>
+                      <button
+                        type="button"
+                        onClick={() => alternarPublico(c)}
+                        disabled={mudando}
+                        aria-pressed={publico}
+                        title={publico ? "Também aparece no álbum dos pais — toque pra tirar" : "Mostrar este vídeo pros pais também"}
+                        className={`absolute inset-x-0 bottom-0 py-1 text-center text-[10px] font-semibold transition ${mudando ? "opacity-60" : ""} ${publico ? "bg-green-500/90 text-black" : "bg-black/70 text-white/80 hover:bg-black/85"}`}
+                      >
+                        {mudando ? "…" : publico ? "✓ Pros pais" : "Mostrar pros pais"}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

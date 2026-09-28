@@ -219,6 +219,9 @@ model Festa {
   videoClipesPos String   @default("espalhados") // onde os clipes entram: "espalhados" | "comeco" | "fim"
   videoClipesDur String   @default("completo") // duração PADRÃO (legado) — usada só pra clipe sem entrada em videoClipesDurMeta
   videoClipesDurMeta String @default("{}") // duração POR CLIPE: JSON { url: "curto"|"medio"|"completo" } — sobrepõe videoClipesDur
+  // Subconjunto de videoClipes (JSON de URLs) que o GERENTE marcou pra TAMBÉM aparecer no álbum
+  // público dos pais (por padrão nenhum — os clipes só entram no Reels, fica a critério do gerente).
+  videoClipesPublico String @default("[]")
   // URL do VÍDEO/Reels já montado desta festa (no Blob). "" = ainda não gerado.
   videoUrl       String   @default("")
   // O gerente liga/desliga o card "Avalie no Google" no álbum dos pais (por festa).

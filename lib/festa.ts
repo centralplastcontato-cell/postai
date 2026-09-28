@@ -83,6 +83,8 @@ export async function festaPorTokenAlbum(token: string) {
         finalizadaEm: true,
         autorizacao: true,
         mostrarAvaliacao: true,
+        videoClipes: true, // todos os clipes do gerente (URLs)
+        videoClipesPublico: true, // quais deles o gerente marcou pra aparecer aqui (subconjunto de videoClipes)
         marca: { select: { slug: true, nome: true, logoUrl: true, corPrimaria: true, telefone: true, site: true } },
       },
     });
@@ -113,7 +115,8 @@ export async function festaPorToken(token: string) {
         autorizacao: true,
         motivoNaoAutoriza: true,
         mostrarAvaliacao: true,
-        videoClipes: true, // clipes de vídeo que o gerente sobe na festa (entram no Reels; não vão pro álbum)
+        videoClipes: true, // clipes de vídeo que o gerente sobe na festa (entram no Reels)
+        videoClipesPublico: true, // quais desses clipes o gerente marcou pra TAMBÉM aparecer pros pais
         marca: { select: { nome: true, logoUrl: true, corPrimaria: true } },
       },
     });
