@@ -160,7 +160,7 @@ export async function criarFestaPublica(
   if (!lista.length) return { ok: false as const, erro: "Informe o nome de pelo menos um aniversariante." };
   const data = dataDoDiaBRT(input.dataISO);
   if (!data) return { ok: false as const, erro: "Data inválida." };
-  const festaToken = gerarTokenFesta();
+  const festaToken = gerarTokenFesta(lista[0]?.nome || "");
   const festa = await prisma.festa.create({
     data: {
       marcaId: m.id,

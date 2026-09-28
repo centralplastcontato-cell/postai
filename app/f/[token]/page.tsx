@@ -1,12 +1,39 @@
+import { type Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { marcaPorTokenFotos, festaPorToken } from "@/lib/festa";
-import { parseAniversariantes } from "@/lib/aniversariantes";
+import { parseAniversariantes, rotuloAniversariantes } from "@/lib/aniversariantes";
 import { CriarFestaPublico } from "@/components/criar-festa-publico";
 import { FestaPublico } from "@/components/festa-publico";
 import { type FestaView } from "@/lib/festa-tipos";
 import { baseUrl } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
+
+// PREVIEW do link (WhatsApp/redes): título/descrição com o nome do aniversariante em vez do
+// card genérico do site. A IMAGEM do cartão vem junto, automática, de ./opengraph-image.tsx
+// (mesmo token, mesma lógica) — o Next casa os dois pelo mesmo segmento de rota.
+// Link privado (token é o segredo) → nunca indexar.
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  const robots = { index: false, follow: false };
+
+  const festa = await festaPorToken(token);
+  if (festa) {
+    const nomes = rotuloAniversariantes(parseAniversariantes(festa.aniversariantes)) || "Festa";
+    const titulo = `📸 Suba as fotos — ${nomes}`;
+    const descricao = `${festa.marca.nome} · link pra enviar as fotos da festa.`;
+    return { title: titulo, description: descricao, robots, openGraph: { title: titulo, description: descricao }, twitter: { card: "summary_large_image", title: titulo, description: descricao } };
+  }
+
+  const marca = await marcaPorTokenFotos(token);
+  if (marca) {
+    const titulo = `🏰 ${marca.nome} — Cadastrar festa`;
+    const descricao = "Cadastre a nova festa e comece a subir as fotos.";
+    return { title: titulo, description: descricao, robots, openGraph: { title: titulo, description: descricao }, twitter: { card: "summary_large_image", title: titulo, description: descricao } };
+  }
+
+  return { title: "Link inválido", robots };
+}
 
 // Link PÚBLICO do Álbum da Festa. O mesmo path serve dois tipos de token:
 //  • token de FESTA  → mostra SÓ aquela festa (isolada): subir fotos, finalizar.

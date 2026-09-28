@@ -101,7 +101,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     let token = f.token;
     let tokenAlbum = f.tokenAlbum;
     const patch: { token?: string; tokenAlbum?: string } = {};
-    if (!token) patch.token = token = gerarTokenFesta();
+    if (!token) patch.token = token = gerarTokenFesta(anivs[0]?.nome || "");
     if (!tokenAlbum) patch.tokenAlbum = tokenAlbum = gerarTokenAlbum(slugBuffet, anivs[0]?.nome || "");
     if (Object.keys(patch).length) {
       await prisma.festa.update({ where: { id: f.id }, data: patch }).catch(() => {});

@@ -1,11 +1,16 @@
 import { prisma } from "@/lib/prisma";
 import { randomBytes } from "crypto";
 
-// Token aleatório do link de uma festa (~16 chars url-safe). Imprevisível — é a credencial
-// que isola a festa: quem tem o link mexe só nela. Sem @unique no schema porque o espaço
-// aleatório (96 bits) torna colisão desprezível, e o backfill gera valores distintos.
-export function gerarTokenFesta(): string {
-  return randomBytes(12).toString("base64url");
+// Token do link de uma festa: "<slug-criança>-<código>" quando dá o nome (ex: "joaquim-x7k2p9r3mq4n"),
+// ou só o código quando não dá (comportamento antigo). O código continua os MESMOS 96 bits
+// aleatórios de sempre — é a parte SECRETA (inviável de adivinhar); o nome é só pra deixar o link
+// bonito/reconhecível quando compartilhado (WhatsApp etc.), não afeta a segurança nem o "match"
+// (é comparado como string inteira). Sem @unique no schema: o espaço aleatório torna colisão
+// desprezível, e o backfill gera valores distintos.
+export function gerarTokenFesta(nomeAniversariante?: string): string {
+  const codigo = randomBytes(12).toString("base64url");
+  const slug = slugify(nomeAniversariante || "");
+  return slug ? `${slug}-${codigo}` : codigo;
 }
 
 // Slug url-safe de um texto livre (nome do buffet/criança): minúsculo, sem acento, kebab.
