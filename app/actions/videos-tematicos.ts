@@ -321,17 +321,41 @@ export async function removerMusicaDoBancoTema(videoId: string, url: string) {
 // entrar como fundo da NARRAÇÃO (sob a voz). Casa pela URL do MP3.
 // CLIPES DE VÍDEO do vídeo do buffet (temático) — URLs no Blob, intercalam com as fotos (mudos). Máx 6.
 export async function definirClipesTematico(videoId: string, clipes: string[], posicao?: string, duracao?: string) {
-  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true } });
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoClipesDurMeta: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const urls = (Array.isArray(clipes) ? clipes : []).filter((u) => typeof u === "string" && u.startsWith("http")).slice(0, 6);
-  const data: { videoClipes: string; videoClipesPos?: string; videoClipesDur?: string } = { videoClipes: JSON.stringify(urls) };
+  const data: { videoClipes: string; videoClipesPos?: string; videoClipesDur?: string; videoClipesDurMeta?: string } = { videoClipes: JSON.stringify(urls) };
   if (posicao && ["espalhados", "comeco", "fim"].includes(posicao)) data.videoClipesPos = posicao;
   if (duracao && ["curto", "medio", "completo"].includes(duracao)) data.videoClipesDur = duracao;
+  // Poda o mapa de duração POR CLIPE: tira entradas de clipes que não existem mais na lista.
+  let mapaDur: Record<string, string> = {};
+  try { const m = JSON.parse(v.videoClipesDurMeta || "{}"); if (m && typeof m === "object") mapaDur = m; } catch {}
+  const podado: Record<string, string> = {};
+  for (const u of urls) if (mapaDur[u]) podado[u] = mapaDur[u];
+  data.videoClipesDurMeta = JSON.stringify(podado);
   await prisma.videoTematico.update({ where: { id: videoId }, data });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, clipes: urls };
+}
+
+// Duração INDIVIDUAL de um clipe (sobrepõe a duração padrão do vídeo pra esse clipe específico).
+export async function definirDuracaoClipeTematico(videoId: string, url: string, duracao: string) {
+  if (!["curto", "medio", "completo"].includes(duracao)) return { ok: false as const, erro: "Duração inválida." };
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoClipes: true, videoClipesDurMeta: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  let urls: string[] = [];
+  try { urls = (JSON.parse(v.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string"); } catch {}
+  if (!urls.includes(url)) return { ok: false as const, erro: "Clipe não encontrado." };
+  let mapaDur: Record<string, string> = {};
+  try { const m = JSON.parse(v.videoClipesDurMeta || "{}"); if (m && typeof m === "object") mapaDur = m; } catch {}
+  mapaDur[url] = duracao;
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { videoClipesDurMeta: JSON.stringify(mapaDur) } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const };
 }
 
 // ZERA o vídeo do buffet: volta TODAS as escolhas ao começo (fotos, legendas, capa, moldura, fundo,
@@ -353,7 +377,7 @@ export async function zerarVideoTematico(videoId: string) {
       videoFotos: "[]", videoTextos: "{}", videoCapa: "", videoMoldura: "branca", videoMolduraCor: "",
       videoTextoFinal: "", videoFundo: "", videoFundoCor: "", capaEstilo: "", capaIaUrl: "", capaRecorteUrl: "",
       mascoteCanto: "", mascoteTam: "m", logoCanto: "", logoTam: "m", videoMusica: "",
-      videoClipes: "[]", videoClipesPos: "espalhados", videoClipesDur: "completo", videoUrl: "",
+      videoClipes: "[]", videoClipesPos: "espalhados", videoClipesDur: "completo", videoClipesDurMeta: "{}", videoUrl: "",
       narracaoTexto: "", narracaoVoz: "", narracaoEstilo: "", narracaoUrl: "", narracaoSeg: 0,
     },
   });
@@ -721,9 +745,13 @@ export async function gerarVideoTematico(videoId: string) {
   // próximo vídeo do mesmo tema — perderíamos cenas boas sem elas nunca terem aparecido.
   const usadas = [...new Set([...idsSlideshow, ...(v.videoCapa && mapa.has(v.videoCapa) ? [v.videoCapa] : [])])];
   if (usadas.length) await prisma.imagemMarca.updateMany({ where: { id: { in: usadas } }, data: { usos: { increment: 1 } } }).catch(() => {});
-  // clipes de vídeo (opcional) — entram MUDOS, intercalados com as fotos.
-  let clipesTema: string[] = [];
-  try { clipesTema = (JSON.parse(v.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+  // clipes de vídeo (opcional) — entram MUDOS, intercalados com as fotos. Cada um leva a SUA duração
+  // individual (videoClipesDurMeta); sem entrada no mapa, cai na duração padrão do vídeo (videoClipesDur).
+  let clipesTemaUrls: string[] = [];
+  try { clipesTemaUrls = (JSON.parse(v.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+  let mapaDurClipesTema: Record<string, string> = {};
+  try { const m = JSON.parse(v.videoClipesDurMeta || "{}"); if (m && typeof m === "object") mapaDurClipesTema = m; } catch {}
+  const clipesTema = clipesTemaUrls.map((url) => ({ url, duracao: mapaDurClipesTema[url] || v.videoClipesDur || "completo" }));
 
   const r = await dispararMotorReels({
     fotos: fotosMotor,

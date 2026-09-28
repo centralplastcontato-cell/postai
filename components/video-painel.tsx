@@ -34,7 +34,8 @@ export type VideoTematicoView = {
   videoMusica: string; // trilha escolhida (URL) — "" = jingle do buffet
   videoClipes?: string[]; // clipes de vídeo (URLs) pra intercalar com as fotos
   videoClipesPos?: string; // onde os clipes entram: "espalhados" | "comeco" | "fim"
-  videoClipesDur?: string; // quanto de cada clipe toca: "curto" | "medio" | "completo"
+  videoClipesDur?: string; // duração PADRÃO (legado) — só vale pra clipe sem entrada em videoClipesDurMeta
+  videoClipesDurMeta?: Record<string, string>; // duração INDIVIDUAL de cada clipe: { url: "curto"|"medio"|"completo" }
   videoTextos: Record<string, string>; // legendas por foto (a copy que aparece no vídeo)
   narracao: { texto: string; voz: string; estilo: string; url: string; segundos: number }; // a voz que fala no vídeo
   capaUrl: string | null; // thumb do card (capa escolhida ou 1ª foto)
@@ -545,6 +546,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           clipesInicial={seletor.videoClipes ?? []}
           clipesPosInicial={seletor.videoClipesPos ?? "espalhados"}
           clipesDurInicial={seletor.videoClipesDur ?? "completo"}
+          clipesDurPorClipeInicial={seletor.videoClipesDurMeta ?? {}}
           musicasBanco={musicasBanco}
           mascoteCantoInicial={seletor.mascoteCanto}
           mascoteTamInicial={seletor.mascoteTam}
@@ -584,6 +586,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           clipesInicial={seletorTema.video.videoClipes ?? []}
           clipesPosInicial={seletorTema.video.videoClipesPos ?? "espalhados"}
           clipesDurInicial={seletorTema.video.videoClipesDur ?? "completo"}
+          clipesDurPorClipeInicial={seletorTema.video.videoClipesDurMeta ?? {}}
           musicasBanco={musicasBanco}
           corMarca={corMarca}
           jaTemVideo={seletorTema.video.videoUrl.startsWith("http")}

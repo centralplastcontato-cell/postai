@@ -9,11 +9,17 @@
 
 import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { salvarFotosVideo, gerarVideoDaFesta, statusVideoFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, removerMusicaDoBanco, definirMascoteFesta, definirClipesFesta } from "@/app/actions/festas";
-import { salvarFotosVideoTematico, gerarVideoTematico, statusVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, removerMusicaDoBancoTema, definirWavMusicaTema, definirClipesTematico, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
+import { salvarFotosVideo, gerarVideoDaFesta, statusVideoFesta, gerarTextoFinalVideo, gerarTituloCapaVideo, listarMusicasDaMarca, adicionarMusicaAoBanco, removerMusicaDoBanco, definirMascoteFesta, definirClipesFesta, definirDuracaoClipeFesta } from "@/app/actions/festas";
+import { salvarFotosVideoTematico, gerarVideoTematico, statusVideoTematico, gerarTextoFinalVideoTematico, gerarTextosVideoTematico, editarTextoFotoVideo, gerarLegendaUmaFotoVideo, gerarRoteiroNarracao, gerarCtaNarracao, gerarNarracaoVideo, removerNarracaoVideo, definirFundoVideo, listarMusicasDaMarcaTema, adicionarMusicaAoBancoTema, removerMusicaDoBancoTema, definirWavMusicaTema, definirClipesTematico, definirDuracaoClipeTematico, renomearVideoTematico, definirCapaEstilo, gerarCapaIa, definirFundoCorVideo, definirMolduraCorVideo, gerarRecorteCapa, aplicarCapaIa, definirMascoteVideo, definirLogoVideo } from "@/app/actions/videos-tematicos";
 
 // Paleta de cores pro fundo "cor" (degradê). A 1ª ("") = cor da marca; as outras são presets festivos.
 const CORES_FUNDO = ["#7C3AED", "#2563EB", "#0EA5E9", "#16A34A", "#EC4899", "#F97316", "#EAB308", "#9D174D", "#334155"];
+// Quanto CADA clipe toca (escolha INDIVIDUAL, por clipe — cada um pode ter uma duração diferente).
+const DURACOES_CLIPE = [
+  { id: "curto", ic: "⚡", label: "Curto", desc: "~4 seg" },
+  { id: "medio", ic: "🎬", label: "Médio", desc: "~8 seg" },
+  { id: "completo", ic: "▶️", label: "Completo", desc: "toca inteiro" },
+];
 import { type FotoView } from "@/lib/festa-tipos";
 import { VOZES, VOZ_PADRAO, ESTILOS, DIRECAO_PADRAO, fotosParaDuracao } from "@/lib/vozes";
 import { MOMENTOS_FESTA } from "@/lib/momentos-festa";
@@ -151,7 +157,7 @@ function floatParaWavBlob(data: Float32Array, taxa: number): Blob {
   return new Blob([buf], { type: "audio/wav" });
 }
 
-export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", clipesInicial = [], clipesPosInicial = "espalhados", clipesDurInicial = "completo", musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", logoCantoInicial = "", logoTamInicial = "m", logoUrlMarca = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, gerente = "", onFechar }: {
+export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, capaInicial = "", molduraInicial = "branca", textoFinalInicial = "", tituloCapaInicial = "", tituloCapaAuto = "", textosIniciais = {}, narracao, musicaInicial = "", clipesInicial = [], clipesPosInicial = "espalhados", clipesDurInicial = "completo", clipesDurPorClipeInicial = {}, musicasBanco = [], fundoInicial = "", fundoCorInicial = "", molduraCorInicial = "", capaEstiloInicial = "", capaIaUrlInicial = "", capaRecorteUrlInicial = "", mascoteCantoInicial = "", mascoteTamInicial = "m", mascoteUrl = "", logoCantoInicial = "", logoTamInicial = "m", logoUrlMarca = "", capasBanco = [], corMarca = "#E11D2A", jaTemVideo = false, gerente = "", onFechar }: {
   festaId: string;
   tematicoId?: string; // modo TEMÁTICO: salva/gera no VideoTematico (fotos vêm do acervo)
   nome: string;
@@ -168,7 +174,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   musicaInicial?: string;
   clipesInicial?: string[]; // clipes de vídeo já salvos na festa (URLs) — intercalam com as fotos
   clipesPosInicial?: string; // onde os clipes entram: "espalhados" | "comeco" | "fim"
-  clipesDurInicial?: string; // quanto de cada clipe toca: "curto" | "medio" | "completo"
+  clipesDurInicial?: string; // duração PADRÃO (legado) — só vale pra clipe sem entrada em clipesDurPorClipeInicial
+  clipesDurPorClipeInicial?: Record<string, string>; // duração INDIVIDUAL de cada clipe: { url: "curto"|"medio"|"completo" }
   musicasBanco?: { url: string; nome: string; wav?: string }[];
   fundoInicial?: string; // fundo do quadro do vídeo temático: "" (foto borrada) | "cheia" | "cor"
   fundoCorInicial?: string; // cor do fundo "cor" (hex); "" = cor da marca
@@ -403,15 +410,20 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [clipes, setClipes] = useState<string[]>(Array.isArray(clipesInicial) ? clipesInicial : []); // clipes de vídeo
   const [subindoClipe, setSubindoClipe] = useState(false);
   const [posClipes, setPosClipes] = useState<string>(clipesPosInicial || "espalhados"); // onde os clipes entram
-  const [durClipes, setDurClipes] = useState<string>(clipesDurInicial || "completo"); // quanto de cada clipe toca
+  const [durClipes, setDurClipes] = useState<string>(clipesDurInicial || "completo"); // duração padrão (legado)
+  // Duração INDIVIDUAL de cada clipe: { url: "curto"|"medio"|"completo" }. Clipe sem entrada aqui usa durClipes.
+  const [durPorClipe, setDurPorClipe] = useState<Record<string, string>>(clipesDurPorClipeInicial || {});
+  const duracaoDoClipe = (url: string) => durPorClipe[url] || durClipes;
   const salvarClipes = (novos: string[], pos?: string, dur?: string) => (tematicoId ? definirClipesTematico(tematicoId, novos, pos, dur) : definirClipesFesta(festaId, novos, pos, dur)).catch(() => {});
   function mudarPosClipes(pos: string) {
     setPosClipes(pos);
     salvarClipes(clipes, pos, durClipes);
   }
-  function mudarDurClipes(dur: string) {
-    setDurClipes(dur);
-    salvarClipes(clipes, posClipes, dur);
+  // Muda a duração de UM clipe específico (os outros continuam com a duração deles).
+  async function mudarDurClipe(url: string, dur: string) {
+    setDurPorClipe((m) => ({ ...m, [url]: dur }));
+    const r = tematicoId ? definirDuracaoClipeTematico(tematicoId, url, dur) : definirDuracaoClipeFesta(festaId, url, dur);
+    await r.catch(() => {});
   }
   async function enviarClipe(file?: File) {
     if (!file || (!festaId && !tematicoId)) return;
@@ -429,6 +441,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   async function excluirClipe(url: string) {
     const novos = clipes.filter((c) => c !== url);
     setClipes(novos);
+    setDurPorClipe((m) => { const { [url]: _rem, ...resto } = m; return resto; });
     await salvarClipes(novos);
   }
   const [banco, setBanco] = useState<{ url: string; nome: string; wav?: string }[]>(musicasBanco); // biblioteca de trilhas da marca
@@ -1300,37 +1313,31 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       <input type="file" accept="video/*" className="hidden" disabled={subindoClipe || clipes.length >= 6} onChange={(e) => enviarClipe(e.target.files?.[0])} />
                     </label>
                   </div>
-                  <p className="mt-1 text-[11px] leading-snug text-muted/70">Sobe uns clipinhos curtos da festa e o vídeo <strong className="text-white/80">intercala eles com as fotos</strong>. Entram <strong className="text-white/80">sem som</strong> (a música/narração continua por cima). Máx 6 — cada um usa ~4s.</p>
+                  <p className="mt-1 text-[11px] leading-snug text-muted/70">Sobe uns clipinhos curtos da festa e o vídeo <strong className="text-white/80">intercala eles com as fotos</strong>. Entram <strong className="text-white/80">sem som</strong> (a música/narração continua por cima). Máx 6 — escolha <strong className="text-white/80">quanto CADA clipe toca</strong> logo abaixo dele.</p>
                   {clipes.length === 0 ? (
                     <p className="mt-3 rounded-lg border border-dashed border-linha bg-preto p-6 text-center text-xs text-muted">Nenhum clipe ainda. Toque em <strong className="text-white/70">➕ Enviar clipe</strong> pra adicionar. 👆</p>
                   ) : (
                     <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
                       {clipes.map((c) => (
-                        <div key={c} className="relative overflow-hidden rounded-lg border border-linha bg-black">
-                          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                          <video src={`${c}#t=0.3`} preload="metadata" muted playsInline controls className="aspect-[9/16] w-full object-cover" />
-                          <button type="button" onClick={() => excluirClipe(c)} title="Tirar este clipe" aria-label="Tirar clipe" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-red-300 transition hover:bg-red-900/70">✕</button>
+                        <div key={c} className="overflow-hidden rounded-lg border border-linha bg-black">
+                          <div className="relative">
+                            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                            <video src={`${c}#t=0.3`} preload="metadata" muted playsInline controls className="aspect-[9/16] w-full object-cover" />
+                            <button type="button" onClick={() => excluirClipe(c)} title="Tirar este clipe" aria-label="Tirar clipe" className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-xs font-bold text-red-300 transition hover:bg-red-900/70">✕</button>
+                          </div>
+                          {/* duração INDIVIDUAL deste clipe (não mexe nos outros) */}
+                          <div className="flex items-center gap-0.5 border-t border-linha bg-preto p-1">
+                            {DURACOES_CLIPE.map((o) => (
+                              <button key={o.id} type="button" onClick={() => mudarDurClipe(c, o.id)} title={`${o.label} — ${o.desc}`} aria-label={`Duração: ${o.label}`} className={`flex-1 rounded py-1 text-[13px] leading-none transition ${duracaoDoClipe(c) === o.id ? "bg-[#ec4899]/25 text-[#f9a8d4]" : "text-muted hover:bg-white/5 hover:text-white"}`}>{o.ic}</button>
+                            ))}
+                          </div>
                         </div>
                       ))}
                     </div>
                   )}
                   {clipes.length > 0 && (
                     <div className="mt-4">
-                      <span className="text-[11px] font-semibold text-white">⏱️ Quanto de cada clipe toca</span>
-                      <div className="mt-2 grid grid-cols-3 gap-2">
-                        {[
-                          { id: "curto", ic: "⚡", label: "Curto", desc: "~4 seg" },
-                          { id: "medio", ic: "🎬", label: "Médio", desc: "~8 seg" },
-                          { id: "completo", ic: "▶️", label: "Completo", desc: "toca inteiro" },
-                        ].map((o) => (
-                          <button key={o.id} type="button" onClick={() => mudarDurClipes(o.id)} className={`rounded-lg border p-2 text-center transition ${durClipes === o.id ? "border-[#ec4899] bg-[#ec4899]/15" : "border-linha bg-preto hover:border-[#ec4899]/50"}`}>
-                            <div className="text-base">{o.ic}</div>
-                            <div className="text-[11px] font-semibold text-white">{o.label}</div>
-                            <div className="text-[9px] leading-tight text-muted/70">{o.desc}</div>
-                          </button>
-                        ))}
-                      </div>
-                      <span className="mt-4 block text-[11px] font-semibold text-white">📍 Onde os clipes entram</span>
+                      <span className="block text-[11px] font-semibold text-white">📍 Onde os clipes entram</span>
                       <div className="mt-2 grid grid-cols-3 gap-2">
                         {[
                           { id: "espalhados", ic: "🔀", label: "Espalhados", desc: "no meio das fotos" },

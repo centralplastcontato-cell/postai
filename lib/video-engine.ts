@@ -14,9 +14,11 @@ function credenciais(): Record<string, unknown> {
 
 export type PedidoReels = {
   fotos: string[];
-  clipes?: string[]; // clipes de VÍDEO (URLs) pra intercalar com as fotos — entram mudos
+  // clipes de VÍDEO pra intercalar com as fotos — entram mudos. Cada item pode ser só a URL (usa
+  // duracaoClipes abaixo) ou { url, duracao } pra dar uma duração PRÓPRIA a esse clipe (sobrepõe).
+  clipes?: (string | { url: string; duracao?: string })[];
   posicaoClipes?: string; // onde os clipes entram: "espalhados" (padrão) | "comeco" | "fim"
-  duracaoClipes?: string; // quanto de cada clipe toca: "curto" (~4s) | "medio" (~8s) | "completo" (inteiro)
+  duracaoClipes?: string; // duração PADRÃO quando um clipe não tem duração própria: "curto" (~4s) | "medio" (~8s) | "completo" (inteiro)
   naoCortarVideo?: boolean; // true = música curta REPETE pra o vídeo manter o tempo cheio
   aberturaUrl?: string; // clipe do mascote (COM voz/som próprio) colado no COMEÇO do vídeo
   fechoUrl?: string; // clipe do mascote (COM voz/som próprio) colado no FIM do vídeo

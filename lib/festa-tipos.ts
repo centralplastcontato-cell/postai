@@ -26,7 +26,8 @@ export type FestaView = {
   videoMusica: string; // trilha própria da festa (URL do MP3) — "" = música padrão do buffet
   videoClipes?: string[]; // clipes de vídeo (URLs) pra intercalar com as fotos no vídeo
   videoClipesPos?: string; // onde os clipes entram: "espalhados" | "comeco" | "fim"
-  videoClipesDur?: string; // quanto de cada clipe toca: "curto" | "medio" | "completo"
+  videoClipesDur?: string; // duração PADRÃO (legado) — só vale pra clipe sem entrada em videoClipesDurMeta
+  videoClipesDurMeta?: Record<string, string>; // duração INDIVIDUAL de cada clipe: { url: "curto"|"medio"|"completo" }
   mascoteCanto: string; // mascote na CAPA do vídeo da festa: "" (não) | dir | esq | cima-dir | cima-esq
   mascoteTam: string; // tamanho do mascote na capa: p | m | g
   videoUrl: string; // URL do vídeo/Reels já montado ("" = ainda não gerado)

@@ -423,17 +423,41 @@ export async function removerMusicaDoBanco(festaId: string, url: string) {
 
 // CLIPES DE VÍDEO da festa (URLs no Blob) — intercalam com as fotos no vídeo (entram mudos). Máx 6.
 export async function definirClipesFesta(festaId: string, clipes: string[], posicao?: string, duracao?: string) {
-  const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true } });
+  const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true, videoClipesDurMeta: true } });
   if (!f) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(f.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const urls = (Array.isArray(clipes) ? clipes : []).filter((u) => typeof u === "string" && u.startsWith("http")).slice(0, 6);
-  const data: { videoClipes: string; videoClipesPos?: string; videoClipesDur?: string } = { videoClipes: JSON.stringify(urls) };
+  const data: { videoClipes: string; videoClipesPos?: string; videoClipesDur?: string; videoClipesDurMeta?: string } = { videoClipes: JSON.stringify(urls) };
   if (posicao && ["espalhados", "comeco", "fim"].includes(posicao)) data.videoClipesPos = posicao;
   if (duracao && ["curto", "medio", "completo"].includes(duracao)) data.videoClipesDur = duracao;
+  // Poda o mapa de duração POR CLIPE: tira entradas de clipes que não existem mais na lista.
+  let mapaDur: Record<string, string> = {};
+  try { const m = JSON.parse(f.videoClipesDurMeta || "{}"); if (m && typeof m === "object") mapaDur = m; } catch {}
+  const podado: Record<string, string> = {};
+  for (const u of urls) if (mapaDur[u]) podado[u] = mapaDur[u];
+  data.videoClipesDurMeta = JSON.stringify(podado);
   await prisma.festa.update({ where: { id: festaId }, data });
   revalidatePath(`/painel/marcas/${f.marcaId}`);
   return { ok: true as const, clipes: urls };
+}
+
+// Duração INDIVIDUAL de um clipe (sobrepõe a duração padrão da festa pra esse clipe específico).
+export async function definirDuracaoClipeFesta(festaId: string, url: string, duracao: string) {
+  if (!["curto", "medio", "completo"].includes(duracao)) return { ok: false as const, erro: "Duração inválida." };
+  const f = await prisma.festa.findUnique({ where: { id: festaId }, select: { marcaId: true, videoClipes: true, videoClipesDurMeta: true } });
+  if (!f) return { ok: false as const, erro: "Festa não encontrada." };
+  const g = await guardaMarca(f.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  let urls: string[] = [];
+  try { urls = (JSON.parse(f.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string"); } catch {}
+  if (!urls.includes(url)) return { ok: false as const, erro: "Clipe não encontrado." };
+  let mapaDur: Record<string, string> = {};
+  try { const m = JSON.parse(f.videoClipesDurMeta || "{}"); if (m && typeof m === "object") mapaDur = m; } catch {}
+  mapaDur[url] = duracao;
+  await prisma.festa.update({ where: { id: festaId }, data: { videoClipesDurMeta: JSON.stringify(mapaDur) } });
+  revalidatePath(`/painel/marcas/${f.marcaId}`);
+  return { ok: true as const };
 }
 
 // ZERA o vídeo da festa: volta TODAS as escolhas do vídeo ao começo (fotos, capa, moldura, mascote,
@@ -455,7 +479,7 @@ export async function zerarVideoFesta(festaId: string) {
     data: {
       videoFotos: "[]", videoCapa: "", videoMoldura: "branca", mascoteCanto: "", mascoteTam: "m",
       videoTextoFinal: "", videoTituloCapa: "", videoMusica: "", videoClipes: "[]",
-      videoClipesPos: "espalhados", videoClipesDur: "completo", videoUrl: "",
+      videoClipesPos: "espalhados", videoClipesDur: "completo", videoClipesDurMeta: "{}", videoUrl: "",
     },
   });
 
@@ -779,7 +803,7 @@ export async function statusVideoFesta(festaId: string) {
 export async function gerarVideoDaFesta(festaId: string) {
   const festa = await prisma.festa.findUnique({
     where: { id: festaId },
-    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoClipes: true, videoClipesPos: true, videoClipesDur: true, videoUrl: true, mascoteCanto: true, mascoteTam: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true, mascoteUrl: true, mascoteAbertura: true, mascoteFecho: true } }, fotos: { select: { id: true, url: true } } },
+    select: { marcaId: true, videoFotos: true, videoCapa: true, videoMoldura: true, videoTextoFinal: true, videoTituloCapa: true, videoMusica: true, videoClipes: true, videoClipesPos: true, videoClipesDur: true, videoClipesDurMeta: true, videoUrl: true, mascoteCanto: true, mascoteTam: true, aniversariante: true, aniversariantes: true, marca: { select: { logoUrl: true, slug: true, corPrimaria: true, mascoteUrl: true, mascoteAbertura: true, mascoteFecho: true } }, fotos: { select: { id: true, url: true } } },
   });
   if (!festa) return { ok: false as const, erro: "Festa não encontrada." };
   const g = await guardaMarca(festa.marcaId);
@@ -819,9 +843,13 @@ export async function gerarVideoDaFesta(festaId: string) {
   const versaoCapa = hashCurto([festa.aniversariantes, festa.aniversariante, festa.videoTituloCapa, festa.videoCapa, capaUrl, festa.marca.corPrimaria, festa.mascoteCanto, festa.mascoteTam, festa.marca.mascoteUrl].join("|"));
   const capaDesenhada = `${base}/api/capa-festa/${festaId}.jpg?v=${versaoCapa}`;
 
-  // clipes de vídeo (opcional) — entram MUDOS, intercalados com as fotos.
-  let clipes: string[] = [];
-  try { clipes = (JSON.parse(festa.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+  // clipes de vídeo (opcional) — entram MUDOS, intercalados com as fotos. Cada um leva a SUA duração
+  // individual (videoClipesDurMeta); sem entrada no mapa, cai na duração padrão da festa (videoClipesDur).
+  let clipesUrls: string[] = [];
+  try { clipesUrls = (JSON.parse(festa.videoClipes || "[]") as unknown[]).filter((u): u is string => typeof u === "string" && u.startsWith("http")); } catch {}
+  let mapaDurClipes: Record<string, string> = {};
+  try { const m = JSON.parse(festa.videoClipesDurMeta || "{}"); if (m && typeof m === "object") mapaDurClipes = m; } catch {}
+  const clipes = clipesUrls.map((url) => ({ url, duracao: mapaDurClipes[url] || festa.videoClipesDur || "completo" }));
 
   await prisma.festa.update({ where: { id: festaId }, data: { videoUrl: "gerando" } });
   const r = await dispararMotorReels({
