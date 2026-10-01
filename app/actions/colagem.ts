@@ -21,7 +21,7 @@ import { vozValida, VOZ_PADRAO } from "@/lib/vozes";
 import { dispararMotorColagem } from "@/lib/video-engine";
 import { baseUrl } from "@/lib/config";
 import {
-  corrigir, validarRoteiro, narracaoCompleta, alinharTempos, promptSistemaColagem, contarPalavras, prazoCurto,
+  corrigir, garantirOferta, validarRoteiro, narracaoCompleta, alinharTempos, promptSistemaColagem, contarPalavras, prazoCurto,
   type Oferta, type Roteiro, type FotoInfo, type PalavraFalada,
 } from "@/lib/colagem";
 
@@ -192,7 +192,7 @@ Escreva o roteiro de cenas.`;
 
   let roteiro: Roteiro;
   try {
-    roteiro = corrigir(JSON.parse(texto) as Roteiro);
+    roteiro = garantirOferta(corrigir(JSON.parse(texto) as Roteiro), oferta);
   } catch {
     return { ok: false as const, reprovado: true as const, rascunho: texto, erros: ["A resposta não veio em JSON válido — responda SÓ com o JSON no formato pedido."] };
   }

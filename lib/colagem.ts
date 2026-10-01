@@ -36,6 +36,12 @@ export const ESTILOS_ADESIVO = [
   "etiqueta_amarela", "etiqueta_rosa", "etiqueta_azul", "etiqueta_verde", "recibo", "nota", "selo_promo", "botao_whatsapp",
 ];
 const DECORATIVAS = new Set(["rasgo_papel", "virar_pagina"]);
+const TIPOS = ["foto", "adesivo", "mascote", "grupo", "texto"];
+const ESTILO_APELIDO: Record<string, string> = {
+  selo: "selo_promo", selo_promocao: "selo_promo", selo_promocional: "selo_promo", promo: "selo_promo",
+  whatsapp: "botao_whatsapp", botao: "botao_whatsapp", botao_whats: "botao_whatsapp", whats: "botao_whatsapp",
+  estrela: "estrela_amarela", explosao: "uau", etiqueta: "etiqueta_amarela", seta: "seta_desenhada", balao: "balao_fala", nota_post_it: "nota",
+};
 const RE_FACHADA = /fachada|entrada do|frente do|port[aã]o|letreiro|vista externa|parte externa/i;
 
 // ---------- texto / números ----------
@@ -83,7 +89,14 @@ export function corrigir(r: Roteiro): Roteiro {
       fundo: cena.fundo === "papel_claro" ? "papel_claro" : "papel_kraft",
       transicao_saida: c(cena.transicao_saida, TRANSICOES, "corte_seco"),
       elementos: (cena.elementos || []).map((e) => {
-        const x: Elemento = { ...e, posicao: c(e.posicao, POSICOES, "centro"), animacao: c(e.animacao, ANIMACOES, "pop_bounce") };
+        // A IA às vezes põe o nome da figurinha no "tipo" ({"tipo":"selo_promo"}) ou usa apelidos
+        // ("selo", "whatsapp") — normaliza pro formato certo em vez de reprovar.
+        const bruto = { ...e } as Elemento & { tipo: string };
+        const est = ESTILO_APELIDO[String(bruto.estilo || "").toLowerCase()] || String(bruto.estilo || "").toLowerCase();
+        const tip = String(bruto.tipo || "").toLowerCase();
+        if (!TIPOS.includes(tip)) { bruto.estilo = ESTILO_APELIDO[tip] || tip; bruto.tipo = "adesivo"; }
+        else { bruto.tipo = tip as Elemento["tipo"]; if (bruto.estilo) bruto.estilo = est; }
+        const x: Elemento = { ...bruto, posicao: c(bruto.posicao, POSICOES, "centro"), animacao: c(bruto.animacao, ANIMACOES, "pop_bounce") };
         if (typeof x.rotacao === "number") x.rotacao = Math.max(-8, Math.min(8, Math.round(x.rotacao)));
         if (x.tipo === "foto") x.moldura = c(x.moldura, MOLDURAS, "polaroid");
         if (x.tipo === "mascote") x.pose = c(x.pose, POSES, "acenar");
@@ -92,6 +105,41 @@ export function corrigir(r: Roteiro): Roteiro {
       }),
     })),
   };
+}
+
+// ---------- peças OBRIGATÓRIAS da cena final ----------
+// Selo com o benefício, prazo escrito, extras, botão do WhatsApp e "Consulte condições" são iguais
+// em todo anúncio — se a Bia esquecer, o sistema coloca (não vale gastar tentativa da IA nisso).
+export function garantirOferta(r: Roteiro, oferta: Oferta): Roteiro {
+  const cenas = r.cenas.map((c) => ({ ...c, elementos: [...c.elementos] }));
+  const ofertas = cenas.filter((c) => c.ato === "oferta");
+  const ultima = ofertas[ofertas.length - 1] || cenas[cenas.length - 1];
+  if (!ultima) return r;
+  const ps = palavras(ultima.narracao);
+  const acha = (alvos: string[]) => ps.find((p) => alvos.some((a) => a && casa(p, a))) || ps[0] || "";
+  const todosOferta = ofertas.flatMap((c) => c.elementos);
+  const telaOferta = normalizar(todosOferta.map((e) => e.texto || "").join(" "));
+  const chave = palavras(oferta.principal).filter((p) => p.length >= 4 && !["gratis", "ganha", "ganhe", "mais"].includes(p));
+  if (!todosOferta.some((e) => e.estilo === "selo_promo")) {
+    ultima.elementos.push({ tipo: "adesivo", estilo: "selo_promo", texto: oferta.principal, posicao: "centro", animacao: "selo_giro", gatilho: acha(chave) });
+  }
+  const pz = prazoCurto(oferta.prazo);
+  if (pz && !todosOferta.some((e) => (e.texto || "").includes(pz))) {
+    const dia = prazoPartes(oferta.prazo);
+    ultima.elementos.push({ tipo: "adesivo", estilo: "uau", texto: `Até ${pz}`, posicao: "sup_dir", rotacao: 7, animacao: "carimbo", gatilho: acha(dia ? [porExtenso(dia.dia), "ate"] : ["ate"]) });
+  }
+  const lados = ["sup_esq", "meio_dir", "meio_esq"];
+  (oferta.extras || []).forEach((ex, i) => {
+    const k = palavras(ex).filter((p) => p.length >= 4);
+    if (k[0] && !telaOferta.includes(k[0])) ultima.elementos.push({ tipo: "adesivo", estilo: i % 2 ? "etiqueta_rosa" : "etiqueta_amarela", texto: ex, posicao: lados[i % 3], rotacao: i % 2 ? 6 : -6, animacao: "carimbo", gatilho: acha(k) });
+  });
+  if (!ultima.elementos.some((e) => e.estilo === "botao_whatsapp")) {
+    ultima.elementos.push({ tipo: "adesivo", estilo: "botao_whatsapp", texto: "Chama no WhatsApp", posicao: "base", animacao: "pop_bounce", gatilho: acha(["whatsapp", "chama", "zap"]) });
+  }
+  if (oferta.condicoes && !ultima.elementos.some((e) => e.tipo === "texto" && /condi/i.test(e.texto || ""))) {
+    ultima.elementos.push({ tipo: "texto", estilo: "rodape", texto: "Consulte condições", posicao: "rodape", animacao: "nenhuma", gatilho: acha(["whatsapp", "chama", "zap"]) });
+  }
+  return { cenas };
 }
 
 // ---------- VALIDADOR ----------
@@ -125,8 +173,8 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
   let decorativas = 0;
   cenas.forEach((c, i) => {
     const n = c.elementos.length;
-    const max = c.ato === "oferta" ? 8 : 5;
-    if (n < 2 || n > max) erros.push(`Cena ${i + 1} (${c.ato}) tem ${n} elementos — use de 2 a ${max === 8 ? "4 (a da oferta pode ter até 8)" : "4 (no máximo 5)"}.`);
+    const max = c.ato === "oferta" ? 10 : 5; // a oferta recebe as peças obrigatórias (selo, prazo, extras, botão, rodapé)
+    if (n < 2 || n > max) erros.push(`Cena ${i + 1} (${c.ato}) tem ${n} elementos — use de 2 a ${max === 10 ? "4 (a da oferta pode ter até 10)" : "4 (no máximo 5)"}.`);
     const figurinhas = c.elementos.filter((e) => e.tipo === "adesivo" || e.tipo === "grupo").length;
     if (figurinhas < 2) erros.push(`Cena ${i + 1} (${c.ato}) precisa de pelo menos 2 figurinhas (adesivos).`);
     if (!c.narracao) erros.push(`Cena ${i + 1} está sem narração.`);
