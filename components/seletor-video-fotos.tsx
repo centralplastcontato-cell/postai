@@ -1364,14 +1364,17 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <div>
                       <span className="text-[11px] font-semibold text-white">🎬 Fundo do vídeo</span>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }, { id: "cor", emoji: "🎨", label: "Cor" }].map((f) => (
+                        {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }, { id: "cor", emoji: "🎨", label: "Cor" }, { id: "colagem", emoji: "📎", label: "Colagem" }].map((f) => (
                           <button key={f.id || "borrada"} type="button" onClick={() => trocarFundo(f.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${fundo === f.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
                             {f.id === "cor" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corDoFundo }} />}
                             {f.id !== "cor" && f.emoji} {f.label}
                           </button>
                         ))}
                       </div>
-                      <p className="mt-1 text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta as beiradas). 🎨 <strong className="text-white/70">Cor</strong>: a foto emoldurada sobre um degradê de cor. Veja na prévia. Vale no próximo <strong className="text-white/70">Gerar</strong>.</p>
+                      <p className="mt-1 text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta as beiradas). 🎨 <strong className="text-white/70">Cor</strong>: a foto emoldurada sobre um degradê de cor. 📎 <strong className="text-white/70">Colagem</strong>: estilo anúncio — fundo de papel, fotos tipo polaroid e legendas em adesivo (ótimo pra promoção/oferta). Veja na prévia. Vale no próximo <strong className="text-white/70">Gerar</strong>.</p>
+                      {fundo === "colagem" && (
+                        <p className="mt-1.5 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-2 text-[10px] leading-snug text-amber-200/90">📣 Esse estilo é pra <strong className="text-amber-100">vídeo-anúncio</strong>: na aba 🎙️ Narração, a Bia já escreve seguindo gancho → dor → virada → prova → oferta. Se você tiver uma <strong className="text-amber-100">Campanha ativa</strong> no painel, ela já entra sozinha na oferta (números certinhos, sem precisar digitar de novo).</p>
+                      )}
                       {/* PALETA de cores do fundo (só quando o fundo é "cor") */}
                       {fundo === "cor" && (
                         <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
@@ -1388,7 +1391,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     </div>
                   )}
 
-                  {/* MOLDURA das fotos */}
+                  {/* MOLDURA das fotos (o estilo Colagem já desenha a dela — tipo polaroid — e ignora esta escolha) */}
+                  {!(tematicoId && fundo === "colagem") && (
                   <div>
                     <span className="text-[11px] font-semibold text-white">🖼️ Moldura das fotos</span>
                     <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -1414,6 +1418,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     )}
                     {fundoCheia && <p className="mt-1 text-[10px] leading-snug text-amber-300/80">Com o fundo <strong>🔳 na tela toda</strong>, a foto preenche a tela e a moldura não aparece.</p>}
                   </div>
+                  )}
 
                   {/* MASCOTE no vídeo (se a marca tem mascote). Buffet = todos os quadros; festa = só a capa. */}
                   {mascoteUrl && (
@@ -1436,8 +1441,9 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     </div>
                   )}
 
-                  {/* LOGO com posição própria (só buffet e se a marca tem logo) */}
-                  {tematicoId && logoUrlMarca && (
+                  {/* LOGO com posição própria (só buffet e se a marca tem logo) — no Colagem o logo já
+                      entra sozinho, como etiqueta no topo de cada quadro (ver estilo do fundo acima). */}
+                  {tematicoId && logoUrlMarca && fundo !== "colagem" && (
                     <div>
                       <span className="text-[11px] font-semibold text-white">🏷️ Logo no vídeo</span>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -1483,7 +1489,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       <p className="mt-0.5 text-[11px] leading-snug text-muted">A capa é o <strong className="text-white/80">1º quadro</strong> — o que segura o dedo de quem rola o feed. Uma capa chamativa traz <strong className="text-white/80">bem mais visualizações</strong>.</p>
                     </div>
 
-                    {/* estilo da capa */}
+                    {/* estilo da capa (o Colagem já tem a capa dele — gancho em adesivo sobre a polaroid) */}
+                    {fundo === "colagem" ? (
+                      <p className="rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-2.5 text-[11px] leading-snug text-amber-200/90">📎 Com o fundo <strong className="text-amber-100">Colagem</strong> ativo, a capa já usa o gancho que a Bia escreveu (aba 🎙️ Narração ou ✨ Bia escreve a copy), no estilo polaroid+adesivo — esses estilos abaixo não se aplicam.</p>
+                    ) : (
                     <div className="grid grid-cols-2 gap-2">
                       {[
                         { id: "", emoji: "🖼️", nome: "Clássica", desc: "foto + frase" },
@@ -1497,6 +1506,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                         </button>
                       ))}
                     </div>
+                    )}
 
                     {/* painel do RECORTE (só quando o estilo é "recortado") */}
                     {capaEstilo === "recortado" && (

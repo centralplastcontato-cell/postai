@@ -34,6 +34,15 @@ const MAX_FOTOS_CORPO = MAX_FOTOS - 1;
 const comPonto = (t: string) => { const s = (t || "").trim(); return !s || /[.!?…]$/.test(s) ? s : `${s}!`; };
 const FOTOS_SUGERIDAS = 26; // ~65s de vídeo
 
+// Resume a CAMPANHA ativa da marca (se houver) num texto curto pra IA usar como FONTE DOS NÚMEROS
+// da oferta — assim o roteiro nunca inventa prazo/benefício que não existe. "" = sem campanha ativa.
+async function ofertaAtivaContexto(marcaId: string): Promise<string> {
+  const c = await prisma.campanha.findFirst({ where: { marcaId, ativa: true }, orderBy: { criadoEm: "desc" }, select: { selo: true, titulo: true, texto: true } });
+  if (!c) return "";
+  const partes = [c.titulo, c.texto].filter((s) => s?.trim()).join(" — ");
+  return c.selo?.trim() ? `${c.selo} — ${partes}` : partes;
+}
+
 function lerIds(json: string): string[] {
   try {
     const a = JSON.parse(json || "[]");
@@ -420,7 +429,7 @@ export async function definirFundoVideo(videoId: string, fundo: string) {
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
-  const valor = fundo === "cheia" ? "cheia" : fundo === "cor" ? "cor" : ""; // borrada (padrão) | cheia | cor
+  const valor = ["cheia", "cor", "colagem"].includes(fundo) ? fundo : ""; // borrada (padrão) | cheia | cor | colagem
   await prisma.videoTematico.update({ where: { id: videoId }, data: { videoFundo: valor } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, fundo: valor };
@@ -707,18 +716,22 @@ export async function gerarVideoTematico(videoId: string) {
   // Mascote/logo posicionado → os quadros precisam ser os NOSSOS (o overlay mora no /api/quadro-tema).
   const mascoteOn = Boolean(v.marca.mascoteUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.mascoteCanto || "");
   const logoOn = Boolean(v.marca.logoUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.logoCanto || "");
+  // Estilo "Colagem" (vídeo-anúncio tipo scrapbook): SEMPRE passa pelo nosso quadro (fundo papel
+  // kraft, foto tipo polaroid, legenda em "adesivo") — mesmo sem legenda/mascote/logo escolhidos.
+  const colagemOn = v.videoFundo === "colagem";
   const versao = hashCurto(
     ["q8", v.videoFundo, v.videoFundoCor, v.videoMoldura, v.videoMolduraCor, v.capaEstilo, v.capaIaUrl, v.capaRecorteUrl, v.mascoteCanto, v.mascoteTam, v.marca.mascoteUrl, v.logoCanto, v.logoTam, v.videoTextos, v.videoTextoFinal, v.videoFotos, v.videoCapa, v.marca.corPrimaria, v.marca.corFundo, v.marca.site, v.marca.logoUrl, capaUrl, ...idsSlideshow.map((id) => mapa.get(id))].join("|"),
   );
 
   // TELA FINAL: o motor SEMPRE crava uma tela borrada própria por último (não dá pra desligar daqui).
-  // Sozinha ela fica feia (foto borrada sem logo). Então, quando o logo está posicionado, colamos
-  // ANTES a NOSSA tela bonita (logo no centro + mensagem) e deixamos a do motor como um convite curto
-  // na cor da marca — vira um fechamento estilo Reels: [logo] → [convite], em vez da tela borrada.
-  const quadroFinalOn = logoOn;
+  // Sozinha ela fica feia (foto borrada sem logo). Então, quando o logo está posicionado — OU no
+  // estilo Colagem (sempre: é vídeo de ANÚNCIO, precisa terminar com a chamada) — colamos ANTES a
+  // NOSSA tela bonita (logo/CTA + mensagem) e deixamos a do motor como um convite curto na cor da
+  // marca — vira um fechamento estilo Reels: [logo/CTA] → [convite], em vez da tela borrada.
+  const quadroFinalOn = logoOn || colagemOn;
 
   let fotosMotor: string[];
-  if (temLegenda || mascoteOn || logoOn) {
+  if (temLegenda || mascoteOn || logoOn || colagemOn) {
     // O índice do quadro é a posição da foto em videoFotos (a rota lê o MESMO array). Também
     // entra aqui quando o MASCOTE ou o LOGO posicionado estão ligados (overlays no /api/quadro-tema).
     fotosMotor = idsSlideshow.map((id) => `${base}/api/quadro-tema/${videoId}/${ids.indexOf(id) + 1}.jpg?v=${versao}`);
@@ -735,7 +748,7 @@ export async function gerarVideoTematico(videoId: string) {
   // Com frase de capa, a capa é a NOSSA arte (n=0). Sem frase, vai a foto crua — mas SEM texto:
   // o nome do tema ("Brinquedos") é etiqueta interna, não abertura de vídeo. Melhor capa limpa
   // do que capa com etiqueta. Por isso o motor nunca escreve nada na capa.
-  const capaFinal = fraseCapa || mascoteOn || logoOn ? `${base}/api/quadro-tema/${videoId}/0.jpg?v=${versao}` : capaUrl;
+  const capaFinal = fraseCapa || mascoteOn || logoOn || colagemOn ? `${base}/api/quadro-tema/${videoId}/0.jpg?v=${versao}` : capaUrl;
   const textoDaCapa = "";
 
   const antigo = v.videoUrl; // guardado ANTES do lock (só apagamos depois, e se ninguém usar)
@@ -765,12 +778,12 @@ export async function gerarVideoTematico(videoId: string) {
     // se ela for curta, REPETE pra o vídeo manter o tempo cheio em vez de encolher no tamanho da música.
     naoCortarVideo: !temNarracao,
     capaUrl: capaFinal,
-    moldura: temLegenda || mascoteOn || logoOn ? "nenhuma" : v.videoMoldura || "branca",
+    moldura: temLegenda || mascoteOn || logoOn || colagemOn ? "nenhuma" : v.videoMoldura || "branca",
     corMoldura: v.marca.corPrimaria || "#FFFFFF",
-    // Logo posicionado por nós → mandamos um logo INVISÍVEL pro motor (ele EXIGE um logo,
-    // recusa com "Sem logo" se vier vazio). Assim ele não carimba nada visível e o logo de
-    // verdade aparece no canto escolhido (desenhado por nós no /api/quadro-tema).
-    logoUrl: logoOn ? `${base}/api/logo-vazio` : v.marca.logoUrl,
+    // Logo posicionado por nós (ou estilo Colagem, que desenha o logo/CTA do seu jeito) → mandamos
+    // um logo INVISÍVEL pro motor (ele EXIGE um logo, recusa com "Sem logo" se vier vazio). Assim
+    // ele não carimba nada visível e o logo de verdade aparece onde NÓS desenhamos.
+    logoUrl: logoOn || colagemOn ? `${base}/api/logo-vazio` : v.marca.logoUrl,
     // A trilha do vídeo: a NARRAÇÃO (que já vem com o jingle misturado por baixo) ou, sem
     // narração, o jingle puro. O motor só aceita uma trilha — por isso a mistura é nossa.
     // Com narração: a voz (com o jingle já misturado). Sem narração: a trilha ESCOLHIDA pelo dono
@@ -848,11 +861,13 @@ export async function gerarTextosVideoTematico(videoId: string) {
           {
             role: "system",
             content: `Você é a social media do buffet infantil "${v.marca.nome}". ${v.marca.descricao || ""}
-Você escreve a COPY de um Reels sobre "${v.titulo}" — frases curtas que aparecem POR CIMA das fotos.
+Você escreve a COPY de um Reels sobre "${v.titulo}" — frases curtas que aparecem POR CIMA das fotos${v.videoFundo === "colagem" ? ", em formato de ADESIVO colado na foto (estilo colagem/scrapbook)" : ""}.
 REGRAS:
 - Fale COM o pai/mãe que decide a festa ("seu filho", "sua festa"), vendendo o BENEFÍCIO (diversão segura, memórias, festa sem trabalho pra você) — não descreva a foto ("Mesa decorada") nem rotule ("Brinquedos", "Nosso espaço").
 - Cada frase nasce da FOTO daquele quadro: fale do que ela mostra, conectando com o benefício.
-- Frases CURTAS: 3 a 8 palavras. TERMINE cada frase com pontuação — ponto final "." nas afirmações e "!" nas mais animadas (a capa combina com "!"). No máximo 1 emoji no vídeo inteiro.
+${v.videoFundo === "colagem"
+  ? `- Frases BEM CURTAS: NO MÁXIMO 5 palavras (é um adesivo, não uma legenda — ele COMPLEMENTA a narração, não repete a frase inteira dela). Pode ser só uma exclamação ("Que diversão!", "Olha só!") quando fizer sentido.`
+  : `- Frases CURTAS: 3 a 8 palavras.`} TERMINE cada frase com pontuação — ponto final "." nas afirmações e "!" nas mais animadas (a capa combina com "!"). No máximo 1 emoji no vídeo inteiro.
 - A copy tem ARCO: a CAPA é o gancho que segura o dedo, as do meio entregam o que a família ganha, a última é um convite.
 - A marca É o lugar da festa: nunca mande "procurar um local".`,
           },
@@ -981,6 +996,8 @@ export async function gerarRoteiroNarracao(videoId: string, briefing: string, se
   const b = (briefing || "").trim();
   // ~2,6 palavras por segundo de locução (medido nas vozes do Google a 1.08x).
   const palavras = Math.max(30, Math.round(segundosAlvo * 2.6));
+  // A CAMPANHA ativa (se houver) é a FONTE DOS NÚMEROS da oferta — a IA nunca inventa prazo/benefício.
+  const oferta = await ofertaAtivaContexto(v.marcaId);
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -992,24 +1009,26 @@ export async function gerarRoteiroNarracao(videoId: string, briefing: string, se
         messages: [
           {
             role: "system",
-            content: `Você escreve o ROTEIRO DA LOCUÇÃO de um vídeo do buffet infantil "${v.marca.nome}". ${v.marca.descricao || ""}
-É texto PRA SER FALADO em voz alta, não pra ser lido. Regras que fazem a voz soar humana:
+            content: `Você escreve o ROTEIRO DA LOCUÇÃO de um vídeo ANÚNCIO do buffet infantil "${v.marca.nome}" — o objetivo é VENDER FESTA. ${v.marca.descricao || ""}
+É texto PRA SER FALADO em voz alta, não pra ser lido. Siga esta estrutura, NESTA ordem (não pule etapa):
+1. GANCHO (os 3 primeiros segundos): uma pergunta ou frase que para quem tá rolando o feed. NUNCA comece descrevendo o buffet ou citando o nome dele de cara.
+2. A DOR: o problema que o pai/mãe tem ao organizar festa sozinho (conta alta, mil fornecedores, estresse).
+3. A VIRADA: o buffet como a solução — "no [nome] é diferente".
+4. A PROVA: 2 ou 3 diferenciais REAIS (só use o que está na descrição da marca acima — nunca invente um diferencial que não foi dito).
+NÃO feche com a oferta/promoção nem com a chamada final — isso entra numa fala SEPARADA, depois desta. Pare logo após a prova, numa frase que prepara a virada pra oferta (ex: "e olha só o que preparamos pra você").
+Regras que fazem a voz soar humana:
 - Frases CURTAS. Uma ideia por frase.
 - Use "..." onde a voz deve respirar/pausar, e "!" onde ela sobe.
-- Fale como brasileiro fala: "pra", "tá", "cê", "olha só", "pois é". Nada de texto empolado.
-- Comece com um GANCHO que segura a atenção nos 3 primeiros segundos.
-- Fale COM o pai/mãe ("seu filho", "sua festa"), vendendo o BENEFÍCIO — não liste características.
-- Termine com uma CHAMADA clara pra ação.
+- Fale como brasileiro fala: "pra", "tá", "cê", "olha só", "pois é". Nada de texto empolado ("venha conhecer nossas instalações" é PROIBIDO).
+- Fale COM o pai/mãe ("seu filho", "sua festa"), vendendo o BENEFÍCIO — não liste características secas.
 - Números por extenso ("vinte por cento", "dia vinte") — a voz lê melhor.
-- NÃO leia o número de WhatsApp/telefone dígito a dígito (fica LONGO e ninguém decora ouvindo) — ele aparece na tela. Se convidar, diga só "chama no nosso WhatsApp" ou "link na bio".
-- UMA chamada pra ação só, no fim (não repita o convite várias vezes).
 - Sem emoji, sem hashtag, sem marcação de cena. SÓ o que a voz fala.
 - A marca É o lugar da festa: nunca mande procurar outro local.
 - IMPORTANTE — CURTO: no máximo ${palavras} palavras. A locução TEM que durar ~${segundosAlvo}s (se passar muito, o vídeo corta a fala). Prefira cortar do que estourar.`,
           },
           {
             role: "user",
-            content: `Tema do vídeo: "${v.titulo}".\nO que o dono quer anunciar: ${b || "um convite pra conhecer o buffet e fechar a festa aqui"}.${v.marca.telefone ? `\nA marca tem WhatsApp, mas NÃO leia o número na fala (ele aparece na tela) — convide só "chama no nosso WhatsApp".` : ""}\n\nEscreva o roteiro. Responda só com JSON: {"roteiro":"..."}`,
+            content: `Tema do vídeo: "${v.titulo}".\nO que o dono quer anunciar: ${b || "um convite pra conhecer o buffet e fechar a festa aqui"}.${oferta ? `\nOFERTA CADASTRADA (não é pra falar dela agora — é só contexto de que existe uma promoção rolando, que vem na próxima fala): ${oferta}` : ""}\n\nEscreva o roteiro (gancho → dor → virada → prova, SEM a oferta/CTA). Responda só com JSON: {"roteiro":"..."}`,
           },
         ],
       }),
@@ -1028,8 +1047,10 @@ export async function gerarRoteiroNarracao(videoId: string, briefing: string, se
   }
 }
 
-// A Bia escreve a 2ª FALA (CTA) — a fala CURTA do FIM do vídeo, que convida a agir (fazer o
-// orçamento, acessar o site). NÃO persiste (fica no MP3 quando o dono gera a voz); só devolve o texto.
+// A Bia escreve a 2ª FALA (CTA) — o ATO 5 do anúncio: a OFERTA (se houver campanha ativa) + a
+// chamada pra ação, falada no FIM do vídeo. Quando o estilo é "Colagem" e há campanha ativa (e o
+// dono ainda não escreveu nada na tela final), também grava um resuminho ESCRITO da oferta pra
+// aparecer na tela de fechamento — prazo/benefício têm que estar falados E escritos.
 export async function gerarCtaNarracao(videoId: string) {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
@@ -1039,11 +1060,20 @@ export async function gerarCtaNarracao(videoId: string) {
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const key = process.env.OPENAI_API_KEY;
+  const oferta = await ofertaAtivaContexto(v.marcaId);
+
+  // Resuminho ESCRITO da oferta pra tela final (só Colagem, só campanha ativa, só se o dono não
+  // escreveu nada na mão — não sobrescreve o que ele já personalizou).
+  if (v.videoFundo === "colagem" && oferta && !v.videoTextoFinal.trim()) {
+    await prisma.videoTematico.update({ where: { id: videoId }, data: { videoTextoFinal: oferta.slice(0, 120) } }).catch(() => {});
+  }
 
   const site = (v.marca.site || "").replace(/^https?:\/\//i, "").replace(/\/+$/, "");
-  const fallback = site
-    ? `Acesse ${site} e faça seu orçamento agora mesmo!`
-    : "Chama a gente e garanta a festa do seu filho agora mesmo!";
+  const fallback = oferta
+    ? `${oferta}! Chama no WhatsApp e garanta a sua.`
+    : site
+      ? `Acesse ${site} e faça seu orçamento agora mesmo!`
+      : "Chama a gente e garanta a festa do seu filho agora mesmo!";
   if (!key) return { ok: true as const, cta: fallback };
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -1056,14 +1086,16 @@ export async function gerarCtaNarracao(videoId: string) {
         messages: [
           {
             role: "system",
-            content: `Você escreve a FALA FINAL (CTA) de um vídeo do buffet infantil "${v.marca.nome}" — pra ser FALADA em voz alta no fim do vídeo. Regras:
-- UMA frase CURTA (no máximo ~14 palavras). Ela é FALADA — se ficar longa, o vídeo corta o fim.
-- Tom empolgado e direto, convidando a pessoa a AGIR AGORA (fazer o orçamento / garantir a festa).
+            content: `Você escreve a FALA FINAL (CTA) de um vídeo ANÚNCIO do buffet infantil "${v.marca.nome}" — pra ser FALADA em voz alta no fim do vídeo. Esta é a ÚLTIMA parte do roteiro (depois do gancho/dor/virada/prova que já foram falados) — aqui entra A OFERTA e a CHAMADA PRA AÇÃO. Regras:
+- Se houver uma OFERTA CADASTRADA abaixo, USE OS NÚMEROS DELA EXATAMENTE — nunca invente prazo, desconto ou brinde diferente do cadastrado. Lidere com o benefício MAIS concreto/emocional da oferta; se houver mais de um, os outros entram como reforço rápido.
+- Se houver PRAZO na oferta, ele precisa ser DITO claramente (ex: "só até dia quinze").
+- UMA ou duas frases CURTAS (no máximo ~22 palavras no total). É FALADA — se ficar longa, o vídeo corta o fim.
+- Tom empolgado e direto, convidando a pessoa a AGIR AGORA.
 - NÃO leia URL de site nem número de telefone por extenso na fala (fica longo e a pessoa não anota ouvindo) — eles aparecem na tela. Convide só "chama no nosso WhatsApp" ou "link na bio".
 - A marca É o lugar da festa; nunca mande procurar outro local.
 - Sem emoji, sem hashtag, sem marcação de cena. Só o que a voz fala.`,
           },
-          { role: "user", content: `Tema do vídeo: "${v.titulo}". Escreva a fala final (CTA). Responda só com JSON: {"cta":"..."}` },
+          { role: "user", content: `Tema do vídeo: "${v.titulo}".${oferta ? `\nOFERTA CADASTRADA (use estes números exatamente): ${oferta}` : "\nSem oferta cadastrada — feche só com o convite pra fechar a festa."} Escreva a fala final (oferta + CTA). Responda só com JSON: {"cta":"..."}` },
         ],
       }),
     });

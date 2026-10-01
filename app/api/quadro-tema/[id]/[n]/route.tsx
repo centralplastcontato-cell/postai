@@ -117,6 +117,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
           ? 50
           : 58;
 
+    // Estilo "Colagem" (vídeo-anúncio tipo scrapbook): fundo papel kraft + foto tipo polaroid
+    // rodada + legenda em "adesivo" colado. É o próprio estilo — ignora os outros modos de fundo.
+    const colagemOn = v.videoFundo === "colagem";
+
     // Estilo do FUNDO do quadro (escolhido pelo dono): "cheia" = a foto preenche a tela toda (sem
     // moldura); senão (padrão) a foto BORRADA e escurecida atrás, com a foto emoldurada por cima.
     const modo = v.videoFundo === "cheia" ? "cheia" : "desfocada";
@@ -264,7 +268,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     // LOGO com posição própria (quando o dono escolheu um canto): o motor não carimba o logo
     // (mandamos logoUrl vazio na geração), e desenhamos o logo aqui, no canto/tamanho escolhidos.
     const logoCanto = v.logoCanto;
-    const usaLogo = Boolean(v.marca.logoUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(logoCanto || "");
+    // No Colagem o logo já entra como "etiqueta" própria dentro do quadro (ver colagemEl) — o
+    // overlay genérico de canto ficaria redundante (dois logos).
+    const usaLogo = !colagemOn && Boolean(v.marca.logoUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(logoCanto || "");
     const logoDim = v.logoTam === "p" ? { w: 210, h: 92 } : v.logoTam === "g" ? { w: 400, h: 172 } : { w: 300, h: 128 };
     const logoEmCima = logoCanto === "cima-dir" || logoCanto === "cima-esq";
     const logoNaDireita = logoCanto === "dir" || logoCanto === "cima-dir";
@@ -276,7 +282,59 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string; n: 
     const legLargPx = logoNoRodape ? Math.max(430, L - 128 - logoDim.w) : LARG_LEGENDA;
     const legAlinhaDir = logoNoRodape && !logoNaDireita; // logo embaixo à ESQUERDA → texto vai pra direita
 
-    const el = capaRecorte ? recorteEl : capaGrande ? impactoEl :
+    // ESTILO COLAGEM: fundo papel kraft + foto tipo polaroid (rodada, com fita adesiva) + legenda
+    // em "adesivo" colado. idx par/ímpar alterna o ângulo pra não ficar tudo alinhado (cara de
+    // colagem feita à mão); a capa ganha um ângulo e um adesivo maiores (é o gancho do vídeo).
+    const rotFoto = ehCapa ? -3 : idx % 2 === 0 ? -4 : 5;
+    const rotAdesivo = ehCapa ? 4 : idx % 2 === 0 ? 6 : -6;
+    const corAdesivo = ehCapa ? cor : "#FFD835";
+    const txtAdesivo = ehCapa ? "#ffffff" : "#141414";
+    // Foto quadrada (cara de polaroid de verdade) — sempre CORTA pra preencher (cover), diferente
+    // do recorte "inteligente" das outras molduras.
+    let fSrcColagem = foto.src;
+    try {
+      const raw = Buffer.from((foto.src.split(",")[1] || ""), "base64");
+      const b = await sharp(raw).resize(820, 820, { fit: "cover", position: "attention" }).jpeg({ quality: 88 }).toBuffer();
+      fSrcColagem = `data:image/jpeg;base64,${b.toString("base64")}`;
+    } catch (e) { console.error("Não consegui preparar a foto da colagem:", e); }
+    const colagemEl = (
+      // alignItems/justifyContent EXPLÍCITOS em todo mundo aqui — sem isso o flexbox "estica" o
+      // cartão da foto pra ocupar a altura inteira do quadro (o padrão de um flex container é
+      // align-items:stretch; foi assim que descobrimos, testando, que o cartão branco tomava a
+      // tela inteira).
+      <div style={{ width: `${L}px`, height: `${A}px`, display: "flex", alignItems: "flex-start", justifyContent: "flex-start", position: "relative", fontFamily: "Baloo", backgroundImage: "linear-gradient(135deg, #F2E4C4 0%, #E7D6A8 55%, #D9C78E 100%)" }}>
+        {/* vinheta suave nos cantos — dá profundidade ao papel */}
+        <div style={{ position: "absolute", top: 0, left: 0, width: `${L}px`, height: `${A}px`, display: "flex", backgroundImage: "radial-gradient(circle at 50% 42%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.16) 100%)" }} />
+        {/* logo da marca, como etiqueta coladinha no topo */}
+        {v.marca.logoUrl ? (
+          <div style={{ position: "absolute", top: 56, left: "50%", transform: "translateX(-50%) rotate(-2deg)", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#ffffff", borderRadius: 10, padding: "10px 22px", boxShadow: "0 8px 20px rgba(0,0,0,0.25)" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={v.marca.logoUrl} width={220} height={70} style={{ width: "220px", height: "70px", objectFit: "contain" }} />
+          </div>
+        ) : null}
+        {/* a FOTO tipo polaroid, com "fita adesiva" nos dois cantos de cima */}
+        {/* position:relative aqui é O QUE ANCORA os dois retângulos de "fita" (absolute) nos
+            CANTOS DESTA FOTO — sem isso eles pulariam pro canvas inteiro. */}
+        <div style={{ position: "relative", top: ehCapa ? 230 : 300, left: "50%", display: "flex", alignItems: "flex-start", transform: `translateX(-50%) rotate(${rotFoto}deg)` }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", backgroundColor: "#ffffff", padding: "22px 22px 90px", borderRadius: 4, boxShadow: "0 24px 50px rgba(0,0,0,0.38)" }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={fSrcColagem} width={820} height={820} style={{ width: "820px", height: "820px", objectFit: "cover", borderRadius: 2 }} />
+          </div>
+          <div style={{ position: "absolute", top: -22, left: 46, display: "flex", width: 150, height: 46, backgroundColor: `${cor}CC`, transform: "rotate(-9deg)", boxShadow: "0 4px 10px rgba(0,0,0,0.2)" }} />
+          <div style={{ position: "absolute", top: -22, right: 46, display: "flex", width: 150, height: 46, backgroundColor: `${cor}CC`, transform: "rotate(8deg)", boxShadow: "0 4px 10px rgba(0,0,0,0.2)" }} />
+        </div>
+        {/* o ADESIVO de texto, flutuando logo abaixo da foto */}
+        {legenda ? (
+          <div style={{ position: "absolute", bottom: ehCapa ? 420 : 480, left: "50%", display: "flex", maxWidth: `${L - 140}px`, transform: `translateX(-50%) rotate(${rotAdesivo}deg)` }}>
+            <div style={{ display: "flex", backgroundColor: corAdesivo, color: txtAdesivo, fontWeight: 700, fontSize: ehCapa ? 68 : 46, lineHeight: 1.08, padding: ehCapa ? "22px 34px" : "16px 26px", borderRadius: 16, boxShadow: "0 14px 30px rgba(0,0,0,0.3)", textAlign: "center" }}>
+              {legenda}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+
+    const el = colagemOn ? colagemEl : capaRecorte ? recorteEl : capaGrande ? impactoEl :
       modo === "cheia" ? (
         // FOTO NA TELA TODA: preenche o 9:16 (corta as beiradas); legenda embaixo, sobre um
         // escurecido pra ler. Sem moldura.
