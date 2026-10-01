@@ -142,6 +142,55 @@ export function garantirOferta(r: Roteiro, oferta: Oferta): Roteiro {
   return { cenas };
 }
 
+// ---------- detalhes VISUAIS que o sistema completa sozinho ----------
+// Mínimo de figurinhas por cena, gatilho que não existe na fala e transições decorativas demais
+// não são motivo pra reprovar o roteiro inteiro: o sistema arruma.
+const FIGURINHAS_POR_ATO: Record<string, { estilo: string; texto?: string }[]> = {
+  gancho: [{ estilo: "estrela_amarela", texto: "UAU!" }, { estilo: "confete" }, { estilo: "coracao" }],
+  dor: [{ estilo: "carinha_preocupada" }, { estilo: "recibo", texto: "Conta alta" }, { estilo: "nota", texto: "Ufa..." }],
+  virada: [{ estilo: "coracao" }, { estilo: "confete" }, { estilo: "estrela_amarela", texto: "Uau!" }],
+  prova: [{ estilo: "estrela_amarela" }, { estilo: "seta_desenhada" }, { estilo: "coracao" }],
+  oferta: [{ estilo: "confete" }, { estilo: "baloes" }, { estilo: "estrela_amarela" }],
+};
+const VAGAS_EXTRA = ["sup_dir", "inf_esq", "meio_dir", "sup_esq", "meio_esq", "inf_dir"];
+export function completarCenas(r: Roteiro): Roteiro {
+  let decorativas = 0;
+  const cenas = r.cenas.map((c) => {
+    const ps = palavras(c.narracao);
+    const palavraEm = (frac: number) => ps[Math.min(ps.length - 1, Math.max(0, Math.round(frac * (ps.length - 1))))] || "";
+    const elementos = c.elementos.map((e, k) => {
+      const g = palavras(e.gatilho || "")[0];
+      if (g && ps.some((p) => casa(p, g))) return e;
+      return { ...e, gatilho: palavraEm((k + 0.5) / Math.max(1, c.elementos.length)) };
+    });
+    const usadas = new Set(elementos.map((e) => e.posicao));
+    const pool = FIGURINHAS_POR_ATO[c.ato] || FIGURINHAS_POR_ATO.prova;
+    let i = 0;
+    while (elementos.filter((e) => e.tipo === "adesivo" || e.tipo === "grupo").length < 2 && i < pool.length) {
+      const f = pool[i];
+      i++;
+      if (elementos.some((e) => e.estilo === f.estilo)) continue;
+      const vaga = VAGAS_EXTRA.find((v) => !usadas.has(v)) || "sup_dir";
+      usadas.add(vaga);
+      elementos.push({ tipo: "adesivo", estilo: f.estilo, texto: f.texto, posicao: vaga, rotacao: i % 2 ? 6 : -6, animacao: i % 2 ? "pop_bounce" : "wiggle", gatilho: palavraEm(i / 3) });
+    }
+    let transicao = c.transicao_saida;
+    if (DECORATIVAS.has(transicao || "")) { decorativas++; if (decorativas > 2) transicao = "corte_seco"; }
+    return { ...c, elementos, transicao_saida: transicao };
+  });
+  return { cenas };
+}
+
+// Problemas de GOSTO (não impedem um bom vídeo): na última tentativa, o roteiro é aceito com eles.
+// Tamanho da narração só é "gosto" se estiver perto da faixa (60 a 100 palavras ≈ 25 a 38s).
+export function soDetalhes(erros: string[]): boolean {
+  return erros.every((e) => {
+    const n = /narração tem (\d+) palavras/.exec(e);
+    if (n) return Number(n[1]) >= 60 && Number(n[1]) <= 100;
+    return /sem cor|passa de 5 palavras|elementos — use/.test(e);
+  });
+}
+
 // ---------- VALIDADOR ----------
 // Devolve a lista de problemas (vazia = aprovado). As mensagens voltam pra Bia corrigir.
 export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, FotoInfo>): string[] {

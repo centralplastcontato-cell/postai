@@ -81,7 +81,7 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     let correcao: { rascunho: string; erros: string[] } | undefined;
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
       if (tentativa > 1) setMsg({ tipo: "aviso", txt: `🔁 A conferência pediu ajustes — a Bia está corrigindo (tentativa ${tentativa} de 3)…` });
-      const r = await gerarRoteiroColagem(videoId, correcao).catch(() => null);
+      const r = await gerarRoteiroColagem(videoId, correcao, tentativa === 3).catch(() => null);
       if (r?.ok) {
         setOcupado("");
         setRoteiro(r.roteiro);

@@ -21,7 +21,7 @@ import { vozValida, VOZ_PADRAO } from "@/lib/vozes";
 import { dispararMotorColagem } from "@/lib/video-engine";
 import { baseUrl } from "@/lib/config";
 import {
-  corrigir, garantirOferta, validarRoteiro, narracaoCompleta, alinharTempos, promptSistemaColagem, contarPalavras, prazoCurto,
+  corrigir, garantirOferta, completarCenas, soDetalhes, validarRoteiro, narracaoCompleta, alinharTempos, promptSistemaColagem, contarPalavras, prazoCurto,
   type Oferta, type Roteiro, type FotoInfo, type PalavraFalada,
 } from "@/lib/colagem";
 
@@ -134,7 +134,7 @@ function pontuar(descricao: string, categoria: string): number {
 
 // UMA tentativa por chamada (a Vercel corta em 60s): se reprovar, devolve o rascunho + os
 // problemas e a TELA chama de novo mandando a correção (até 3 vezes).
-export async function gerarRoteiroColagem(videoId: string, correcao?: { rascunho: string; erros: string[] }) {
+export async function gerarRoteiroColagem(videoId: string, correcao?: { rascunho: string; erros: string[] }, ultimaTentativa = false) {
   const c = await carregar(videoId);
   if (!c.ok) return c;
   const { v } = c;
@@ -192,7 +192,7 @@ Escreva o roteiro de cenas.`;
 
   let roteiro: Roteiro;
   try {
-    roteiro = garantirOferta(corrigir(JSON.parse(texto) as Roteiro), oferta);
+    roteiro = completarCenas(garantirOferta(corrigir(JSON.parse(texto) as Roteiro), oferta));
   } catch {
     return { ok: false as const, reprovado: true as const, rascunho: texto, erros: ["A resposta não veio em JSON válido — responda SÓ com o JSON no formato pedido."] };
   }
@@ -205,7 +205,8 @@ Escreva o roteiro de cenas.`;
     if (m && m.brilho < 62) erros.push(`A foto "${id}" é muito escura — troque por outra mais clara e colorida.`);
     else if (m && m.cor < 18) erros.push(`A foto "${id}" está sem cor (cinza/apagada) — prefira uma mais colorida.`);
   });
-  if (erros.length) return { ok: false as const, reprovado: true as const, rascunho: texto, erros };
+  // Na última tentativa, problema só de gosto (tamanho do texto, foto meio apagada) não segura o vídeo.
+  if (erros.length && !(ultimaTentativa && soDetalhes(erros))) return { ok: false as const, reprovado: true as const, rascunho: texto, erros };
 
   await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(roteiro), narracaoTexto: narracaoCompleta(roteiro) } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
