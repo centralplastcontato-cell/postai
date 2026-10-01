@@ -43,6 +43,25 @@ async function ofertaAtivaContexto(marcaId: string): Promise<string> {
   return c.selo?.trim() ? `${c.selo} — ${partes}` : partes;
 }
 
+// TIPOS DE GANCHO do roteiro — sorteado a cada "Bia escreve", pra os vídeos não abrirem todos
+// iguais (a IA sozinha cai sempre no "Já pensou...?").
+const GANCHOS = [
+  "uma PERGUNTA direta pro pai/mãe — mas que NÃO comece com \"Já pensou\"",
+  "uma AFIRMAÇÃO forte e curiosa sobre festa infantil (algo que faz a pessoa pensar \"é verdade!\")",
+  "uma CENA pra imaginar: em uma frase, o momento do filho na festa (o sorriso no parabéns, a corrida pro brinquedo)",
+  "chamando direto quem decide: \"Mãe, pai...\" ou \"Atenção, família...\" seguido de uma frase forte",
+  "o BENEFÍCIO mais forte da oferta logo de cara, como manchete (curto e empolgado)",
+  "um CONTRASTE: o trabalhão da festa em casa x a tranquilidade da festa no buffet",
+  "a FALA imaginada de uma criança pedindo a festa (ex: \"Mãe, quero minha festa lá!\")",
+];
+// Como a fala de abertura termina — a ponte pra fala final (oferta). Também sorteada.
+const PONTES = [
+  "uma frase curta que cria expectativa pra novidade que vem a seguir",
+  "uma pergunta que prepara a oferta (ex: \"e sabe o melhor?\")",
+  "uma frase que lembra que tem condição especial chegando",
+];
+const sortear = <T,>(a: T[]): T => a[Math.floor(Math.random() * a.length)];
+
 function lerIds(json: string): string[] {
   try {
     const a = JSON.parse(json || "[]");
@@ -996,8 +1015,13 @@ export async function gerarRoteiroNarracao(videoId: string, briefing: string, se
   const b = (briefing || "").trim();
   // ~2,6 palavras por segundo de locução (medido nas vozes do Google a 1.08x).
   const palavras = Math.max(30, Math.round(segundosAlvo * 2.6));
-  // A CAMPANHA ativa (se houver) é a FONTE DOS NÚMEROS da oferta — a IA nunca inventa prazo/benefício.
-  const oferta = await ofertaAtivaContexto(v.marcaId);
+  // O que o DONO digitou manda. A Campanha ativa (banner do álbum) só entra quando ele não digitou
+  // nada — senão uma campanha antiga atropelava o anúncio do mês (ex: "12x" no lugar de "10x").
+  const oferta = b ? "" : await ofertaAtivaContexto(v.marcaId);
+  const gancho = sortear(GANCHOS);
+  const ponte = sortear(PONTES);
+  // Começo do roteiro ANTERIOR — a Bia não pode abrir igual de novo.
+  const aberturaAnterior = (v.narracaoTexto || "").split(/[.!?…]/)[0]?.trim().slice(0, 90) || "";
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -1011,15 +1035,15 @@ export async function gerarRoteiroNarracao(videoId: string, briefing: string, se
             role: "system",
             content: `Você escreve o ROTEIRO DA LOCUÇÃO de um vídeo ANÚNCIO do buffet infantil "${v.marca.nome}" — o objetivo é VENDER FESTA. ${v.marca.descricao || ""}
 É texto PRA SER FALADO em voz alta, não pra ser lido. Siga esta estrutura, NESTA ordem (não pule etapa):
-1. GANCHO (os 3 primeiros segundos): uma pergunta ou frase que para quem tá rolando o feed. NUNCA comece descrevendo o buffet ou citando o nome dele de cara.
-2. A DOR: o problema que o pai/mãe tem ao organizar festa sozinho (conta alta, mil fornecedores, estresse).
-3. A VIRADA: o buffet como a solução — "no [nome] é diferente".
+1. GANCHO (os 3 primeiros segundos), que para quem tá rolando o feed. NESTE roteiro, o gancho TEM que ser: ${gancho}. NUNCA comece com "Já pensou", nem descrevendo o buffet, nem citando o nome dele de cara.
+2. A DOR: o problema que o pai/mãe tem ao organizar festa sozinho (conta alta, mil fornecedores, estresse). Varie as palavras — não use sempre "dor de cabeça".
+3. A VIRADA: o buffet como a solução. Varie o jeito de dizer (não use sempre "é diferente").
 4. A PROVA: 2 ou 3 diferenciais REAIS (só use o que está na descrição da marca acima — nunca invente um diferencial que não foi dito).
-NÃO feche com a oferta/promoção nem com a chamada final — isso entra numa fala SEPARADA, depois desta. Pare logo após a prova, numa frase que prepara a virada pra oferta (ex: "e olha só o que preparamos pra você").
+NÃO feche com a oferta/promoção nem com a chamada final — isso entra numa fala SEPARADA, depois desta. Termine com ${ponte} — com palavras SUAS, não use "olha só o que preparamos pra você".
 Regras que fazem a voz soar humana:
 - Frases CURTAS. Uma ideia por frase.
 - Use "..." onde a voz deve respirar/pausar, e "!" onde ela sobe.
-- Fale como brasileiro fala: "pra", "tá", "cê", "olha só", "pois é". Nada de texto empolado ("venha conhecer nossas instalações" é PROIBIDO).
+- Linguagem leve e próxima, de quem conversa ("pra", "tá"), mas SEMPRE "você" — NUNCA "cê" nem "ocê" (soa feio na voz). Nada de texto empolado ("venha conhecer nossas instalações" é PROIBIDO).
 - Fale COM o pai/mãe ("seu filho", "sua festa"), vendendo o BENEFÍCIO — não liste características secas.
 - Números por extenso ("vinte por cento", "dia vinte") — a voz lê melhor.
 - Sem emoji, sem hashtag, sem marcação de cena. SÓ o que a voz fala.
@@ -1028,7 +1052,7 @@ Regras que fazem a voz soar humana:
           },
           {
             role: "user",
-            content: `Tema do vídeo: "${v.titulo}".\nO que o dono quer anunciar: ${b || "um convite pra conhecer o buffet e fechar a festa aqui"}.${oferta ? `\nOFERTA CADASTRADA (não é pra falar dela agora — é só contexto de que existe uma promoção rolando, que vem na próxima fala): ${oferta}` : ""}\n\nEscreva o roteiro (gancho → dor → virada → prova, SEM a oferta/CTA). Responda só com JSON: {"roteiro":"..."}`,
+            content: `Tema do vídeo: "${v.titulo}".\nO que o dono quer anunciar: ${b || "um convite pra conhecer o buffet e fechar a festa aqui"}.${oferta ? `\nOFERTA CADASTRADA (contexto — os números dela só são falados na próxima fala, exceto se o gancho sorteado for o benefício da oferta): ${oferta}` : ""}${aberturaAnterior ? `\nO roteiro anterior começava assim: "${aberturaAnterior}" — o novo NÃO pode começar igual nem parecido.` : ""}\n\nEscreva o roteiro (gancho → dor → virada → prova, SEM a chamada final). Use os números EXATOS do que o dono escreveu — nunca troque um valor. Responda só com JSON: {"roteiro":"..."}`,
           },
         ],
       }),
@@ -1047,11 +1071,11 @@ Regras que fazem a voz soar humana:
   }
 }
 
-// A Bia escreve a 2ª FALA (CTA) — o ATO 5 do anúncio: a OFERTA (se houver campanha ativa) + a
-// chamada pra ação, falada no FIM do vídeo. Quando o estilo é "Colagem" e há campanha ativa (e o
-// dono ainda não escreveu nada na tela final), também grava um resuminho ESCRITO da oferta pra
-// aparecer na tela de fechamento — prazo/benefício têm que estar falados E escritos.
-export async function gerarCtaNarracao(videoId: string) {
+// A Bia escreve a 2ª FALA (CTA) — o ATO 5 do anúncio: a OFERTA + a chamada pra ação, falada no FIM
+// do vídeo. A oferta vem do que o DONO digitou ("O que você quer anunciar?"); só sem isso cai na
+// Campanha ativa. No estilo "Colagem" também grava um resuminho ESCRITO da oferta pra tela de
+// fechamento (se o dono ainda não escreveu uma) — prazo/benefício têm que estar falados E escritos.
+export async function gerarCtaNarracao(videoId: string, briefing = "") {
   const v = await prisma.videoTematico.findUnique({
     where: { id: videoId },
     include: { marca: { select: { nome: true, site: true, telefone: true } } },
@@ -1060,17 +1084,13 @@ export async function gerarCtaNarracao(videoId: string) {
   const g = await guardaMarca(v.marcaId);
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const key = process.env.OPENAI_API_KEY;
-  const oferta = await ofertaAtivaContexto(v.marcaId);
-
-  // Resuminho ESCRITO da oferta pra tela final (só Colagem, só campanha ativa, só se o dono não
-  // escreveu nada na mão — não sobrescreve o que ele já personalizou).
-  if (v.videoFundo === "colagem" && oferta && !v.videoTextoFinal.trim()) {
-    await prisma.videoTematico.update({ where: { id: videoId }, data: { videoTextoFinal: oferta.slice(0, 120) } }).catch(() => {});
-  }
+  const b = (briefing || "").trim().slice(0, 400);
+  const oferta = b || (await ofertaAtivaContexto(v.marcaId));
+  const gravarTela = v.videoFundo === "colagem" && Boolean(oferta) && !v.videoTextoFinal.trim();
 
   const site = (v.marca.site || "").replace(/^https?:\/\//i, "").replace(/\/+$/, "");
   const fallback = oferta
-    ? `${oferta}! Chama no WhatsApp e garanta a sua.`
+    ? "Condição especial por tempo limitado! Chama no nosso WhatsApp e garanta a festa do seu filho."
     : site
       ? `Acesse ${site} e faça seu orçamento agora mesmo!`
       : "Chama a gente e garanta a festa do seu filho agora mesmo!";
@@ -1087,22 +1107,24 @@ export async function gerarCtaNarracao(videoId: string) {
           {
             role: "system",
             content: `Você escreve a FALA FINAL (CTA) de um vídeo ANÚNCIO do buffet infantil "${v.marca.nome}" — pra ser FALADA em voz alta no fim do vídeo. Esta é a ÚLTIMA parte do roteiro (depois do gancho/dor/virada/prova que já foram falados) — aqui entra A OFERTA e a CHAMADA PRA AÇÃO. Regras:
-- Se houver uma OFERTA CADASTRADA abaixo, USE OS NÚMEROS DELA EXATAMENTE — nunca invente prazo, desconto ou brinde diferente do cadastrado. Lidere com o benefício MAIS concreto/emocional da oferta; se houver mais de um, os outros entram como reforço rápido.
+- Se houver uma OFERTA abaixo, USE OS NÚMEROS DELA EXATAMENTE — nunca invente prazo, desconto, parcelas ou brinde diferente do que está escrito, e não acrescente condição que não foi dita. Lidere com o benefício MAIS concreto/emocional; se houver mais de um, os outros entram como reforço rápido.
 - Se houver PRAZO na oferta, ele precisa ser DITO claramente (ex: "só até dia quinze").
 - UMA ou duas frases CURTAS (no máximo ~22 palavras no total). É FALADA — se ficar longa, o vídeo corta o fim.
-- Tom empolgado e direto, convidando a pessoa a AGIR AGORA.
+- Tom empolgado e direto, convidando a pessoa a AGIR AGORA. Sempre "você", NUNCA "cê".
 - NÃO leia URL de site nem número de telefone por extenso na fala (fica longo e a pessoa não anota ouvindo) — eles aparecem na tela. Convide só "chama no nosso WhatsApp" ou "link na bio".
 - A marca É o lugar da festa; nunca mande procurar outro local.
 - Sem emoji, sem hashtag, sem marcação de cena. Só o que a voz fala.`,
           },
-          { role: "user", content: `Tema do vídeo: "${v.titulo}".${oferta ? `\nOFERTA CADASTRADA (use estes números exatamente): ${oferta}` : "\nSem oferta cadastrada — feche só com o convite pra fechar a festa."} Escreva a fala final (oferta + CTA). Responda só com JSON: {"cta":"..."}` },
+          { role: "user", content: `Tema do vídeo: "${v.titulo}".${oferta ? `\nOFERTA (use estes números exatamente): ${oferta}` : "\nSem oferta — feche só com o convite pra fechar a festa."}\nEscreva a fala final (oferta + CTA).${gravarTela ? ` Escreva também "tela": a oferta resumida pra aparecer ESCRITA na tela final (no máximo 9 palavras, mesmos números, sem emoji).` : ""} Responda só com JSON: {"cta":"..."${gravarTela ? ',"tela":"..."' : ""}}` },
         ],
       }),
     });
     if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
     const data = await resp.json();
-    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { cta?: string };
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { cta?: string; tela?: string };
     const cta = (j.cta || "").trim().slice(0, 300);
+    const tela = (j.tela || "").trim().slice(0, 90);
+    if (gravarTela && tela) await prisma.videoTematico.update({ where: { id: videoId }, data: { videoTextoFinal: tela } }).catch(() => {});
     return { ok: true as const, cta: cta || fallback };
   } catch (e) {
     console.error("Erro ao escrever o CTA da narração:", e);

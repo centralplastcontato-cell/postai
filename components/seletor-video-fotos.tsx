@@ -659,7 +659,7 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   async function biaEscreveCta() {
     if (!tematicoId) return;
     setEscrevendoCta(true);
-    const r = await gerarCtaNarracao(tematicoId).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }));
+    const r = await gerarCtaNarracao(tematicoId, briefing).catch(() => ({ ok: false as const, erro: "Não consegui escrever agora." }));
     setEscrevendoCta(false);
     if (r.ok && r.cta) setRoteiro2(r.cta);
   }
