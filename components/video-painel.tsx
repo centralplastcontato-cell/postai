@@ -9,12 +9,15 @@ import { useRouter } from "next/navigation";
 import { type FestaView, type FotoView } from "@/lib/festa-tipos";
 import { rotuloAniversariantes, tituloCapaFesta } from "@/lib/aniversariantes";
 import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
+import { ColagemEditor } from "@/components/colagem-editor";
+import { criarVideoColagem } from "@/app/actions/colagem";
 import { criarVideoTematico, excluirVideoTematico, fotosDoVideoTematico, zerarVideoTematico } from "@/app/actions/videos-tematicos";
 import { excluirFesta, zerarVideoFesta } from "@/app/actions/festas";
 
 // Vídeo TEMÁTICO do buffet (Reels institucional do acervo, sem festa) — view do painel.
 export type VideoTematicoView = {
   id: string;
+  modo?: string; // "" = vídeo temático (slideshow) | "colagem" = vídeo anúncio (abre o ColagemEditor)
   titulo: string;
   videoUrl: string; // "" | "gerando" | http (evergreen: nunca "arquivado")
   videoFotos: string[];
@@ -323,7 +326,7 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir, onZerar }: { v: V
     ? `${v.postadoVezes > 1 ? `postado ${v.postadoVezes}×` : "já postado"} — reposte quando quiser`
     : pronto
     ? "guardado — reposte quando quiser"
-    : "monte com fotos do acervo";
+    : v.modo === "colagem" ? "📎 vídeo anúncio — monte com a oferta" : "monte com fotos do acervo";
   // Evergreen: aqui "agendado" convive com "postado" (ele volta ao ar em datas diferentes), então
   // o selo mostra a PRÓXIMA data e, se tiver mais de um marcado, quantos ainda estão na fila.
   const naFila = v.agendadoEm ? `⏰ Agendado ${dataCurta(v.agendadoEm)}${v.naFila > 1 ? ` +${v.naFila - 1}` : ""}` : "";
@@ -400,6 +403,15 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
   const [msgTema, setMsgTema] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
   const [carregandoTema, setCarregandoTema] = useState<string | null>(null); // id do temático abrindo o seletor
   const [seletorTema, setSeletorTema] = useState<{ video: VideoTematicoView; fotos: FotoView[] } | null>(null);
+  const [colagemAberta, setColagemAberta] = useState<string | null>(null); // id do vídeo anúncio aberto
+  async function novoAnuncio() {
+    setCriando(true); setMsgTema(null);
+    const r = await criarVideoColagem(marcaId).catch(() => ({ ok: false as const, erro: "Não deu pra criar agora." }));
+    setCriando(false);
+    if (!r.ok) { setMsgTema({ tipo: "erro", txt: r.erro || "Não deu pra criar." }); return; }
+    setColagemAberta(r.id);
+    router.refresh();
+  }
   // Exclusão de FESTA (pra tirar festas repetidas) — abre um aviso claro antes de apagar de vez.
   const [apagarFesta, setApagarFesta] = useState<FestaView | null>(null);
   const [apagando, setApagando] = useState(false);
@@ -438,6 +450,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
   // Abre o seletor do temático: o servidor devolve o acervo divulgável com as fotos JÁ
   // escolhidas na frente (e garante que nenhuma delas suma, mesmo em acervo grande).
   async function abrirSeletorTema(v: VideoTematicoView) {
+    if (v.modo === "colagem") { setColagemAberta(v.id); return; }
     setCarregandoTema(v.id); setMsgTema(null);
     const r = await fotosDoVideoTematico(v.id).catch(() => ({ ok: false as const, erro: "Não consegui carregar as fotos." }));
     setCarregandoTema(null);
@@ -494,6 +507,14 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           </div>
         </div>
         {msgTema && <p className={`mt-2 text-xs font-semibold ${msgTema.tipo === "ok" ? "text-green-400" : "text-vermelho"}`}>{msgTema.txt}</p>}
+        {/* VÍDEO ANÚNCIO (colagem): mural animado com a oferta — formato próprio, separado dos temas */}
+        <button type="button" disabled={criando} onClick={novoAnuncio} className="mt-3 flex w-full items-center gap-3 rounded-xl border border-[#ec4899]/40 bg-gradient-to-r from-[#ec4899]/15 to-[#a855f7]/15 p-3 text-left transition hover:from-[#ec4899]/25 hover:to-[#a855f7]/25 disabled:opacity-50">
+          <span className="text-2xl">🎬</span>
+          <span className="min-w-0">
+            <span className="block text-sm font-bold text-white">Novo vídeo anúncio (colagem)</span>
+            <span className="block text-[11px] text-muted">Pra promoção: a Bia monta gancho → dor → virada → prova → oferta, com fotos, figurinhas e o mascote apresentando.</span>
+          </span>
+        </button>
       </div>
 
       {tematicos.length > 0 && (
@@ -556,6 +577,8 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
           onFechar={() => setSeletor(null)}
         />
       )}
+
+      {colagemAberta && <ColagemEditor videoId={colagemAberta} onFechar={() => { setColagemAberta(null); router.refresh(); }} />}
 
       {seletorTema && (
         <SeletorVideoFotos

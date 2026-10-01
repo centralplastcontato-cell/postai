@@ -286,6 +286,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     const ids = (() => { try { const a = JSON.parse(v.videoFotos || "[]"); return Array.isArray(a) ? a.filter((x: unknown): x is string => typeof x === "string") : []; } catch { return [] as string[]; } })();
     return {
       id: v.id,
+      modo: v.modo || "",
       titulo: v.titulo,
       videoUrl: v.videoUrl,
       videoFotos: ids,

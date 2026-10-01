@@ -127,6 +127,11 @@ model VideoTematico {
   narracaoEstilo String @default("")
   narracaoUrl   String @default("") // MP3 pronto (voz + jingle) no Blob
   narracaoSeg   Int    @default(0)  // duração da narração — define quantas fotos o vídeo leva
+  // VÍDEO ANÚNCIO (colagem): "" = vídeo temático clássico (slideshow) | "colagem" = anúncio scrapbook
+  // montado pelo endpoint /colagem do motor (mural animado, figurinhas, mascote apresentador).
+  modo           String @default("")
+  colagemOferta  String @default("{}") // JSON { principal, extras[], prazo "AAAA-MM-DD", condicoes }
+  colagemRoteiro String @default("{}") // JSON de cenas (o roteiro da Bia, já validado)
   criadoEm        DateTime @default(now())
 
   publicacoes Publicacao[] // os Reels agendados/postados a partir deste vídeo (evergreen: vários)

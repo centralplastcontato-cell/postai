@@ -56,6 +56,37 @@ export async function dispararMotorReels(opts: PedidoReels): Promise<{ ok: true 
   }
 }
 
+// VÍDEO ANÚNCIO (colagem): manda o roteiro de cenas (já com o tempo de cada elemento) pro
+// endpoint /colagem do motor. Mesmo esquema do /montar: responde "aceitei" e avisa no callback
+// (o `ref` volta como festaId — o /api/video-pronto acha o vídeo temático por ele).
+export type PedidoColagem = {
+  roteiro: unknown;
+  fotos: Record<string, string>;
+  audioUrl: string;
+  mascote?: { url: string; poses?: Record<string, string> };
+  logoUrl?: string;
+  corSelo?: string;
+  nomeArquivo?: string;
+  ref: string;
+  callbackUrl: string;
+  callbackToken: string;
+};
+export async function dispararMotorColagem(opts: PedidoColagem): Promise<{ ok: true } | { ok: false; erro: string }> {
+  if (!MOTOR_URL) return { ok: false, erro: "Motor de vídeo não configurado (VIDEO_ENGINE_URL)." };
+  try {
+    const auth = new GoogleAuth({ credentials: credenciais() });
+    const client = await auth.getIdTokenClient(MOTOR_URL);
+    const r = await client.request({ url: `${MOTOR_URL}/colagem`, method: "POST", headers: { "Content-Type": "application/json" }, data: opts, timeout: 30000 });
+    const d = r.data as { ok?: boolean } | undefined;
+    return d?.ok ? { ok: true } : { ok: false, erro: "O motor não aceitou o pedido." };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    // Motor ainda sem o /colagem (não foi atualizado): mensagem clara em vez do erro técnico.
+    if (/404|Cannot POST/i.test(msg)) return { ok: false, erro: "O motor de vídeo ainda não tem a colagem — precisa atualizar o motor (gcloud run deploy)." };
+    return { ok: false, erro: msg || "Erro ao falar com o motor de vídeo." };
+  }
+}
+
 export function motorConfigurado(): boolean {
   return Boolean(MOTOR_URL && process.env.GOOGLE_SA_KEY_B64);
 }

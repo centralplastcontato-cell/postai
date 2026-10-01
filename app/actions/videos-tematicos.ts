@@ -407,6 +407,7 @@ export async function zerarVideoTematico(videoId: string) {
       mascoteCanto: "", mascoteTam: "m", logoCanto: "", logoTam: "m", videoMusica: "",
       videoClipes: "[]", videoClipesPos: "espalhados", videoClipesDur: "completo", videoClipesDurMeta: "{}", videoUrl: "",
       narracaoTexto: "", narracaoVoz: "", narracaoEstilo: "", narracaoUrl: "", narracaoSeg: 0,
+      colagemRoteiro: "{}", // vídeo anúncio: recomeçar apaga o roteiro (a oferta fica)
     },
   });
 

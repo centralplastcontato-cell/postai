@@ -1377,17 +1377,14 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                     <div>
                       <span className="text-[11px] font-semibold text-white">🎬 Fundo do vídeo</span>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                        {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }, { id: "cor", emoji: "🎨", label: "Cor" }, { id: "colagem", emoji: "📎", label: "Colagem" }].map((f) => (
+                        {[{ id: "", emoji: "🖼️", label: "Foto borrada" }, { id: "cheia", emoji: "🔳", label: "Foto na tela toda" }, { id: "cor", emoji: "🎨", label: "Cor" }].map((f) => (
                           <button key={f.id || "borrada"} type="button" onClick={() => trocarFundo(f.id)} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition ${fundo === f.id ? "border-vermelho bg-vermelho text-white" : "border-linha bg-preto text-muted hover:border-white/30 hover:text-white"}`}>
                             {f.id === "cor" && <span className="h-2.5 w-2.5 rounded-full border border-white/40" style={{ background: corDoFundo }} />}
                             {f.id !== "cor" && f.emoji} {f.label}
                           </button>
                         ))}
                       </div>
-                      <p className="mt-1 text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta as beiradas). 🎨 <strong className="text-white/70">Cor</strong>: a foto emoldurada sobre um degradê de cor. 📎 <strong className="text-white/70">Colagem</strong>: estilo anúncio — fundo de papel, fotos tipo polaroid e legendas em adesivo (ótimo pra promoção/oferta). Veja na prévia. Vale no próximo <strong className="text-white/70">Gerar</strong>.</p>
-                      {fundo === "colagem" && (
-                        <p className="mt-1.5 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-2 text-[10px] leading-snug text-amber-200/90">📣 Esse estilo é pra <strong className="text-amber-100">vídeo-anúncio</strong>: na aba 🎙️ Narração, a Bia já escreve seguindo gancho → dor → virada → prova → oferta. Se você tiver uma <strong className="text-amber-100">Campanha ativa</strong> no painel, ela já entra sozinha na oferta (números certinhos, sem precisar digitar de novo).</p>
-                      )}
+                      <p className="mt-1 text-[10px] leading-snug text-muted/70">🖼️ <strong className="text-white/70">Borrada</strong>: a foto desfocada atrás, com a moldura. 🔳 <strong className="text-white/70">Na tela toda</strong>: a foto preenche tudo (sem moldura; corta as beiradas). 🎨 <strong className="text-white/70">Cor</strong>: a foto emoldurada sobre um degradê de cor. Veja na prévia. Vale no próximo <strong className="text-white/70">Gerar</strong>.</p>
                       {/* PALETA de cores do fundo (só quando o fundo é "cor") */}
                       {fundo === "cor" && (
                         <div className="mt-2 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
