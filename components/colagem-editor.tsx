@@ -111,6 +111,11 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     // A voz tem que dar 30–35s: se sair fora, a Bia ajusta o tamanho das falas e a voz é refeita
     // (no máximo 3 rodadas — depois disso vai do jeito que ficou, com aviso).
     let r = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+    // A voz do Google às vezes repete trechos: gera de novo (até 2x) antes de mexer no texto.
+    for (let i = 0; i < 2 && r?.ok && r.repetiu; i++) {
+      setMsg({ tipo: "aviso", txt: `🔁 A voz repetiu trechos (falou ${r.palavrasFaladas} palavras de ${r.palavrasTexto}) — gerando de novo…` });
+      r = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+    }
     for (let rodada = 1; rodada <= 3 && r?.ok && r.foraDoTempo; rodada++) {
       setMsg({ tipo: "aviso", txt: `⏱️ A fala ficou com ${r.segundos}s (o ideal é 30–35s) — a Bia está ${r.foraDoTempo === "longo" ? "encurtando" : "alongando"} o texto (rodada ${rodada} de 3)…` });
       const aj = await ajustarTamanhoRoteiro(videoId, r.segundosExatos).catch(() => null);
@@ -124,7 +129,7 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     setTemTempos(true);
     const d = await dadosVideoColagem(videoId).catch(() => null);
     if (d?.ok && d.roteiro) setRoteiro(d.roteiro);
-    setMsg({ tipo: r.foraDoTempo ? "aviso" : "ok", txt: `🔊 Voz pronta (${r.segundos}s)${r.foraDoTempo ? " — ainda fora dos 30–35s, mas pode montar assim" : ""}${r.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
+    setMsg({ tipo: r.foraDoTempo ? "aviso" : "ok", txt: `🔊 Voz pronta (${r.segundos}s · ${r.palavrasTexto} palavras)${r.foraDoTempo ? " — ainda fora dos 30–35s, mas pode montar assim" : ""}${r.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
   }
 
   async function montar() {

@@ -248,8 +248,16 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
   const voz = vozValida(vozId || v.narracaoVoz || VOZ_PADRAO);
   const estilo = (direcao ?? v.narracaoEstilo ?? "").trim().slice(0, 900);
   try {
-    const { url, segundos } = await gerarNarracaoMp3({ texto: narracaoCompleta(roteiro), vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), apertarPausas: true });
+    // Anúncio tem que caber em 30–35s: a direção pede ritmo ágil, as pausas mudas longas são
+    // encurtadas e, se ainda passar de 34s, a voz é acelerada um pouco (até ~18%, sem virar esquilo).
+    const ritmo = "Ritmo ágil de anúncio de rádio, frases emendadas, sem pausas longas entre as frases.";
+    const texto = narracaoCompleta(roteiro);
+    const { url, segundos } = await gerarNarracaoMp3({ texto, vozId: voz, direcao: `${estilo || ""} ${ritmo}`.trim(), slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), apertarPausas: true, alvoSegundos: 34 });
     const falada = await tempoDasPalavras(url);
+    const palavrasTexto = contarPalavras(texto);
+    // A voz do Google às vezes REPETE trechos (sai bem mais palavra falada do que escrita).
+    const repetiu = falada.length > palavrasTexto * 1.3;
+    console.log(`colagem voz: ${segundos}s, ${palavrasTexto} palavras no texto, ${falada.length} faladas${repetiu ? " (REPETIU)" : ""}`);
     const alinhado = alinharTempos(roteiro, falada, segundos);
     const antigo = v.narracaoUrl;
     await prisma.videoTematico.update({
@@ -259,7 +267,7 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
     if (antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
     revalidatePath(`/painel/marcas/${v.marcaId}`);
     const foraDoTempo = segundos > 35.5 ? ("longo" as const) : segundos < 27 ? ("curto" as const) : null;
-    return { ok: true as const, url, segundos: Math.round(segundos), segundosExatos: segundos, sincronizado: falada.length > 0, foraDoTempo };
+    return { ok: true as const, url, segundos: Math.round(segundos), segundosExatos: segundos, sincronizado: falada.length > 0, foraDoTempo, repetiu, palavrasTexto, palavrasFaladas: falada.length };
   } catch (e) {
     console.error("Erro ao gerar a voz da colagem:", e);
     return { ok: false as const, erro: "Não consegui gerar a voz agora." };
