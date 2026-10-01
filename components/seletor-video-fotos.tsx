@@ -400,6 +400,10 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
   const [estilo, setEstilo] = useState(narracao?.estilo || DIRECAO_PADRAO); // COMO a voz fala
   const [volMusica, setVolMusica] = useState(50); // volume da MÚSICA de fundo (0-100; 50 = padrão)
   const [audioUrl, setAudioUrl] = useState(narracao?.url ?? "");
+  // De QUAL texto (fala de abertura | fala final) saiu a voz que está salva. Se o roteiro mudar depois
+  // do "Ouvir" (ou nunca teve "Ouvir"), o Gerar refaz a voz sozinho — antes o vídeo saía mudo/com a
+  // fala antiga sem aviso nenhum.
+  const [audioDe, setAudioDe] = useState(narracao?.url ? `${(narracao?.texto ?? "").trim()}|` : "");
   const [audioSeg, setAudioSeg] = useState(narracao?.segundos ?? 0);
   const [escrevendoRoteiro, setEscrevendoRoteiro] = useState(false);
   const [escrevendoCta, setEscrevendoCta] = useState(false); // a Bia escrevendo a 2ª fala
@@ -663,8 +667,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setEscrevendoCta(false);
     if (r.ok && r.cta) setRoteiro2(r.cta);
   }
-  async function ouvirNarracao() {
-    if (!tematicoId) return;
+  async function ouvirNarracao(): Promise<boolean> {
+    if (!tematicoId) return false;
     setGerandoVoz(true);
     setMsgVoz(null);
     // slider 0-100 → FRAÇÃO (0..1); o motor traduz em ganho audível (0 = sem música; 100 = bem alta).
@@ -684,11 +688,15 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     const wavUrl = musica ? await garantirWav(musica).catch(() => null) : null;
     const r = await gerarNarracaoVideo(tematicoId, roteiro, voz, estilo, musicaVol, roteiro2, alvoSegundos, wavUrl || undefined).catch(() => ({ ok: false as const, erro: "Não consegui gerar a voz agora." }));
     setGerandoVoz(false);
-    if (!r.ok) { setMsgVoz({ tipo: "erro", txt: r.erro || "Não consegui gerar a voz." }); return; }
+    if (!r.ok) { setMsgVoz({ tipo: "erro", txt: r.erro || "Não consegui gerar a voz." }); return false; }
     setAudioUrl(r.url);
     setAudioSeg(r.segundos);
+    setAudioDe(`${roteiro.trim()}|${roteiro2.trim()}`);
     setMsgVoz({ tipo: "ok", txt: `🔊 Narração de ${r.segundos}s pronta — o vídeo vai usar as ${r.fotos} primeiras fotos pra casar com a voz.` });
+    return true;
   }
+  // Tem roteiro escrito mas a voz não existe (ou é de um texto antigo) → precisa (re)gerar a voz.
+  const vozDesatualizada = !!tematicoId && roteiro.trim().length >= 20 && (!audioUrl || audioDe !== `${roteiro.trim()}|${roteiro2.trim()}`);
   async function tirarNarracao() {
     if (!tematicoId) return;
     setGerandoVoz(true);
@@ -761,6 +769,11 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
     setErroGerar("");
     try {
       await salvarSelecao();
+      // Roteiro escrito sem voz (ou voz de um texto antigo): gera a voz ANTES de montar o vídeo.
+      if (vozDesatualizada) {
+        const ok = await ouvirNarracao();
+        if (!ok) { setErroGerar("Não consegui gerar a voz da narração — veja a aba 🎙️ Narração."); setSalvando(false); return; }
+      }
       const r = await (tematicoId ? gerarVideoTematico(tematicoId) : gerarVideoDaFesta(festaId)).catch(() => ({ ok: false as const, erro: "Não consegui gerar agora." }));
       if (!r.ok) { setErroGerar(r.erro || "Não deu pra gerar."); setSalvando(false); return; }
       setSalvando(false);
@@ -1787,7 +1800,8 @@ export function SeletorVideoFotos({ festaId, tematicoId, nome, fotos, inicial, c
                       );
                     })()}
                     {msgVoz && <p className={`mt-1.5 text-[11px] font-semibold ${msgVoz.tipo === "ok" ? "text-emerald-400" : "text-vermelho"}`}>{msgVoz.txt}</p>}
-                    {!audioUrl && !msgVoz && <p className="mt-1.5 text-[10px] leading-snug text-muted/80">Sem narração, o vídeo sai com o <strong className="text-white/70">jingle do buffet</strong> como hoje. Com narração, a voz entra por cima da música.</p>}
+                    {vozDesatualizada && !gerandoVoz && <p className="mt-1.5 rounded-md border border-amber-500/30 bg-amber-500/[0.07] px-2 py-1.5 text-[10px] leading-snug text-amber-200/90">⚠️ {audioUrl ? "O texto mudou depois da última voz." : "A voz desse roteiro ainda não foi gerada."} Toque em <strong className="text-amber-100">🔊 Ouvir</strong> pra conferir antes — ou, se tocar direto em <strong className="text-amber-100">Gerar vídeo</strong>, eu gero a voz sozinho.</p>}
+                    {!audioUrl && !msgVoz && !vozDesatualizada && <p className="mt-1.5 text-[10px] leading-snug text-muted/80">Sem narração, o vídeo sai com o <strong className="text-white/70">jingle do buffet</strong> como hoje. Com narração, a voz entra por cima da música.</p>}
                   </div>
                 </div>
               )}

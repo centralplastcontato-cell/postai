@@ -1062,7 +1062,9 @@ Regras que fazem a voz soar humana:
     const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { roteiro?: string };
     const roteiro = (j.roteiro || "").trim().slice(0, 1200);
     if (!roteiro) throw new Error("A IA não devolveu roteiro.");
-    await prisma.videoTematico.update({ where: { id: videoId }, data: { narracaoTexto: roteiro } });
+    // Já existe uma VOZ gravada → narracaoTexto continua sendo o texto DELA (a tela compara os dois
+    // pra saber que a voz ficou desatualizada e refazer no Gerar). Sem voz, guarda o rascunho.
+    if (!v.narracaoUrl.startsWith("http")) await prisma.videoTematico.update({ where: { id: videoId }, data: { narracaoTexto: roteiro } });
     revalidatePath(`/painel/marcas/${v.marcaId}`);
     return { ok: true as const, roteiro };
   } catch (e) {
