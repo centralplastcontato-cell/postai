@@ -109,10 +109,10 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     setMsg(null);
     setOcupado("voz");
     // A voz tem que dar 30–35s: se sair fora, a Bia ajusta o tamanho das falas e a voz é refeita
-    // (no máximo 2 rodadas — depois disso vai do jeito que ficou, com aviso).
+    // (no máximo 3 rodadas — depois disso vai do jeito que ficou, com aviso).
     let r = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
-    for (let rodada = 1; rodada <= 2 && r?.ok && r.foraDoTempo; rodada++) {
-      setMsg({ tipo: "aviso", txt: `⏱️ A fala ficou com ${r.segundos}s (o ideal é 30–35s) — a Bia está ${r.foraDoTempo === "longo" ? "encurtando" : "alongando"} o texto (rodada ${rodada} de 2)…` });
+    for (let rodada = 1; rodada <= 3 && r?.ok && r.foraDoTempo; rodada++) {
+      setMsg({ tipo: "aviso", txt: `⏱️ A fala ficou com ${r.segundos}s (o ideal é 30–35s) — a Bia está ${r.foraDoTempo === "longo" ? "encurtando" : "alongando"} o texto (rodada ${rodada} de 3)…` });
       const aj = await ajustarTamanhoRoteiro(videoId, r.segundosExatos).catch(() => null);
       if (!aj?.ok) break;
       setRoteiro(aj.roteiro);

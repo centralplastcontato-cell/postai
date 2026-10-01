@@ -279,7 +279,7 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
   const oferta = lerOferta(v.colagemOferta);
   const atuais = roteiro.cenas.reduce((s, x) => s + contarPalavras(x.narracao), 0);
-  const alvo = Math.max(72, Math.min(90, Math.round((atuais * 32.5) / Math.max(10, segundosAtuais))));
+  const alvo = Math.max(50, Math.min(90, Math.round((atuais * 32.5) / Math.max(10, segundosAtuais)))); // pela velocidade REAL da voz (voz lenta = menos palavras)
   const cenasTxt = roteiro.cenas.map((x, i) => `${i + 1}. [${x.ato}] "${x.narracao}" — palavras que precisam continuar na fala: ${[...new Set(x.elementos.map((e) => e.gatilho).filter(Boolean))].join(", ")}`).join("\n");
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
