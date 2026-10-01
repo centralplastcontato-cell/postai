@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VOZES, ESTILOS, VOZ_PADRAO, DIRECAO_PADRAO } from "@/lib/vozes";
 import type { Oferta, Roteiro } from "@/lib/colagem";
-import { dadosVideoColagem, salvarOfertaColagem, gerarRoteiroColagem, gerarVozColagem, montarVideoColagem } from "@/app/actions/colagem";
+import { type Qualidade, dadosVideoColagem, salvarOfertaColagem, gerarRoteiroColagem, gerarVozColagem, montarVideoColagem, ajustarTamanhoRoteiro } from "@/app/actions/colagem";
 import { statusVideoTematico } from "@/app/actions/videos-tematicos";
 
 const NOME_ATO: Record<string, { emoji: string; nome: string; cor: string }> = {
@@ -36,6 +36,7 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
   const [audio, setAudio] = useState<{ url: string; segundos: number } | null>(null);
   const [temTempos, setTemTempos] = useState(false);
   const [videoUrl, setVideoUrl] = useState("");
+  const [qualidade, setQualidade] = useState<Qualidade | null>(null);
   const [ocupado, setOcupado] = useState<"" | "roteiro" | "voz" | "montar">("");
   const [msg, setMsg] = useState<{ tipo: "ok" | "erro" | "aviso"; txt: string } | null>(null);
 
@@ -53,6 +54,7 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     setAudio(d.narracao.url.startsWith("http") ? { url: d.narracao.url, segundos: d.narracao.segundos } : null);
     setTemTempos(d.temTempos);
     setVideoUrl(d.videoUrl);
+    setQualidade(d.qualidade);
   }
   useEffect(() => { recarregar(); }, [videoId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -63,6 +65,8 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
       const r = await statusVideoTematico(videoId).catch(() => null);
       if (r?.ok && r.videoUrl !== "gerando") {
         setVideoUrl(r.videoUrl);
+        const d = await dadosVideoColagem(videoId).catch(() => null);
+        if (d?.ok) setQualidade(d.qualidade);
         setMsg(r.videoUrl.startsWith("http") ? { tipo: "ok", txt: "🎬 Vídeo pronto! Assista abaixo." } : { tipo: "erro", txt: "O motor não conseguiu montar o vídeo. Tente de novo." });
         router.refresh();
       }
@@ -104,12 +108,23 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
   async function gerarVoz() {
     setMsg(null);
     setOcupado("voz");
-    const r = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+    // A voz tem que dar 30–35s: se sair fora, a Bia ajusta o tamanho das falas e a voz é refeita
+    // (no máximo 2 rodadas — depois disso vai do jeito que ficou, com aviso).
+    let r = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+    for (let rodada = 1; rodada <= 2 && r?.ok && r.foraDoTempo; rodada++) {
+      setMsg({ tipo: "aviso", txt: `⏱️ A fala ficou com ${r.segundos}s (o ideal é 30–35s) — a Bia está ${r.foraDoTempo === "longo" ? "encurtando" : "alongando"} o texto (rodada ${rodada} de 2)…` });
+      const aj = await ajustarTamanhoRoteiro(videoId, r.segundosExatos).catch(() => null);
+      if (!aj?.ok) break;
+      setRoteiro(aj.roteiro);
+      r = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+    }
     setOcupado("");
     if (!r || !r.ok) { setMsg({ tipo: "erro", txt: (r && "erro" in r && r.erro) || "Não consegui gerar a voz." }); return; }
     setAudio({ url: r.url, segundos: r.segundos });
     setTemTempos(true);
-    setMsg({ tipo: r.aviso ? "aviso" : "ok", txt: r.aviso || `🔊 Voz pronta (${r.segundos}s)${r.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
+    const d = await dadosVideoColagem(videoId).catch(() => null);
+    if (d?.ok && d.roteiro) setRoteiro(d.roteiro);
+    setMsg({ tipo: r.foraDoTempo ? "aviso" : "ok", txt: `🔊 Voz pronta (${r.segundos}s)${r.foraDoTempo ? " — ainda fora dos 30–35s, mas pode montar assim" : ""}${r.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
   }
 
   async function montar() {
@@ -224,6 +239,13 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
                 {videoUrl === "gerando" ? "⏳ Montando…" : ocupado === "montar" ? "Enviando…" : videoUrl.startsWith("http") ? "🔄 Montar de novo" : "⚡ Montar vídeo"}
               </button>
             </div>
+            {videoUrl.startsWith("http") && qualidade && (
+              <p className={`mt-2 rounded-lg border px-2.5 py-1.5 text-[11px] ${qualidade.aprovado ? "border-emerald-500/30 bg-emerald-500/[0.07] text-emerald-200" : "border-amber-500/30 bg-amber-500/[0.07] text-amber-200"}`}>
+                {qualidade.aprovado ? "✓ Conferência aprovada" : "⚠️ Conferência com aviso"} · tela coberta: mínimo {qualidade.coberturaMin}% (média {qualidade.coberturaMedia}%) · {qualidade.cortados.length ? `peça na borda: ${qualidade.cortados.join(", ")}` : "nada cortado"}
+                {qualidade.ajustes > 0 && ` · ${qualidade.ajustes} ajuste(s) automático(s)`}
+                {qualidade.aviso && <><br />{qualidade.aviso}</>}
+              </p>
+            )}
             {videoUrl.startsWith("http") && (
               // eslint-disable-next-line jsx-a11y/media-has-caption
               <video src={videoUrl} controls playsInline className="mx-auto mt-3 aspect-[9/16] w-full max-w-xs rounded-xl bg-black" />

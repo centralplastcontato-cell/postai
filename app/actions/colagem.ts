@@ -25,6 +25,7 @@ import {
   type Oferta, type Roteiro, type FotoInfo, type PalavraFalada,
 } from "@/lib/colagem";
 
+export type Qualidade = { aprovado: boolean; coberturaMin: number; coberturaMedia: number; baseVaziaTrechos: string[]; cortados: string[]; ajustes: number; aviso: string };
 const OFERTA_VAZIA: Oferta = { principal: "", extras: [], prazo: "", condicoes: true };
 
 function lerOferta(json: string): Oferta {
@@ -97,6 +98,7 @@ export async function dadosVideoColagem(videoId: string) {
     narracao: { url: c.v.narracaoUrl, segundos: c.v.narracaoSeg, voz: c.v.narracaoVoz || VOZ_PADRAO, estilo: c.v.narracaoEstilo },
     temTempos: Boolean(roteiro?.cenas.every((x) => typeof x.inicio === "number")) && c.v.narracaoUrl.startsWith("http"),
     videoUrl: c.v.videoUrl,
+    qualidade: (() => { try { const q = JSON.parse(c.v.colagemQualidade || "{}"); return q && typeof q === "object" && "aprovado" in q ? (q as Qualidade) : null; } catch { return null; } })(),
   };
 }
 
@@ -256,11 +258,54 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
     });
     if (antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
     revalidatePath(`/painel/marcas/${v.marcaId}`);
-    const aviso = segundos < 26 ? "A narração ficou curta — se quiser um vídeo mais cheio, peça outro roteiro." : segundos > 38 ? "A narração passou de 35s — se quiser mais curto, peça outro roteiro." : "";
-    return { ok: true as const, url, segundos: Math.round(segundos), sincronizado: falada.length > 0, aviso };
+    const foraDoTempo = segundos > 35.5 ? ("longo" as const) : segundos < 29.5 ? ("curto" as const) : null;
+    return { ok: true as const, url, segundos: Math.round(segundos), segundosExatos: segundos, sincronizado: falada.length > 0, foraDoTempo };
   } catch (e) {
     console.error("Erro ao gerar a voz da colagem:", e);
     return { ok: false as const, erro: "Não consegui gerar a voz agora." };
+  }
+}
+
+// ---------- 3b. duração 30–35s ----------
+// A voz saiu fora do tempo: a Bia reescreve SÓ as falas (mesmas cenas, fotos e figurinhas), mirando
+// o número de palavras que dá ~32s nessa voz. Depois a tela gera a voz de novo.
+export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: number) {
+  const c = await carregar(videoId);
+  if (!c.ok) return c;
+  const { v } = c;
+  const roteiro = lerRoteiro(v.colagemRoteiro);
+  if (!roteiro) return { ok: false as const, erro: "Sem roteiro pra ajustar." };
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
+  const oferta = lerOferta(v.colagemOferta);
+  const atuais = roteiro.cenas.reduce((s, x) => s + contarPalavras(x.narracao), 0);
+  const alvo = Math.max(72, Math.min(90, Math.round((atuais * 32.5) / Math.max(10, segundosAtuais))));
+  const cenasTxt = roteiro.cenas.map((x, i) => `${i + 1}. [${x.ato}] "${x.narracao}" — palavras que precisam continuar na fala: ${[...new Set(x.elementos.map((e) => e.gatilho).filter(Boolean))].join(", ")}`).join("\n");
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4.1",
+        response_format: { type: "json_object" },
+        temperature: 0.5,
+        messages: [
+          { role: "system", content: `Você ajusta o TAMANHO da narração de um vídeo-anúncio de buffet infantil, sem mudar a estrutura. Reescreva cada fala pra que o TOTAL tenha ${alvo} palavras (hoje tem ${atuais}). Mantenha o sentido, o tom informal, "você" (nunca "cê"), os números da oferta EXATOS (${oferta.principal}${oferta.extras.length ? "; " + oferta.extras.join("; ") : ""}${oferta.prazo ? "; prazo até " + prazoCurto(oferta.prazo) + ", falado por extenso" : ""}) e, em cada cena, as palavras listadas (elas disparam as figurinhas). Responda só com JSON: {"narracoes":["fala da cena 1","fala da cena 2",...]} — uma por cena, na mesma ordem.` },
+          { role: "user", content: cenasTxt },
+        ],
+      }),
+      signal: AbortSignal.timeout(40000),
+    });
+    if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
+    const data = await resp.json();
+    const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { narracoes?: string[] };
+    if (!Array.isArray(j.narracoes) || j.narracoes.length !== roteiro.cenas.length) throw new Error("resposta fora do formato");
+    const novo = completarCenas({ cenas: roteiro.cenas.map((x, i) => ({ ...x, narracao: String(j.narracoes![i] || x.narracao).trim(), inicio: undefined, fim: undefined, elementos: x.elementos.map((e) => ({ ...e, t: undefined })) })) });
+    await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(novo), narracaoTexto: narracaoCompleta(novo) } });
+    return { ok: true as const, roteiro: novo, palavras: novo.cenas.reduce((s, x) => s + contarPalavras(x.narracao), 0) };
+  } catch (e) {
+    console.error("Erro ao ajustar o tamanho do roteiro:", e);
+    return { ok: false as const, erro: "Não consegui ajustar o tamanho da fala agora." };
   }
 }
 

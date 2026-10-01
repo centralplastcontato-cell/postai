@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 // TEMÁTICO — descobrimos aqui e gravamos no lugar certo (o motor não precisa saber).
 export async function POST(req: Request) {
   const secret = process.env.VIDEO_CALLBACK_SECRET || "";
-  const body = (await req.json().catch(() => ({}))) as { festaId?: string; videoUrl?: string; ok?: boolean; erro?: string; token?: string };
+  const body = (await req.json().catch(() => ({}))) as { festaId?: string; videoUrl?: string; ok?: boolean; erro?: string; token?: string; qualidade?: unknown };
   if (!secret || body.token !== secret) {
     return Response.json({ ok: false, erro: "Não autorizado." }, { status: 401 });
   }
@@ -45,7 +45,10 @@ export async function POST(req: Request) {
       // do vídeo do buffet). Deu errado: só volta pro "sem vídeo", sem mexer no carimbo antigo.
       await prisma.videoTematico.update({
         where: { id },
-        data: novaUrl ? { videoUrl: novaUrl, videoEm: new Date() } : { videoUrl: novaUrl },
+        // vídeo anúncio (colagem): guarda também o relatório da conferência do motor
+        data: novaUrl
+          ? { videoUrl: novaUrl, videoEm: new Date(), ...(body.qualidade && typeof body.qualidade === "object" ? { colagemQualidade: JSON.stringify(body.qualidade).slice(0, 4000) } : {}) }
+          : { videoUrl: novaUrl },
       });
       await registrarAtividade(
         AGENTE,

@@ -6,7 +6,7 @@
 export type Oferta = { principal: string; extras: string[]; prazo: string; condicoes: boolean }; // prazo "AAAA-MM-DD" ou ""
 
 export type Elemento = {
-  tipo: "foto" | "adesivo" | "mascote" | "grupo" | "texto";
+  tipo: "foto" | "adesivo" | "mascote" | "grupo" | "texto" | "logo";
   asset?: string; // id da foto (ImagemMarca)
   estilo?: string;
   texto?: string;
@@ -19,6 +19,11 @@ export type Elemento = {
   quantidade?: number;
   intervalo?: number;
   gatilho?: string;
+  entra_em?: number; // segundos desde o início da cena (a 1ª peça: ≤ 0,2)
+  papel?: string; // "principal" = a foto grande da cena
+  tamanho?: number; // fração da largura (logo/selo) ou px
+  ao_redor_de?: string; // carinhas: em volta de qual peça (ex.: "selo_promo")
+  sangrar?: boolean; // pode sair da tela (o motor não encaixa na área segura)
   t?: number; // segundos (preenchido pelo alinhamento)
 };
 export type Cena = { id: number; ato: string; narracao: string; fundo?: string; elementos: Elemento[]; transicao_saida?: string; inicio?: number; fim?: number };
@@ -27,7 +32,7 @@ export type FotoInfo = { descricao: string; categoria: string };
 
 export const ATOS = ["gancho", "dor", "virada", "prova", "oferta"] as const;
 export const ANIMACOES = ["pop_bounce", "slide_giro", "fita_adesiva", "carimbo", "empilhar", "wiggle", "ken_burns", "selo_giro", "nenhuma"];
-export const POSICOES = ["centro", "sup_esq", "sup_dir", "inf_esq", "inf_dir", "meio_esq", "meio_dir", "topo", "faixa_meio", "base", "rodape"];
+export const POSICOES = ["centro", "sup_esq", "sup_dir", "inf_esq", "inf_dir", "meio_esq", "meio_dir", "topo", "faixa_meio", "base", "rodape", "ao_redor"];
 export const POSES = ["pular", "apontar", "comemorar", "acenar"];
 export const TRANSICOES = ["corte_seco", "rasgo_papel", "virar_pagina", "acumula", "fim"];
 export const MOLDURAS = ["polaroid", "recorte_branco", "sem_moldura"];
@@ -36,7 +41,7 @@ export const ESTILOS_ADESIVO = [
   "etiqueta_amarela", "etiqueta_rosa", "etiqueta_azul", "etiqueta_verde", "recibo", "nota", "selo_promo", "botao_whatsapp",
 ];
 const DECORATIVAS = new Set(["rasgo_papel", "virar_pagina"]);
-const TIPOS = ["foto", "adesivo", "mascote", "grupo", "texto"];
+const TIPOS = ["foto", "adesivo", "mascote", "grupo", "texto", "logo"];
 const ESTILO_APELIDO: Record<string, string> = {
   selo: "selo_promo", selo_promocao: "selo_promo", selo_promocional: "selo_promo", promo: "selo_promo",
   whatsapp: "botao_whatsapp", botao: "botao_whatsapp", botao_whats: "botao_whatsapp", whats: "botao_whatsapp",
@@ -155,6 +160,14 @@ const FIGURINHAS_POR_ATO: Record<string, { estilo: string; texto?: string }[]> =
 const VAGAS_EXTRA = ["sup_dir", "inf_esq", "meio_dir", "sup_esq", "meio_esq", "inf_dir"];
 export function completarCenas(r: Roteiro): Roteiro {
   let decorativas = 0;
+  // VIRADA: logo grande no centro + mascote comemorando (se a Bia esquecer, o sistema põe)
+  const virada = r.cenas.find((c) => c.ato === "virada");
+  if (virada) {
+    const pv = palavras(virada.narracao);
+    if (!virada.elementos.some((e) => e.tipo === "logo")) virada.elementos.unshift({ tipo: "logo", posicao: "centro", tamanho: 0.65, animacao: "carimbo", entra_em: 0, gatilho: pv[0] || "" });
+    if (!virada.elementos.some((e) => e.tipo === "mascote")) virada.elementos.push({ tipo: "mascote", pose: "comemorar", posicao: "inf_dir", animacao: "pop_bounce", gatilho: pv[Math.floor(pv.length / 2)] || pv[0] || "" });
+    else for (const e of virada.elementos) if (e.tipo === "mascote") e.pose = "comemorar";
+  }
   const cenas = r.cenas.map((c) => {
     const ps = palavras(c.narracao);
     const palavraEm = (frac: number) => ps[Math.min(ps.length - 1, Math.max(0, Math.round(frac * (ps.length - 1))))] || "";
@@ -186,7 +199,9 @@ export function completarCenas(r: Roteiro): Roteiro {
 export function soDetalhes(erros: string[]): boolean {
   return erros.every((e) => {
     const n = /narração tem (\d+) palavras/.exec(e);
-    if (n) return Number(n[1]) >= 60 && Number(n[1]) <= 100;
+    if (n) return Number(n[1]) >= 68 && Number(n[1]) <= 95;
+    const p = /prova precisa de 5 a 6 fotos.*veio (\d+)/.exec(e);
+    if (p) return Number(p[1]) >= 3;
     return /sem cor|passa de 5 palavras|elementos — use/.test(e);
   });
 }
@@ -204,11 +219,13 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
 
   // duração (~2,6 palavras/s): 28–35s ≈ 70–92 palavras
   const total = cenas.reduce((s, c) => s + contarPalavras(c.narracao), 0);
-  if (total < 68 || total > 92) erros.push(`A narração tem ${total} palavras — precisa ter entre 70 e 90 (vídeo de 28 a 35 segundos).`);
+  if (total < 75 || total > 88) erros.push(`A narração tem ${total} palavras — precisa ter entre 75 e 88 (vídeo de 30 a 35 segundos).`);
 
   // fotos
   const ids = cenas.flatMap((c) => c.elementos.filter((e) => e.tipo === "foto").map((e) => e.asset || ""));
   if (ids.length > 10) erros.push(`Use no máximo 10 fotos (veio ${ids.length}).`);
+  const fotosProva = cenas.filter((c) => c.ato === "prova").flatMap((c) => c.elementos.filter((e) => e.tipo === "foto")).length;
+  if (fotosProva < 5) erros.push(`A prova precisa de 5 a 6 fotos de festa com crianças, empilhando (veio ${fotosProva}).`);
   if (ids.length < 3) erros.push("Use pelo menos 3 fotos do buffet (prova real).");
   const repetidas = ids.filter((id, i) => ids.indexOf(id) !== i);
   if (repetidas.length) erros.push(`Não repita foto no mesmo vídeo (repetida: ${[...new Set(repetidas)].join(", ")}).`);
@@ -222,8 +239,8 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
   let decorativas = 0;
   cenas.forEach((c, i) => {
     const n = c.elementos.length;
-    const max = c.ato === "oferta" ? 10 : 5; // a oferta recebe as peças obrigatórias (selo, prazo, extras, botão, rodapé)
-    if (n < 2 || n > max) erros.push(`Cena ${i + 1} (${c.ato}) tem ${n} elementos — use de 2 a ${max === 10 ? "4 (a da oferta pode ter até 10)" : "4 (no máximo 5)"}.`);
+    const max = c.ato === "oferta" ? 10 : 7; // a oferta recebe as peças obrigatórias (selo, prazo, extras, botão, rodapé)
+    if (n < 2 || n > max) erros.push(`Cena ${i + 1} (${c.ato}) tem ${n} elementos — use de 2 a ${max === 10 ? "6 (a da oferta pode ter até 10)" : "6 (no máximo 7)"}.`);
     const figurinhas = c.elementos.filter((e) => e.tipo === "adesivo" || e.tipo === "grupo").length;
     if (figurinhas < 2) erros.push(`Cena ${i + 1} (${c.ato}) precisa de pelo menos 2 figurinhas (adesivos).`);
     if (!c.narracao) erros.push(`Cena ${i + 1} está sem narração.`);
@@ -329,27 +346,27 @@ DIFERENCIAIS DO BUFFET (use SÓ estes — nunca invente diferencial): ${marca.de
 ESTRUTURA OBRIGATÓRIA — 5 atos, nesta ordem (um ato pode ter 1 ou 2 cenas seguidas):
 1. gancho (3–4s): pergunta ou cena que para o scroll. Foto MAIS impactante (festa cheia, crianças, salão montado). NUNCA abra com fachada, entrada ou logo.
 2. dor (5–7s): o problema do pai/mãe (conta alta, mil fornecedores, estresse). Use recibos (estilo "recibo", animação "empilhar") e a carinha_preocupada. Pode ficar sem foto.
-3. virada (3–4s): o buffet como solução ("no ${marca.nome}... tá tudo incluso").
-4. prova (7–10s): 2 ou 3 diferenciais reais, UMA FOTO POR DIFERENCIAL, na mesma ordem da fala. Pode ter 2 cenas — as fotos se ACUMULAM na tela como um mural.
+3. virada (3–4s): o buffet como solução ("no ${marca.nome}... tá tudo incluso"). Elementos: LOGO grande no centro ({"tipo":"logo","posicao":"centro","tamanho":0.65}), o mascote COMEMORANDO e 1 foto de festa cheia.
+4. prova (7–10s): 2 ou 3 diferenciais reais, com 5 a 6 FOTOS de festa com crianças, em 2 cenas de 3 fotos (as fotos se ACUMULAM na tela como um mural, entrando rápido com "empilhar"). A 1ª foto de cada cena é a principal ("papel":"principal").
 5. oferta (6–8s): o benefício principal lidera, extras como reforço, PRAZO falado e escrito, chamada pro WhatsApp.
 
 REGRAS DE TEXTO:
 - Narração falada, informal, frases curtas, sempre "você" (nunca "cê"). Números e datas POR EXTENSO na fala ("dez amiguinhos", "até quinze de outubro").
-- A narração INTEIRA soma entre 70 e 90 palavras.
+- A narração INTEIRA soma entre 75 e 88 palavras (vídeo de 30 a 35 segundos).
 - Texto na tela: no máximo 5 palavras por adesivo (o selo_promo pode ter o benefício inteiro). A tela COMPLEMENTA a fala, não repete a frase.
 - Prazo: falado E escrito ("Até DD/MM" num adesivo).
 - Use os números da oferta EXATAMENTE como vieram.
 
-FOTOS: escolha da lista pelo id. Priorize fotos com crianças e cor; evite espaço vazio ou escuro; nunca fachada no gancho; no máximo 10 fotos; não repita.
+FOTOS: escolha da lista pelo id. Priorize fotos com crianças e cor; evite espaço vazio ou escuro; nunca fachada no gancho; de 7 a 10 fotos no total; não repita.
 
-CADA CENA: de 2 a 4 elementos (a da oferta pode ter até 8), com pelo menos 2 figurinhas (adesivo ou grupo). Todo elemento tem "gatilho" = UMA palavra da narração DAQUELA cena, no momento em que ele deve entrar.
+CADA CENA: de 3 a 6 elementos (a da oferta pode ter até 8), com pelo menos 2 figurinhas (adesivo ou grupo), com peças no TOPO, no MEIO e na BASE da tela. O 1º elemento de cada cena tem "entra_em": 0 (tela nunca vazia); os outros têm "gatilho" = UMA palavra da narração DAQUELA cena, no momento em que devem entrar.
 
-MASCOTE (o castelinho apresentador): tipo "mascote", com "pose" (pular | apontar | comemorar | acenar) e "balao" opcional (até 5 palavras). Entra pulando no gancho, aponta as fotos na prova, comemora segurando o selo na oferta.
+MASCOTE (o castelinho apresentador): tipo "mascote", com "pose" (pular | apontar | comemorar | acenar) e "balao" opcional (até 5 palavras). Aparece em quase toda cena, MUDANDO de canto e de pose: entra pulando no gancho, comemora na virada, aponta as fotos na prova, comemora segurando o selo na oferta.
 
 CATÁLOGO (use só estes valores):
-- tipo: foto | adesivo | mascote | grupo | texto
+- tipo: foto | adesivo | mascote | grupo | texto | logo
 - estilo do adesivo: ${ESTILOS_ADESIVO.join(", ")}
-- grupo: {"tipo":"grupo","estilo":"carinhas_criancas","quantidade":10,"intervalo":0.08} (carinhas de criança pulando — ótimo pra "amiguinhos")
+- grupo: {"tipo":"grupo","estilo":"carinhas_criancas","quantidade":10,"intervalo":0.08,"posicao":"ao_redor","ao_redor_de":"selo_promo"} (carinhas de criança pulando EM VOLTA do selo — ótimo pra "amiguinhos"; nunca por cima de foto)
 - texto: só o rodapé {"tipo":"texto","estilo":"rodape","texto":"Consulte condições","posicao":"rodape"}
 - animacao: ${ANIMACOES.join(", ")} (fade só em exceção)
 - posicao: ${POSICOES.join(", ")} (fotos: centro, sup_esq, sup_dir, inf_esq, inf_dir; mascote: inf_esq, inf_dir, meio_esq, meio_dir; botão WhatsApp: base)
