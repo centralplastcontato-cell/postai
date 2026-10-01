@@ -152,6 +152,38 @@ function acelerarVoz(v: Int16Array, ratio: number): Int16Array {
   return out;
 }
 
+// Encurta os silêncios LONGOS da voz (a voz do Google às vezes faz pausas mudas de 1–3s entre
+// frases, e o vídeo-anúncio estoura o tempo). Pausa maior que `maxS` vira `fica` segundos.
+function apertarPausas(v: Int16Array, maxS = 0.45, fica = 0.3): Int16Array {
+  const jan = Math.round(0.02 * TAXA); // janelas de 20ms
+  const nJan = Math.floor(v.length / jan);
+  const mudo: boolean[] = [];
+  for (let j = 0; j < nJan; j++) {
+    let soma = 0;
+    for (let i = j * jan; i < (j + 1) * jan; i++) soma += v[i] * v[i];
+    mudo.push(Math.sqrt(soma / jan) < 450); // ~ -37 dB
+  }
+  const manter = Math.round(fica / 0.02 / 2); // janelas mantidas de cada lado da pausa
+  const partes: Int16Array[] = [];
+  let ini = 0; // início do trecho ainda não copiado (em amostras)
+  for (let j = 0; j < nJan; ) {
+    if (!mudo[j]) { j++; continue; }
+    let k = j;
+    while (k < nJan && mudo[k]) k++;
+    if ((k - j) * 0.02 > maxS && j > 0 && k < nJan) {
+      partes.push(v.subarray(ini, (j + manter) * jan));
+      ini = (k - manter) * jan;
+    }
+    j = k;
+  }
+  if (!partes.length) return v;
+  partes.push(v.subarray(ini));
+  const out = new Int16Array(partes.reduce((s, p) => s + p.length, 0));
+  let o = 0;
+  for (const p of partes) { out.set(p, o); o += p.length; }
+  return out;
+}
+
 function montarTrilha(
   voz1in: Int16Array,
   voz2in: Int16Array | null,
@@ -245,13 +277,18 @@ export async function gerarNarracaoMp3(opts: {
   volMusica?: number;
   alvoSegundos?: number;
   musicaWav?: string; // WAV (24kHz mono) da trilha ESCOLHIDA pelo dono — entra no lugar do jingle
+  apertarPausas?: boolean; // vídeo-anúncio: encurta as pausas mudas longas da voz
 }): Promise<{ url: string; segundos: number }> {
   const texto = opts.texto.trim();
   if (!texto) throw new Error("Sem texto pra narrar.");
 
-  const voz1 = await falar(texto, opts.vozId, opts.direcao || "");
+  let voz1 = await falar(texto, opts.vozId, opts.direcao || "");
   const t2 = (opts.texto2 || "").trim();
-  const voz2 = t2 ? await falar(t2, opts.vozId, opts.direcao || "") : null;
+  let voz2 = t2 ? await falar(t2, opts.vozId, opts.direcao || "") : null;
+  if (opts.apertarPausas) {
+    voz1 = apertarPausas(voz1);
+    if (voz2) voz2 = apertarPausas(voz2);
+  }
 
   // Música de fundo: a TRILHA do dono (musicaWav) tem prioridade; senão o jingle da marca. Tudo
   // best-effort — se a trilha do dono falhar (formato/rede), cai no jingle; se o jingle falhar,

@@ -248,7 +248,7 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
   const voz = vozValida(vozId || v.narracaoVoz || VOZ_PADRAO);
   const estilo = (direcao ?? v.narracaoEstilo ?? "").trim().slice(0, 900);
   try {
-    const { url, segundos } = await gerarNarracaoMp3({ texto: narracaoCompleta(roteiro), vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6) });
+    const { url, segundos } = await gerarNarracaoMp3({ texto: narracaoCompleta(roteiro), vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), apertarPausas: true });
     const falada = await tempoDasPalavras(url);
     const alinhado = alinharTempos(roteiro, falada, segundos);
     const antigo = v.narracaoUrl;
@@ -258,7 +258,7 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
     });
     if (antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
     revalidatePath(`/painel/marcas/${v.marcaId}`);
-    const foraDoTempo = segundos > 35.5 ? ("longo" as const) : segundos < 29.5 ? ("curto" as const) : null;
+    const foraDoTempo = segundos > 35.5 ? ("longo" as const) : segundos < 27 ? ("curto" as const) : null;
     return { ok: true as const, url, segundos: Math.round(segundos), segundosExatos: segundos, sincronizado: falada.length > 0, foraDoTempo };
   } catch (e) {
     console.error("Erro ao gerar a voz da colagem:", e);
@@ -269,6 +269,22 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
 // ---------- 3b. duração 30–35s ----------
 // A voz saiu fora do tempo: a Bia reescreve SÓ as falas (mesmas cenas, fotos e figurinhas), mirando
 // o número de palavras que dá ~32s nessa voz. Depois a tela gera a voz de novo.
+// Fala "enchida" pela IA: o mesmo trecho de 3 palavras aparece 2x, ou termina numa lista de
+// palavras soltas ("grátis, parcelamento, recreação, primeiros, WhatsApp.").
+function falaRepetitiva(fala: string): boolean {
+  const p = fala.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean);
+  const vistos = new Set<string>();
+  for (let i = 0; i + 2 < p.length; i++) {
+    const tri = p.slice(i, i + 3).join(" ");
+    if (vistos.has(tri)) return true;
+    vistos.add(tri);
+  }
+  const pedacos = fala.split(/[,.!?;]/).map((x) => x.trim()).filter(Boolean);
+  let soltos = 0;
+  for (const x of pedacos) { soltos = x.split(/\s+/).length <= 1 ? soltos + 1 : 0; if (soltos >= 4) return true; }
+  return false;
+}
+
 export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: number) {
   const c = await carregar(videoId);
   if (!c.ok) return c;
@@ -279,7 +295,10 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
   const oferta = lerOferta(v.colagemOferta);
   const atuais = roteiro.cenas.reduce((s, x) => s + contarPalavras(x.narracao), 0);
-  const alvo = Math.max(50, Math.min(90, Math.round((atuais * 32.5) / Math.max(10, segundosAtuais)))); // pela velocidade REAL da voz (voz lenta = menos palavras)
+  // pela velocidade REAL da voz (voz lenta = menos palavras). Alongar: no máximo +12 palavras por
+  // rodada (pedir muito a mais fazia a IA encher de palavras soltas e frases repetidas).
+  const pelaVoz = Math.round((atuais * 32.5) / Math.max(10, segundosAtuais));
+  const alvo = Math.max(50, Math.min(90, atuais + 12, pelaVoz));
   const cenasTxt = roteiro.cenas.map((x, i) => `${i + 1}. [${x.ato}] "${x.narracao}" — palavras que precisam continuar na fala: ${[...new Set(x.elementos.map((e) => e.gatilho).filter(Boolean))].join(", ")}`).join("\n");
   try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -290,7 +309,7 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
         response_format: { type: "json_object" },
         temperature: 0.5,
         messages: [
-          { role: "system", content: `Você ajusta o TAMANHO da narração de um vídeo-anúncio de buffet infantil, sem mudar a estrutura. Reescreva cada fala pra que o TOTAL tenha ${alvo} palavras (hoje tem ${atuais}). Mantenha o sentido, o tom informal, "você" (nunca "cê"), os números da oferta EXATOS (${oferta.principal}${oferta.extras.length ? "; " + oferta.extras.join("; ") : ""}${oferta.prazo ? "; prazo até " + prazoCurto(oferta.prazo) + ", falado por extenso" : ""}) e, em cada cena, as palavras listadas (elas disparam as figurinhas). Responda só com JSON: {"narracoes":["fala da cena 1","fala da cena 2",...]} — uma por cena, na mesma ordem.` },
+          { role: "system", content: `Você ajusta o TAMANHO da narração de um vídeo-anúncio de buffet infantil, sem mudar a estrutura. Reescreva cada fala pra que o TOTAL tenha ${alvo} palavras (hoje tem ${atuais}). Mantenha o sentido, o tom informal, "você" (nunca "cê"), os números da oferta EXATOS (${oferta.principal}${oferta.extras.length ? "; " + oferta.extras.join("; ") : ""}${oferta.prazo ? "; prazo até " + prazoCurto(oferta.prazo) + ", falado por extenso" : ""}) e, em cada cena, as palavras listadas (elas disparam as figurinhas) — encaixadas em frases naturais, NUNCA como lista de palavras soltas no fim. Proibido repetir frase ou ideia já dita; cada fala tem que soar como gente falando. Responda só com JSON: {"narracoes":["fala da cena 1","fala da cena 2",...]} — uma por cena, na mesma ordem.` },
           { role: "user", content: cenasTxt },
         ],
       }),
@@ -300,6 +319,8 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
     const data = await resp.json();
     const j = JSON.parse(data.choices?.[0]?.message?.content ?? "{}") as { narracoes?: string[] };
     if (!Array.isArray(j.narracoes) || j.narracoes.length !== roteiro.cenas.length) throw new Error("resposta fora do formato");
+    const ruim = j.narracoes.map(String).find(falaRepetitiva);
+    if (ruim) throw new Error(`fala repetitiva: ${ruim.slice(0, 80)}`);
     const novo = completarCenas({ cenas: roteiro.cenas.map((x, i) => ({ ...x, narracao: String(j.narracoes![i] || x.narracao).trim(), inicio: undefined, fim: undefined, elementos: x.elementos.map((e) => ({ ...e, t: undefined })) })) });
     await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(novo), narracaoTexto: narracaoCompleta(novo) } });
     return { ok: true as const, roteiro: novo, palavras: novo.cenas.reduce((s, x) => s + contarPalavras(x.narracao), 0) };
