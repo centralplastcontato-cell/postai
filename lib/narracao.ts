@@ -53,7 +53,7 @@ async function falar(texto: string, vozId: string, direcao: string): Promise<Int
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
       // Sem timeout, um Google lento consumiria os 60s da função e o dono veria um erro cru.
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(45000), // voz de anúncio (~85 palavras) pode levar uns 30s no Google
     });
     if (!r.ok) return { status: r.status, erro: (await r.text()).slice(0, 200) };
     const j = (await r.json()) as { audioContent?: string };

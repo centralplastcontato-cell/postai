@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VOZES, ESTILOS, VOZ_PADRAO, DIRECAO_PADRAO } from "@/lib/vozes";
 import type { Oferta, Roteiro } from "@/lib/colagem";
-import { type Qualidade, dadosVideoColagem, salvarOfertaColagem, gerarRoteiroColagem, gerarVozColagem, montarVideoColagem, ajustarTamanhoRoteiro } from "@/app/actions/colagem";
+import { type Qualidade, dadosVideoColagem, salvarOfertaColagem, gerarRoteiroColagem, gerarVozColagem, sincronizarVozColagem, montarVideoColagem, ajustarTamanhoRoteiro } from "@/app/actions/colagem";
 import { statusVideoTematico } from "@/app/actions/videos-tematicos";
 
 const NOME_ATO: Record<string, { emoji: string; nome: string; cor: string }> = {
@@ -105,31 +105,48 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     setMsg({ tipo: "erro", txt: `A Bia não conseguiu fechar um roteiro que passasse na conferência. Problemas: ${correcao?.erros.slice(0, 3).join(" ")} — tente de novo.` });
   }
 
+  // Voz em 2 chamadas (gerar + marcar cada palavra): juntas passavam do limite de 60s do site.
+  // Se uma chamada cair (rede/tempo), tenta de novo uma vez antes de desistir.
+  async function vozCompleta() {
+    let g = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+    if (!g) g = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+    if (!g || !g.ok) return g;
+    setMsg({ tipo: "aviso", txt: `🎙️ Voz gerada (${g.segundos}s) — marcando cada palavra pras figurinhas…` });
+    let s = await sincronizarVozColagem(videoId).catch(() => null);
+    if (!s) s = await sincronizarVozColagem(videoId).catch(() => null);
+    const sinc = s && s.ok ? s : null;
+    return { ...g, sincronizado: !!sinc?.sincronizado, repetiu: !!sinc?.repetiu, palavrasFaladas: sinc?.palavrasFaladas ?? 0 };
+  }
+
   async function gerarVoz() {
     setMsg(null);
     setOcupado("voz");
     // A voz tem que dar 30–35s: se sair fora, a Bia ajusta o tamanho das falas e a voz é refeita
     // (no máximo 3 rodadas — depois disso vai do jeito que ficou, com aviso).
-    let r = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+    let r = await vozCompleta();
+    let boa = r?.ok ? r : null; // a última voz que deu certo (se uma rodada falhar, fica com ela)
     // A voz do Google às vezes repete trechos: gera de novo (até 2x) antes de mexer no texto.
     for (let i = 0; i < 2 && r?.ok && r.repetiu; i++) {
       setMsg({ tipo: "aviso", txt: `🔁 A voz repetiu trechos (falou ${r.palavrasFaladas} palavras de ${r.palavrasTexto}) — gerando de novo…` });
-      r = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+      r = await vozCompleta();
+      if (r?.ok) boa = r;
     }
     for (let rodada = 1; rodada <= 3 && r?.ok && r.foraDoTempo; rodada++) {
-      setMsg({ tipo: "aviso", txt: `⏱️ A fala ficou com ${r.segundos}s (o ideal é 30–35s) — a Bia está ${r.foraDoTempo === "longo" ? "encurtando" : "alongando"} o texto (rodada ${rodada} de 3)…` });
+      setMsg({ tipo: "aviso", txt: `⏱️ A fala ficou com ${r.segundos}s (o ideal é 30–34s) — a Bia está ${r.foraDoTempo === "longo" ? "encurtando" : "alongando"} o texto (rodada ${rodada} de 3)…` });
       const aj = await ajustarTamanhoRoteiro(videoId, r.segundosExatos).catch(() => null);
       if (!aj?.ok) break;
       setRoteiro(aj.roteiro);
-      r = await gerarVozColagem(videoId, voz, estilo).catch(() => null);
+      r = await vozCompleta();
+      if (r?.ok) boa = r;
     }
     setOcupado("");
-    if (!r || !r.ok) { setMsg({ tipo: "erro", txt: (r && "erro" in r && r.erro) || "Não consegui gerar a voz." }); return; }
-    setAudio({ url: r.url, segundos: r.segundos });
+    const fim = r?.ok ? r : boa;
+    if (!fim) { setMsg({ tipo: "erro", txt: (r && "erro" in r && r.erro) || "Não consegui gerar a voz (o serviço de voz demorou demais). Tente de novo em instantes." }); return; }
+    setAudio({ url: fim.url, segundos: fim.segundos });
     setTemTempos(true);
     const d = await dadosVideoColagem(videoId).catch(() => null);
     if (d?.ok && d.roteiro) setRoteiro(d.roteiro);
-    setMsg({ tipo: r.foraDoTempo ? "aviso" : "ok", txt: `🔊 Voz pronta (${r.segundos}s · ${r.palavrasTexto} palavras)${r.foraDoTempo ? " — ainda fora dos 30–35s, mas pode montar assim" : ""}${r.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
+    setMsg({ tipo: fim.foraDoTempo ? "aviso" : "ok", txt: `🔊 Voz pronta (${fim.segundos}s · ${fim.palavrasTexto} palavras)${fim.foraDoTempo ? " — ainda fora do tempo" + (fim.foraDoTempo === "longo" ? " (acima de 34s não monta: gere de novo)" : ", mas pode montar assim") : ""}${fim.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
   }
 
   async function montar() {

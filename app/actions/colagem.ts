@@ -257,25 +257,44 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
     const ritmo = "Ritmo ágil de anúncio de rádio, frases emendadas, sem pausas longas entre as frases.";
     const texto = narracaoCompleta(roteiro);
     const { url, segundos } = await gerarNarracaoMp3({ texto, vozId: voz, direcao: `${estilo || ""} ${ritmo}`.trim(), slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), apertarPausas: true, alvoSegundos: 34 });
-    const falada = await tempoDasPalavras(url);
     const palavrasTexto = contarPalavras(texto);
-    // A voz do Google às vezes REPETE trechos (sai bem mais palavra falada do que escrita).
-    const repetiu = falada.length > palavrasTexto * 1.3;
-    console.log(`colagem voz: ${segundos}s, ${palavrasTexto} palavras no texto, ${falada.length} faladas${repetiu ? " (REPETIU)" : ""}`);
-    const alinhado = alinharTempos(roteiro, falada, segundos);
+    // Já salva com o tempo ESTIMADO de cada palavra (dá pra montar mesmo se a marcação falhar);
+    // a marcação exata (Whisper) é outra chamada — juntas passavam do limite de 60s do site.
+    const alinhado = alinharTempos(roteiro, [], segundos);
     const antigo = v.narracaoUrl;
     await prisma.videoTematico.update({
       where: { id: videoId },
-      data: { colagemRoteiro: JSON.stringify(alinhado), narracaoTexto: narracaoCompleta(roteiro), narracaoVoz: voz, narracaoEstilo: estilo, narracaoUrl: url, narracaoSeg: Math.round(segundos) },
+      data: { colagemRoteiro: JSON.stringify(alinhado), narracaoTexto: texto, narracaoVoz: voz, narracaoEstilo: estilo, narracaoUrl: url, narracaoSeg: Math.round(segundos) },
     });
     if (antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
     revalidatePath(`/painel/marcas/${v.marcaId}`);
     const foraDoTempo = segundos > 34.4 ? ("longo" as const) : segundos < 27 ? ("curto" as const) : null;
-    return { ok: true as const, url, segundos: Math.round(segundos), segundosExatos: segundos, sincronizado: falada.length > 0, foraDoTempo, repetiu, palavrasTexto, palavrasFaladas: falada.length };
+    return { ok: true as const, url, segundos: Math.round(segundos), segundosExatos: segundos, foraDoTempo, palavrasTexto };
   } catch (e) {
     console.error("Erro ao gerar a voz da colagem:", e);
     return { ok: false as const, erro: "Não consegui gerar a voz agora." };
   }
+}
+
+// ---------- 3a. marca o tempo de CADA palavra falada (Whisper) ----------
+// Chamada separada da geração da voz (as duas juntas estouravam o limite de 60s). Se falhar, a voz
+// continua valendo com o tempo estimado.
+export async function sincronizarVozColagem(videoId: string) {
+  const c = await carregar(videoId);
+  if (!c.ok) return c;
+  const { v } = c;
+  const roteiro = lerRoteiro(v.colagemRoteiro);
+  if (!roteiro || !v.narracaoUrl.startsWith("http")) return { ok: false as const, erro: "Gere a voz primeiro." };
+  const falada = await tempoDasPalavras(v.narracaoUrl);
+  const palavrasTexto = contarPalavras(v.narracaoTexto);
+  // A voz do Google às vezes REPETE trechos (sai bem mais palavra falada do que escrita).
+  const repetiu = falada.length > palavrasTexto * 1.3;
+  console.log(`colagem voz: ${v.narracaoSeg}s, ${palavrasTexto} palavras no texto, ${falada.length} faladas${repetiu ? " (REPETIU)" : ""}`);
+  if (falada.length) {
+    const alinhado = alinharTempos({ cenas: roteiro.cenas.map((x) => ({ ...x, inicio: undefined, fim: undefined, elementos: x.elementos.map((e) => ({ ...e, t: undefined })) })) }, falada, v.narracaoSeg);
+    await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(alinhado) } });
+  }
+  return { ok: true as const, sincronizado: falada.length > 0, repetiu, palavrasFaladas: falada.length, palavrasTexto };
 }
 
 // ---------- 3b. duração 30–35s ----------
