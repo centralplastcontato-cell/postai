@@ -32,13 +32,15 @@ export type FotoInfo = { descricao: string; categoria: string };
 
 export const ATOS = ["gancho", "dor", "virada", "prova", "oferta"] as const;
 export const ANIMACOES = ["pop_bounce", "slide_giro", "fita_adesiva", "carimbo", "empilhar", "wiggle", "ken_burns", "selo_giro", "nenhuma"];
-export const POSICOES = ["centro", "sup_esq", "sup_dir", "inf_esq", "inf_dir", "meio_esq", "meio_dir", "topo", "faixa_meio", "base", "rodape", "ao_redor"];
+export const POSICOES = ["centro", "sup_esq", "sup_dir", "inf_esq", "inf_dir", "meio_esq", "meio_dir", "topo", "faixa_meio", "base", "rodape", "ao_redor",
+  // posições fixas da cena da OFERTA (montada pelo sistema)
+  "acima_esq", "acima_dir", "abaixo_centro", "lado_esq_do_selo", "arco_atras", "abaixo_do_botao"];
 export const POSES = ["pular", "apontar", "comemorar", "acenar"];
 export const TRANSICOES = ["corte_seco", "rasgo_papel", "virar_pagina", "acumula", "fim"];
 export const MOLDURAS = ["polaroid", "recorte_branco", "sem_moldura"];
 export const ESTILOS_ADESIVO = [
   "estrela_amarela", "uau", "coracao", "confete", "baloes", "seta_desenhada", "carinha_preocupada", "balao_fala",
-  "etiqueta_amarela", "etiqueta_rosa", "etiqueta_azul", "etiqueta_verde", "recibo", "nota", "selo_promo", "botao_whatsapp",
+  "etiqueta_amarela", "etiqueta_rosa", "etiqueta_azul", "etiqueta_verde", "etiqueta_vermelha", "recibo", "nota", "selo_promo", "botao_whatsapp",
 ];
 const DECORATIVAS = new Set(["rasgo_papel", "virar_pagina"]);
 const TIPOS = ["foto", "adesivo", "mascote", "grupo", "texto", "logo"];
@@ -68,6 +70,10 @@ export function normalizar(s: string): string {
 const palavras = (s: string) => normalizar(s).split(" ").filter(Boolean);
 const casa = (p: string, g: string) => p === g || (g.length >= 3 && p.startsWith(g)) || (p.length >= 4 && g.startsWith(p));
 export const contarPalavras = (s: string) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
+// Teto de cada cena (~2,6 palavras/s): 6s nas cenas comuns, 8s na oferta. Passou → encurta o texto.
+export const MAX_PALAVRAS_CENA = 15;
+export const MAX_PALAVRAS_OFERTA = 22;
+export const maxPalavrasDa = (ato: string) => (ato === "oferta" ? MAX_PALAVRAS_OFERTA : MAX_PALAVRAS_CENA);
 
 // Narração completa (o que a voz fala), com respiro entre os atos.
 export function narracaoCompleta(r: Roteiro): string {
@@ -112,38 +118,62 @@ export function corrigir(r: Roteiro): Roteiro {
   };
 }
 
-// ---------- peças OBRIGATÓRIAS da cena final ----------
-// Selo com o benefício, prazo escrito, extras, botão do WhatsApp e "Consulte condições" são iguais
-// em todo anúncio — se a Bia esquecer, o sistema coloca (não vale gastar tentativa da IA nisso).
+// ---------- CENA DA OFERTA: layout FIXO, montado pelo sistema ----------
+// Centro: selo grande (principal). Acima: até 2 etiquetas (extras). Abaixo: UMA etiqueta de urgência
+// ("Só 10 contratos · até 17/10"). Base: botão do WhatsApp sozinho + "Consulte condições" embaixo.
+// Mascote ao lado do selo; carinhas em arco ATRÁS do selo (longe do botão). Cada peça entra na
+// palavra dela na fala (sequência), nunca tudo de uma vez. Peças que a Bia pôs na oferta são trocadas.
+const RE_URGENCIA = /\b(s[oó]|somente|apenas|primeir|[uú]ltim|limitad|vagas?|contratos?)\b/i;
+function urgenciaCurta(ex: string): string {
+  const m = /(\d+)\s*(?:primeir[oa]s\s*)?(contratos?|vagas?|festas?|datas?|fam[ií]lias?)/i.exec(ex);
+  if (m) return `Só ${m[1]} ${m[2].toLowerCase()}`;
+  return ex.split(/\s+/).slice(0, 4).join(" ");
+}
 export function garantirOferta(r: Roteiro, oferta: Oferta): Roteiro {
   const cenas = r.cenas.map((c) => ({ ...c, elementos: [...c.elementos] }));
   const ofertas = cenas.filter((c) => c.ato === "oferta");
   const ultima = ofertas[ofertas.length - 1] || cenas[cenas.length - 1];
   if (!ultima) return r;
   const ps = palavras(ultima.narracao);
-  const acha = (alvos: string[]) => ps.find((p) => alvos.some((a) => a && casa(p, a))) || ps[0] || "";
-  const todosOferta = ofertas.flatMap((c) => c.elementos);
-  const telaOferta = normalizar(todosOferta.map((e) => e.texto || "").join(" "));
-  const chave = palavras(oferta.principal).filter((p) => p.length >= 4 && !["gratis", "ganha", "ganhe", "mais"].includes(p));
-  if (!todosOferta.some((e) => e.estilo === "selo_promo")) {
-    ultima.elementos.push({ tipo: "adesivo", estilo: "selo_promo", texto: oferta.principal, posicao: "centro", animacao: "selo_giro", gatilho: acha(chave) });
-  }
+  const acha = (alvos: string[], depoisDe = -1) => {
+    const i = ps.findIndex((p, k) => k > depoisDe && alvos.some((a) => a && casa(p, a)));
+    return i >= 0 ? i : -1;
+  };
+  const chaves = (s: string) => palavras(s).filter((p) => p.length >= 4 && !["gratis", "ganha", "ganhe", "mais", "para", "voce"].includes(p));
+  const gat = (i: number, reserva: number) => ps[i >= 0 ? i : Math.min(ps.length - 1, Math.max(0, reserva))] || "";
+
+  const extras = (oferta.extras || []).map((x) => x.trim()).filter(Boolean);
+  const urgentes = extras.filter((x) => RE_URGENCIA.test(x));
+  const normais = extras.filter((x) => !RE_URGENCIA.test(x)).slice(0, 2);
   const pz = prazoCurto(oferta.prazo);
-  if (pz && !todosOferta.some((e) => (e.texto || "").includes(pz))) {
-    const dia = prazoPartes(oferta.prazo);
-    ultima.elementos.push({ tipo: "adesivo", estilo: "uau", texto: `Até ${pz}`, posicao: "sup_dir", rotacao: 7, animacao: "carimbo", gatilho: acha(dia ? [porExtenso(dia.dia), "ate"] : ["ate"]) });
-  }
-  const lados = ["sup_esq", "meio_dir", "meio_esq"];
-  (oferta.extras || []).forEach((ex, i) => {
-    const k = palavras(ex).filter((p) => p.length >= 4);
-    if (k[0] && !telaOferta.includes(k[0])) ultima.elementos.push({ tipo: "adesivo", estilo: i % 2 ? "etiqueta_rosa" : "etiqueta_amarela", texto: ex, posicao: lados[i % 3], rotacao: i % 2 ? 6 : -6, animacao: "carimbo", gatilho: acha(k) });
+  const dia = prazoPartes(oferta.prazo);
+  const urgTexto = [urgentes[0] ? urgenciaCurta(urgentes[0]) : "", pz ? `até ${pz}` : ""].filter(Boolean).join(" · ");
+
+  const n = ps.length;
+  const iSelo = acha(chaves(oferta.principal));
+  const iGratis = acha(["gratis", "ganha", "ganhe", "presente"], iSelo);
+  const els: Elemento[] = [];
+  els.push({ tipo: "adesivo", estilo: "selo_promo", texto: oferta.principal, papel: "principal", posicao: "centro", tamanho: 0.55, animacao: "selo_giro", entra_em: 0.1, gatilho: gat(iSelo, 0) });
+  els.push({ tipo: "grupo", estilo: "carinhas_criancas", quantidade: 8, intervalo: 0.08, posicao: "arco_atras", ao_redor_de: "selo_promo", animacao: "pop_bounce", gatilho: gat(iGratis >= 0 ? iGratis : iSelo + 1, 2) });
+  els.push({ tipo: "mascote", pose: "apontar", posicao: "lado_esq_do_selo", animacao: "slide_giro", gatilho: gat(iGratis >= 0 ? iGratis : iSelo + 1, 2) });
+  let ultimo = Math.max(iSelo, iGratis);
+  normais.forEach((ex, k) => {
+    const i = acha(chaves(ex), ultimo);
+    if (i >= 0) ultimo = i;
+    els.push({ tipo: "adesivo", estilo: k ? "etiqueta_rosa" : "etiqueta_amarela", texto: ex, posicao: k ? "acima_dir" : "acima_esq", rotacao: k ? 5 : -5, animacao: "carimbo", gatilho: gat(i, Math.round(n * (0.3 + k * 0.15))) });
   });
-  if (!ultima.elementos.some((e) => e.estilo === "botao_whatsapp")) {
-    ultima.elementos.push({ tipo: "adesivo", estilo: "botao_whatsapp", texto: "Chama no WhatsApp", posicao: "base", animacao: "pop_bounce", gatilho: acha(["whatsapp", "chama", "zap"]) });
+  if (urgTexto) {
+    const alvo = urgentes[0] ? chaves(urgenciaCurta(urgentes[0])) : [];
+    const i = acha([...alvo, ...(dia ? [porExtenso(dia.dia)] : []), "ate"], ultimo);
+    if (i >= 0) ultimo = i;
+    els.push({ tipo: "adesivo", estilo: "etiqueta_vermelha", texto: urgTexto, posicao: "abaixo_centro", rotacao: -3, animacao: "carimbo", gatilho: gat(i, Math.round(n * 0.65)) });
   }
-  if (oferta.condicoes && !ultima.elementos.some((e) => e.tipo === "texto" && /condi/i.test(e.texto || ""))) {
-    ultima.elementos.push({ tipo: "texto", estilo: "rodape", texto: "Consulte condições", posicao: "rodape", animacao: "nenhuma", gatilho: acha(["whatsapp", "chama", "zap"]) });
-  }
+  const iZap = acha(["whatsapp", "chama", "zap", "chame"]);
+  els.push({ tipo: "adesivo", estilo: "botao_whatsapp", texto: "Chama no WhatsApp", posicao: "base", animacao: "pop_bounce", gatilho: gat(iZap, n - 2) });
+  if (oferta.condicoes) els.push({ tipo: "texto", estilo: "rodape", texto: "Consulte condições", posicao: "abaixo_do_botao", animacao: "nenhuma", gatilho: gat(iZap, n - 2) });
+  ultima.elementos = els;
+  ultima.fundo = "papel_claro";
+  ultima.transicao_saida = "fim";
   return { cenas };
 }
 
@@ -176,9 +206,24 @@ export function completarCenas(r: Roteiro): Roteiro {
       if (g && ps.some((p) => casa(p, g))) return e;
       return { ...e, gatilho: palavraEm((k + 0.5) / Math.max(1, c.elementos.length)) };
     });
+    // GANCHO: a foto da festa é a principal e entra primeiro (os adesivos ficam em volta)
+    if (c.ato === "gancho") {
+      const foto = elementos.find((e) => e.tipo === "foto" && e.papel === "principal") || elementos.find((e) => e.tipo === "foto");
+      if (foto) {
+        for (const e of elementos) { if (e !== foto && e.papel === "principal") delete e.papel; if (e !== foto && typeof e.entra_em === "number" && e.entra_em < 0.3) e.entra_em = undefined; }
+        foto.papel = "principal";
+        foto.entra_em = 0;
+        foto.posicao = "centro";
+        elementos.splice(elementos.indexOf(foto), 1);
+        elementos.unshift(foto);
+      }
+    }
+    // pilha de recibos: no máximo 3 por cena (com mais, os textos acabam um em cima do outro)
+    let nPilha = 0;
+    for (let k = elementos.length - 1; k >= 0; k--) if (elementos[k].animacao === "empilhar" && elementos[k].tipo !== "foto" && ++nPilha > 3) elementos.splice(k, 1);
     const usadas = new Set(elementos.map((e) => e.posicao));
     const pool = FIGURINHAS_POR_ATO[c.ato] || FIGURINHAS_POR_ATO.prova;
-    let i = 0;
+    let i = c.ato === "oferta" ? pool.length : 0; // a oferta tem layout fixo: sem figurinha extra
     while (elementos.filter((e) => e.tipo === "adesivo" || e.tipo === "grupo").length < 2 && i < pool.length) {
       const f = pool[i];
       i++;
@@ -200,6 +245,8 @@ export function soDetalhes(erros: string[]): boolean {
   return erros.every((e) => {
     const n = /narração tem (\d+) palavras/.exec(e);
     if (n) return Number(n[1]) >= 68 && Number(n[1]) <= 95;
+    const pc = /tem (\d+) palavras na fala — o máximo é (\d+)/.exec(e);
+    if (pc) return Number(pc[1]) <= Number(pc[2]) + 3;
     const p = /prova precisa de 5 a 6 fotos.*veio (\d+)/.exec(e);
     if (p) return Number(p[1]) >= 3;
     return /sem cor|passa de 5 palavras|elementos — use/.test(e);
@@ -238,6 +285,8 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
   // cenas
   let decorativas = 0;
   cenas.forEach((c, i) => {
+    const np = contarPalavras(c.narracao), maxP = maxPalavrasDa(c.ato);
+    if (np > maxP) erros.push(`Cena ${i + 1} (${c.ato}) tem ${np} palavras na fala — o máximo é ${maxP} (${c.ato === "oferta" ? "8" : "6"} segundos). Encurte o texto dessa cena.`);
     const n = c.elementos.length;
     const max = c.ato === "oferta" ? 10 : 7; // a oferta recebe as peças obrigatórias (selo, prazo, extras, botão, rodapé)
     if (n < 2 || n > max) erros.push(`Cena ${i + 1} (${c.ato}) tem ${n} elementos — use de 2 a ${max === 10 ? "6 (a da oferta pode ter até 10)" : "6 (no máximo 7)"}.`);
@@ -248,7 +297,7 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
     const ps = palavras(c.narracao);
     for (const e of c.elementos) {
       if (e.tipo === "adesivo" && !ESTILOS_ADESIVO.includes(e.estilo || "")) erros.push(`Cena ${i + 1}: estilo de adesivo "${e.estilo}" não existe. Use um destes: ${ESTILOS_ADESIVO.join(", ")}.`);
-      if ((e.tipo === "adesivo" || e.tipo === "texto") && e.texto && contarPalavras(e.texto) > 5 && e.estilo !== "selo_promo") erros.push(`Cena ${i + 1}: o texto "${e.texto}" passa de 5 palavras.`);
+      if ((e.tipo === "adesivo" || e.tipo === "texto") && e.texto && contarPalavras(e.texto) > 5 && e.estilo !== "selo_promo" && e.estilo !== "etiqueta_vermelha") erros.push(`Cena ${i + 1}: o texto "${e.texto}" passa de 5 palavras.`);
       if (e.balao && contarPalavras(e.balao) > 5) erros.push(`Cena ${i + 1}: o balão do mascote "${e.balao}" passa de 5 palavras.`);
       const g = palavras(e.gatilho || "")[0];
       if (!g) erros.push(`Cena ${i + 1}: todo elemento precisa de "gatilho" (uma palavra da narração dessa cena).`);
@@ -265,10 +314,6 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
   if (chave && !falaOferta.includes(chave)) erros.push(`A oferta principal ("${oferta.principal}") precisa ser FALADA na cena da oferta.`);
   if (chave && !telaOferta.includes(chave)) erros.push(`A oferta principal ("${oferta.principal}") precisa aparecer ESCRITA (selo_promo) na cena da oferta.`);
   if (!cenasOferta.some((c) => c.elementos.some((e) => e.estilo === "selo_promo"))) erros.push("A cena da oferta precisa de um selo_promo com o benefício principal.");
-  for (const ex of oferta.extras || []) {
-    const k = palavras(ex).filter((p) => p.length >= 4)[0];
-    if (k && !telaOferta.includes(k)) erros.push(`O extra "${ex}" precisa aparecer escrito na cena da oferta.`);
-  }
   const pz = prazoPartes(oferta.prazo);
   if (pz) {
     if (!falaOferta.includes(porExtenso(pz.dia))) erros.push(`O prazo (dia ${pz.dia}) precisa ser FALADO na oferta (ex: "só até dia ${porExtenso(pz.dia)}").`);
@@ -344,15 +389,17 @@ export function promptSistemaColagem(marca: { nome: string; descricao: string })
 DIFERENCIAIS DO BUFFET (use SÓ estes — nunca invente diferencial): ${marca.descricao || "(sem descrição cadastrada — fale de forma geral: festa completa, diversão, tranquilidade pros pais)"}
 
 ESTRUTURA OBRIGATÓRIA — 5 atos, nesta ordem (um ato pode ter 1 ou 2 cenas seguidas):
-1. gancho (3–4s): pergunta ou cena que para o scroll. Foto MAIS impactante (festa cheia, crianças, salão montado). NUNCA abra com fachada, entrada ou logo.
+1. gancho (3–4s): pergunta ou cena que para o scroll. Foto MAIS impactante (festa cheia, crianças, salão montado) entra PRIMEIRO, grande, no centro; os adesivos (UAU, estrela, balões) ficam EM VOLTA dela, nunca por cima. NUNCA abra com fachada, entrada ou logo.
 2. dor (5–7s): o problema do pai/mãe (conta alta, mil fornecedores, estresse). Use recibos (estilo "recibo", animação "empilhar") e a carinha_preocupada. Pode ficar sem foto.
 3. virada (3–4s): o buffet como solução ("no ${marca.nome}... tá tudo incluso"). Elementos: LOGO grande no centro ({"tipo":"logo","posicao":"centro","tamanho":0.65}), o mascote COMEMORANDO e 1 foto de festa cheia.
 4. prova (7–10s): 2 ou 3 diferenciais reais, com 5 a 6 FOTOS de festa com crianças, em 2 cenas de 3 fotos (as fotos se ACUMULAM na tela como um mural, entrando rápido com "empilhar"). A 1ª foto de cada cena é a principal ("papel":"principal").
-5. oferta (6–8s): o benefício principal lidera, extras como reforço, PRAZO falado e escrito, chamada pro WhatsApp.
+5. oferta (até 8s, UMA cena): fala o benefício principal, os extras, a urgência/prazo e chama pro WhatsApp. As peças da oferta o sistema monta sozinho (selo, etiquetas, botão) — capriche só na FALA.
 
 REGRAS DE TEXTO:
 - Narração falada, informal, frases curtas, sempre "você" (nunca "cê"). Números e datas POR EXTENSO na fala ("dez amiguinhos", "até quinze de outubro").
-- A narração INTEIRA soma entre 75 e 88 palavras (vídeo de 30 a 35 segundos).
+- A narração INTEIRA soma entre 75 e 88 palavras (vídeo de 30 a 35 segundos, teto rígido de 35s).
+- CADA CENA tem no máximo ${MAX_PALAVRAS_CENA} palavras de fala (6 segundos); a da oferta no máximo ${MAX_PALAVRAS_OFERTA} (8 segundos). Use 6 ou 7 cenas.
+- Cada cena tem UM elemento principal ("papel":"principal") — o maior, o foco da cena (no gancho: a foto da festa).
 - Texto na tela: no máximo 5 palavras por adesivo (o selo_promo pode ter o benefício inteiro). A tela COMPLEMENTA a fala, não repete a frase.
 - Prazo: falado E escrito ("Até DD/MM" num adesivo).
 - Use os números da oferta EXATAMENTE como vieram.

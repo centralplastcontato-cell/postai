@@ -21,11 +21,15 @@ import { vozValida, VOZ_PADRAO } from "@/lib/vozes";
 import { dispararMotorColagem } from "@/lib/video-engine";
 import { baseUrl } from "@/lib/config";
 import {
-  corrigir, garantirOferta, completarCenas, soDetalhes, validarRoteiro, narracaoCompleta, alinharTempos, promptSistemaColagem, contarPalavras, prazoCurto,
+  corrigir, garantirOferta, completarCenas, soDetalhes, validarRoteiro, narracaoCompleta, alinharTempos, promptSistemaColagem, contarPalavras, prazoCurto, MAX_PALAVRAS_CENA, MAX_PALAVRAS_OFERTA,
   type Oferta, type Roteiro, type FotoInfo, type PalavraFalada,
 } from "@/lib/colagem";
 
-export type Qualidade = { aprovado: boolean; coberturaMin: number; coberturaMedia: number; baseVaziaTrechos: string[]; cortados: string[]; ajustes: number; aviso: string };
+export type Qualidade = {
+  aprovado: boolean; coberturaMin: number; coberturaMedia: number; baseVaziaTrechos: string[]; cortados: string[]; ajustes: number; aviso: string;
+  // checagem ampliada (motor v4) — opcionais: vídeos montados antes não têm
+  duracao?: number; parados?: string[]; textosEncostando?: string[]; principalCoberto?: string[]; cenasLongas?: string[];
+};
 const OFERTA_VAZIA: Oferta = { principal: "", extras: [], prazo: "", condicoes: true };
 
 function lerOferta(json: string): Oferta {
@@ -266,7 +270,7 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
     });
     if (antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
     revalidatePath(`/painel/marcas/${v.marcaId}`);
-    const foraDoTempo = segundos > 35.5 ? ("longo" as const) : segundos < 27 ? ("curto" as const) : null;
+    const foraDoTempo = segundos > 34.4 ? ("longo" as const) : segundos < 27 ? ("curto" as const) : null;
     return { ok: true as const, url, segundos: Math.round(segundos), segundosExatos: segundos, sincronizado: falada.length > 0, foraDoTempo, repetiu, palavrasTexto, palavrasFaladas: falada.length };
   } catch (e) {
     console.error("Erro ao gerar a voz da colagem:", e);
@@ -317,7 +321,7 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
         response_format: { type: "json_object" },
         temperature: 0.5,
         messages: [
-          { role: "system", content: `Você ajusta o TAMANHO da narração de um vídeo-anúncio de buffet infantil, sem mudar a estrutura. Reescreva cada fala pra que o TOTAL tenha ${alvo} palavras (hoje tem ${atuais}). Mantenha o sentido, o tom informal, "você" (nunca "cê"), os números da oferta EXATOS (${oferta.principal}${oferta.extras.length ? "; " + oferta.extras.join("; ") : ""}${oferta.prazo ? "; prazo até " + prazoCurto(oferta.prazo) + ", falado por extenso" : ""}) e, em cada cena, as palavras listadas (elas disparam as figurinhas) — encaixadas em frases naturais, NUNCA como lista de palavras soltas no fim. Proibido repetir frase ou ideia já dita; cada fala tem que soar como gente falando. Responda só com JSON: {"narracoes":["fala da cena 1","fala da cena 2",...]} — uma por cena, na mesma ordem.` },
+          { role: "system", content: `Você ajusta o TAMANHO da narração de um vídeo-anúncio de buffet infantil, sem mudar a estrutura. Reescreva cada fala pra que o TOTAL tenha ${alvo} palavras (hoje tem ${atuais}), e NENHUMA cena passe de ${MAX_PALAVRAS_CENA} palavras (a da oferta: ${MAX_PALAVRAS_OFERTA}). Mantenha o sentido, o tom informal, "você" (nunca "cê"), os números da oferta EXATOS (${oferta.principal}${oferta.extras.length ? "; " + oferta.extras.join("; ") : ""}${oferta.prazo ? "; prazo até " + prazoCurto(oferta.prazo) + ", falado por extenso" : ""}) e, em cada cena, as palavras listadas (elas disparam as figurinhas) — encaixadas em frases naturais, NUNCA como lista de palavras soltas no fim. Proibido repetir frase ou ideia já dita; cada fala tem que soar como gente falando. Responda só com JSON: {"narracoes":["fala da cena 1","fala da cena 2",...]} — uma por cena, na mesma ordem.` },
           { role: "user", content: cenasTxt },
         ],
       }),
@@ -329,7 +333,7 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
     if (!Array.isArray(j.narracoes) || j.narracoes.length !== roteiro.cenas.length) throw new Error("resposta fora do formato");
     const ruim = j.narracoes.map(String).find(falaRepetitiva);
     if (ruim) throw new Error(`fala repetitiva: ${ruim.slice(0, 80)}`);
-    const novo = completarCenas({ cenas: roteiro.cenas.map((x, i) => ({ ...x, narracao: String(j.narracoes![i] || x.narracao).trim(), inicio: undefined, fim: undefined, elementos: x.elementos.map((e) => ({ ...e, t: undefined })) })) });
+    const novo = completarCenas(garantirOferta({ cenas: roteiro.cenas.map((x, i) => ({ ...x, narracao: String(j.narracoes![i] || x.narracao).trim(), inicio: undefined, fim: undefined, elementos: x.elementos.map((e) => ({ ...e, t: undefined })) })) }, oferta));
     await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(novo), narracaoTexto: narracaoCompleta(novo) } });
     return { ok: true as const, roteiro: novo, palavras: novo.cenas.reduce((s, x) => s + contarPalavras(x.narracao), 0) };
   } catch (e) {
@@ -347,6 +351,8 @@ export async function montarVideoColagem(videoId: string) {
   const roteiro = lerRoteiro(v.colagemRoteiro);
   if (!roteiro) return { ok: false as const, erro: "Peça o roteiro pra Bia primeiro." };
   if (!v.narracaoUrl.startsWith("http") || !roteiro.cenas.every((x) => typeof x.inicio === "number")) return { ok: false as const, erro: "Gere a voz antes de montar o vídeo." };
+  // Teto RÍGIDO de 35s: voz mais longa → gerar de novo (a Bia encurta o texto), nunca esticar o vídeo.
+  if (v.narracaoSeg > 34.4) return { ok: false as const, erro: `A voz ficou com ${v.narracaoSeg}s e o vídeo tem teto de 35s (voz + respiro final). Clique em "Gerar voz de novo" — a Bia encurta o texto.` };
 
   // LGPD: só fotos desta marca, soltas ou de festa autorizada.
   const ids = [...new Set(roteiro.cenas.flatMap((x) => x.elementos.filter((e) => e.tipo === "foto").map((e) => e.asset || "")))];

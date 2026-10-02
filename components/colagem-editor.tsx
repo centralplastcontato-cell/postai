@@ -246,7 +246,10 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
             </div>
             {videoUrl.startsWith("http") && qualidade && (
               <p className={`mt-2 rounded-lg border px-2.5 py-1.5 text-[11px] ${qualidade.aprovado ? "border-emerald-500/30 bg-emerald-500/[0.07] text-emerald-200" : "border-amber-500/30 bg-amber-500/[0.07] text-amber-200"}`}>
-                {qualidade.aprovado ? "✓ Conferência aprovada" : "⚠️ Conferência com aviso"} · tela coberta: mínimo {qualidade.coberturaMin}% (média {qualidade.coberturaMedia}%) · {qualidade.cortados.length ? `peça na borda: ${qualidade.cortados.join(", ")}` : "nada cortado"}
+                {qualidade.aprovado ? "✓ Conferência aprovada" : "⚠️ Conferência com aviso"}
+                {typeof qualidade.duracao === "number" && ` · ${qualidade.duracao}s`} · tela coberta: mínimo {qualidade.coberturaMin}% (média {qualidade.coberturaMedia}%) · {qualidade.cortados.length ? `peça na borda: ${qualidade.cortados.join(", ")}` : "nada cortado"}
+                {qualidade.parados && ` · ${qualidade.parados.length ? `parado em ${qualidade.parados.join(", ")}` : "nada parado"}`}
+                {qualidade.textosEncostando && ` · ${qualidade.textosEncostando.length ? `textos encostando: ${qualidade.textosEncostando.join("; ")}` : "textos sem encostar"}`}
                 {qualidade.ajustes > 0 && ` · ${qualidade.ajustes} ajuste(s) automático(s)`}
                 {qualidade.aviso && <><br />{qualidade.aviso}</>}
               </p>
