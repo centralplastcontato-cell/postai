@@ -83,9 +83,16 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     if (!s || !s.ok) { setOcupado(""); setMsg({ tipo: "erro", txt: (s && "erro" in s && s.erro) || "Não consegui salvar a oferta." }); return; }
     // Até 3 tentativas: se a conferência reprovar, a Bia recebe os problemas e corrige.
     let correcao: { rascunho: string; erros: string[] } | undefined;
+    let quedas = 0; // a chamada caiu (a Bia demorou mais que o limite do site) — tenta de novo, até 2x
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
       if (tentativa > 1) setMsg({ tipo: "aviso", txt: `🔁 A conferência pediu ajustes — a Bia está corrigindo (tentativa ${tentativa} de 3)…` });
       const r = await gerarRoteiroColagem(videoId, correcao, tentativa === 3).catch(() => null);
+      if (!r && quedas < 2) {
+        quedas++;
+        setMsg({ tipo: "aviso", txt: "⏳ A Bia demorou demais pra responder — pedindo de novo…" });
+        tentativa--;
+        continue;
+      }
       if (r?.ok) {
         setOcupado("");
         setRoteiro(r.roteiro);

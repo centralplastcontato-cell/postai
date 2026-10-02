@@ -186,7 +186,7 @@ Escreva o roteiro de cenas.`;
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "gpt-4.1", response_format: { type: "json_object" }, temperature: correcao ? 0.5 : 0.8, messages: mensagens }),
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(42000), // + banco/conferência: cabe nos 60s do site
     });
     if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
     const data = await resp.json();
