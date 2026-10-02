@@ -25,9 +25,14 @@ export type Elemento = {
   ao_redor_de?: string; // carinhas: em volta de qual peça (ex.: "selo_promo")
   sangrar?: boolean; // pode sair da tela (o motor não encaixa na área segura)
   t?: number; // segundos (preenchido pelo alinhamento)
+  // MOLDES (lib/moldes.ts): posição/tamanho/camada fixos, definidos pelo molde (nunca pela IA)
+  x?: number; y?: number; w?: number; rot?: number; z?: number;
+  tf?: number; // quando entra, em fração da cena (0 a 1) — se não houver palavra-gatilho
+  vaga?: string; pilha?: boolean;
+  arco?: { cx: number; cy: number; raio: number; de: number; ate: number };
 };
-export type Cena = { id: number; ato: string; narracao: string; fundo?: string; elementos: Elemento[]; transicao_saida?: string; inicio?: number; fim?: number };
-export type Roteiro = { cenas: Cena[] };
+export type Cena = { id: number; ato: string; narracao: string; fundo?: string; elementos: Elemento[]; transicao_saida?: string; inicio?: number; fim?: number; molde?: string };
+export type Roteiro = { cenas: Cena[]; moldes?: Record<string, string> };
 export type FotoInfo = { descricao: string; categoria: string };
 
 export const ATOS = ["gancho", "dor", "virada", "prova", "oferta"] as const;
@@ -70,8 +75,8 @@ export function normalizar(s: string): string {
 const palavras = (s: string) => normalizar(s).split(" ").filter(Boolean);
 const casa = (p: string, g: string) => p === g || (g.length >= 3 && p.startsWith(g)) || (p.length >= 4 && g.startsWith(p));
 export const contarPalavras = (s: string) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
-// DURAÇÃO do vídeo-anúncio (segundos de VOZ; o vídeo fecha ~1s depois). Teto de 55s (pedido do Victor).
-export const DURACAO = { min: 40, ideal: 47, max: 54 };
+// DURAÇÃO do vídeo-anúncio (segundos de VOZ; o vídeo fecha ~1s depois). Teto de 60s.
+export const DURACAO = { min: 48, ideal: 54, max: 58 }; // vídeo de 55–60s (pedido do Victor)
 export type Faixa = { min: number; max: number }; // total de palavras da narração
 export const FAIXA_PADRAO: Faixa = { min: 92, max: 115 };
 // Teto por cena acompanha a faixa (voz mais lenta = cenas mais curtas): ~17% do total por cena
@@ -383,7 +388,9 @@ export function alinharTempos(r: Roteiro, falada: PalavraFalada[], duracaoAudio:
           const g = palavras(e.gatilho || "")[0];
           const idx = g ? ps.findIndex((x) => casa(x.p, g)) : -1;
           const achou = idx >= 0 ? ps[idx].t : null;
-          const t = achou !== null ? achou - 0.05 : idx >= 0 ? inicio + (idx / total) * (fim - inicio - 0.3) : inicio + 0.2 + k * 0.3;
+          const t = achou !== null ? achou - 0.05 : idx >= 0 ? inicio + (idx / total) * (fim - inicio - 0.3)
+            : typeof e.tf === "number" ? inicio + Math.max(0, Math.min(1, e.tf)) * Math.max(0.5, fim - inicio - 0.3) // molde: fração da cena
+            : inicio + 0.2 + k * 0.3;
           return { ...e, t: Math.max(inicio, t) };
         }),
       };

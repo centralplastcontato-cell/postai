@@ -21,9 +21,10 @@ import { vozValida, VOZ_PADRAO } from "@/lib/vozes";
 import { dispararMotorColagem } from "@/lib/video-engine";
 import { baseUrl } from "@/lib/config";
 import {
-  corrigir, garantirOferta, completarCenas, soDetalhes, validarRoteiro, narracaoCompleta, alinharTempos, promptSistemaColagem, contarPalavras, prazoCurto, faixaPelaVelocidade, DURACAO,
+  garantirOferta, completarCenas, narracaoCompleta, alinharTempos, contarPalavras, prazoCurto, faixaPelaVelocidade, DURACAO,
   type Oferta, type Roteiro, type FotoInfo, type PalavraFalada,
 } from "@/lib/colagem";
+import { ATOS_MOLDE, moldePorId, sortearMoldes, sortearMascote, validarMoldes, soDetalhesMoldes, montarRoteiroMoldes, promptBiaMoldes, type Ato, type RespostaMoldes } from "@/lib/moldes";
 
 export type Qualidade = {
   aprovado: boolean; coberturaMin: number; coberturaMedia: number; baseVaziaTrechos: string[]; cortados: string[]; ajustes: number; aviso: string;
@@ -170,25 +171,45 @@ export async function gerarRoteiroColagem(videoId: string, correcao?: { rascunho
   const urlDe = new Map(acervo.map((f) => [f.id, f.url]));
 
   const lista = acervo.map((f) => `${f.id} | ${f.categoria} | ${f.descricao}`).join("\n");
+
+  // MOLDES: o sistema sorteia um molde por ato (sem repetir a combinação do último vídeo do buffet)
+  // e em quais atos o mascote aparece; a Bia só preenche as vagas e escreve a narração. Nas
+  // correções, o rascunho carrega a mesma escolha (a Bia corrige em cima do mesmo layout).
+  let escolha: Record<Ato, string> | null = null;
+  let comMascote: Set<Ato> | null = null;
+  let rascunhoBia = "";
+  if (correcao?.rascunho) {
+    try {
+      const r = JSON.parse(correcao.rascunho) as { texto: string; escolha: Record<Ato, string>; mascote: Ato[] };
+      if (r.escolha && ATOS_MOLDE.every((a) => moldePorId(r.escolha[a]))) { escolha = r.escolha; comMascote = new Set(r.mascote || ["oferta"]); rascunhoBia = r.texto || ""; }
+    } catch {}
+  }
+  if (!escolha || !comMascote) {
+    const ultimo = await prisma.videoTematico.findFirst({ where: { marcaId: v.marcaId, modo: "colagem", NOT: { id: videoId } }, orderBy: { criadoEm: "desc" }, select: { colagemRoteiro: true } });
+    let ultima: Record<string, string> | undefined;
+    try { ultima = (JSON.parse(ultimo?.colagemRoteiro || "{}") as Roteiro).moldes; } catch {}
+    escolha = sortearMoldes(ultima);
+    comMascote = sortearMascote(escolha);
+  }
+
   const pedido = `OFERTA (obrigatória — use exatamente):
 - Benefício principal: ${oferta.principal}
 - Extras: ${oferta.extras.length ? oferta.extras.join("; ") : "(nenhum)"}
-- Prazo: ${oferta.prazo ? `até ${prazoCurto(oferta.prazo)} (fale "até dia ..." por extenso; escreva "Até ${prazoCurto(oferta.prazo)}" num adesivo)` : "(sem prazo)"}
-- Tem condições/letras miúdas: ${oferta.condicoes ? 'sim — rodapé "Consulte condições" na última cena' : "não"}
+- Prazo: ${oferta.prazo ? `até ${prazoCurto(oferta.prazo)} (fale "até dia ..." por extenso)` : "(sem prazo)"}
 
 FOTOS DISPONÍVEIS (id | categoria | descrição) — as primeiras costumam ser as melhores:
 ${lista}
 
-Escreva o roteiro de cenas.`;
+Escreva o roteiro.`;
 
   const mensagens: { role: string; content: string }[] = [
-    { role: "system", content: promptSistemaColagem({ nome: v.marca.nome, descricao: v.marca.descricao || "" }, faixa) },
+    { role: "system", content: promptBiaMoldes({ nome: v.marca.nome, descricao: v.marca.descricao || "" }, faixa, escolha, comMascote) },
     { role: "user", content: pedido },
   ];
-  if (correcao?.rascunho) {
+  if (rascunhoBia) {
     mensagens.push(
-      { role: "assistant", content: correcao.rascunho.slice(0, 20000) },
-      { role: "user", content: `O roteiro foi REPROVADO na conferência. Corrija TODOS estes pontos e devolva o JSON completo de novo:\n- ${correcao.erros.slice(0, 12).join("\n- ")}` },
+      { role: "assistant", content: rascunhoBia.slice(0, 20000) },
+      { role: "user", content: `O roteiro foi REPROVADO na conferência. Corrija TODOS estes pontos e devolva o JSON completo de novo:\n- ${(correcao?.erros || []).slice(0, 12).join("\n- ")}` },
     );
   }
 
@@ -197,7 +218,7 @@ Escreva o roteiro de cenas.`;
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "gpt-4.1", response_format: { type: "json_object" }, temperature: correcao ? 0.5 : 0.8, messages: mensagens }),
+      body: JSON.stringify({ model: "gpt-4.1", response_format: { type: "json_object" }, temperature: rascunhoBia ? 0.5 : 0.8, messages: mensagens }),
       signal: AbortSignal.timeout(42000), // + banco/conferência: cabe nos 60s do site
     });
     if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
@@ -207,24 +228,26 @@ Escreva o roteiro de cenas.`;
     console.error("Erro ao escrever o roteiro da colagem:", e);
     return { ok: false as const, erro: "Não consegui falar com a Bia agora. Tenta de novo em instantes." };
   }
+  const rascunho = (t: string) => JSON.stringify({ texto: t, escolha, mascote: [...comMascote!] });
 
-  let roteiro: Roteiro;
+  let resposta: RespostaMoldes;
   try {
-    roteiro = completarCenas(garantirOferta(corrigir(JSON.parse(texto) as Roteiro), oferta));
+    resposta = JSON.parse(texto) as RespostaMoldes;
   } catch {
-    return { ok: false as const, reprovado: true as const, rascunho: texto, erros: ["A resposta não veio em JSON válido — responda SÓ com o JSON no formato pedido."] };
+    return { ok: false as const, reprovado: true as const, rascunho: rascunho(texto), erros: ["A resposta não veio em JSON válido — responda SÓ com o JSON no formato pedido."] };
   }
-  const erros = validarRoteiro(roteiro, oferta, fotos, faixa);
+  const erros = validarMoldes(resposta, escolha, oferta, fotos, faixa, comMascote);
   // Fotos escolhidas: escura ou sem cor nenhuma → pede troca (mede todas em paralelo).
-  const escolhidas = [...new Set(roteiro.cenas.flatMap((x) => x.elementos.filter((e) => e.tipo === "foto").map((e) => e.asset || "")))].filter((id) => urlDe.has(id));
+  const escolhidas = [...new Set(ATOS_MOLDE.flatMap((a) => Object.values(resposta[a]?.vagas || {}).map((x) => x?.foto || "")))].filter((id) => urlDe.has(id));
   const medidas = await Promise.all(escolhidas.map((id) => medirFoto(urlDe.get(id)!)));
   escolhidas.forEach((id, i) => {
     const m = medidas[i];
     if (m && m.brilho < 62) erros.push(`A foto "${id}" é muito escura — troque por outra mais clara e colorida.`);
     else if (m && m.cor < 18) erros.push(`A foto "${id}" está sem cor (cinza/apagada) — prefira uma mais colorida.`);
   });
-  // Na última tentativa, problema só de gosto (tamanho do texto, foto meio apagada) não segura o vídeo.
-  if (erros.length && !(ultimaTentativa && soDetalhes(erros))) return { ok: false as const, reprovado: true as const, rascunho: texto, erros };
+  // Na última tentativa, problema só de gosto (tamanho um pouco fora) não segura o vídeo.
+  if (erros.length && !(ultimaTentativa && soDetalhesMoldes(erros))) return { ok: false as const, reprovado: true as const, rascunho: rascunho(texto), erros };
+  const roteiro = montarRoteiroMoldes(resposta, escolha, oferta, comMascote);
 
   await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(roteiro), narracaoTexto: narracaoCompleta(roteiro) } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
@@ -370,7 +393,9 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
     const novas = j.narracoes.reduce((s2, x) => s2 + contarPalavras(String(x)), 0);
     // aceita se chegou perto do alvo OU se ao menos encurtou bem (a próxima rodada termina o serviço)
     if (novas > alvo + 6 && !(alvo < atuais && novas <= atuais - 5)) throw new Error(`ficou com ${novas} palavras (alvo ${alvo})`);
-    const novo = completarCenas(garantirOferta({ cenas: roteiro.cenas.map((x, i) => ({ ...x, narracao: String(j.narracoes![i] || x.narracao).trim(), inicio: undefined, fim: undefined, elementos: x.elementos.map((e) => ({ ...e, t: undefined })) })) }, oferta));
+    const cenasNovas = roteiro.cenas.map((x, i) => ({ ...x, narracao: String(j.narracoes![i] || x.narracao).trim(), inicio: undefined, fim: undefined, elementos: x.elementos.map((e) => ({ ...e, t: undefined })) }));
+    // roteiro de MOLDES: o layout não muda (gatilho que sumir da fala cai no tempo do molde)
+    const novo = roteiro.cenas[0]?.molde ? { ...roteiro, cenas: cenasNovas } : completarCenas(garantirOferta({ cenas: cenasNovas }, oferta));
     await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(novo), narracaoTexto: narracaoCompleta(novo) } });
     return { ok: true as const, roteiro: novo, palavras: novo.cenas.reduce((s, x) => s + contarPalavras(x.narracao), 0) };
   } catch (e) {
