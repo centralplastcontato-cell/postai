@@ -11,7 +11,7 @@ import { rotuloAniversariantes, tituloCapaFesta } from "@/lib/aniversariantes";
 import { SeletorVideoFotos } from "@/components/seletor-video-fotos";
 import { ColagemEditor } from "@/components/colagem-editor";
 import { criarVideoColagem } from "@/app/actions/colagem";
-import { criarVideoTematico, excluirVideoTematico, fotosDoVideoTematico, zerarVideoTematico } from "@/app/actions/videos-tematicos";
+import { criarVideoTematico, excluirVideoTematico, fotosDoVideoTematico, pararGeracaoVideoTematico, zerarVideoTematico } from "@/app/actions/videos-tematicos";
 import { excluirFesta, zerarVideoFesta } from "@/app/actions/festas";
 
 // Vídeo TEMÁTICO do buffet (Reels institucional do acervo, sem festa) — view do painel.
@@ -304,8 +304,9 @@ function nomeDaMusica(url: string): string {
 }
 
 // Card de um vídeo TEMÁTICO do buffet — mesma cara do card de festa, sem LGPD/aniversariante.
-function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir, onZerar }: { v: VideoTematicoView; ocupado: boolean; onAbrirSeletor: () => void; onExcluir: () => void; onZerar: () => void }) {
+function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir, onZerar, onParar }: { v: VideoTematicoView; ocupado: boolean; onAbrirSeletor: () => void; onExcluir: () => void; onZerar: () => void; onParar: () => void }) {
   const [ver, setVer] = useState(false);
+  const [confirmaParar, setConfirmaParar] = useState(false);
   const [confirmaExcluir, setConfirmaExcluir] = useState(false);
 
   const pronto = v.videoUrl.startsWith("http");
@@ -373,7 +374,15 @@ function CardTematico({ v, ocupado, onAbrirSeletor, onExcluir, onZerar }: { v: V
               <button onClick={onAbrirSeletor} disabled={ocupado} title="Escolher as fotos e gerar de novo (substitui o vídeo atual)" className="shrink-0 rounded-lg border border-[#7c3aed]/40 bg-[#7c3aed]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6c6ff] transition hover:border-[#7c3aed]/70 hover:bg-[#7c3aed]/25 disabled:opacity-50">🔄 Refazer</button>
             </>
           ) : emGeracao ? (
-            <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
+            <>
+              <button disabled className="flex-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-xs font-semibold text-amber-300">🎬 Gerando…</button>
+              {/* Preso em "gerando" (o motor caiu no meio): parar libera pra excluir ou gerar de novo */}
+              {confirmaParar ? (
+                <button onClick={() => { onParar(); setConfirmaParar(false); }} className="shrink-0 rounded-lg bg-red-700 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-red-600">Parar?</button>
+              ) : (
+                <button onClick={() => setConfirmaParar(true)} title="Parar a geração (se travou) pra poder excluir ou gerar de novo" className="shrink-0 rounded-lg border border-red-900/60 px-2.5 py-1.5 text-xs font-semibold text-red-400 transition hover:bg-red-950/40">⏹ Parar</button>
+              )}
+            </>
           ) : (
             <button onClick={onAbrirSeletor} disabled={ocupado} className="flex-1 rounded-lg bg-[#7c3aed] px-2 py-1.5 text-xs font-semibold text-white transition hover:bg-[#6d28d9] disabled:opacity-50">{ocupado ? "Abrindo…" : "⚡ Fotos & gerar"}</button>
           )}
@@ -467,6 +476,12 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
     setApagarFesta(null);
     router.refresh();
   }
+  async function pararTema(id: string) {
+    setMsgTema(null);
+    const r = await pararGeracaoVideoTematico(id).catch(() => ({ ok: false as const, erro: "Não deu pra parar agora." }));
+    if (!r.ok) { setMsgTema({ tipo: "erro", txt: r.erro || "Não deu pra parar." }); return; }
+    router.refresh();
+  }
   async function excluirTema(id: string) {
     setMsgTema(null);
     const r = await excluirVideoTematico(id).catch(() => ({ ok: false as const, erro: "Não deu pra excluir agora." }));
@@ -520,7 +535,7 @@ export function VideoPainel({ marcaId, festas, tematicos, corMarca, capasBanco =
       {tematicos.length > 0 && (
         <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
           {tematicos.map((v) => (
-            <CardTematico key={v.id} v={v} ocupado={carregandoTema === v.id} onAbrirSeletor={() => abrirSeletorTema(v)} onExcluir={() => excluirTema(v.id)} onZerar={() => setZerarAlvo({ tipo: "tema", id: v.id, nome: v.titulo })} />
+            <CardTematico key={v.id} v={v} ocupado={carregandoTema === v.id} onAbrirSeletor={() => abrirSeletorTema(v)} onExcluir={() => excluirTema(v.id)} onParar={() => pararTema(v.id)} onZerar={() => setZerarAlvo({ tipo: "tema", id: v.id, nome: v.titulo })} />
           ))}
         </div>
       )}

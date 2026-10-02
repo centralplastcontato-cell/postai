@@ -223,6 +223,19 @@ export async function statusVideoTematico(videoId: string) {
   return { ok: true as const, videoUrl: v.videoUrl };
 }
 
+// PARAR um vídeo preso em "gerando" (o motor caiu/foi atualizado no meio e o aviso nunca veio):
+// volta pro "sem vídeo" pra o dono poder excluir ou gerar de novo. Se o motor ainda terminar
+// depois, o aviso dele só preenche o vídeo normalmente.
+export async function pararGeracaoVideoTematico(videoId: string) {
+  const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoUrl: true } });
+  if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
+  const g = await guardaMarca(v.marcaId);
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  if (v.videoUrl === "gerando") await prisma.videoTematico.update({ where: { id: videoId }, data: { videoUrl: "" } });
+  revalidatePath(`/painel/marcas/${v.marcaId}`);
+  return { ok: true as const };
+}
+
 export async function excluirVideoTematico(videoId: string) {
   const v = await prisma.videoTematico.findUnique({ where: { id: videoId }, select: { marcaId: true, videoUrl: true, titulo: true, narracaoUrl: true } });
   if (!v) return { ok: false as const, erro: "Vídeo não encontrado." };
