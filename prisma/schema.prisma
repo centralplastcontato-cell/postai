@@ -57,7 +57,7 @@ model Marca {
   // API de automação externa (/api/v1/posts): chave por marca, enviada como
   // "Authorization: Bearer pa_...". Guardamos SÓ o hash SHA-256 (nunca a chave em si) +
   // o começo dela pra o painel mostrar qual está ativa. null = sem chave. Gerar outra revoga a atual.
-  apiChaveHash    String?   @unique
+  apiChaveHash    String? // indexado (não UNIQUE: o db push do deploy recusa UNIQUE novo em tabela com dados)
   apiChavePrefixo String    @default("")
   apiChaveEm      DateTime?
   criadoEm    DateTime @default(now())
@@ -82,6 +82,7 @@ model Marca {
   videosTematicos VideoTematico[]
 
   @@index([usuarioId])
+  @@index([apiChaveHash])
 }
 
 // Vídeo TEMÁTICO do buffet (Reels institucional, SEM festa): montado com fotos do ACERVO
@@ -298,7 +299,8 @@ model Conteudo {
   salvamentos Int? // 🔖 salvamentos
   insightsEm  DateTime? // quando os números foram atualizados pela última vez
   // API de automação externa (/api/v1/posts). origem="api" marca o que veio de fora.
-  // externalId = chave de idempotência enviada pela automação (reenvio não duplica).
+  // externalId = chave de idempotência enviada pela automação (reenvio não duplica — garantido no
+  // código, com trava por marca+external_id; não é UNIQUE no banco, ver apiChaveHash).
   origem       String?
   externalId   String?
   erroPostagem String? // motivo da última falha ao publicar (null = sem falha) — volta a null ao publicar
@@ -306,7 +308,7 @@ model Conteudo {
   createdAt   DateTime @default(now())
 
   @@index([marcaId, data])
-  @@unique([marcaId, externalId])
+  @@index([marcaId, externalId])
 }
 
 // Post de feed (imagem única) agendado pra uma marca.
@@ -353,7 +355,8 @@ model Publicacao {
   salvamentos Int? // 🔖 salvamentos (feed/carrossel)
   insightsEm  DateTime? // quando os números foram atualizados pela última vez
   // API de automação externa (/api/v1/posts). origem="api" marca o que veio de fora.
-  // externalId = chave de idempotência enviada pela automação (reenvio não duplica).
+  // externalId = chave de idempotência enviada pela automação (reenvio não duplica — garantido no
+  // código, com trava por marca+external_id; não é UNIQUE no banco, ver apiChaveHash).
   origem       String?
   externalId   String?
   erroPostagem String? // motivo da última falha ao publicar (null = sem falha) — volta a null ao publicar
@@ -362,7 +365,7 @@ model Publicacao {
 
   @@index([marcaId, data])
   @@index([videoTematicoId])
-  @@unique([marcaId, externalId])
+  @@index([marcaId, externalId])
 }
 
 // Operadores do painel (admin mestre via ADMIN_SENHA; usuários extras opcionais).

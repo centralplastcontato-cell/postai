@@ -4,7 +4,7 @@ import { put, del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { urlExternaSegura } from "@/lib/foto-arte";
 import { acessoExpirado } from "@/lib/plano";
-import type { Conteudo, Publicacao } from "@prisma/client";
+import type { Conteudo, Prisma, Publicacao } from "@prisma/client";
 
 // API de AUTOMAÇÃO EXTERNA (/api/v1/posts): uma automação de fora (n8n, Make, Zapier, script)
 // cria, consulta e cancela posts de UMA marca. O post vira um Conteudo (carrossel) ou uma
@@ -32,7 +32,7 @@ export async function marcaDaChave(req: Request): Promise<{ ok: true; marca: Mar
   const m = h.match(/^Bearer\s+(pa_[A-Za-z0-9_-]{20,})\s*$/);
   if (!m) return { ok: false, status: 401, erro: "Envie a chave da marca no cabeçalho: Authorization: Bearer pa_..." };
   const marca = await prisma.marca
-    .findUnique({ where: { apiChaveHash: hashChave(m[1]) }, include: { usuario: { select: { admin: true, acessoAte: true } } } })
+    .findFirst({ where: { apiChaveHash: hashChave(m[1]) }, include: { usuario: { select: { admin: true, acessoAte: true } } } })
     .catch(() => undefined);
   if (marca === undefined) return { ok: false, status: 503, erro: "O banco demorou a responder. Tente de novo em instantes." };
   if (!marca) return { ok: false, status: 401, erro: "Chave inválida ou revogada." };
@@ -426,32 +426,53 @@ export async function criarPostApi(marca: MarcaApi, e: EntradaPost): Promise<Res
   const sufixo = `${Date.now().toString(36).slice(-6)}${randomBytes(2).toString("hex")}`;
   const comum = { marcaId: marca.id, data: v.data, titulo, legenda: v.legenda, hashtags: v.hashtags, status, origem: "api", externalId: v.externalId };
 
-  try {
-    let reg: Registro;
+  const criarRegistro = async (tx: Prisma.TransactionClient): Promise<Registro> => {
     if (v.formato === "carrossel") {
-      const c = await prisma.conteudo.create({
+      const c = await tx.conteudo.create({
         data: { ...comum, slug: `${marca.slug}-api-${sufixo}`, slides: JSON.stringify(urls), slidesTexto: null, tema: null, categoria: null },
       });
-      reg = { tipo: "carrossel", c };
-    } else {
-      const ehVideoMidia = midias[0].tipo === "video";
-      const p = await prisma.publicacao.create({
-        data: {
-          ...comum,
-          slug: `${marca.slug}-api-${sufixo}`,
-          template: "arte-pronta", // o painel mostra a mídia como veio, sem template por cima
-          texto: "",
-          imagemUrl: ehVideoMidia ? capaUrl : urls[0],
-          videoUrl: ehVideoMidia ? urls[0] : null,
-          extra: JSON.stringify(capaUrl ? { capaUrl } : {}),
-          tema: null,
-          categoria: null,
-          formato: v.formato, // feed | story | reels
-          espelhar: false, // a automação manda o Story separado se quiser
-        },
-      });
-      reg = { tipo: "publicacao", p };
+      return { tipo: "carrossel", c };
     }
+    const ehVideoMidia = midias[0].tipo === "video";
+    const p = await tx.publicacao.create({
+      data: {
+        ...comum,
+        slug: `${marca.slug}-api-${sufixo}`,
+        template: "arte-pronta", // o painel mostra a mídia como veio, sem template por cima
+        texto: "",
+        imagemUrl: ehVideoMidia ? capaUrl : urls[0],
+        videoUrl: ehVideoMidia ? urls[0] : null,
+        extra: JSON.stringify(capaUrl ? { capaUrl } : {}),
+        tema: null,
+        categoria: null,
+        formato: v.formato, // feed | story | reels
+        espelhar: false, // a automação manda o Story separado se quiser
+      },
+    });
+    return { tipo: "publicacao", p };
+  };
+
+  try {
+    // Idempotência sem índice UNIQUE no banco (o db push do deploy recusa criar UNIQUE em tabela
+    // com dados sem --accept-data-loss): uma trava por (marca, external_id) dentro da transação
+    // serializa reenvios simultâneos — o 2º espera, acha o post do 1º e devolve ele.
+    const r = await prisma.$transaction(async (tx) => {
+      if (v.externalId) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`postai-api:${marca.id}:${v.externalId}`}))`;
+        const [c0, p0] = await Promise.all([
+          tx.conteudo.findFirst({ where: { marcaId: marca.id, externalId: v.externalId } }),
+          tx.publicacao.findFirst({ where: { marcaId: marca.id, externalId: v.externalId } }),
+        ]);
+        if (c0) return { novo: false, reg: { tipo: "carrossel", c: c0 } as Registro };
+        if (p0) return { novo: false, reg: { tipo: "publicacao", p: p0 } as Registro };
+      }
+      return { novo: true, reg: await criarRegistro(tx) };
+    });
+    if (!r.novo) {
+      await del(subidas).catch(() => {});
+      return { ok: true, criado: false, post: await postParaJson(r.reg, marca), avisos: [] };
+    }
+    const reg = r.reg;
     const { registrarAtividade } = await import("@/lib/atividade");
     const { AGENTE } = await import("@/lib/config");
     const quando = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" }).format(v.data);
@@ -465,11 +486,6 @@ export async function criarPostApi(marca: MarcaApi, e: EntradaPost): Promise<Res
     return { ok: true, criado: true, post: await postParaJson(reg, marca), avisos };
   } catch (err) {
     await del(subidas).catch(() => {});
-    // Corrida: dois envios do mesmo external_id ao mesmo tempo → o 2º cai aqui. Devolve o 1º.
-    if (v.externalId && (err as { code?: string }).code === "P2002") {
-      const existente = await buscarPorExternalId(marca.id, v.externalId);
-      if (existente) return { ok: true, criado: false, post: await postParaJson(existente, marca), avisos: [] };
-    }
     console.error("[api] falha ao criar post:", err);
     return { ok: false, status: 500, erros: [{ campo: "", codigo: "ERRO_INTERNO", mensagem: "Não consegui salvar o post. Tente de novo." }] };
   }
@@ -480,8 +496,8 @@ export type Registro = { tipo: "carrossel"; c: Conteudo } | { tipo: "publicacao"
 
 export async function buscarPorExternalId(marcaId: string, externalId: string): Promise<Registro | null> {
   const [c, p] = await Promise.all([
-    prisma.conteudo.findUnique({ where: { marcaId_externalId: { marcaId, externalId } } }),
-    prisma.publicacao.findUnique({ where: { marcaId_externalId: { marcaId, externalId } } }),
+    prisma.conteudo.findFirst({ where: { marcaId, externalId } }),
+    prisma.publicacao.findFirst({ where: { marcaId, externalId } }),
   ]);
   if (c) return { tipo: "carrossel", c };
   if (p) return { tipo: "publicacao", p };
