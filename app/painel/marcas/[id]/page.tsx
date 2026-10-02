@@ -16,6 +16,8 @@ import { baseUrl } from "@/lib/config";
 import { musicaBuffet } from "@/lib/musica-buffet";
 import { OnboardingMarca } from "@/components/onboarding-marca";
 import { analisarEngajamento, sugerirProximoPost, type AnaliseInsights } from "@/lib/inteligencia";
+import { midiasDoRegistro } from "@/lib/api-externa";
+import { type PendenteApi } from "@/components/automacao-card";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +50,7 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
 
   // Todas as queries da marca em PARALELO (Promise.all) — antes eram sequenciais e
   // somavam ~4-5s + pressionavam o pool de conexões. Em paralelo cai pra ~1 query.
-  const [conteudos, pubs, imgs, metricas, ativ, festasRaw, campanhasRaw, tematicosRaw] = await Promise.all([
+  const [conteudosTodos, pubsTodos, imgs, metricas, ativ, festasRaw, campanhasRaw, tematicosRaw] = await Promise.all([
     prisma.conteudo.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.publicacao.findMany({ where: { marcaId: id }, orderBy: { data: "asc" } }),
     prisma.imagemMarca.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
@@ -58,6 +60,21 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
     prisma.campanha.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
     prisma.videoTematico.findMany({ where: { marcaId: id }, orderBy: { criadoEm: "desc" } }),
   ]);
+  // Posts que a automação externa (API) mandou "aguardando_aprovacao" ficam SÓ no cartão 🔌
+  // Automação (aprovar/recusar) — fora das abas e do calendário até serem aprovados.
+  const AGUARDANDO = "aguardando_aprovacao";
+  const conteudos = conteudosTodos.filter((c) => c.status !== AGUARDANDO);
+  const pubs = pubsTodos.filter((p) => p.status !== AGUARDANDO);
+  const pendentesApi: PendenteApi[] = [
+    ...conteudosTodos.filter((c) => c.status === AGUARDANDO).map((c) => ({ tipo: "carrossel" as const, x: c, formato: "carrossel", m: midiasDoRegistro({ tipo: "carrossel", c }), video: false })),
+    ...pubsTodos.filter((p) => p.status === AGUARDANDO).map((p) => ({ tipo: "publicacao" as const, x: p, formato: p.formato, m: midiasDoRegistro({ tipo: "publicacao", p }), video: p.videoUrl !== null })),
+  ]
+    .sort((a, b) => a.x.data.getTime() - b.x.data.getTime())
+    .map(({ tipo, x, formato, m, video }) => ({
+      id: x.id, tipo, formato, data: x.data.toISOString(), legenda: x.legenda, hashtags: x.hashtags,
+      midias: m.midias, capa: m.capa, video, externalId: x.externalId,
+    }));
+  const apiChave = marca.apiChaveHash && marca.apiChaveEm ? { prefixo: marca.apiChavePrefixo, em: marca.apiChaveEm.toISOString() } : null;
   const campanhas: CampanhaView[] = campanhasRaw.map((c) => ({
     id: c.id, selo: c.selo, titulo: c.titulo, texto: c.texto, ctaTexto: c.ctaTexto, ctaTipo: c.ctaTipo, ctaValor: c.ctaValor, ativa: c.ativa,
   }));
@@ -440,6 +457,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
         entregue={entregue}
         analise={analise}
         sugestao={sugestao}
+        apiChave={apiChave}
+        pendentesApi={pendentesApi}
       />
     </div>
   );

@@ -22,6 +22,7 @@ import { EvolucaoCard } from "./evolucao-card";
 import { BackfillEngajamento } from "./backfill-engajamento";
 import { BiaDescobriu } from "./bia-descobriu";
 import { RegerarCalendario } from "./regerar-calendario";
+import { AutomacaoCard, type PendenteApi } from "./automacao-card";
 import { type AnaliseInsights, type SugestaoBia } from "@/lib/inteligencia";
 import { rotuloPlano, diasDeAcesso } from "@/lib/plano";
 
@@ -61,6 +62,8 @@ export function MarcaHub({
   entregue,
   analise,
   sugestao,
+  apiChave = null,
+  pendentesApi = [],
 }: {
   marca: MarcaView;
   posts: Post[];
@@ -83,6 +86,8 @@ export function MarcaHub({
   entregue: { carrosseis: number; feed: number; stories: number; reels: number; total: number };
   analise: AnaliseInsights;
   sugestao: SugestaoBia | null;
+  apiChave?: { prefixo: string; em: string } | null;
+  pendentesApi?: PendenteApi[];
 }) {
   const [aba, setAba] = useState<"redes" | "imagens" | "arte" | "festas" | "video-buffet" | "video-festa" | "mascote" | "instagram" | "paginas" | "campanhas" | "config">("redes");
   // Segmento do perfil: "buffet" mostra TUDO (como sempre); "jogo" esconde as abas específicas de festa.
@@ -139,6 +144,7 @@ export function MarcaHub({
           </div>
         )}
         <ConexaoCard marcaId={marca.id} temConexao={conectada} />
+        {ehAdmin && <AutomacaoCard marcaId={marca.id} linkBase={linkBase} chave={apiChave} pendentes={pendentesApi} />}
         {entregue.total > 0 && (
           <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
             <p className="text-sm font-semibold text-white">🤖 A Bia já trabalhou por você</p>

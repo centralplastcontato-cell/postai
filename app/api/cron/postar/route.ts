@@ -115,12 +115,20 @@ async function claimPublicacao(id: string): Promise<boolean> {
     return false;
   }
 }
-async function reverterCarrossel(id: string) {
-  try { await prisma.conteudo.update({ where: { id }, data: { status: "a_postar", postadoEm: null } }); } catch {}
+// Reverte pra "a_postar" (o piloto tenta de novo na próxima passada) e ANOTA o motivo — é o que a
+// API de automação devolve como "falhou" + motivo_falha. Publicar com sucesso limpa o motivo.
+async function reverterCarrossel(id: string, erro: string) {
+  try { await prisma.conteudo.update({ where: { id }, data: { status: "a_postar", postadoEm: null, erroPostagem: erro.slice(0, 500) } }); } catch {}
 }
-async function reverterPublicacao(id: string) {
-  try { await prisma.publicacao.update({ where: { id }, data: { status: "a_postar", postadoEm: null } }); } catch {}
+async function reverterPublicacao(id: string, erro: string, extra: { reelsContainerId?: string } = {}) {
+  try { await prisma.publicacao.update({ where: { id }, data: { status: "a_postar", postadoEm: null, erroPostagem: erro.slice(0, 500), ...extra } }); } catch {}
 }
+async function anotarErroPublicacao(id: string, erro: string, extra: { reelsContainerId?: string } = {}) {
+  try { await prisma.publicacao.update({ where: { id }, data: { erroPostagem: erro.slice(0, 500), ...extra } }); } catch {}
+}
+// Imagem que veio PRONTA pela API de automação: posta o arquivo como veio (proporção validada na
+// entrada), em vez de passar pelo render da arte (que encaixaria a foto num quadro 4:5/9:16).
+const imagemApi = (p: { origem: string | null; imagemUrl: string | null }) => (p.origem === "api" && p.imagemUrl?.startsWith("http") ? p.imagemUrl : null);
 
 async function postarCarrossel(m: { id: string; nome: string; igUserId: string | null; accessToken: string | null; fbPageId: string | null }, agora: Date, base: string, out: Resultado[]) {
   try {
@@ -137,9 +145,9 @@ async function postarCarrossel(m: { id: string; nome: string; igUserId: string |
     if (r.ig.ok) {
       const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
       await registrarAtividade(AGENTE, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
-      await prisma.conteudo.update({ where: { id: c.id }, data: { mediaId: r.ig.mediaId } }).catch(() => {}); // guarda o ID pra coletar o engajamento depois
+      await prisma.conteudo.update({ where: { id: c.id }, data: { mediaId: r.ig.mediaId, permalink: r.ig.permalink, erroPostagem: null } }).catch(() => {}); // guarda o ID pra coletar o engajamento depois
     } else {
-      await reverterCarrossel(c.id);
+      await reverterCarrossel(c.id, r.ig.erro);
       await registrarAtividade(AGENTE, `Não consegui postar o carrossel "${c.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "carrossel", titulo: c.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
@@ -155,18 +163,18 @@ async function postarFeed(m: { id: string; nome: string; igUserId: string | null
     if (!(await claimPublicacao(p.id))) return;
 
     const legenda = `${p.legenda}\n\n${p.hashtags}`.trim().slice(0, 2200);
-    const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, [`${base}/api/feed/${p.id}?v=${tokenArte(p)}`], legenda);
+    const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, [imagemApi(p) ?? `${base}/api/feed/${p.id}?v=${tokenArte(p)}`], legenda);
     if (r.ig.ok) {
       const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
       await registrarAtividade(AGENTE, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
-      await prisma.publicacao.update({ where: { id: p.id }, data: { mediaId: r.ig.mediaId } }).catch(() => {}); // guarda o ID pra coletar o engajamento depois
+      await prisma.publicacao.update({ where: { id: p.id }, data: { mediaId: r.ig.mediaId, permalink: r.ig.permalink, erroPostagem: null } }).catch(() => {}); // guarda o ID pra coletar o engajamento depois
       // Espelhar no Story (best-effort): ligado na marca ou forçado no post.
       if (p.espelhar ?? m.espelharStory) {
         const rs = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${p.id}?v=${tokenArte(p)}`);
         await registrarAtividade(AGENTE, rs.ig.ok ? `Espelhei "${p.titulo}" no Story de ${m.nome} (auto).` : `Não consegui espelhar "${p.titulo}" no Story: ${rs.ig.erro}`, m.id).catch(() => {});
       }
     } else {
-      await reverterPublicacao(p.id);
+      await reverterPublicacao(p.id, r.ig.erro);
       await registrarAtividade(AGENTE, `Não consegui postar "${p.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "feed", titulo: p.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
@@ -183,12 +191,12 @@ async function postarStory(m: { id: string; nome: string; igUserId: string | nul
     if (st.videoUrl && st.videoUrl.startsWith("http")) { await postarStoryVideo(m, st, out); return; }
     if (!(await claimPublicacao(st.id))) return;
 
-    const r = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, `${base}/api/story/${st.id}?v=${tokenArte(st)}`);
+    const r = await publicarStoryNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, imagemApi(st) ?? `${base}/api/story/${st.id}?v=${tokenArte(st)}`);
     if (r.ig.ok) {
       await registrarAtividade(AGENTE, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
-      await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.ig.mediaId } }).catch(() => {}); // guarda o ID pra coletar as visualizações (dentro de 24h)
+      await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.ig.mediaId, erroPostagem: null } }).catch(() => {}); // guarda o ID pra coletar as visualizações (dentro de 24h)
     } else {
-      await reverterPublicacao(st.id);
+      await reverterPublicacao(st.id, r.ig.erro);
       await registrarAtividade(AGENTE, `Não consegui postar o Story "${st.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
@@ -198,6 +206,17 @@ async function postarStory(m: { id: string; nome: string; igUserId: string | nul
 }
 
 const dorme = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Capa própria do Reels enviada pela API (vai como cover_url). Os outros Reels usam o frame de 1,5s.
+function capaApi(p: { origem: string | null; extra: string | null }): string | null {
+  if (p.origem !== "api") return null;
+  try {
+    const u = (JSON.parse(p.extra || "{}") as { capaUrl?: unknown }).capaUrl;
+    return typeof u === "string" && u.startsWith("http") ? u : null;
+  } catch {
+    return null;
+  }
+}
 
 // PILOTO DO STORY DE VÍDEO (mesma lógica 2 fases do Reels): cria o container de Story de vídeo,
 // aguarda processar e publica quando FINISHED. Reaproveita reelsContainerId entre as passadas.
@@ -214,14 +233,14 @@ async function postarStoryVideo(m: { id: string; nome: string; igUserId: string 
         const r = await publicarContainerReels(conn, st.reelsContainerId);
         if (r.ok) {
           await registrarAtividade(AGENTE, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
-          await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.mediaId, reelsContainerId: "" } }).catch(() => {});
+          await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.mediaId, reelsContainerId: "", erroPostagem: null } }).catch(() => {});
         } else {
-          await prisma.publicacao.update({ where: { id: st.id }, data: { status: "a_postar", postadoEm: null, reelsContainerId: "" } }).catch(() => {});
+          await reverterPublicacao(st.id, r.erro, { reelsContainerId: "" });
           await registrarAtividade(AGENTE, `Não consegui publicar o Story "${st.titulo}" de ${m.nome}: ${r.erro}`, m.id).catch(() => {});
         }
         out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: r.ok, erro: r.ok ? undefined : r.erro });
       } else if (status === "ERROR" || status === "EXPIRED") {
-        await prisma.publicacao.update({ where: { id: st.id }, data: { reelsContainerId: "" } }).catch(() => {}); // recria na próxima
+        await anotarErroPublicacao(st.id, `A Meta não conseguiu processar o vídeo (${status}).`, { reelsContainerId: "" }); // recria na próxima
         out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: false, erro: status });
       }
       return; // IN_PROGRESS/UNKNOWN → espera a próxima passada
@@ -229,7 +248,7 @@ async function postarStoryVideo(m: { id: string; nome: string; igUserId: string 
 
     // FASE 1 — cria o container e guarda; poll curto pra publicar já se ficar pronto rápido
     const c = await criarContainerStoryVideo(conn, st.videoUrl);
-    if (!c.ok) { out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: false, erro: c.erro }); return; }
+    if (!c.ok) { await anotarErroPublicacao(st.id, c.erro); out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: false, erro: c.erro }); return; }
     await prisma.publicacao.update({ where: { id: st.id }, data: { reelsContainerId: c.containerId } }).catch(() => {});
     for (let i = 0; i < 5; i++) { // ~20s
       await dorme(4000);
@@ -239,15 +258,15 @@ async function postarStoryVideo(m: { id: string; nome: string; igUserId: string 
         const r = await publicarContainerReels(conn, c.containerId);
         if (r.ok) {
           await registrarAtividade(AGENTE, `Postei o Story "${st.titulo}" no Instagram de ${m.nome} (auto).`, m.id).catch(() => {});
-          await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.mediaId, reelsContainerId: "" } }).catch(() => {});
+          await prisma.publicacao.update({ where: { id: st.id }, data: { mediaId: r.mediaId, reelsContainerId: "", erroPostagem: null } }).catch(() => {});
         } else {
-          await prisma.publicacao.update({ where: { id: st.id }, data: { status: "a_postar", postadoEm: null, reelsContainerId: "" } }).catch(() => {});
+          await reverterPublicacao(st.id, r.erro, { reelsContainerId: "" });
         }
         out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: r.ok, erro: r.ok ? undefined : r.erro });
         return;
       }
       if (s === "ERROR" || s === "EXPIRED") {
-        await prisma.publicacao.update({ where: { id: st.id }, data: { reelsContainerId: "" } }).catch(() => {});
+        await anotarErroPublicacao(st.id, `A Meta não conseguiu processar o vídeo (${s}).`, { reelsContainerId: "" });
         out.push({ marca: m.nome, tipo: "story", titulo: st.titulo, ok: false, erro: s });
         return;
       }
@@ -273,10 +292,10 @@ async function publicarReelsPronto(
     let fbOk = false;
     if (p.videoUrl) { const fb = await espelharVideoFacebook(m, p.videoUrl, p.legenda || "").catch(() => undefined); fbOk = Boolean(fb?.ok); }
     await registrarAtividade(AGENTE, `Postei o Reels "${p.titulo}" no Instagram${fbOk ? " + Facebook" : ""} de ${m.nome} (auto).`, m.id).catch(() => {});
-    await prisma.publicacao.update({ where: { id: p.id }, data: { mediaId: r.mediaId } }).catch(() => {});
+    await prisma.publicacao.update({ where: { id: p.id }, data: { mediaId: r.mediaId, permalink: r.permalink, erroPostagem: null } }).catch(() => {});
   } else {
     // volta a "a_postar" e zera o container (recria do zero na próxima passada)
-    await prisma.publicacao.update({ where: { id: p.id }, data: { status: "a_postar", postadoEm: null, reelsContainerId: "" } }).catch(() => {});
+    await reverterPublicacao(p.id, r.erro, { reelsContainerId: "" });
     await registrarAtividade(AGENTE, `Não consegui publicar o Reels "${p.titulo}" de ${m.nome}: ${r.erro}`, m.id).catch(() => {});
   }
   out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: r.ok, erro: r.ok ? undefined : r.erro });
@@ -297,7 +316,8 @@ async function postarReels(m: { id: string; nome: string; igUserId: string | nul
       return;
     }
     const conn = { igUserId: m.igUserId as string, accessToken: m.accessToken as string };
-    const legenda = p.legenda.slice(0, 2200);
+    // Reels de festa/temático já trazem as hashtags dentro da legenda; os da API vêm separados.
+    const legenda = (p.origem === "api" ? [p.legenda, p.hashtags].map((t) => t.trim()).filter(Boolean).join("\n\n") : p.legenda).slice(0, 2200);
 
     // FASE 2 — já criou o container numa passada anterior
     if (p.reelsContainerId) {
@@ -305,7 +325,7 @@ async function postarReels(m: { id: string; nome: string; igUserId: string | nul
       if (status === "FINISHED") {
         await publicarReelsPronto(m, p, p.reelsContainerId, out);
       } else if (status === "ERROR" || status === "EXPIRED") {
-        await prisma.publicacao.update({ where: { id: p.id }, data: { reelsContainerId: "" } }).catch(() => {}); // recria na próxima
+        await anotarErroPublicacao(p.id, `A Meta não conseguiu processar o vídeo (${status}).`, { reelsContainerId: "" }); // recria na próxima
         await registrarAtividade(AGENTE, `O vídeo do Reels "${p.titulo}" de ${m.nome} falhou no preparo (${status}) — vou tentar de novo.`, m.id).catch(() => {});
         out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: false, erro: status });
       }
@@ -314,8 +334,9 @@ async function postarReels(m: { id: string; nome: string; igUserId: string | nul
     }
 
     // FASE 1 — cria o container e guarda; poll curto pra publicar já se ficar pronto rápido
-    const c = await criarContainerReels(conn, p.videoUrl, legenda);
+    const c = await criarContainerReels(conn, p.videoUrl, legenda, capaApi(p));
     if (!c.ok) {
+      await anotarErroPublicacao(p.id, c.erro);
       await registrarAtividade(AGENTE, `Não consegui preparar o Reels "${p.titulo}" de ${m.nome}: ${c.erro}`, m.id).catch(() => {});
       out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: false, erro: c.erro });
       return;
@@ -327,7 +348,7 @@ async function postarReels(m: { id: string; nome: string; igUserId: string | nul
       const s = await statusContainerReels(conn, c.containerId);
       if (s === "FINISHED") { await publicarReelsPronto(m, p, c.containerId, out); return; }
       if (s === "ERROR" || s === "EXPIRED") {
-        await prisma.publicacao.update({ where: { id: p.id }, data: { reelsContainerId: "" } }).catch(() => {});
+        await anotarErroPublicacao(p.id, `A Meta não conseguiu processar o vídeo (${s}).`, { reelsContainerId: "" });
         out.push({ marca: m.nome, tipo: "reels", titulo: p.titulo, ok: false, erro: s });
         return;
       }
