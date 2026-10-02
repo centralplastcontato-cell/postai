@@ -70,19 +70,18 @@ export function normalizar(s: string): string {
 const palavras = (s: string) => normalizar(s).split(" ").filter(Boolean);
 const casa = (p: string, g: string) => p === g || (g.length >= 3 && p.startsWith(g)) || (p.length >= 4 && g.startsWith(p));
 export const contarPalavras = (s: string) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
-// Teto de cada cena (~2,6 palavras/s): 6s nas cenas comuns, 8s na oferta. Passou → encurta o texto.
-export const MAX_PALAVRAS_CENA = 13;
-export const MAX_PALAVRAS_OFERTA = 22;
+// DURAÇÃO do vídeo-anúncio (segundos de VOZ; o vídeo fecha ~1s depois). Teto de 55s (pedido do Victor).
+export const DURACAO = { min: 40, ideal: 47, max: 54 };
 export type Faixa = { min: number; max: number }; // total de palavras da narração
-export const FAIXA_PADRAO: Faixa = { min: 66, max: 80 };
+export const FAIXA_PADRAO: Faixa = { min: 92, max: 115 };
 // Teto por cena acompanha a faixa (voz mais lenta = cenas mais curtas): ~17% do total por cena
-// comum e ~28% na oferta (com 80 palavras: 13 e 22).
+// comum e ~28% na oferta.
 export const maxPalavrasDa = (ato: string, faixa: Faixa = FAIXA_PADRAO) =>
-  ato === "oferta" ? Math.min(MAX_PALAVRAS_OFERTA, Math.round(faixa.max * 0.28)) : Math.min(MAX_PALAVRAS_CENA, Math.round(faixa.max * 0.17));
-// Faixa de palavras pra caber em 27–32s de fala (o vídeo fecha em ~34s), na velocidade da voz.
+  ato === "oferta" ? Math.round(faixa.max * 0.28) : Math.round(faixa.max * 0.17);
+// Faixa de palavras pra fala de ~38–50s (o vídeo fecha até 55s), na velocidade da voz.
 export function faixaPelaVelocidade(palavrasPorSeg: number): Faixa {
-  const v = Math.max(1.6, Math.min(3.2, palavrasPorSeg || 2.4));
-  return { min: Math.round(v * 27), max: Math.round(v * 32) };
+  const v = Math.max(1.6, Math.min(3.2, palavrasPorSeg || 2.3));
+  return { min: Math.round(v * (DURACAO.min - 2)), max: Math.round(v * (DURACAO.max - 4)) };
 }
 
 // Narração completa (o que a voz fala), com respiro entre os atos.
@@ -274,9 +273,9 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
   const seq = cenas.map((c) => c.ato).filter((a, i, arr) => i === 0 || arr[i - 1] !== a);
   if (seq.join(",") !== ATOS.join(",")) erros.push(`Os atos precisam ser exatamente ${ATOS.join(" → ")}, nessa ordem (cenas do mesmo ato ficam seguidas). Veio: ${seq.join(" → ")}.`);
 
-  // duração (~2,6 palavras/s): 28–35s ≈ 70–92 palavras
+  // duração: a faixa vem da velocidade da voz (ver faixaPelaVelocidade)
   const total = cenas.reduce((s, c) => s + contarPalavras(c.narracao), 0);
-  if (total < faixa.min || total > faixa.max) erros.push(`A narração tem ${total} palavras — precisa ter entre ${faixa.min} e ${faixa.max} (vídeo de 30 a 34 segundos nessa voz).`);
+  if (total < faixa.min || total > faixa.max) erros.push(`A narração tem ${total} palavras — precisa ter entre ${faixa.min} e ${faixa.max} (vídeo de ${DURACAO.min} a ${DURACAO.max} segundos nessa voz).`);
 
   // fotos
   const ids = cenas.flatMap((c) => c.elementos.filter((e) => e.tipo === "foto").map((e) => e.asset || ""));
@@ -394,7 +393,7 @@ export function alinharTempos(r: Roteiro, falada: PalavraFalada[], duracaoAudio:
 
 // ---------- PROMPT da Bia (a skill, condensada) ----------
 export function promptSistemaColagem(marca: { nome: string; descricao: string }, faixa: Faixa = FAIXA_PADRAO): string {
-  return `Você é a Bia, roteirista de vídeos-ANÚNCIO do buffet infantil "${marca.nome}". Transforme as fotos do buffet + a oferta num vídeo vertical 9:16 de 28 a 35 segundos, narrado, no estilo COLAGEM/scrapbook (fotos tipo polaroid, adesivos e textos entrando na tela enquanto uma voz conduz). O objetivo é VENDER FESTA: prender nos 3 primeiros segundos, mostrar prova real, deixar a oferta clara e terminar chamando pro WhatsApp.
+  return `Você é a Bia, roteirista de vídeos-ANÚNCIO do buffet infantil "${marca.nome}". Transforme as fotos do buffet + a oferta num vídeo vertical 9:16 de ${DURACAO.min} a ${DURACAO.max + 1} segundos, narrado, no estilo COLAGEM/scrapbook (fotos tipo polaroid, adesivos e textos entrando na tela enquanto uma voz conduz). O objetivo é VENDER FESTA: prender nos 3 primeiros segundos, mostrar prova real, deixar a oferta clara e terminar chamando pro WhatsApp.
 
 DIFERENCIAIS DO BUFFET (use SÓ estes — nunca invente diferencial): ${marca.descricao || "(sem descrição cadastrada — fale de forma geral: festa completa, diversão, tranquilidade pros pais)"}
 
@@ -407,8 +406,8 @@ ESTRUTURA OBRIGATÓRIA — 5 atos, nesta ordem (um ato pode ter 1 ou 2 cenas seg
 
 REGRAS DE TEXTO:
 - Narração falada, informal, frases curtas, sempre "você" (nunca "cê"). Números e datas POR EXTENSO na fala ("dez amiguinhos", "até quinze de outubro").
-- A narração INTEIRA soma entre ${faixa.min} e ${faixa.max} palavras (vídeo de 30 a 34 segundos na voz escolhida, teto rígido de 35s). CONTE as palavras antes de responder.
-- CADA CENA tem no máximo ${maxPalavrasDa("gancho", faixa)} palavras de fala (6 segundos); a da oferta no máximo ${maxPalavrasDa("oferta", faixa)} (8 segundos). Use 6 cenas.
+- A narração INTEIRA soma entre ${faixa.min} e ${faixa.max} palavras (vídeo de ${DURACAO.min} a ${DURACAO.max} segundos na voz escolhida, teto de ${DURACAO.max + 1}s). CONTE as palavras antes de responder.
+- CADA CENA tem no máximo ${maxPalavrasDa("gancho", faixa)} palavras de fala ; a da oferta no máximo ${maxPalavrasDa("oferta", faixa)}. Use 6 ou 7 cenas.
 - Cada cena tem UM elemento principal ("papel":"principal") — o maior, o foco da cena (no gancho: a foto da festa).
 - Texto na tela: no máximo 5 palavras por adesivo (o selo_promo pode ter o benefício inteiro). A tela COMPLEMENTA a fala, não repete a frase.
 - Prazo: falado E escrito ("Até DD/MM" num adesivo).

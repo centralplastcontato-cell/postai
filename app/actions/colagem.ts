@@ -21,7 +21,7 @@ import { vozValida, VOZ_PADRAO } from "@/lib/vozes";
 import { dispararMotorColagem } from "@/lib/video-engine";
 import { baseUrl } from "@/lib/config";
 import {
-  corrigir, garantirOferta, completarCenas, soDetalhes, validarRoteiro, narracaoCompleta, alinharTempos, promptSistemaColagem, contarPalavras, prazoCurto, faixaPelaVelocidade,
+  corrigir, garantirOferta, completarCenas, soDetalhes, validarRoteiro, narracaoCompleta, alinharTempos, promptSistemaColagem, contarPalavras, prazoCurto, faixaPelaVelocidade, DURACAO,
   type Oferta, type Roteiro, type FotoInfo, type PalavraFalada,
 } from "@/lib/colagem";
 
@@ -265,7 +265,7 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
   const estilo = (direcao ?? v.narracaoEstilo ?? "").trim().slice(0, 900);
   try {
     // A voz é a MESMA dos outros vídeos (mesma voz e direção escolhidas, sem acelerar — acelerar
-    // deixava a voz mais fina). Só as pausas mudas longas são encurtadas; o tempo de 30–34s vem do
+    // deixava a voz mais fina). Só as pausas mudas longas são encurtadas; o tempo (DURACAO) vem do
     // TAMANHO do texto (a Bia encurta se passar).
     const texto = narracaoCompleta(roteiro);
     const { url, segundos } = await gerarNarracaoMp3({ texto, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), apertarPausas: true });
@@ -280,7 +280,7 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
     });
     if (antigo.startsWith("http")) import("@vercel/blob").then(({ del }) => del(antigo)).catch(() => {});
     revalidatePath(`/painel/marcas/${v.marcaId}`);
-    const foraDoTempo = segundos > 34.4 ? ("longo" as const) : segundos < 27 ? ("curto" as const) : null;
+    const foraDoTempo = segundos > DURACAO.max + 0.4 ? ("longo" as const) : segundos < DURACAO.min - 8 ? ("curto" as const) : null;
     return { ok: true as const, url, segundos: Math.round(segundos), segundosExatos: segundos, foraDoTempo, palavrasTexto };
   } catch (e) {
     console.error("Erro ao gerar a voz da colagem:", e);
@@ -309,7 +309,7 @@ export async function sincronizarVozColagem(videoId: string) {
   return { ok: true as const, sincronizado: falada.length > 0, repetiu, palavrasFaladas: falada.length, palavrasTexto };
 }
 
-// ---------- 3b. duração 30–35s ----------
+// ---------- 3b. duração (DURACAO: até 55s) ----------
 // A voz saiu fora do tempo: a Bia reescreve SÓ as falas (mesmas cenas, fotos e figurinhas), mirando
 // o número de palavras que dá ~32s nessa voz. Depois a tela gera a voz de novo.
 // Fala "enchida" pela IA: o mesmo trecho de 3 palavras aparece 2x, ou termina numa lista de
@@ -340,8 +340,8 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
   const atuais = roteiro.cenas.reduce((s, x) => s + contarPalavras(x.narracao), 0);
   // pela velocidade REAL da voz (voz lenta = menos palavras). Alongar: no máximo +12 palavras por
   // rodada (pedir muito a mais fazia a IA encher de palavras soltas e frases repetidas).
-  const pelaVoz = Math.round((atuais * 32.5) / Math.max(10, segundosAtuais));
-  const alvo = Math.max(50, Math.min(90, atuais + 12, pelaVoz));
+  const pelaVoz = Math.round((atuais * DURACAO.ideal) / Math.max(10, segundosAtuais));
+  const alvo = Math.max(50, Math.min(130, atuais + 12, pelaVoz));
   // meta POR CENA (a IA acerta muito melhor um número por cena do que um total)
   const fator = alvo / Math.max(1, atuais);
   const metaDa = (x: { narracao: string }) => Math.max(4, Math.round(contarPalavras(x.narracao) * fator));
@@ -388,8 +388,8 @@ export async function montarVideoColagem(videoId: string) {
   const roteiro = lerRoteiro(v.colagemRoteiro);
   if (!roteiro) return { ok: false as const, erro: "Peça o roteiro pra Bia primeiro." };
   if (!v.narracaoUrl.startsWith("http") || !roteiro.cenas.every((x) => typeof x.inicio === "number")) return { ok: false as const, erro: "Gere a voz antes de montar o vídeo." };
-  // Teto RÍGIDO de 35s: voz mais longa → gerar de novo (a Bia encurta o texto), nunca esticar o vídeo.
-  if (v.narracaoSeg > 34.4) return { ok: false as const, erro: `A voz ficou com ${v.narracaoSeg}s e o vídeo tem teto de 35s (voz + respiro final). Clique em "Gerar voz de novo" — a Bia encurta o texto.` };
+  // Teto de 55s: voz mais longa → gerar de novo (a Bia encurta o texto), nunca esticar o vídeo.
+  if (v.narracaoSeg > DURACAO.max + 0.4) return { ok: false as const, erro: `A voz ficou com ${v.narracaoSeg}s e o vídeo tem teto de ${DURACAO.max + 1}s (voz + respiro final). Clique em "Gerar voz de novo" — a Bia encurta o texto.` };
 
   // LGPD: só fotos desta marca, soltas ou de festa autorizada.
   const ids = [...new Set(roteiro.cenas.flatMap((x) => x.elementos.filter((e) => e.tipo === "foto").map((e) => e.asset || "")))];

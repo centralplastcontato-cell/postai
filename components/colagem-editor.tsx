@@ -128,7 +128,7 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
   async function gerarVoz() {
     setMsg(null);
     setOcupado("voz");
-    // A voz tem que dar 30–35s: se sair fora, a Bia ajusta o tamanho das falas e a voz é refeita
+    // A voz tem que caber no tempo (até 55s): se sair fora, a Bia ajusta o tamanho das falas e a voz é refeita
     // (no máximo 3 rodadas — depois disso vai do jeito que ficou, com aviso).
     let r = await vozCompleta();
     let boa = r?.ok ? r : null; // a última voz que deu certo (se uma rodada falhar, fica com ela)
@@ -139,7 +139,7 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
       if (r?.ok) boa = r;
     }
     for (let rodada = 1; rodada <= 3 && r?.ok && r.foraDoTempo; rodada++) {
-      setMsg({ tipo: "aviso", txt: `⏱️ A fala ficou com ${r.segundos}s (o ideal é 30–34s) — a Bia está ${r.foraDoTempo === "longo" ? "encurtando" : "alongando"} o texto (rodada ${rodada} de 3)…` });
+      setMsg({ tipo: "aviso", txt: `⏱️ A fala ficou com ${r.segundos}s (o ideal é 40–54s) — a Bia está ${r.foraDoTempo === "longo" ? "encurtando" : "alongando"} o texto (rodada ${rodada} de 3)…` });
       const aj = await ajustarTamanhoRoteiro(videoId, r.segundosExatos).catch(() => null);
       if (!aj?.ok) break;
       setRoteiro(aj.roteiro);
@@ -155,7 +155,7 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     if (d?.ok && d.roteiro) setRoteiro(d.roteiro);
     const urlSalva = d?.ok && d.narracao.url.startsWith("http") ? d.narracao.url : fim.url;
     setAudio({ url: urlSalva, segundos: d?.ok ? d.narracao.segundos : fim.segundos });
-    setMsg({ tipo: fim.foraDoTempo ? "aviso" : "ok", txt: `🔊 Voz pronta (${fim.segundos}s · ${fim.palavrasTexto} palavras)${fim.foraDoTempo ? " — ainda fora do tempo" + (fim.foraDoTempo === "longo" ? " (acima de 34s não monta: gere de novo)" : ", mas pode montar assim") : ""}${fim.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
+    setMsg({ tipo: fim.foraDoTempo ? "aviso" : "ok", txt: `🔊 Voz pronta (${fim.segundos}s · ${fim.palavrasTexto} palavras)${fim.foraDoTempo ? " — ainda fora do tempo" + (fim.foraDoTempo === "longo" ? " (acima de 54s não monta: gere de novo)" : ", mas pode montar assim") : ""}${fim.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
   }
 
   async function montar() {
