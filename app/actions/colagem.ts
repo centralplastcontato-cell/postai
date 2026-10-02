@@ -88,11 +88,51 @@ export async function salvarOfertaColagem(videoId: string, oferta: Oferta) {
   return { ok: true as const, oferta: o, roteiroZerado: mudou && c.v.colagemRoteiro !== "{}" };
 }
 
+// ---------- FOTOS escolhidas pelo dono ----------
+// (B) antes do roteiro: o dono marca as fotos do anúncio — com 6 ou mais, a Bia usa SÓ elas; com
+// menos, ela usa todas as marcadas e completa com o banco. (A) depois do roteiro: troca a foto de
+// uma vaga por outra do banco (só fotos divulgáveis: soltas ou de festa autorizada — LGPD).
+const MIN_FOTOS_SO_DO_DONO = 6;
+function lerFotosEscolhidas(json: string): string[] {
+  try { const a = JSON.parse(json || "[]"); return Array.isArray(a) ? a.map(String).filter(Boolean).slice(0, 20) : []; } catch { return []; }
+}
+export async function fotosParaColagem(videoId: string) {
+  const c = await carregar(videoId);
+  if (!c.ok) return c;
+  const lista = await fotosDivulgaveis(c.v.marcaId, { limite: 400 });
+  return { ok: true as const, fotos: lista.map((f) => ({ id: f.id, url: f.url, descricao: f.descricao, categoria: f.categoria })) };
+}
+export async function salvarFotosColagem(videoId: string, ids: string[]) {
+  const c = await carregar(videoId);
+  if (!c.ok) return c;
+  const ok = new Set((await fotosDivulgaveis(c.v.marcaId, { limite: 400 })).map((f) => f.id));
+  const limpas = [...new Set(ids.map(String))].filter((id) => ok.has(id)).slice(0, 20);
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemFotos: JSON.stringify(limpas) } });
+  return { ok: true as const, ids: limpas };
+}
+export async function trocarFotoColagem(videoId: string, cenaId: number, vaga: string, fotoId: string) {
+  const c = await carregar(videoId);
+  if (!c.ok) return c;
+  if (c.v.videoUrl === "gerando") return { ok: false as const, erro: "O vídeo está sendo montado agora — espere terminar." };
+  const roteiro = lerRoteiro(c.v.colagemRoteiro);
+  if (!roteiro) return { ok: false as const, erro: "Peça o roteiro pra Bia primeiro." };
+  const foto = (await fotosDivulgaveis(c.v.marcaId, { limite: 400 })).find((f) => f.id === fotoId);
+  if (!foto) return { ok: false as const, erro: "Essa foto não pode ser usada (não é desta marca ou a festa não foi autorizada)." };
+  const cena = roteiro.cenas.find((x) => x.id === cenaId);
+  const el = cena?.elementos.find((e) => e.tipo === "foto" && (e.vaga === vaga || (!e.vaga && e.asset === vaga)));
+  if (!el) return { ok: false as const, erro: "Não achei essa foto no roteiro." };
+  el.asset = fotoId;
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(roteiro) } });
+  revalidatePath(`/painel/marcas/${c.v.marcaId}`);
+  return { ok: true as const, roteiro, url: foto.url };
+}
+
 export async function dadosVideoColagem(videoId: string) {
   const c = await carregar(videoId);
   if (!c.ok) return c;
   const roteiro = lerRoteiro(c.v.colagemRoteiro);
-  const fotosIds = roteiro ? [...new Set(roteiro.cenas.flatMap((x) => x.elementos.filter((e) => e.tipo === "foto").map((e) => e.asset || "")))] : [];
+  const escolhidas = lerFotosEscolhidas(c.v.colagemFotos);
+  const fotosIds = [...new Set([...(roteiro ? roteiro.cenas.flatMap((x) => x.elementos.filter((e) => e.tipo === "foto").map((e) => e.asset || "")) : []), ...escolhidas])];
   const imgs = fotosIds.length ? await prisma.imagemMarca.findMany({ where: { id: { in: fotosIds }, marcaId: c.v.marcaId }, select: { id: true, url: true } }) : [];
   return {
     ok: true as const,
@@ -100,6 +140,7 @@ export async function dadosVideoColagem(videoId: string) {
     oferta: lerOferta(c.v.colagemOferta),
     roteiro,
     fotos: Object.fromEntries(imgs.map((i) => [i.id, i.url])),
+    fotosEscolhidas: escolhidas,
     narracao: { url: c.v.narracaoUrl, segundos: c.v.narracaoSeg, voz: c.v.narracaoVoz || VOZ_PADRAO, estilo: c.v.narracaoEstilo },
     temTempos: Boolean(roteiro?.cenas.every((x) => typeof x.inicio === "number")) && c.v.narracaoUrl.startsWith("http"),
     videoUrl: c.v.videoUrl,
@@ -162,10 +203,17 @@ export async function gerarRoteiroColagem(videoId: string, correcao?: { rascunho
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
 
-  const acervo = (await fotosDivulgaveis(v.marcaId, { comDescricao: true }))
-    .map((f) => ({ ...f, pts: pontuar(f.descricao, f.categoria) }))
-    .sort((a, b) => b.pts - a.pts || a.usos - b.usos)
-    .slice(0, 60);
+  const idsDoDono = lerFotosEscolhidas(v.colagemFotos);
+  const todas = await fotosDivulgaveis(v.marcaId, { limite: 400 });
+  const doDono = todas.filter((f) => idsDoDono.includes(f.id)).map((f) => ({ ...f, pts: 999, descricao: f.descricao || "(foto escolhida pelo dono, sem descrição)" }));
+  const soDoDono = doDono.length >= MIN_FOTOS_SO_DO_DONO;
+  const acervo = soDoDono ? doDono : [
+    ...doDono,
+    ...todas.filter((f) => f.descricao && !idsDoDono.includes(f.id))
+      .map((f) => ({ ...f, pts: pontuar(f.descricao, f.categoria) }))
+      .sort((a, b) => b.pts - a.pts || a.usos - b.usos)
+      .slice(0, 60 - doDono.length),
+  ];
   if (acervo.length < 4) return { ok: false as const, erro: "Preciso de pelo menos 4 fotos com descrição no banco de imagens pra montar o anúncio." };
   const fotos = new Map<string, FotoInfo>(acervo.map((f) => [f.id, { descricao: f.descricao, categoria: f.categoria }]));
   const urlDe = new Map(acervo.map((f) => [f.id, f.url]));
@@ -199,6 +247,7 @@ export async function gerarRoteiroColagem(videoId: string, correcao?: { rascunho
 
 FOTOS DISPONÍVEIS (id | categoria | descrição) — as primeiras costumam ser as melhores:
 ${lista}
+${doDono.length ? `\nFOTOS ESCOLHIDAS PELO DONO — ${soDoDono ? "use SÓ estas" : "use TODAS estas (e complete com as outras)"}: ${doDono.map((f) => f.id).join(", ")}` : ""}
 
 Escreva o roteiro.`;
 
@@ -237,6 +286,10 @@ Escreva o roteiro.`;
     return { ok: false as const, reprovado: true as const, rascunho: rascunho(texto), erros: ["A resposta não veio em JSON válido — responda SÓ com o JSON no formato pedido."] };
   }
   const erros = validarMoldes(resposta, escolha, oferta, fotos, faixa, comMascote);
+  if (doDono.length && !soDoDono) {
+    const usadas = new Set(ATOS_MOLDE.flatMap((a) => Object.values(resposta[a]?.vagas || {}).map((x) => x?.foto || "")));
+    for (const f of doDono) if (!usadas.has(f.id)) erros.push(`Use a foto "${f.id}" — o dono escolheu ela pro vídeo.`);
+  }
   // Fotos escolhidas: escura ou sem cor nenhuma → pede troca (mede todas em paralelo).
   const escolhidas = [...new Set(ATOS_MOLDE.flatMap((a) => Object.values(resposta[a]?.vagas || {}).map((x) => x?.foto || "")))].filter((id) => urlDe.has(id));
   const medidas = await Promise.all(escolhidas.map((id) => medirFoto(urlDe.get(id)!)));

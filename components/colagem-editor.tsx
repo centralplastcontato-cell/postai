@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VOZES, ESTILOS, VOZ_PADRAO, DIRECAO_PADRAO } from "@/lib/vozes";
 import type { Oferta, Roteiro } from "@/lib/colagem";
-import { type Qualidade, dadosVideoColagem, salvarOfertaColagem, gerarRoteiroColagem, gerarVozColagem, sincronizarVozColagem, montarVideoColagem, ajustarTamanhoRoteiro } from "@/app/actions/colagem";
+import { type Qualidade, dadosVideoColagem, salvarOfertaColagem, gerarRoteiroColagem, gerarVozColagem, sincronizarVozColagem, montarVideoColagem, ajustarTamanhoRoteiro, fotosParaColagem, salvarFotosColagem, trocarFotoColagem } from "@/app/actions/colagem";
 import { statusVideoTematico } from "@/app/actions/videos-tematicos";
 
 const NOME_ATO: Record<string, { emoji: string; nome: string; cor: string }> = {
@@ -39,6 +39,11 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
   const [qualidade, setQualidade] = useState<Qualidade | null>(null);
   const [ocupado, setOcupado] = useState<"" | "roteiro" | "voz" | "montar">("");
   const [msg, setMsg] = useState<{ tipo: "ok" | "erro" | "aviso"; txt: string } | null>(null);
+  // fotos: (B) as que o dono escolhe ANTES do roteiro · (A) trocar a foto de uma vaga DEPOIS
+  const [fotosEscolhidas, setFotosEscolhidas] = useState<string[]>([]);
+  const [banco, setBanco] = useState<{ id: string; url: string; descricao: string }[] | null>(null);
+  const [seletor, setSeletor] = useState<null | { modo: "varias" } | { modo: "trocar"; cenaId: number; vaga: string; atual: string }>(null);
+  const [marcadas, setMarcadas] = useState<string[]>([]);
 
   async function recarregar() {
     const d = await dadosVideoColagem(videoId).catch(() => null);
@@ -49,6 +54,7 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     setExtrasTxt([0, 1, 2].map((i) => d.oferta.extras[i] || ""));
     setRoteiro(d.roteiro);
     setFotos(d.fotos);
+    setFotosEscolhidas(d.fotosEscolhidas);
     setVoz(d.narracao.voz || VOZ_PADRAO);
     setEstilo(d.narracao.estilo || DIRECAO_PADRAO);
     setAudio(d.narracao.url.startsWith("http") ? { url: d.narracao.url, segundos: d.narracao.segundos } : null);
@@ -158,6 +164,33 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     setMsg({ tipo: fim.foraDoTempo ? "aviso" : "ok", txt: `🔊 Voz pronta (${fim.segundos}s · ${fim.palavrasTexto} palavras)${fim.foraDoTempo ? " — ainda fora do tempo" + (fim.foraDoTempo === "longo" ? " (acima de 54s não monta: gere de novo)" : ", mas pode montar assim") : ""}${fim.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
   }
 
+  async function abrirSeletor(s: NonNullable<typeof seletor>) {
+    setSeletor(s);
+    setMarcadas(s.modo === "varias" ? fotosEscolhidas : []);
+    if (!banco) {
+      const r = await fotosParaColagem(videoId).catch(() => null);
+      if (r?.ok) setBanco(r.fotos);
+      else { setSeletor(null); setMsg({ tipo: "erro", txt: "Não consegui abrir o banco de imagens." }); }
+    }
+  }
+  async function confirmarSeletor(idUnico?: string) {
+    if (!seletor) return;
+    if (seletor.modo === "varias") {
+      const r = await salvarFotosColagem(videoId, marcadas).catch(() => null);
+      if (!r?.ok) { setMsg({ tipo: "erro", txt: "Não consegui salvar as fotos escolhidas." }); return; }
+      setFotosEscolhidas(r.ids);
+      setFotos((f) => ({ ...f, ...Object.fromEntries((banco || []).filter((b) => r.ids.includes(b.id)).map((b) => [b.id, b.url])) }));
+      setMsg({ tipo: "ok", txt: r.ids.length ? `📸 ${r.ids.length} foto(s) escolhida(s). ${r.ids.length >= 6 ? "A Bia vai usar só essas." : "A Bia usa essas e completa com o banco."} Peça o roteiro.` : "Sem fotos escolhidas: a Bia escolhe sozinha." });
+    } else if (idUnico) {
+      const r = await trocarFotoColagem(videoId, seletor.cenaId, seletor.vaga, idUnico).catch(() => null);
+      if (!r || !r.ok) { setMsg({ tipo: "erro", txt: (r && "erro" in r && r.erro) || "Não consegui trocar a foto." }); return; }
+      setRoteiro(r.roteiro);
+      setFotos((f) => ({ ...f, [idUnico]: r.url }));
+      setMsg({ tipo: "ok", txt: `📸 Foto trocada.${videoUrl.startsWith("http") ? " Clique em \"Montar de novo\" pra ver no vídeo." : ""}` });
+    }
+    setSeletor(null);
+  }
+
   async function montar() {
     setMsg(null);
     setOcupado("montar");
@@ -206,6 +239,22 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
                 Tem condições (mostra &quot;Consulte condições&quot;)
               </label>
             </div>
+            <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold text-white">📸 Fotos do vídeo <span className="font-normal text-muted">(opcional — vazio = a Bia escolhe; com 6 ou mais, ela usa só as suas)</span></p>
+                <button type="button" onClick={() => abrirSeletor({ modo: "varias" })} disabled={!!ocupado} className="rounded-lg border border-sky-500/40 bg-sky-500/15 px-3 py-1 text-xs font-semibold text-sky-300 hover:bg-sky-500/25 disabled:opacity-40">
+                  {fotosEscolhidas.length ? `Mudar (${fotosEscolhidas.length})` : "Escolher fotos"}
+                </button>
+              </div>
+              {fotosEscolhidas.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {fotosEscolhidas.map((id) => fotos[id] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={id} src={fotos[id]} alt="" className="h-10 w-10 rounded object-cover ring-1 ring-white/40" />
+                  ) : null)}
+                </div>
+              )}
+            </div>
           </section>
 
           {/* 2. ROTEIRO */}
@@ -228,8 +277,11 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
                       <p className="mt-1.5 text-[12px] leading-snug text-white">“{c.narracao}”</p>
                       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                         {c.elementos.map((e, k) => e.tipo === "foto" && fotos[e.asset || ""] ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img key={k} src={fotos[e.asset || ""]} alt="" className="h-10 w-10 rounded object-cover ring-2 ring-white" title={`foto — entra em "${e.gatilho}"`} />
+                          <button key={k} type="button" disabled={!!ocupado || videoUrl === "gerando"} onClick={() => abrirSeletor({ modo: "trocar", cenaId: c.id, vaga: e.vaga || e.asset || "", atual: e.asset || "" })} className="group relative" title="Trocar esta foto">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={fotos[e.asset || ""]} alt="" className="h-14 w-14 rounded object-cover ring-2 ring-white" />
+                            <span className="absolute inset-x-0 bottom-0 rounded-b bg-black/70 text-center text-[9px] font-bold text-white">🔄 Trocar</span>
+                          </button>
                         ) : (
                           <span key={k} className="rounded-full border border-white/15 bg-black/30 px-2 py-0.5 text-[10px] text-white/80" title={`entra em "${e.gatilho}"`}>
                             {e.tipo === "mascote" ? `🏰 ${e.pose}${e.balao ? `: “${e.balao}”` : ""}` : e.tipo === "grupo" ? `👧🧒 ×${e.quantidade}` : e.tipo === "texto" ? e.texto : `${ROTULO_ADESIVO[e.estilo || ""] || "✨"} ${e.texto || e.estilo}`}
@@ -287,6 +339,40 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
           </section>
           </>)}
         </div>
+
+        {seletor && (
+          <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/90 sm:items-center sm:p-4" onClick={() => setSeletor(null)}>
+            <div onClick={(e) => e.stopPropagation()} className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden bg-preto-card sm:rounded-2xl sm:border sm:border-linha">
+              <div className="flex items-center justify-between gap-2 border-b border-linha px-4 py-3">
+                <p className="text-sm font-bold text-white">{seletor.modo === "varias" ? `📸 Escolha as fotos do vídeo (${marcadas.length})` : "🔄 Escolha a nova foto"}</p>
+                <div className="flex gap-2">
+                  {seletor.modo === "varias" && (
+                    <button type="button" onClick={() => confirmarSeletor()} className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500">Salvar</button>
+                  )}
+                  <button type="button" onClick={() => setSeletor(null)} className="rounded-full border border-linha px-3 py-1 text-sm text-muted hover:text-white">✕</button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-3">
+                {!banco ? <p className="text-sm text-muted">Carregando o banco de imagens…</p> : !banco.length ? <p className="text-sm text-muted">Nenhuma foto liberada pra divulgação no banco de imagens.</p> : (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                    {banco.map((f) => {
+                      const sel = seletor.modo === "varias" ? marcadas.includes(f.id) : seletor.atual === f.id;
+                      return (
+                        <button key={f.id} type="button" title={f.descricao || ""}
+                          onClick={() => seletor.modo === "varias" ? setMarcadas((m) => (m.includes(f.id) ? m.filter((x) => x !== f.id) : [...m, f.id].slice(0, 20))) : confirmarSeletor(f.id)}
+                          className={`relative aspect-square overflow-hidden rounded-lg ring-2 ${sel ? "ring-emerald-400" : "ring-transparent hover:ring-white/40"}`}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={f.url} alt="" loading="lazy" className="h-full w-full object-cover" />
+                          {sel && <span className="absolute right-1 top-1 rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-white">✓</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {msg && (
           <div className={`border-t border-linha px-4 py-2.5 text-[12px] font-semibold ${msg.tipo === "ok" ? "text-green-400" : msg.tipo === "aviso" ? "text-amber-300" : "text-vermelho"}`}>{msg.txt}</div>

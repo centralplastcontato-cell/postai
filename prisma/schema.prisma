@@ -133,6 +133,7 @@ model VideoTematico {
   colagemOferta  String @default("{}") // JSON { principal, extras[], prazo "AAAA-MM-DD", condicoes }
   colagemRoteiro String @default("{}") // JSON de cenas (o roteiro da Bia, já validado)
   colagemQualidade String @default("{}") // relatório da conferência do motor (cobertura, base vazia, cortes)
+  colagemFotos   String @default("[]") // ids das fotos que o DONO escolheu pro anúncio (vazio = a Bia escolhe)
   criadoEm        DateTime @default(now())
 
   publicacoes Publicacao[] // os Reels agendados/postados a partir deste vídeo (evergreen: vários)
