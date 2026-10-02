@@ -7,6 +7,8 @@ import { creditosTrial } from "@/lib/limites";
 import { PainelHeader } from "@/components/painel-header";
 import { ChatBia } from "@/components/chat-bia";
 
+const MOSTRAR_CHAT_BIA = false;
+
 export const dynamic = "force-dynamic";
 
 const WHATS = "https://wa.me/5515981121710?text=" + encodeURIComponent("Oi! Quero reativar o meu acesso ao Postaí.");
@@ -93,7 +95,8 @@ export default async function PainelLayout({
         </div>
       )}
       <main className="flex-1">{children}</main>
-      <ChatBia nome={s.nome} />
+      {/* Botão de ajuda da Bia oculto por enquanto (pedido do Victor) — pra voltar, troque false por true */}
+      {MOSTRAR_CHAT_BIA && <ChatBia nome={s.nome} />}
     </div>
   );
 }
