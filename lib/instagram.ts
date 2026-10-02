@@ -26,8 +26,11 @@ async function materializar(url: string, tentativas = 3): Promise<string> {
     const resp = await fetch(url, { cache: "no-store" });
     if (resp.ok) {
       const buf = Buffer.from(await resp.arrayBuffer());
-      const nome = `posts/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.png`;
-      const blob = await put(nome, buf, { access: "public", contentType: "image/png" });
+      // Mídia que já chega em JPEG (ex.: foto enviada pela API de automação) segue como JPEG —
+      // não rotula bytes de JPEG como PNG. As artes renderizadas (next/og) continuam PNG.
+      const jpeg = (resp.headers.get("content-type") || "").startsWith("image/jpeg");
+      const nome = `posts/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${jpeg ? "jpg" : "png"}`;
+      const blob = await put(nome, buf, { access: "public", contentType: jpeg ? "image/jpeg" : "image/png" });
       return blob.url;
     }
     ultimoStatus = resp.status;
@@ -255,7 +258,7 @@ export async function publicarStoryNasRedes(
 export type StatusReels = "FINISHED" | "IN_PROGRESS" | "ERROR" | "EXPIRED" | "UNKNOWN";
 
 /** Cria o container de um REELS na Meta (NÃO publica). O vídeo entra em PROCESSAMENTO. */
-export async function criarContainerReels(conn: ConexaoIG, videoUrl: string, legenda: string): Promise<{ ok: true; containerId: string } | { ok: false; erro: string }> {
+export async function criarContainerReels(conn: ConexaoIG, videoUrl: string, legenda: string, capaUrl?: string | null): Promise<{ ok: true; containerId: string } | { ok: false; erro: string }> {
   if (!marcaConectada(conn)) return { ok: false, erro: "Marca sem conexão com o Instagram." };
   try {
     const c = await graphRetry(conn, `${conn.igUserId}/media`, {
@@ -263,7 +266,8 @@ export async function criarContainerReels(conn: ConexaoIG, videoUrl: string, leg
       video_url: videoUrl,
       caption: legenda,
       share_to_feed: "true",
-      thumb_offset: "1500", // capa = frame de 1,5s (logo + nome nítidos, fora do fade)
+      // capa: imagem própria (cover_url, ex.: enviada pela API) ou o frame de 1,5s (logo + nome nítidos, fora do fade)
+      ...(capaUrl ? { cover_url: capaUrl } : { thumb_offset: "1500" }),
     });
     return { ok: true, containerId: String(c.id) };
   } catch (e) {
@@ -346,6 +350,17 @@ export async function publicarReelsNasRedes(
 ): Promise<ResultadoRedes> {
   const ig = await publicarReelsIG({ igUserId: marca.igUserId, accessToken: marca.accessToken }, videoUrl, legenda);
   return { ig };
+}
+
+/** Link (permalink) de uma mídia já publicada. null se a Meta não devolver. */
+export async function buscarPermalink(accessToken: string, mediaId: string): Promise<string | null> {
+  try {
+    const r = await fetch(`${GRAPH}/${mediaId}?fields=permalink&access_token=${accessToken}`, { cache: "no-store" });
+    const j = (await r.json()) as { permalink?: string };
+    return j.permalink ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Monta URLs públicas absolutas a partir de caminhos relativos (/api/...). */

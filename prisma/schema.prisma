@@ -54,6 +54,12 @@ model Marca {
   // Álbum da Festa: token SECRETO do link público que o gerente do buffet usa pra subir
   // fotos das festas (sem login). Vazio = link ainda não gerado. Regerar revoga o anterior.
   tokenFotos  String   @default("")
+  // API de automação externa (/api/v1/posts): chave por marca, enviada como
+  // "Authorization: Bearer pa_...". Guardamos SÓ o hash SHA-256 (nunca a chave em si) +
+  // o começo dela pra o painel mostrar qual está ativa. null = sem chave. Gerar outra revoga a atual.
+  apiChaveHash    String?   @unique
+  apiChavePrefixo String    @default("")
+  apiChaveEm      DateTime?
   criadoEm    DateTime @default(now())
 
   // Inteligência: a análise do HISTÓRICO do Instagram ("A Bia estudou seu feed") cacheada,
@@ -291,9 +297,16 @@ model Conteudo {
   alcance     Int? // 👁️ pessoas alcançadas (reach)
   salvamentos Int? // 🔖 salvamentos
   insightsEm  DateTime? // quando os números foram atualizados pela última vez
+  // API de automação externa (/api/v1/posts). origem="api" marca o que veio de fora.
+  // externalId = chave de idempotência enviada pela automação (reenvio não duplica).
+  origem       String?
+  externalId   String?
+  erroPostagem String? // motivo da última falha ao publicar (null = sem falha) — volta a null ao publicar
+  permalink    String? // link do post no Instagram depois de publicado
   createdAt   DateTime @default(now())
 
   @@index([marcaId, data])
+  @@unique([marcaId, externalId])
 }
 
 // Post de feed (imagem única) agendado pra uma marca.
@@ -339,10 +352,17 @@ model Publicacao {
   alcance     Int? // 👁️ alcance (reach) — no Story, é a contagem de visualizações
   salvamentos Int? // 🔖 salvamentos (feed/carrossel)
   insightsEm  DateTime? // quando os números foram atualizados pela última vez
+  // API de automação externa (/api/v1/posts). origem="api" marca o que veio de fora.
+  // externalId = chave de idempotência enviada pela automação (reenvio não duplica).
+  origem       String?
+  externalId   String?
+  erroPostagem String? // motivo da última falha ao publicar (null = sem falha) — volta a null ao publicar
+  permalink    String? // link do post no Instagram depois de publicado
   createdAt DateTime @default(now())
 
   @@index([marcaId, data])
   @@index([videoTematicoId])
+  @@unique([marcaId, externalId])
 }
 
 // Operadores do painel (admin mestre via ADMIN_SENHA; usuários extras opcionais).

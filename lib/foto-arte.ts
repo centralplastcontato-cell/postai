@@ -18,7 +18,7 @@ function ehDataUriSuportado(url: string): boolean {
 // Guard de SSRF: a foto externa só é buscada se for http(s) público. Bloqueia loopback,
 // IP privado, link-local e o endereço de metadados de nuvem (169.254.169.254) — pra um
 // usuário não conseguir fazer o servidor buscar URLs internas via campo de imagem.
-function urlExternaSegura(url: string): boolean {
+export function urlExternaSegura(url: string): boolean {
   let u: URL;
   try {
     u = new URL(url);

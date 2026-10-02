@@ -435,14 +435,15 @@ export async function gerarItemAgenda(marcaId: string, item: ItemAgenda): Promis
 
   // RECRIAR: tira a versão antiga do dia AQUI (item a item, junto da geração da nova) — se o
   // lote parar no meio, os dias que não chegaram a rodar ficam intactos. Só apaga o que está
-  // "a_postar"; o que já foi postado no Instagram é intocável.
+  // "a_postar"; o que já foi postado no Instagram é intocável. Post que veio da automação externa
+  // (origem="api") também nunca é apagado aqui — ele não é da agenda da Bia.
   if (item.recriar) {
     const ini = new Date(`${item.dia}T00:00:00-03:00`);
     const fim = new Date(`${item.dia}T23:59:59-03:00`);
     if (item.tipo === "carrossel") {
-      await prisma.conteudo.deleteMany({ where: { marcaId, status: "a_postar", data: { gte: ini, lte: fim } } }).catch(() => {});
+      await prisma.conteudo.deleteMany({ where: { marcaId, status: "a_postar", origem: null, data: { gte: ini, lte: fim } } }).catch(() => {});
     } else {
-      await prisma.publicacao.deleteMany({ where: { marcaId, formato: "feed", status: "a_postar", data: { gte: ini, lte: fim } } }).catch(() => {});
+      await prisma.publicacao.deleteMany({ where: { marcaId, formato: "feed", status: "a_postar", origem: null, data: { gte: ini, lte: fim } } }).catch(() => {});
     }
   }
 
