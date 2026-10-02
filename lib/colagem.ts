@@ -73,7 +73,17 @@ export const contarPalavras = (s: string) => String(s || "").trim().split(/\s+/)
 // Teto de cada cena (~2,6 palavras/s): 6s nas cenas comuns, 8s na oferta. Passou → encurta o texto.
 export const MAX_PALAVRAS_CENA = 13;
 export const MAX_PALAVRAS_OFERTA = 22;
-export const maxPalavrasDa = (ato: string) => (ato === "oferta" ? MAX_PALAVRAS_OFERTA : MAX_PALAVRAS_CENA);
+export type Faixa = { min: number; max: number }; // total de palavras da narração
+export const FAIXA_PADRAO: Faixa = { min: 66, max: 80 };
+// Teto por cena acompanha a faixa (voz mais lenta = cenas mais curtas): ~17% do total por cena
+// comum e ~28% na oferta (com 80 palavras: 13 e 22).
+export const maxPalavrasDa = (ato: string, faixa: Faixa = FAIXA_PADRAO) =>
+  ato === "oferta" ? Math.min(MAX_PALAVRAS_OFERTA, Math.round(faixa.max * 0.28)) : Math.min(MAX_PALAVRAS_CENA, Math.round(faixa.max * 0.17));
+// Faixa de palavras pra caber em 27–32s de fala (o vídeo fecha em ~34s), na velocidade da voz.
+export function faixaPelaVelocidade(palavrasPorSeg: number): Faixa {
+  const v = Math.max(1.6, Math.min(3.2, palavrasPorSeg || 2.4));
+  return { min: Math.round(v * 27), max: Math.round(v * 32) };
+}
 
 // Narração completa (o que a voz fala), com respiro entre os atos.
 export function narracaoCompleta(r: Roteiro): string {
@@ -243,8 +253,8 @@ export function completarCenas(r: Roteiro): Roteiro {
 // Tamanho da narração só é "gosto" se estiver perto da faixa (60 a 100 palavras ≈ 25 a 38s).
 export function soDetalhes(erros: string[]): boolean {
   return erros.every((e) => {
-    const n = /narração tem (\d+) palavras/.exec(e);
-    if (n) return Number(n[1]) >= 62 && Number(n[1]) <= 82;
+    const n = /narração tem (\d+) palavras — precisa ter entre (\d+) e (\d+)/.exec(e);
+    if (n) return Number(n[1]) >= Number(n[2]) - 4 && Number(n[1]) <= Number(n[3]) + 2;
     const pc = /tem (\d+) palavras na fala — o máximo é (\d+)/.exec(e);
     if (pc) return Number(pc[1]) <= Number(pc[2]) + 3;
     const p = /prova precisa de 5 a 6 fotos.*veio (\d+)/.exec(e);
@@ -255,7 +265,7 @@ export function soDetalhes(erros: string[]): boolean {
 
 // ---------- VALIDADOR ----------
 // Devolve a lista de problemas (vazia = aprovado). As mensagens voltam pra Bia corrigir.
-export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, FotoInfo>): string[] {
+export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, FotoInfo>, faixa: Faixa = FAIXA_PADRAO): string[] {
   const erros: string[] = [];
   const cenas = r.cenas || [];
   if (!cenas.length) return ["O roteiro não tem cenas."];
@@ -266,7 +276,7 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
 
   // duração (~2,6 palavras/s): 28–35s ≈ 70–92 palavras
   const total = cenas.reduce((s, c) => s + contarPalavras(c.narracao), 0);
-  if (total < 66 || total > 80) erros.push(`A narração tem ${total} palavras — precisa ter entre 66 e 80 (vídeo de 30 a 34 segundos).`);
+  if (total < faixa.min || total > faixa.max) erros.push(`A narração tem ${total} palavras — precisa ter entre ${faixa.min} e ${faixa.max} (vídeo de 30 a 34 segundos nessa voz).`);
 
   // fotos
   const ids = cenas.flatMap((c) => c.elementos.filter((e) => e.tipo === "foto").map((e) => e.asset || ""));
@@ -285,7 +295,7 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
   // cenas
   let decorativas = 0;
   cenas.forEach((c, i) => {
-    const np = contarPalavras(c.narracao), maxP = maxPalavrasDa(c.ato);
+    const np = contarPalavras(c.narracao), maxP = maxPalavrasDa(c.ato, faixa);
     if (np > maxP) erros.push(`Cena ${i + 1} (${c.ato}) tem ${np} palavras na fala — o máximo é ${maxP} (${c.ato === "oferta" ? "8" : "6"} segundos). Encurte o texto dessa cena.`);
     const n = c.elementos.length;
     const max = c.ato === "oferta" ? 10 : 7; // a oferta recebe as peças obrigatórias (selo, prazo, extras, botão, rodapé)
@@ -383,7 +393,7 @@ export function alinharTempos(r: Roteiro, falada: PalavraFalada[], duracaoAudio:
 }
 
 // ---------- PROMPT da Bia (a skill, condensada) ----------
-export function promptSistemaColagem(marca: { nome: string; descricao: string }): string {
+export function promptSistemaColagem(marca: { nome: string; descricao: string }, faixa: Faixa = FAIXA_PADRAO): string {
   return `Você é a Bia, roteirista de vídeos-ANÚNCIO do buffet infantil "${marca.nome}". Transforme as fotos do buffet + a oferta num vídeo vertical 9:16 de 28 a 35 segundos, narrado, no estilo COLAGEM/scrapbook (fotos tipo polaroid, adesivos e textos entrando na tela enquanto uma voz conduz). O objetivo é VENDER FESTA: prender nos 3 primeiros segundos, mostrar prova real, deixar a oferta clara e terminar chamando pro WhatsApp.
 
 DIFERENCIAIS DO BUFFET (use SÓ estes — nunca invente diferencial): ${marca.descricao || "(sem descrição cadastrada — fale de forma geral: festa completa, diversão, tranquilidade pros pais)"}
@@ -397,8 +407,8 @@ ESTRUTURA OBRIGATÓRIA — 5 atos, nesta ordem (um ato pode ter 1 ou 2 cenas seg
 
 REGRAS DE TEXTO:
 - Narração falada, informal, frases curtas, sempre "você" (nunca "cê"). Números e datas POR EXTENSO na fala ("dez amiguinhos", "até quinze de outubro").
-- A narração INTEIRA soma entre 66 e 80 palavras (vídeo de 30 a 34 segundos, teto rígido de 35s). CONTE as palavras antes de responder.
-- CADA CENA tem no máximo ${MAX_PALAVRAS_CENA} palavras de fala (6 segundos); a da oferta no máximo ${MAX_PALAVRAS_OFERTA} (8 segundos). Use 6 ou 7 cenas.
+- A narração INTEIRA soma entre ${faixa.min} e ${faixa.max} palavras (vídeo de 30 a 34 segundos na voz escolhida, teto rígido de 35s). CONTE as palavras antes de responder.
+- CADA CENA tem no máximo ${maxPalavrasDa("gancho", faixa)} palavras de fala (6 segundos); a da oferta no máximo ${maxPalavrasDa("oferta", faixa)} (8 segundos). Use 6 cenas.
 - Cada cena tem UM elemento principal ("papel":"principal") — o maior, o foco da cena (no gancho: a foto da festa).
 - Texto na tela: no máximo 5 palavras por adesivo (o selo_promo pode ter o benefício inteiro). A tela COMPLEMENTA a fala, não repete a frase.
 - Prazo: falado E escrito ("Até DD/MM" num adesivo).
