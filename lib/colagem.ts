@@ -71,7 +71,7 @@ const palavras = (s: string) => normalizar(s).split(" ").filter(Boolean);
 const casa = (p: string, g: string) => p === g || (g.length >= 3 && p.startsWith(g)) || (p.length >= 4 && g.startsWith(p));
 export const contarPalavras = (s: string) => String(s || "").trim().split(/\s+/).filter(Boolean).length;
 // Teto de cada cena (~2,6 palavras/s): 6s nas cenas comuns, 8s na oferta. Passou → encurta o texto.
-export const MAX_PALAVRAS_CENA = 15;
+export const MAX_PALAVRAS_CENA = 13;
 export const MAX_PALAVRAS_OFERTA = 22;
 export const maxPalavrasDa = (ato: string) => (ato === "oferta" ? MAX_PALAVRAS_OFERTA : MAX_PALAVRAS_CENA);
 
@@ -244,7 +244,7 @@ export function completarCenas(r: Roteiro): Roteiro {
 export function soDetalhes(erros: string[]): boolean {
   return erros.every((e) => {
     const n = /narração tem (\d+) palavras/.exec(e);
-    if (n) return Number(n[1]) >= 68 && Number(n[1]) <= 95;
+    if (n) return Number(n[1]) >= 62 && Number(n[1]) <= 82;
     const pc = /tem (\d+) palavras na fala — o máximo é (\d+)/.exec(e);
     if (pc) return Number(pc[1]) <= Number(pc[2]) + 3;
     const p = /prova precisa de 5 a 6 fotos.*veio (\d+)/.exec(e);
@@ -266,7 +266,7 @@ export function validarRoteiro(r: Roteiro, oferta: Oferta, fotos: Map<string, Fo
 
   // duração (~2,6 palavras/s): 28–35s ≈ 70–92 palavras
   const total = cenas.reduce((s, c) => s + contarPalavras(c.narracao), 0);
-  if (total < 75 || total > 88) erros.push(`A narração tem ${total} palavras — precisa ter entre 75 e 88 (vídeo de 30 a 35 segundos).`);
+  if (total < 66 || total > 80) erros.push(`A narração tem ${total} palavras — precisa ter entre 66 e 80 (vídeo de 30 a 34 segundos).`);
 
   // fotos
   const ids = cenas.flatMap((c) => c.elementos.filter((e) => e.tipo === "foto").map((e) => e.asset || ""));
@@ -397,7 +397,7 @@ ESTRUTURA OBRIGATÓRIA — 5 atos, nesta ordem (um ato pode ter 1 ou 2 cenas seg
 
 REGRAS DE TEXTO:
 - Narração falada, informal, frases curtas, sempre "você" (nunca "cê"). Números e datas POR EXTENSO na fala ("dez amiguinhos", "até quinze de outubro").
-- A narração INTEIRA soma entre 75 e 88 palavras (vídeo de 30 a 35 segundos, teto rígido de 35s).
+- A narração INTEIRA soma entre 66 e 80 palavras (vídeo de 30 a 34 segundos, teto rígido de 35s). CONTE as palavras antes de responder.
 - CADA CENA tem no máximo ${MAX_PALAVRAS_CENA} palavras de fala (6 segundos); a da oferta no máximo ${MAX_PALAVRAS_OFERTA} (8 segundos). Use 6 ou 7 cenas.
 - Cada cena tem UM elemento principal ("papel":"principal") — o maior, o foco da cena (no gancho: a foto da festa).
 - Texto na tela: no máximo 5 palavras por adesivo (o selo_promo pode ter o benefício inteiro). A tela COMPLEMENTA a fala, não repete a frase.

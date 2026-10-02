@@ -142,10 +142,12 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
     setOcupado("");
     const fim = r?.ok ? r : boa;
     if (!fim) { setMsg({ tipo: "erro", txt: (r && "erro" in r && r.erro) || "Não consegui gerar a voz (o serviço de voz demorou demais). Tente de novo em instantes." }); return; }
-    setAudio({ url: fim.url, segundos: fim.segundos });
     setTemTempos(true);
+    // o áudio que vale é o que está salvo (as rodadas apagam as vozes anteriores)
     const d = await dadosVideoColagem(videoId).catch(() => null);
     if (d?.ok && d.roteiro) setRoteiro(d.roteiro);
+    const urlSalva = d?.ok && d.narracao.url.startsWith("http") ? d.narracao.url : fim.url;
+    setAudio({ url: urlSalva, segundos: d?.ok ? d.narracao.segundos : fim.segundos });
     setMsg({ tipo: fim.foraDoTempo ? "aviso" : "ok", txt: `🔊 Voz pronta (${fim.segundos}s · ${fim.palavrasTexto} palavras)${fim.foraDoTempo ? " — ainda fora do tempo" + (fim.foraDoTempo === "longo" ? " (acima de 34s não monta: gere de novo)" : ", mas pode montar assim") : ""}${fim.sincronizado ? " — figurinhas sincronizadas com cada palavra." : " — não consegui marcar cada palavra; as figurinhas vão entrar no tempo estimado."}` });
   }
 
@@ -250,7 +252,7 @@ export function ColagemEditor({ videoId, onFechar }: { videoId: string; onFechar
                 {ocupado === "voz" ? "🎙️ gerando e marcando cada palavra…" : audio ? "🔊 Gerar voz de novo" : "🔊 Gerar voz"}
               </button>
             </div>
-            {audio && <audio src={audio.url} controls className="mt-2 h-9 w-full" />}
+            {audio && <audio key={audio.url} src={audio.url} controls className="mt-2 h-9 w-full" />}
           </section>
 
           {/* 4. MONTAR */}

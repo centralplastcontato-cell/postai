@@ -252,11 +252,11 @@ export async function gerarVozColagem(videoId: string, vozId?: string, direcao?:
   const voz = vozValida(vozId || v.narracaoVoz || VOZ_PADRAO);
   const estilo = (direcao ?? v.narracaoEstilo ?? "").trim().slice(0, 900);
   try {
-    // Anúncio tem que caber em 30–35s: a direção pede ritmo ágil, as pausas mudas longas são
-    // encurtadas e, se ainda passar de 34s, a voz é acelerada um pouco (até ~18%, sem virar esquilo).
-    const ritmo = "Ritmo ágil de anúncio de rádio, frases emendadas, sem pausas longas entre as frases.";
+    // A voz é a MESMA dos outros vídeos (mesma voz e direção escolhidas, sem acelerar — acelerar
+    // deixava a voz mais fina). Só as pausas mudas longas são encurtadas; o tempo de 30–34s vem do
+    // TAMANHO do texto (a Bia encurta se passar).
     const texto = narracaoCompleta(roteiro);
-    const { url, segundos } = await gerarNarracaoMp3({ texto, vozId: voz, direcao: `${estilo || ""} ${ritmo}`.trim(), slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), apertarPausas: true, alvoSegundos: 34 });
+    const { url, segundos } = await gerarNarracaoMp3({ texto, vozId: voz, direcao: estilo, slugMarca: v.marca.slug || "marca", ref: videoId.slice(-6), apertarPausas: true });
     const palavrasTexto = contarPalavras(texto);
     // Já salva com o tempo ESTIMADO de cada palavra (dá pra montar mesmo se a marcação falhar);
     // a marcação exata (Whisper) é outra chamada — juntas passavam do limite de 60s do site.
@@ -331,7 +331,7 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
   const pelaVoz = Math.round((atuais * 32.5) / Math.max(10, segundosAtuais));
   const alvo = Math.max(50, Math.min(90, atuais + 12, pelaVoz));
   const cenasTxt = roteiro.cenas.map((x, i) => `${i + 1}. [${x.ato}] "${x.narracao}" — palavras que precisam continuar na fala: ${[...new Set(x.elementos.map((e) => e.gatilho).filter(Boolean))].join(", ")}`).join("\n");
-  try {
+  for (let tentativa = 1; tentativa <= 2; tentativa++) try {
     const resp = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
@@ -344,7 +344,7 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
           { role: "user", content: cenasTxt },
         ],
       }),
-      signal: AbortSignal.timeout(40000),
+      signal: AbortSignal.timeout(25000), // 2 tentativas cabem nos 60s do site
     });
     if (!resp.ok) throw new Error(`OpenAI ${resp.status}`);
     const data = await resp.json();
@@ -352,13 +352,15 @@ export async function ajustarTamanhoRoteiro(videoId: string, segundosAtuais: num
     if (!Array.isArray(j.narracoes) || j.narracoes.length !== roteiro.cenas.length) throw new Error("resposta fora do formato");
     const ruim = j.narracoes.map(String).find(falaRepetitiva);
     if (ruim) throw new Error(`fala repetitiva: ${ruim.slice(0, 80)}`);
+    const novas = j.narracoes.reduce((s2, x) => s2 + contarPalavras(String(x)), 0);
+    if (novas > alvo + 6) throw new Error(`ficou com ${novas} palavras (alvo ${alvo})`);
     const novo = completarCenas(garantirOferta({ cenas: roteiro.cenas.map((x, i) => ({ ...x, narracao: String(j.narracoes![i] || x.narracao).trim(), inicio: undefined, fim: undefined, elementos: x.elementos.map((e) => ({ ...e, t: undefined })) })) }, oferta));
     await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(novo), narracaoTexto: narracaoCompleta(novo) } });
     return { ok: true as const, roteiro: novo, palavras: novo.cenas.reduce((s, x) => s + contarPalavras(x.narracao), 0) };
   } catch (e) {
-    console.error("Erro ao ajustar o tamanho do roteiro:", e);
-    return { ok: false as const, erro: "Não consegui ajustar o tamanho da fala agora." };
+    console.error(`Erro ao ajustar o tamanho do roteiro (tentativa ${tentativa}):`, e);
   }
+  return { ok: false as const, erro: "Não consegui ajustar o tamanho da fala agora." };
 }
 
 // ---------- 4. motor ----------
