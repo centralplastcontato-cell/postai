@@ -6,6 +6,7 @@ import { acessoExpirado } from "@/lib/plano";
 import { registrarAtividade } from "@/lib/atividade";
 import { baseUrl, AGENTE } from "@/lib/config";
 import { tokenArte } from "@/lib/arte-token";
+import { cortarTexto } from "@/lib/api-externa";
 import { timingSafeEqual } from "crypto";
 
 export const runtime = "nodejs";
@@ -118,13 +119,13 @@ async function claimPublicacao(id: string): Promise<boolean> {
 // Reverte pra "a_postar" (o piloto tenta de novo na próxima passada) e ANOTA o motivo — é o que a
 // API de automação devolve como "falhou" + motivo_falha. Publicar com sucesso limpa o motivo.
 async function reverterCarrossel(id: string, erro: string) {
-  try { await prisma.conteudo.update({ where: { id }, data: { status: "a_postar", postadoEm: null, erroPostagem: erro.slice(0, 500) } }); } catch {}
+  try { await prisma.conteudo.update({ where: { id }, data: { status: "a_postar", postadoEm: null, erroPostagem: cortarTexto(erro, 500) } }); } catch {}
 }
 async function reverterPublicacao(id: string, erro: string, extra: { reelsContainerId?: string } = {}) {
-  try { await prisma.publicacao.update({ where: { id }, data: { status: "a_postar", postadoEm: null, erroPostagem: erro.slice(0, 500), ...extra } }); } catch {}
+  try { await prisma.publicacao.update({ where: { id }, data: { status: "a_postar", postadoEm: null, erroPostagem: cortarTexto(erro, 500), ...extra } }); } catch {}
 }
 async function anotarErroPublicacao(id: string, erro: string, extra: { reelsContainerId?: string } = {}) {
-  try { await prisma.publicacao.update({ where: { id }, data: { erroPostagem: erro.slice(0, 500), ...extra } }); } catch {}
+  try { await prisma.publicacao.update({ where: { id }, data: { erroPostagem: cortarTexto(erro, 500), ...extra } }); } catch {}
 }
 // Imagem que veio PRONTA pela API de automação: posta o arquivo como veio (proporção validada na
 // entrada), em vez de passar pelo render da arte (que encaixaria a foto num quadro 4:5/9:16).
