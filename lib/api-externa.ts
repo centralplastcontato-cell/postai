@@ -88,6 +88,18 @@ type Normalizado = {
   externalId: string | null;
 };
 
+// Texto que vai pro banco: tira "meio emoji" solto (surrogate sem par) e o caractere nulo — o
+// Postgres/Prisma recusa os dois e o post falhava ao salvar ("unexpected end of hex escape").
+export function textoSeguro(s: string): string {
+  return s.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]|\u0000/g, "");
+}
+
+// Corta por CARACTERE (não por unidade UTF-16): nunca parte um emoji no meio.
+export function cortarTexto(s: string, max: number): string {
+  const chars = Array.from(s);
+  return chars.length > max ? chars.slice(0, max).join("") : s;
+}
+
 // Hashtags podem vir como texto ("#a #b") ou lista (["a", "#b"]). Sai sempre "#a #b".
 function normalizarHashtags(v: unknown): string | null {
   if (v === undefined || v === null || v === "") return "";
@@ -97,6 +109,7 @@ function normalizarHashtags(v: unknown): string | null {
     .map((t) => String(t).trim())
     .filter(Boolean)
     .map((t) => (t.startsWith("#") ? t : `#${t}`))
+    .map(textoSeguro)
     .join(" ");
 }
 
@@ -107,7 +120,7 @@ export function validarCampos(e: EntradaPost, agora = new Date()): { ok: true; v
     erros.push({ campo: "formato", codigo: "FORMATO_INVALIDO", mensagem: `formato deve ser um de: ${FORMATOS.join(", ")}.` });
   }
 
-  const legenda = e.legenda === undefined || e.legenda === null ? "" : typeof e.legenda === "string" ? e.legenda.trim() : null;
+  const legenda = e.legenda === undefined || e.legenda === null ? "" : typeof e.legenda === "string" ? textoSeguro(e.legenda).trim() : null;
   if (legenda === null) erros.push({ campo: "legenda", codigo: "LEGENDA_INVALIDA", mensagem: "legenda deve ser texto." });
 
   const hashtags = normalizarHashtags(e.hashtags);
@@ -146,7 +159,7 @@ export function validarCampos(e: EntradaPost, agora = new Date()): { ok: true; v
     if ((typeof e.external_id !== "string" && typeof e.external_id !== "number") || String(e.external_id).trim().length > 200) {
       erros.push({ campo: "external_id", codigo: "EXTERNAL_ID_INVALIDO", mensagem: "external_id deve ser texto de até 200 caracteres." });
     } else {
-      externalId = String(e.external_id).trim();
+      externalId = textoSeguro(String(e.external_id)).trim();
     }
   }
 
@@ -351,7 +364,7 @@ const tituloDaLegenda = (legenda: string, formato: FormatoApi) => {
   const primeira = legenda.split("\n").map((l) => l.trim()).find(Boolean) || "";
   const base = primeira.replace(/#[\p{L}\p{N}_]+/gu, "").trim();
   const rotulo = { feed: "Post", carrossel: "Carrossel", story: "Story", reels: "Reels" }[formato];
-  return (base ? `${base.length > 60 ? `${base.slice(0, 57)}…` : base}` : `${rotulo} da automação`).slice(0, 80);
+  return base ? (Array.from(base).length > 60 ? `${cortarTexto(base, 57)}…` : base) : `${rotulo} da automação`;
 };
 
 export async function criarPostApi(marca: MarcaApi, e: EntradaPost): Promise<ResultadoCriacao> {
