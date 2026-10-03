@@ -222,7 +222,12 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
     if (midia === "imagem" && comMusica) {
       if (!musicaUrl) { setErro("Escolha ou envie uma música (ou desligue a musiquinha)."); setSalvando(false); return; }
       setFaseMsg("🎬 Montando o videozinho com a música…");
-      const rv = await gerarVideoImagemMusica(marcaId, imagemUrl, musicaUrl, segMusica).catch(() => ({ ok: false as const, erro: "Não consegui montar o videozinho agora." }));
+      let rv = await gerarVideoImagemMusica(marcaId, imagemUrl, musicaUrl, segMusica).catch(() => null);
+      // o motor pode estar "acordando" ou ocupado montando outro vídeo: tenta mais uma vez sozinho
+      if (!rv || !rv.ok) {
+        setFaseMsg("🎬 O motor estava ocupado — tentando de novo…");
+        rv = await gerarVideoImagemMusica(marcaId, imagemUrl, musicaUrl, segMusica).catch(() => ({ ok: false as const, erro: "Não consegui montar o videozinho agora — o motor de vídeo demorou demais. Tente de novo em 1 minuto." }));
+      }
       if (!rv.ok) { setErro(rv.erro); setSalvando(false); return; }
       urlMidia = rv.videoUrl; ehVideoAgora = true; posterFinal = imagemUrl; // a arte vira a miniatura
     }
