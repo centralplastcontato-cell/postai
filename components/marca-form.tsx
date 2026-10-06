@@ -2,8 +2,8 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { salvarMarca, salvarIdentidadeMarca, excluirMarca, testarConexao, extrairCoresLogo, buscarPaginasFacebook } from "@/app/actions/marcas";
-import { ConfirmDialog } from "./confirm-dialog";
+import { ModalExcluirMarca } from "@/components/modal-excluir-marca";
+import { salvarMarca, salvarIdentidadeMarca, testarConexao, extrairCoresLogo, buscarPaginasFacebook } from "@/app/actions/marcas";
 import { rotuloHora, HORAS_RECOMENDADAS } from "@/lib/horarios";
 
 export type MarcaView = {
@@ -283,13 +283,6 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
   function handleExcluir() {
     setConfirmarExcluir(true);
   }
-  function confirmarExclusao() {
-    startTransition(async () => {
-      const r = await excluirMarca(f.id);
-      if (r.ok) router.push("/painel");
-      else setErro(r.erro);
-    });
-  }
 
   const inp = "input-base";
   const diaBtn = (ativo: boolean) =>
@@ -509,18 +502,7 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
         )}
       </div>
 
-      <ConfirmDialog
-        aberto={confirmarExcluir}
-        titulo={`Excluir a marca "${f.nome}"?`}
-        descricao="Todo o conteúdo dela (carrosséis e publicações) será apagado. Não dá pra desfazer."
-        textoConfirmar="Excluir marca"
-        onConfirmar={() => {
-          confirmarExclusao();
-          setConfirmarExcluir(false);
-        }}
-        onCancelar={() => setConfirmarExcluir(false)}
-        ocupado={isPending}
-      />
+      {confirmarExcluir && <ModalExcluirMarca id={f.id} nome={f.nome} onFechar={() => setConfirmarExcluir(false)} onExcluida={() => router.push("/painel")} />}
     </div>
   );
 }

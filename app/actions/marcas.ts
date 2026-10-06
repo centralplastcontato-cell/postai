@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { del } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
 import { exigirAdmin, guardaMarca } from "@/lib/acesso";
-import { estaLogado } from "@/lib/auth";
+import { estaLogado, verificarSenha } from "@/lib/auth";
 import { listarPaginas } from "@/lib/facebook";
 
 function slugify(s: string): string {
@@ -116,13 +116,25 @@ export async function salvarIdentidadeMarca(input: {
   return { ok: true as const };
 }
 
+// A senha confere com o login de quem está excluindo? (admin mestre = ADMIN_SENHA; admin
+// cadastrado = a senha dele no banco)
+async function senhaDoAdminConfere(sessaoId: string, senha: string): Promise<boolean> {
+  if (!senha) return false;
+  const u = await prisma.usuario.findUnique({ where: { id: sessaoId }, select: { senhaHash: true } }).catch(() => null);
+  if (u) return verificarSenha(senha, u.senhaHash);
+  const mestre = process.env.ADMIN_SENHA;
+  return !!mestre && senha === mestre;
+}
+
 // Exclui a marca e TUDO dela. O cascade do banco (onDelete: Cascade) já apaga os REGISTROS
 // de conteúdos, publicações, imagens, festas e métricas. Aqui, antes, apagamos também os
 // ARQUIVOS de foto no Vercel Blob (fotos do banco/festas + imagens de feed + slides), pra não
 // deixar storage órfão. Best-effort: se a limpeza do Blob falhar, a exclusão segue.
-export async function excluirMarca(id: string) {
+export async function excluirMarca(id: string, senha: string) {
   const g = await exigirAdmin(); // excluir marca é ação destrutiva — só admin
   if (!g.ok) return { ok: false as const, erro: g.erro };
+  // Confirmação com a SENHA de quem está logado (conferida aqui no servidor): sem ela, nada é apagado.
+  if (!(await senhaDoAdminConfere(g.sessao.id, senha))) return { ok: false as const, erro: "Senha incorreta — nada foi apagado." };
   try {
     const [imgs, pubs, conts] = await Promise.all([
       prisma.imagemMarca.findMany({ where: { marcaId: id }, select: { url: true } }),
