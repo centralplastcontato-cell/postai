@@ -154,6 +154,7 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
             descricao: f.descricao,
             ativa: f.ativa,
             espelharStory: f.espelharStory,
+            segmento: f.segmento || "buffet",
           });
       if (r?.ok) {
         setSalvo(true);
@@ -349,6 +350,15 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="text-xs text-muted">Nome<input value={f.nome} onChange={(e) => set("nome", e.target.value)} className={inp} /></label>
           <label className="text-xs text-muted">Texto da faixa (na arte)<input value={f.logoTexto} onChange={(e) => set("logoTexto", e.target.value)} placeholder="CASTELO DA DIVERSÃO" className={inp} /></label>
+          {!somenteIdentidade && (
+            <label className="text-xs text-muted sm:col-span-2">Segmento (tipo de negócio — muda o tom da Bia e as abas que aparecem)
+              <select value={f.segmento || "buffet"} onChange={(e) => set("segmento", e.target.value)} className={inp}>
+                <option value="buffet">🏰 Buffet infantil</option>
+                <option value="jogo">🎮 Jogo / App</option>
+                <option value="produtos">🛍️ Loja / Produtos</option>
+              </select>
+            </label>
+          )}
           <div className="text-xs text-muted">Cor principal
             <div className="mt-1 flex items-center gap-2">
               <input type="color" value={f.corPrimaria} onChange={(e) => set("corPrimaria", e.target.value)} className="h-9 w-12 cursor-pointer rounded border border-linha bg-transparent p-0.5" />

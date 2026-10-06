@@ -64,6 +64,7 @@ type DadosMarca = {
   descricao?: string;
   ativa?: boolean;
   espelharStory?: boolean;
+  segmento?: string; // "buffet" | "jogo" | "produtos" (só o admin muda)
 };
 
 export async function salvarMarca(input: DadosMarca) {
@@ -74,6 +75,7 @@ export async function salvarMarca(input: DadosMarca) {
   for (const [k, v] of Object.entries(resto)) {
     if (v === undefined) continue;
     if (k === "accessToken" && v === "") continue; // token write-only: vazio = "mantém o que está salvo" (nunca apaga)
+    if (k === "segmento" && !["buffet", "jogo", "produtos"].includes(String(v))) continue;
     data[k] = v;
   }
   await prisma.marca.update({ where: { id }, data });
