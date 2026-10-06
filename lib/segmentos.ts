@@ -20,6 +20,15 @@ export function contextoSegmento(seg?: string): ContextoSegmento {
       clima: "um clima vibrante e divertido de jogo/desenho animado, colorido e cheio de energia",
     };
   }
+  if (seg === "produtos") {
+    return {
+      negocio: "uma loja/marca de produtos",
+      publico: "clientes e pessoas interessadas nos produtos",
+      tom: "próximo, criativo e confiável, valorizando o produto (detalhes, acabamento, utilidade, personalização) — sem exagerar nem prometer o que não foi dito",
+      cta: "chamar no direct ou no WhatsApp pra encomendar ou pedir orçamento",
+      clima: "um clima criativo e caprichado de ateliê/oficina, mostrando os produtos",
+    };
+  }
   // Padrão: BUFFET (comportamento de sempre).
   return {
     negocio: "um buffet infantil (festas de aniversário)",

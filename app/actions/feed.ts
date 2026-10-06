@@ -783,9 +783,10 @@ export async function gerarLegendaArte(marcaId: string, imagemUrl: string) {
 1) "Simples": curta e direta, 1 a 2 linhas, poucas palavras, 1 emoji.
 2) "Caprichada": calorosa e convidativa, 2 a 3 linhas, 2 a 3 emojis, com chamada pra ação.
 3) "Top": mais elaborada e envolvente, 3 a 5 linhas, com um toque de emoção/história, emojis e uma chamada pra ação forte.`;
-  const sys = marca.segmento === "jogo"
+  // fora do buffet (jogo, loja/produtos): legenda no tom do segmento
+  const sys = (marca.segmento ?? "buffet") !== "buffet"
     ? `Você é o social media de ${contextoSegmento(marca.segmento).negocio} chamado "${marca.nome}". Vou te mandar uma ARTE (imagem) já pronta pra postar no Instagram. OLHE a arte e escreva TRÊS versões de legenda que CONVERSEM com o que está nela (NUNCA invente preço/data que não estejam na arte). Tom ${contextoSegmento(marca.segmento).tom}. ${niveis}
-Cada versão com 4 a 8 hashtags relevantes ao jogo. Responda SÓ em JSON: {"opcoes":[{"nivel":"Simples","legenda":"...","hashtags":"#... #..."},{"nivel":"Caprichada","legenda":"...","hashtags":"..."},{"nivel":"Top","legenda":"...","hashtags":"..."}]}`
+Cada versão com 4 a 8 hashtags relevantes ao negócio. Chamada pra ação: ${contextoSegmento(marca.segmento).cta}. Responda SÓ em JSON: {"opcoes":[{"nivel":"Simples","legenda":"...","hashtags":"#... #..."},{"nivel":"Caprichada","legenda":"...","hashtags":"..."},{"nivel":"Top","legenda":"...","hashtags":"..."}]}`
     : `Você é o social media do buffet infantil "${marca.nome}". Vou te mandar uma ARTE (imagem) já pronta pra postar no Instagram. OLHE a arte e escreva TRÊS versões de legenda que CONVERSEM com o que está nela (se for promoção, fale da promoção; se tiver valor/data escritos na arte pode citar; NUNCA invente preço/data que não estejam na arte). NÃO invente detalhes do espaço nem quantidades — não afirme que tem VÁRIOS salões, brinquedos ou ambientes (pode ser só UM); prefira o SINGULAR ou termos neutros ("nosso espaço", "nosso buffet") e fale só do que aparece na arte. Todas com tom alegre e acolhedor de festa infantil. ${niveis}
 Cada versão com 4 a 8 hashtags relevantes (buffet infantil, festa, aniversário). Responda SÓ em JSON: {"opcoes":[{"nivel":"Simples","legenda":"...","hashtags":"#... #..."},{"nivel":"Caprichada","legenda":"...","hashtags":"..."},{"nivel":"Top","legenda":"...","hashtags":"..."}]}`;
   let content: string;
@@ -836,9 +837,9 @@ export async function gerarLegendaVideo(marcaId: string, descricao: string) {
 1) "Simples": curta e direta, 1 a 2 linhas, poucas palavras, 1 emoji.
 2) "Caprichada": calorosa e convidativa, 2 a 3 linhas, 2 a 3 emojis, com chamada pra ação.
 3) "Top": mais elaborada e envolvente, 3 a 5 linhas, com um toque de emoção, emojis e uma chamada pra ação forte.`;
-  const sys = marca.segmento === "jogo"
+  const sys = (marca.segmento ?? "buffet") !== "buffet"
     ? `Você é o social media de ${contextoSegmento(marca.segmento).negocio} chamado "${marca.nome}". O dono vai postar um VÍDEO no Instagram e te contar em poucas palavras do que é o vídeo. Escreva TRÊS versões de legenda que combinem com esse vídeo, com tom ${contextoSegmento(marca.segmento).tom}. NUNCA invente preço, data ou condições que o dono não tenha dito; use só o que ele descreveu. ${niveisV}
-Cada versão com 4 a 8 hashtags relevantes ao jogo. Responda SÓ em JSON: {"opcoes":[{"nivel":"Simples","legenda":"...","hashtags":"#... #..."},{"nivel":"Caprichada","legenda":"...","hashtags":"..."},{"nivel":"Top","legenda":"...","hashtags":"..."}]}`
+Cada versão com 4 a 8 hashtags relevantes ao negócio. Chamada pra ação: ${contextoSegmento(marca.segmento).cta}. Responda SÓ em JSON: {"opcoes":[{"nivel":"Simples","legenda":"...","hashtags":"#... #..."},{"nivel":"Caprichada","legenda":"...","hashtags":"..."},{"nivel":"Top","legenda":"...","hashtags":"..."}]}`
     : `Você é o social media do buffet infantil "${marca.nome}". O dono vai postar um VÍDEO no Instagram e te contar em poucas palavras do que é o vídeo. Escreva TRÊS versões de legenda que combinem com esse vídeo, com tom alegre e acolhedor de festa infantil. NUNCA invente preço, data ou condições que o dono não tenha dito. IMPORTANTE: NÃO invente detalhes do espaço nem quantidades — não afirme que tem VÁRIOS salões, brinquedos, atrações ou ambientes (pode ser só UM). Prefira o SINGULAR ou termos neutros ("nosso espaço", "nosso buffet", "o nosso salão") e use apenas o que o dono descreveu; não liste coisas que ele não citou. ${niveisV}
 Cada versão com 4 a 8 hashtags relevantes (buffet infantil, festa, aniversário). Responda SÓ em JSON: {"opcoes":[{"nivel":"Simples","legenda":"...","hashtags":"#... #..."},{"nivel":"Caprichada","legenda":"...","hashtags":"..."},{"nivel":"Top","legenda":"...","hashtags":"..."}]}`;
   let content: string;
