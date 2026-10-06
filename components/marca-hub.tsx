@@ -144,7 +144,8 @@ export function MarcaHub({
           </div>
         )}
         <ConexaoCard marcaId={marca.id} temConexao={conectada} />
-        {ehAdmin && <AutomacaoCard marcaId={marca.id} linkBase={linkBase} chave={apiChave} pendentes={pendentesApi} />}
+        {/* posts vindos da API esperando aprovação ficam à vista aqui; a CHAVE fica nas Configurações */}
+        {ehAdmin && <AutomacaoCard parte="aprovacao" marcaId={marca.id} linkBase={linkBase} chave={apiChave} pendentes={pendentesApi ?? []} />}
         {entregue.total > 0 && (
           <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
             <p className="text-sm font-semibold text-white">🤖 A Bia já trabalhou por você</p>
@@ -174,7 +175,6 @@ export function MarcaHub({
         )}
         {entregue.total > 0 && <BiaDescobriu analise={analise} />}
         <EvolucaoCard pontos={evolucao} />
-        {ehAdmin && <BackfillEngajamento marcaId={marca.id} />}
       </div>
       )}
 
@@ -204,7 +204,16 @@ export function MarcaHub({
         {aba === "instagram" && <InstagramEspelho marcaId={marca.id} />}
         {aba === "paginas" && <PaginasPainel festas={festas} linkBase={linkBase} />}
         {aba === "campanhas" && <CampanhasPainel marcaId={marca.id} temTelefone={Boolean(marca.telefone)} campanhas={campanhas} acento={marca.corPrimaria} />}
-        {aba === "config" && (ehAdmin ? <MarcaForm marca={marca} /> : <MarcaForm marca={marca} somenteIdentidade />)}
+        {aba === "config" && (ehAdmin ? (
+          <div className="space-y-4">
+            {/* ferramentas de configuração (só admin): chave da automação externa e puxar posts antigos */}
+            <div className="max-w-2xl space-y-4">
+              <AutomacaoCard parte="chave" marcaId={marca.id} linkBase={linkBase} chave={apiChave} pendentes={pendentesApi ?? []} />
+              <BackfillEngajamento marcaId={marca.id} />
+            </div>
+            <MarcaForm marca={marca} />
+          </div>
+        ) : <MarcaForm marca={marca} somenteIdentidade />)}
       </div>
 
       {/* Atividades da Bia (sobre posts) — só na aba Redes Sociais, junto dos demais cartões. */}

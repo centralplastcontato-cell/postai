@@ -31,11 +31,14 @@ export function AutomacaoCard({
   linkBase,
   chave,
   pendentes,
+  parte = "tudo",
 }: {
   marcaId: string;
   linkBase: string;
   chave: { prefixo: string; em: string } | null;
   pendentes: PendenteApi[];
+  // "chave" = só a chave (Configurações) · "aprovacao" = só os posts esperando aprovação (Redes Sociais)
+  parte?: "tudo" | "chave" | "aprovacao";
 }) {
   const router = useRouter();
   const [pendente, startTransition] = useTransition();
@@ -75,8 +78,12 @@ export function AutomacaoCard({
     } catch {}
   };
 
+  const mostraChave = parte !== "aprovacao";
+  const mostraPendentes = parte !== "chave";
+  if (!mostraChave && !pendentes.length) return null;
   return (
     <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
+      {mostraChave && (<>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-white">🔌 Automação externa (API)</p>
         <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${chave ? "border-green-500/30 bg-green-500/15 text-green-400" : "border-linha text-muted"}`}>
@@ -135,10 +142,11 @@ export function AutomacaoCard({
         )}
       </div>
 
+      </>)}
       {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
 
-      {pendentes.length > 0 && (
-        <div className="mt-5">
+      {mostraPendentes && pendentes.length > 0 && (
+        <div className={mostraChave ? "mt-5" : ""}>
           <p className="text-sm font-semibold text-white">
             ⏳ Aguardando sua aprovação <span className="font-normal text-muted">({pendentes.length})</span>
           </p>
