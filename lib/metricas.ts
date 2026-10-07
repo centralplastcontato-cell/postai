@@ -1,3 +1,4 @@
+import { fetchMeta, metaNoLimite } from "@/lib/meta-uso";
 import { prisma } from "@/lib/prisma";
 import { registrarAtividade } from "@/lib/atividade";
 import { AGENTE } from "@/lib/config";
@@ -27,8 +28,15 @@ export async function gravarSnapshot(marcaId: string, seguidores: number, posts:
 // grava o snapshot do dia. Usado pelo piloto (cron). Best-effort: erro vira null.
 export async function snapshotDeMarca(marca: { id: string; igUserId: string; accessToken: string }): Promise<void> {
   if (!marca.igUserId || !marca.accessToken) return;
+  // 1x por dia basta (o gráfico é diário). Antes rodava a cada passada do piloto (144x/dia por marca)
+  // e gastava o limite de chamadas da Meta, que é do app inteiro.
+  if (metaNoLimite()) return;
+  const jaTemHoje = await prisma.metricaMarca
+    .findUnique({ where: { marcaId_dia: { marcaId: marca.id, dia: diaHojeBRT() } }, select: { id: true } })
+    .catch(() => null);
+  if (jaTemHoje) return;
   try {
-    const r = await fetch(`${GRAPH}/${marca.igUserId}?fields=followers_count,media_count&access_token=${marca.accessToken}`, { cache: "no-store" });
+    const r = await fetchMeta(`${GRAPH}/${marca.igUserId}?fields=followers_count,media_count&access_token=${marca.accessToken}`, { cache: "no-store" });
     const j = (await r.json()) as { followers_count?: number; media_count?: number; error?: unknown };
     if (typeof j.followers_count === "number") {
       await gravarSnapshot(marca.id, j.followers_count, typeof j.media_count === "number" ? j.media_count : 0);
@@ -45,8 +53,14 @@ export async function snapshotDeMarca(marca: { id: string; igUserId: string; acc
 // não expira → nada a fazer. Best-effort: nunca derruba o piloto.
 export async function alertarTokenSeVencendo(marca: { id: string; nome: string; igUserId: string | null; accessToken: string | null }): Promise<void> {
   if (!marca.igUserId || !marca.accessToken) return;
+  // Confere a validade do token no máximo 1x por dia por marca (antes: a cada passada do piloto).
+  if (metaNoLimite()) return;
+  const chave = `token:${marca.id}`;
+  const ultima = await prisma.heartbeat.findUnique({ where: { id: chave } }).catch(() => null);
+  if (ultima && Date.now() - ultima.em.getTime() < 20 * 3_600_000) return;
+  await prisma.heartbeat.upsert({ where: { id: chave }, update: { em: new Date() }, create: { id: chave, em: new Date() } }).catch(() => {});
   try {
-    const d = await fetch(`${GRAPH}/debug_token?input_token=${marca.accessToken}&access_token=${marca.accessToken}`, { cache: "no-store" });
+    const d = await fetchMeta(`${GRAPH}/debug_token?input_token=${marca.accessToken}&access_token=${marca.accessToken}`, { cache: "no-store" });
     const dj = (await d.json()) as { data?: { expires_at?: number } };
     const exp = dj.data?.expires_at;
     if (typeof exp !== "number" || exp <= 0) return; // não expira ou desconhecido
@@ -81,13 +95,13 @@ export async function buscarInsights(token: string, mediaId: string, ehStory: bo
   const out: Insights = {};
   try {
     if (!ehStory) {
-      const m = await fetch(`${GRAPH}/${mediaId}?fields=like_count,comments_count&access_token=${token}`, { cache: "no-store" });
+      const m = await fetchMeta(`${GRAPH}/${mediaId}?fields=like_count,comments_count&access_token=${token}`, { cache: "no-store" });
       const mj = (await m.json()) as { like_count?: number; comments_count?: number };
       if (typeof mj.like_count === "number") out.curtidas = mj.like_count;
       if (typeof mj.comments_count === "number") out.comentarios = mj.comments_count;
     }
     const metric = ehStory ? "reach" : "reach,saved";
-    const i = await fetch(`${GRAPH}/${mediaId}/insights?metric=${metric}&access_token=${token}`, { cache: "no-store" });
+    const i = await fetchMeta(`${GRAPH}/${mediaId}/insights?metric=${metric}&access_token=${token}`, { cache: "no-store" });
     const ij = (await i.json()) as { data?: { name?: string; values?: { value?: number }[] }[] };
     for (const d of ij.data || []) {
       const v = d.values?.[0]?.value;
@@ -101,8 +115,8 @@ export async function buscarInsights(token: string, mediaId: string, ehStory: bo
   }
 }
 
-// Coleta o engajamento dos posts recentes da marca (chamado pelo cron, de hora em hora).
-// - Feed/Carrossel: posts dos últimos 14 dias, re-medindo os que não foram medidos há >3h.
+// Coleta o engajamento dos posts recentes da marca (chamado pelo piloto).
+// - Feed/Carrossel: posts dos últimos 14 dias, re-medindo os que não foram medidos há >12h (5 por vez).
 // - Story: só dentro de 24h (some depois) — fora disso, mantém o último número congelado.
 // Best-effort: qualquer erro é engolido (nunca derruba o piloto).
 export async function coletarInsightsDaMarca(marca: { id: string; igUserId: string | null; accessToken: string | null }): Promise<void> {
@@ -110,15 +124,20 @@ export async function coletarInsightsDaMarca(marca: { id: string; igUserId: stri
   const token = marca.accessToken;
   const agora = Date.now();
   const desde14 = new Date(agora - 14 * 86_400_000);
-  const stale = new Date(agora - 3 * 3_600_000); // re-mede se foi medido há mais de 3h
+  // Re-mede a cada 12h, em lotes pequenos, para não estourar o limite de chamadas da Meta
+  // (antes: a cada 3h e até 40 posts de uma vez = ~80 chamadas numa passada).
+  const stale = new Date(agora - 12 * 3_600_000);
+  if (metaNoLimite()) return;
 
   try {
     const conteudos = await prisma.conteudo.findMany({
       where: { marcaId: marca.id, status: "postado", mediaId: { not: null }, postadoEm: { gte: desde14 }, OR: [{ insightsEm: null }, { insightsEm: { lt: stale } }] },
       select: { id: true, mediaId: true },
-      take: 20,
+      orderBy: { insightsEm: { sort: "asc", nulls: "first" } },
+      take: 5,
     });
     for (const c of conteudos) {
+      if (metaNoLimite()) return;
       const ins = await buscarInsights(token, c.mediaId!, false);
       if (ins) await prisma.conteudo.update({ where: { id: c.id }, data: { ...ins, insightsEm: new Date() } }).catch(() => {});
     }
@@ -126,9 +145,11 @@ export async function coletarInsightsDaMarca(marca: { id: string; igUserId: stri
     const pubs = await prisma.publicacao.findMany({
       where: { marcaId: marca.id, status: "postado", mediaId: { not: null }, postadoEm: { gte: desde14 }, OR: [{ insightsEm: null }, { insightsEm: { lt: stale } }] },
       select: { id: true, mediaId: true, formato: true, postadoEm: true },
-      take: 20,
+      orderBy: { insightsEm: { sort: "asc", nulls: "first" } },
+      take: 5,
     });
     for (const p of pubs) {
+      if (metaNoLimite()) return;
       const ehStory = p.formato === "story";
       // Story some em 24h — depois disso a API não devolve mais; não tenta (mantém o último).
       if (ehStory && p.postadoEm && agora - p.postadoEm.getTime() > 24 * 3_600_000) continue;
@@ -155,7 +176,7 @@ export async function buscarMidiasDaConta(igUserId: string, token: string, maxPa
   let url = `${GRAPH}/${igUserId}/media?fields=id,caption,timestamp&limit=100&access_token=${token}`;
   for (let pagina = 0; pagina < maxPaginas && url; pagina++) {
     try {
-      const r = await fetch(url, { cache: "no-store" });
+      const r = await fetchMeta(url, { cache: "no-store" });
       const j = (await r.json()) as { data?: MidiaIG[]; paging?: { next?: string } };
       if (Array.isArray(j.data)) out.push(...j.data);
       url = j.paging?.next || "";
@@ -257,7 +278,7 @@ export async function rawInsightsDeUmPost(marca: { id: string; accessToken: stri
   const mediaId = c?.mediaId || p?.mediaId;
   if (!mediaId) return "(nenhum post vinculado ainda — clique em Puxar primeiro)";
   try {
-    const r = await fetch(`${GRAPH}/${mediaId}/insights?metric=reach,saved&access_token=${marca.accessToken}`, { cache: "no-store" });
+    const r = await fetchMeta(`${GRAPH}/${mediaId}/insights?metric=reach,saved&access_token=${marca.accessToken}`, { cache: "no-store" });
     return (await r.text()).slice(0, 600);
   } catch (e) {
     return `erro de rede: ${e instanceof Error ? e.message : String(e)}`;

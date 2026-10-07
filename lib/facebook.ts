@@ -12,6 +12,8 @@
  *                um álbum de fotos no Facebook).
  */
 
+import { ehErroDeLimite, fetchMeta } from "@/lib/meta-uso";
+
 const GRAPH = "https://graph.facebook.com/v21.0";
 
 export type ResultadoFB = { ok: true; postId: string; permalink: string | null } | { ok: false; erro: string };
@@ -23,7 +25,7 @@ export function marcaTemFacebook(m: { fbPageId?: string; accessToken?: string } 
 
 async function fbPost(path: string, params: Record<string, string>, token: string): Promise<Record<string, unknown>> {
   const body = new URLSearchParams({ ...params, access_token: token });
-  const resp = await fetch(`${GRAPH}/${path}`, {
+  const resp = await fetchMeta(`${GRAPH}/${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -31,8 +33,12 @@ async function fbPost(path: string, params: Record<string, string>, token: strin
   });
   const json = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
   if (!resp.ok) {
-    const err = (json.error ?? {}) as { message?: string };
-    throw new Error(err.message || `Graph API ${resp.status}`);
+    const err = (json.error ?? {}) as { message?: string; code?: number };
+    const mensagem = err.message || `Graph API ${resp.status}`;
+    if (ehErroDeLimite(mensagem, err.code)) {
+      throw new Error(`Limite de chamadas da Meta atingido (${mensagem}). O piloto tenta de novo na próxima passada.`);
+    }
+    throw new Error(mensagem);
   }
   return json;
 }
@@ -61,7 +67,7 @@ async function fbPostRetry(path: string, params: Record<string, string>, token: 
 // cai no próprio token (System User costuma funcionar direto nas páginas que admin).
 async function obterPageToken(pageId: string, userToken: string): Promise<string> {
   try {
-    const r = await fetch(`${GRAPH}/${pageId}?fields=access_token&access_token=${userToken}`, { cache: "no-store" });
+    const r = await fetchMeta(`${GRAPH}/${pageId}?fields=access_token&access_token=${userToken}`, { cache: "no-store" });
     const j = (await r.json().catch(() => ({}))) as { access_token?: string };
     if (r.ok && j.access_token) return j.access_token;
   } catch {}
@@ -135,7 +141,7 @@ export async function espelharVideoFacebook(
 
 /** Lista as Páginas que o token administra (id + nome) — pra escolher na conexão. */
 export async function listarPaginas(userToken: string): Promise<{ id: string; nome: string }[]> {
-  const r = await fetch(`${GRAPH}/me/accounts?fields=id,name&limit=100&access_token=${userToken}`, { cache: "no-store" });
+  const r = await fetchMeta(`${GRAPH}/me/accounts?fields=id,name&limit=100&access_token=${userToken}`, { cache: "no-store" });
   const j = (await r.json().catch(() => ({}))) as { data?: { id: string; name: string }[]; error?: { message?: string } };
   if (!r.ok) throw new Error(j.error?.message || `Graph API ${r.status}`);
   return (j.data ?? []).map((p) => ({ id: p.id, nome: p.name }));

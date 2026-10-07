@@ -8,6 +8,7 @@ import { baseUrl, AGENTE } from "@/lib/config";
 import { tokenArte } from "@/lib/arte-token";
 import { cortarTexto } from "@/lib/api-externa";
 import { timingSafeEqual } from "crypto";
+import { metaNoLimite, usoDaMeta, zerarUsoDaMeta } from "@/lib/meta-uso";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +54,7 @@ export async function GET(req: Request) {
   const agora = new Date();
   const base = baseUrl();
   const resultados: Resultado[] = [];
+  zerarUsoDaMeta();
 
   // Batimento: registra que o piloto rodou agora — o painel admin avisa se parar de rodar.
   await prisma.heartbeat.upsert({ where: { id: "cron" }, update: { em: agora }, create: { id: "cron", em: agora } }).catch(() => {});
@@ -69,18 +71,24 @@ export async function GET(req: Request) {
     // Dono com acesso vencido → piloto PAUSADO pra essa marca. Marca sem dono (admin) nunca pausa.
     if (m.usuario && acessoExpirado(m.usuario)) continue;
     try {
-      await snapshotDeMarca(m).catch(() => {}); // best-effort, nunca derruba o piloto
-      await alertarTokenSeVencendo(m).catch(() => {}); // avisa nas Atividades se o token estiver vencendo
-
+      // PUBLICAR vem primeiro: o limite de chamadas da Meta é do app inteiro (todas as marcas),
+      // então estatísticas só rodam depois e só se sobrar folga.
+      const antes = resultados.length;
       await postarCarrossel(m, agora, base, resultados);
       await postarFeed(m, agora, base, resultados);
       await postarStory(m, agora, base, resultados);
       await postarReels(m, agora, resultados);
       await arquivarReelsPostados(m, agora, resultados); // libera storage: apaga MP4 já postado há +24h
+      const publicouAgora = resultados.length > antes;
 
-      // Coleta o engajamento (curtidas/comentários/alcance) dos posts recentes — Story só
-      // dentro de 24h. Best-effort: nunca derruba o piloto.
-      await coletarInsightsDaMarca(m).catch(() => {});
+      // Estatísticas (best-effort, nunca derrubam o piloto): seguidores e token 1x/dia;
+      // engajamento em lotes pequenos. Puladas se a marca publicou nesta passada ou se a Meta
+      // já indicou uso alto do limite.
+      if (!publicouAgora && !metaNoLimite()) {
+        await snapshotDeMarca(m).catch(() => {});
+        await alertarTokenSeVencendo(m).catch(() => {}); // avisa nas Atividades se o token estiver vencendo
+        await coletarInsightsDaMarca(m).catch(() => {});
+      }
     } catch (e) {
       resultados.push({ marca: m.nome, tipo: "carrossel", titulo: "(marca)", ok: false, erro: msg(e) });
     }
@@ -88,6 +96,7 @@ export async function GET(req: Request) {
 
   return Response.json({
     ok: true,
+    usoMeta: usoDaMeta(),
     marcas: marcas.length,
     postados: resultados.filter((r) => r.ok).length,
     resultados,

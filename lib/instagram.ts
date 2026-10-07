@@ -9,6 +9,7 @@
  * estático no Blob, e manda essa URL pra Meta — que baixa instantâneo, sem timeout.
  */
 
+import { ehErroDeLimite, fetchMeta } from "@/lib/meta-uso";
 import { put } from "@vercel/blob";
 import { marcaTemFacebook, publicarFacebook, type ResultadoFB } from "./facebook";
 
@@ -56,7 +57,7 @@ async function graph(
   params: Record<string, string>
 ): Promise<Record<string, unknown>> {
   const body = new URLSearchParams({ ...params, access_token: conn.accessToken });
-  const resp = await fetch(`${GRAPH}/${path}`, {
+  const resp = await fetchMeta(`${GRAPH}/${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
@@ -64,8 +65,12 @@ async function graph(
   });
   const json = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
   if (!resp.ok) {
-    const err = (json.error ?? {}) as { message?: string };
-    throw new Error(err.message || `Graph API ${resp.status}`);
+    const err = (json.error ?? {}) as { message?: string; code?: number };
+    const mensagem = err.message || `Graph API ${resp.status}`;
+    if (ehErroDeLimite(mensagem, err.code)) {
+      throw new Error(`Limite de chamadas da Meta atingido (${mensagem}). O piloto tenta de novo na próxima passada.`);
+    }
+    throw new Error(mensagem);
   }
   return json;
 }
@@ -290,7 +295,7 @@ export async function criarContainerStoryVideo(conn: ConexaoIG, videoUrl: string
 /** Verifica o processamento do container do Reels na Meta (1 checagem, sem esperar). */
 export async function statusContainerReels(conn: ConexaoIG, containerId: string): Promise<StatusReels> {
   try {
-    const r = await fetch(`${GRAPH}/${containerId}?fields=status_code&access_token=${conn.accessToken}`, { cache: "no-store" });
+    const r = await fetchMeta(`${GRAPH}/${containerId}?fields=status_code&access_token=${conn.accessToken}`, { cache: "no-store" });
     const j = (await r.json()) as { status_code?: string };
     const s = j.status_code || "";
     if (s === "FINISHED" || s === "IN_PROGRESS" || s === "ERROR" || s === "EXPIRED") return s;
@@ -317,7 +322,7 @@ export async function publicarContainerReels(conn: ConexaoIG, containerId: strin
   if (!mediaId) return { ok: false, erro: `Não consegui publicar o Reels: ${ultimoErro}` };
   let permalink: string | null = null;
   try {
-    const r = await fetch(`${GRAPH}/${mediaId}?fields=permalink&access_token=${conn.accessToken}`, { cache: "no-store" });
+    const r = await fetchMeta(`${GRAPH}/${mediaId}?fields=permalink&access_token=${conn.accessToken}`, { cache: "no-store" });
     const j = (await r.json()) as { permalink?: string };
     permalink = j.permalink ?? null;
   } catch {}
@@ -355,7 +360,7 @@ export async function publicarReelsNasRedes(
 /** Link (permalink) de uma mídia já publicada. null se a Meta não devolver. */
 export async function buscarPermalink(accessToken: string, mediaId: string): Promise<string | null> {
   try {
-    const r = await fetch(`${GRAPH}/${mediaId}?fields=permalink&access_token=${accessToken}`, { cache: "no-store" });
+    const r = await fetchMeta(`${GRAPH}/${mediaId}?fields=permalink&access_token=${accessToken}`, { cache: "no-store" });
     const j = (await r.json()) as { permalink?: string };
     return j.permalink ?? null;
   } catch {
@@ -390,7 +395,7 @@ const imagemDe = (m: ItemMedia): string => (m.media_type === "VIDEO" ? m.thumbna
 async function viewsDoVideo(conn: ConexaoIG, mediaId: string): Promise<number | null> {
   for (const metric of ["plays", "views", "ig_reels_video_view_total_count"]) {
     try {
-      const r = await fetch(`${GRAPH}/${mediaId}/insights?metric=${metric}&access_token=${conn.accessToken}`, { cache: "no-store" });
+      const r = await fetchMeta(`${GRAPH}/${mediaId}/insights?metric=${metric}&access_token=${conn.accessToken}`, { cache: "no-store" });
       const j = (await r.json()) as { data?: { values?: { value?: number }[] }[] };
       const v = j.data?.[0]?.values?.[0]?.value;
       if (typeof v === "number") return v;
@@ -403,7 +408,7 @@ async function viewsDoVideo(conn: ConexaoIG, mediaId: string): Promise<number | 
 export async function buscarFeedIG(conn: ConexaoIG, limit = 24): Promise<PostIG[]> {
   try {
     const fields = "id,media_type,media_url,thumbnail_url,permalink,caption,timestamp,like_count,comments_count";
-    const r = await fetch(`${GRAPH}/${conn.igUserId}/media?fields=${fields}&limit=${limit}&access_token=${conn.accessToken}`, { cache: "no-store" });
+    const r = await fetchMeta(`${GRAPH}/${conn.igUserId}/media?fields=${fields}&limit=${limit}&access_token=${conn.accessToken}`, { cache: "no-store" });
     const j = (await r.json()) as { data?: ItemMedia[] };
     if (!Array.isArray(j.data)) return [];
     const posts: PostIG[] = j.data.map((p) => ({
@@ -419,7 +424,7 @@ export async function buscarFeedIG(conn: ConexaoIG, limit = 24): Promise<PostIG[
 // STORIES ativos (só os das últimas 24h — a API não devolve os que já sumiram). Precisa `instagram_manage_insights`.
 export async function buscarStoriesIG(conn: ConexaoIG): Promise<StoryIG[]> {
   try {
-    const r = await fetch(`${GRAPH}/${conn.igUserId}/stories?fields=id,media_type,media_url,thumbnail_url,permalink,timestamp&access_token=${conn.accessToken}`, { cache: "no-store" });
+    const r = await fetchMeta(`${GRAPH}/${conn.igUserId}/stories?fields=id,media_type,media_url,thumbnail_url,permalink,timestamp&access_token=${conn.accessToken}`, { cache: "no-store" });
     const j = (await r.json()) as { data?: ItemMedia[] };
     if (!Array.isArray(j.data)) return [];
     return j.data.map((s) => ({ id: s.id || "", tipo: s.media_type || "IMAGE", imagem: imagemDe(s), permalink: s.permalink || "", data: s.timestamp || "" }));
