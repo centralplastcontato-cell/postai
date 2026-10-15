@@ -1078,8 +1078,10 @@ export async function excluirArtePronta(id: string) {
   const p = await prisma.publicacao.findUnique({ where: { id }, select: { marcaId: true, template: true, videoUrl: true } });
   if (!p || p.template !== "arte-pronta") return { ok: false as const, erro: "Arte não encontrada." };
   await prisma.publicacao.delete({ where: { id } });
-  // Se era um vídeo enviado, apaga o MP4 do Blob pra liberar espaço (best-effort).
-  if (p.videoUrl && p.videoUrl.startsWith("http")) { try { const { del } = await import("@vercel/blob"); await del(p.videoUrl); } catch {} }
+  // Se era um vídeo enviado, apaga o MP4 do Blob pra liberar espaço (best-effort) — só se nenhuma
+  // outra arte (a mesma agendada em outro dia) ainda usa o arquivo.
+  const outras = p.videoUrl ? await prisma.publicacao.count({ where: { videoUrl: p.videoUrl } }).catch(() => 1) : 0;
+  if (p.videoUrl && p.videoUrl.startsWith("http") && outras === 0) { try { const { del } = await import("@vercel/blob"); await del(p.videoUrl); } catch {} }
   revalidatePath(`/painel/marcas/${p.marcaId}`);
   return { ok: true as const };
 }

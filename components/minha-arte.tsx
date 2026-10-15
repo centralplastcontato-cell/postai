@@ -60,6 +60,9 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
   const [formato, setFormato] = useState<"story" | "feed" | "ambos">("story");
   const [data, setData] = useState("");
   const [hora, setHora] = useState("10:00"); // HH:MM (permite escolher os minutos também)
+  // AGENDAR EM VÁRIOS DIAS: a mesma arte, no mesmo horário, em outros dias além do "Dia"
+  const [diasExtras, setDiasExtras] = useState<string[]>([]);
+  const [novoDia, setNovoDia] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [ok, setOk] = useState("");
   const [faseMsg, setFaseMsg] = useState(""); // o que está acontecendo agora (montando/postando…)
@@ -233,11 +236,17 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
     }
     const rot = (fmt: "feed" | "story") => fmt === "story" ? "Story" : (ehVideoAgora ? "Reels" : "Feed");
 
+    // dias do agendamento: o "Dia" + os dias extras (só no Agendar; vazio = próxima data livre)
+    const dias: (string | undefined)[] = modo === "agendar" && diasExtras.length
+      ? [...new Set([data, ...diasExtras].filter(Boolean))].sort()
+      : [postarAgora ? undefined : (data || undefined)];
     const feitos: string[] = [];
+    const diasOk = new Set<string>();
     let ultimoErro = ""; let processando = false;
-    for (const fmt of alvos) {
+    for (const dia of dias) for (const fmt of alvos) {
+      if (dias.length > 1) setFaseMsg(`📅 Agendando ${dataBR(`${dia}T12:00:00-03:00`)}${alvos.length > 1 ? ` (${rot(fmt)})` : ""}…`);
       if (ehVideoAgora) {
-        const r = await criarArteVideo(marcaId, urlMidia, fmt, postarAgora ? undefined : (data || undefined), hora, legenda, hashtags, rascunho, postarAgora, posterFinal).catch(() => ({ ok: false as const, erro: "Não consegui salvar o vídeo agora." }));
+        const r = await criarArteVideo(marcaId, urlMidia, fmt, dia, hora, legenda, hashtags, rascunho, postarAgora, posterFinal).catch(() => ({ ok: false as const, erro: "Não consegui salvar o vídeo agora." }));
         if (!r.ok) { ultimoErro = r.erro; continue; }
         if (postarAgora) {
           setFaseMsg(`📲 Postando no Instagram${alvos.length > 1 ? ` (${rot(fmt)})` : ""}… o vídeo processa ~1 min`);
@@ -245,15 +254,15 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
           if (pr.ok) feitos.push(rot(fmt));
           else if (pr.processando) processando = true;
           else ultimoErro = pr.erro || "Não consegui postar o vídeo.";
-        } else feitos.push(rot(fmt));
+        } else { feitos.push(rot(fmt)); if (dia) diasOk.add(dia); }
       } else {
-        const r = await criarArtePronta(marcaId, urlMidia, fmt, postarAgora ? undefined : (data || undefined), hora, legendaFinal, "", rascunho, postarAgora).catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
+        const r = await criarArtePronta(marcaId, urlMidia, fmt, dia, hora, legendaFinal, "", rascunho, postarAgora).catch(() => ({ ok: false as const, erro: "Não consegui salvar agora." }));
         if (!r.ok) { ultimoErro = r.erro; continue; }
         if (postarAgora) {
           const post = await (fmt === "story" ? postarStory(r.id) : postarPublicacao(r.id)).catch(() => ({ ok: false as const, erro: "Salvei, mas não consegui postar agora." }));
           if (post.ok) feitos.push(rot(fmt));
           else ultimoErro = post.erro;
-        } else feitos.push(rot(fmt));
+        } else { feitos.push(rot(fmt)); if (dia) diasOk.add(dia); }
       }
     }
     setSalvando(false); setFaseMsg("");
@@ -265,10 +274,12 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
       } else if (rascunho) {
         msg = `Salvo (${feitos.join(" + ")})! Fica guardado em "Suas artes" pra postar quando quiser. 💾`;
       } else {
-        msg = data ? `Agendado (${feitos.join(" + ")}) pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : `Agendado: ${feitos.join(" + ")} (próxima data livre)! 📅`;
+        const tipos = [...new Set(feitos)].join(" + ");
+        msg = diasOk.size > 1 ? `Agendado (${tipos}) em ${diasOk.size} dias: ${[...diasOk].sort().map((d) => dataBR(`${d}T12:00:00-03:00`)).join(", ")}! 📅`
+          : data ? `Agendado (${tipos}) pra ${dataBR(`${data}T12:00:00-03:00`)}! 📅` : `Agendado: ${tipos} (próxima data livre)! 📅`;
       }
       setOk(msg);
-      setImagemUrl(""); setPosterUrl(""); setBriefVideo(""); setMidia("imagem"); setLegenda(""); setHashtags(""); setData(""); setOpcoes([]);
+      setImagemUrl(""); setPosterUrl(""); setBriefVideo(""); setMidia("imagem"); setLegenda(""); setHashtags(""); setData(""); setDiasExtras([]); setNovoDia(""); setOpcoes([]);
       pararMusica(); setComMusica(false); setMusicaUrl(""); setMusicaNome("");
       limparPendente();
     }
@@ -471,9 +482,32 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
                 </select>
               </label>
             </div>
+            {/* AGENDAR EM VÁRIOS DIAS */}
+            <div className="mt-3 rounded-lg border border-linha bg-preto/40 p-2.5">
+              <p className="text-xs font-semibold text-white">📅 Repetir em outros dias <span className="font-normal text-muted">(mesma arte, mesmo horário — vale pro botão Agendar)</span></p>
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <div className="min-w-0 flex-1"><InputDataBR value={novoDia} onChange={setNovoDia} /></div>
+                <button type="button" disabled={!novoDia || !data}
+                  onClick={() => { if (novoDia && novoDia !== data && !diasExtras.includes(novoDia)) setDiasExtras((d) => [...d, novoDia].sort()); setNovoDia(""); }}
+                  className="rounded-lg border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-3 py-2 text-xs font-semibold text-[#d6c6ff] hover:bg-[#7c3aed]/25 disabled:opacity-40">+ Adicionar dia</button>
+              </div>
+              {!data && <p className="mt-1.5 text-[11px] text-muted">Escolha primeiro o <strong className="text-white/80">Dia</strong> lá em cima; depois adicione os outros.</p>}
+              {diasExtras.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {data && <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">{dataBR(`${data}T12:00:00-03:00`)}</span>}
+                  {diasExtras.map((d) => (
+                    <span key={d} className="flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300">
+                      {dataBR(`${d}T12:00:00-03:00`)}
+                      <button type="button" onClick={() => setDiasExtras((l) => l.filter((x) => x !== d))} className="text-emerald-200/70 hover:text-white" aria-label="Tirar este dia">✕</button>
+                    </span>
+                  ))}
+                  <span className="self-center text-[11px] text-muted">= {1 + diasExtras.length} dias</span>
+                </div>
+              )}
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <button type="button" onClick={() => salvar("rascunho")} disabled={salvando} title="Só guarda a arte pra postar depois — não agenda nem posta" className="rounded-lg border border-[#7c3aed]/50 bg-[#7c3aed]/15 px-4 py-2 text-sm font-semibold text-[#d6c6ff] transition hover:bg-[#7c3aed]/25 disabled:opacity-50">{salvando ? "…" : "💾 Salvar"}</button>
-              <button type="button" onClick={() => salvar("agendar")} disabled={salvando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 disabled:opacity-50">{salvando ? "…" : "📅 Agendar"}</button>
+              <button type="button" onClick={() => salvar("agendar")} disabled={salvando} className="rounded-lg border border-linha px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 disabled:opacity-50">{salvando ? "…" : diasExtras.length ? `📅 Agendar ${1 + diasExtras.length} dias` : "📅 Agendar"}</button>
               <button type="button" onClick={() => salvar("postar")} disabled={salvando} className="rounded-lg bg-[#C13584] px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50">{salvando ? "Postando…" : "📲 Postar agora"}</button>
             </div>
             {salvando && (

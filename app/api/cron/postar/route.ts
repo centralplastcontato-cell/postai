@@ -392,6 +392,10 @@ async function arquivarReelsPostados(m: { id: string; nome: string }, agora: Dat
     const { del } = await import("@vercel/blob");
     for (const p of antigos) {
       if (!p.videoUrl) continue;
+      // a MESMA arte pode estar agendada em outros dias (agendar em vários dias / "os dois"):
+      // enquanto alguma ainda vai sair, o MP4 fica
+      const aindaUsa = await prisma.publicacao.count({ where: { id: { not: p.id }, videoUrl: p.videoUrl, status: { not: "postado" } } }).catch(() => 1);
+      if (aindaUsa > 0) continue;
       try { await del(p.videoUrl); } catch {} // se já não existe, segue
       // marca a festa como "arquivado" (sentinela) — o card mostra "📮 Postado · arquivado" + "Gerar de novo",
       // pra NÃO confundir com uma festa que nunca teve vídeo. (gerarVideoDaFesta trata "arquivado" como gerável.)
