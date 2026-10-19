@@ -114,6 +114,8 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
 
   // agendador
   const [festaId, setFestaId] = useState("");
+  // qual lista aparece no seletor: vídeos de FESTA ou vídeos do BUFFET (salão)
+  const [tipoLista, setTipoLista] = useState<"festa" | "tema">("festa");
   const [dataISO, setDataISO] = useState(dataAlvo ?? "");
   const [hora, setHora] = useState(hhmmPadrao);
   // se o dono está olhando um dia X na agenda, a data do Reels acompanha (e dá pra trocar).
@@ -278,19 +280,18 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-semibold text-white">Vídeo</label>
-                <select value={festaId} onChange={(e) => { setFestaId(e.target.value); setMsg(null); }} className="input-base mt-1 w-full text-sm">
-                  <option value="">Escolha o vídeo…</option>
-                  {/* separado em 2 grupos: vídeos do buffet (o salão, evergreen) e vídeos de festa */}
-                  {festasComVideo.some((f) => f.tipo === "tema") && (
-                    <optgroup label="🏰 Vídeos do buffet (salão)">
-                      {festasComVideo.filter((f) => f.tipo === "tema").map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{seloVideo(f)}</option>)}
-                    </optgroup>
-                  )}
-                  {festasComVideo.some((f) => f.tipo === "festa") && (
-                    <optgroup label="🎉 Vídeos de festa">
-                      {festasComVideo.filter((f) => f.tipo === "festa").map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{seloVideo(f)}</option>)}
-                    </optgroup>
-                  )}
+                {/* duas listas separadas: festa × buffet (salão) */}
+                <div className="mt-1 flex gap-1.5">
+                  {([["festa", "🎉 Vídeo de festa"], ["tema", "🏰 Vídeo do buffet"]] as const).map(([t, rot]) => (
+                    <button key={t} type="button" onClick={() => { setTipoLista(t); setFestaId(""); setMsg(null); }}
+                      className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold transition ${tipoLista === t ? "border-[#7c3aed] bg-[#7c3aed]/20 text-white" : "border-linha text-muted hover:text-white"}`}>
+                      {rot} <span className="font-normal text-muted">({festasComVideo.filter((f) => f.tipo === t).length})</span>
+                    </button>
+                  ))}
+                </div>
+                <select value={festaId} onChange={(e) => { setFestaId(e.target.value); setMsg(null); }} className="input-base mt-2 w-full text-sm">
+                  <option value="">{tipoLista === "festa" ? "Escolha a festa…" : "Escolha o vídeo do buffet…"}</option>
+                  {festasComVideo.filter((f) => f.tipo === tipoLista).map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{seloVideo(f)}</option>)}
                 </select>
               </div>
               <div>
