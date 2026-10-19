@@ -280,7 +280,17 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
                 <label className="block text-xs font-semibold text-white">Vídeo</label>
                 <select value={festaId} onChange={(e) => { setFestaId(e.target.value); setMsg(null); }} className="input-base mt-1 w-full text-sm">
                   <option value="">Escolha o vídeo…</option>
-                  {festasComVideo.map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{seloVideo(f)}</option>)}
+                  {/* separado em 2 grupos: vídeos do buffet (o salão, evergreen) e vídeos de festa */}
+                  {festasComVideo.some((f) => f.tipo === "tema") && (
+                    <optgroup label="🏰 Vídeos do buffet (salão)">
+                      {festasComVideo.filter((f) => f.tipo === "tema").map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{seloVideo(f)}</option>)}
+                    </optgroup>
+                  )}
+                  {festasComVideo.some((f) => f.tipo === "festa") && (
+                    <optgroup label="🎉 Vídeos de festa">
+                      {festasComVideo.filter((f) => f.tipo === "festa").map((f) => <option key={f.id} value={f.id}>{festaLabel(f)}{seloVideo(f)}</option>)}
+                    </optgroup>
+                  )}
                 </select>
               </div>
               <div>
