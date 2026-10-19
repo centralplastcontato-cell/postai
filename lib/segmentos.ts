@@ -29,6 +29,15 @@ export function contextoSegmento(seg?: string): ContextoSegmento {
       clima: "um clima criativo e caprichado de ateliê/oficina, mostrando os produtos",
     };
   }
+  if (seg === "online") {
+    return {
+      negocio: "um negócio online (serviço/plataforma digital)",
+      publico: "pessoas e empresas que podem usar o serviço",
+      tom: "claro, confiante e próximo, mostrando o problema que o serviço resolve e o benefício prático — sem jargão nem promessa exagerada",
+      cta: "acessar o link na bio, chamar no direct ou pedir uma demonstração",
+      clima: "um clima moderno e digital, limpo e profissional",
+    };
+  }
   // Padrão: BUFFET (comportamento de sempre).
   return {
     negocio: "um buffet infantil (festas de aniversário)",

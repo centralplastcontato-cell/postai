@@ -88,6 +88,7 @@ export default async function PainelHome() {
               <option value="buffet">🏰 Buffet infantil</option>
               <option value="jogo">🎮 Jogo / App</option>
               <option value="produtos">🛍️ Loja / Produtos</option>
+              <option value="online">💻 Negócio online / Serviços</option>
             </select>
           </label>
           <button className="rounded-lg bg-vermelho px-4 py-2 text-sm font-semibold text-white transition hover:bg-vermelho-hover">

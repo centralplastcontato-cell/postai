@@ -8,7 +8,7 @@ import { rotuloHora, HORAS_RECOMENDADAS } from "@/lib/horarios";
 
 export type MarcaView = {
   id: string;
-  segmento?: string; // ramo do perfil: "buffet" (padrão) | "jogo" | "produtos"
+  segmento?: string; // ramo do perfil: "buffet" (padrão) | "jogo" | "produtos" | "online"
   nome: string;
   corPrimaria: string;
   corFundo: string;
@@ -349,6 +349,7 @@ export function MarcaForm({ marca, somenteIdentidade = false }: { marca: MarcaVi
                 <option value="buffet">🏰 Buffet infantil</option>
                 <option value="jogo">🎮 Jogo / App</option>
                 <option value="produtos">🛍️ Loja / Produtos</option>
+                <option value="online">💻 Negócio online / Serviços</option>
               </select>
             </label>
           )}

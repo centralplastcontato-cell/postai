@@ -35,7 +35,7 @@ export async function criarMarca(formData: FormData) {
   const nome = String(formData.get("nome") || "").trim();
   if (!nome) return;
   const seg = String(formData.get("segmento") || "buffet");
-  const segmento = ["buffet", "jogo", "produtos"].includes(seg) ? seg : "buffet";
+  const segmento = ["buffet", "jogo", "produtos", "online"].includes(seg) ? seg : "buffet";
   const slug = await slugUnico(nome);
   const m = await prisma.marca.create({
     data: { nome, slug, logoTexto: nome.toUpperCase(), segmento },
@@ -75,7 +75,7 @@ export async function salvarMarca(input: DadosMarca) {
   for (const [k, v] of Object.entries(resto)) {
     if (v === undefined) continue;
     if (k === "accessToken" && v === "") continue; // token write-only: vazio = "mantém o que está salvo" (nunca apaga)
-    if (k === "segmento" && !["buffet", "jogo", "produtos"].includes(String(v))) continue;
+    if (k === "segmento" && !["buffet", "jogo", "produtos", "online"].includes(String(v))) continue;
     data[k] = v;
   }
   await prisma.marca.update({ where: { id }, data });
