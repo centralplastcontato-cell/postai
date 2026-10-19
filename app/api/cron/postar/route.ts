@@ -127,8 +127,27 @@ async function claimPublicacao(id: string): Promise<boolean> {
 }
 // Reverte pra "a_postar" (o piloto tenta de novo na próxima passada) e ANOTA o motivo — é o que a
 // API de automação devolve como "falhou" + motivo_falha. Publicar com sucesso limpa o motivo.
-async function reverterCarrossel(id: string, erro: string) {
-  try { await prisma.conteudo.update({ where: { id }, data: { status: "a_postar", postadoEm: null, erroPostagem: cortarTexto(erro, 500) } }); } catch {}
+// Post que FALHA várias vezes não pode ficar tentando pra sempre (a cada passada): na 3ª falha
+// seguida ele sai da fila e vai pro cartão "Aguardando sua aprovação" — o dono confere e aprova
+// pra tentar de novo. O nº de falhas fica no começo do erroPostagem ("[falha N] ...").
+const MAX_FALHAS = 3;
+function proximaFalha(erroAnterior: string | null): number {
+  const m = /^\[falha (\d+)\]/.exec(erroAnterior || "");
+  return (m ? Number(m[1]) : erroAnterior ? 1 : 0) + 1;
+}
+async function falhouCarrossel(id: string, erro: string): Promise<boolean> {
+  const atual = await prisma.conteudo.findUnique({ where: { id }, select: { erroPostagem: true } }).catch(() => null);
+  const n = proximaFalha(atual?.erroPostagem ?? null);
+  const parar = n >= MAX_FALHAS;
+  try { await prisma.conteudo.update({ where: { id }, data: { status: parar ? "aguardando_aprovacao" : "a_postar", postadoEm: null, erroPostagem: cortarTexto(`[falha ${n}] ${erro}`, 500) } }); } catch {}
+  return parar;
+}
+async function falhouPublicacao(id: string, erro: string): Promise<boolean> {
+  const atual = await prisma.publicacao.findUnique({ where: { id }, select: { erroPostagem: true } }).catch(() => null);
+  const n = proximaFalha(atual?.erroPostagem ?? null);
+  const parar = n >= MAX_FALHAS;
+  try { await prisma.publicacao.update({ where: { id }, data: { status: parar ? "aguardando_aprovacao" : "a_postar", postadoEm: null, erroPostagem: cortarTexto(`[falha ${n}] ${erro}`, 500) } }); } catch {}
+  return parar;
 }
 async function reverterPublicacao(id: string, erro: string, extra: { reelsContainerId?: string } = {}) {
   try { await prisma.publicacao.update({ where: { id }, data: { status: "a_postar", postadoEm: null, erroPostagem: cortarTexto(erro, 500), ...extra } }); } catch {}
@@ -157,8 +176,8 @@ async function postarCarrossel(m: { id: string; nome: string; igUserId: string |
       await registrarAtividade(AGENTE, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
       await prisma.conteudo.update({ where: { id: c.id }, data: { mediaId: r.ig.mediaId, permalink: r.ig.permalink, erroPostagem: null } }).catch(() => {}); // guarda o ID pra coletar o engajamento depois
     } else {
-      await reverterCarrossel(c.id, r.ig.erro);
-      await registrarAtividade(AGENTE, `Não consegui postar o carrossel "${c.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
+      const parou = await falhouCarrossel(c.id, r.ig.erro);
+      await registrarAtividade(AGENTE, `Não consegui postar o carrossel "${c.titulo}" de ${m.nome}: ${r.ig.erro}${parou ? ` — falhou ${MAX_FALHAS} vezes, parei de tentar: está em "Aguardando sua aprovação" (aprove pra tentar de novo).` : ""}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "carrossel", titulo: c.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
   } catch (e) {
@@ -184,8 +203,8 @@ async function postarFeed(m: { id: string; nome: string; igUserId: string | null
         await registrarAtividade(AGENTE, rs.ig.ok ? `Espelhei "${p.titulo}" no Story de ${m.nome} (auto).` : `Não consegui espelhar "${p.titulo}" no Story: ${rs.ig.erro}`, m.id).catch(() => {});
       }
     } else {
-      await reverterPublicacao(p.id, r.ig.erro);
-      await registrarAtividade(AGENTE, `Não consegui postar "${p.titulo}" de ${m.nome}: ${r.ig.erro}`, m.id).catch(() => {});
+      const parou = await falhouPublicacao(p.id, r.ig.erro);
+      await registrarAtividade(AGENTE, `Não consegui postar "${p.titulo}" de ${m.nome}: ${r.ig.erro}${parou ? ` — falhou ${MAX_FALHAS} vezes, parei de tentar: está em "Aguardando sua aprovação" (aprove pra tentar de novo).` : ""}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "feed", titulo: p.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
   } catch (e) {

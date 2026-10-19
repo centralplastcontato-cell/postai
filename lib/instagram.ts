@@ -202,7 +202,9 @@ export async function publicarNasRedes(
   }
   const ig = await publicar({ igUserId: marca.igUserId, accessToken: marca.accessToken }, estaticas, legenda);
   let fb: ResultadoFB | undefined;
-  if (marcaTemFacebook(marca)) {
+  // Facebook é ESPELHO do Instagram: só publica se o Instagram deu certo. Antes, com o Instagram
+  // falhando, o piloto tentava de novo a cada passada e o Facebook recebia o post repetido.
+  if (ig.ok && marcaTemFacebook(marca)) {
     fb = await publicarFacebook(marca.fbPageId!, marca.accessToken, estaticas, legenda);
   }
   return { ig, fb };
