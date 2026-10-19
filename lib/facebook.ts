@@ -146,3 +146,30 @@ export async function listarPaginas(userToken: string): Promise<{ id: string; no
   if (!r.ok) throw new Error(j.error?.message || `Graph API ${r.status}`);
   return (j.data ?? []).map((p) => ({ id: p.id, nome: p.name }));
 }
+
+// ---------- LIMPEZA de posts repetidos na Página ----------
+export type PostPagina = { id: string; mensagem: string; criadoEm: string; imagem: string | null; link: string | null };
+/** Lista os posts da Página publicados desde `desde` (mais novos primeiro), até `limite`. */
+export async function listarPostsPagina(pageId: string, userToken: string, desde: Date, limite = 600): Promise<PostPagina[]> {
+  const token = await obterPageToken(pageId, userToken);
+  const out: PostPagina[] = [];
+  let url: string | null = `${GRAPH}/${pageId}/posts?fields=id,message,created_time,full_picture,permalink_url&limit=100&since=${Math.floor(desde.getTime() / 1000)}&access_token=${token}`;
+  while (url && out.length < limite) {
+    const r: Response = await fetchMeta(url, { cache: "no-store" });
+    const j = (await r.json().catch(() => ({}))) as { data?: { id: string; message?: string; created_time: string; full_picture?: string; permalink_url?: string }[]; paging?: { next?: string }; error?: { message?: string } };
+    if (!r.ok) throw new Error(j.error?.message || `Facebook respondeu ${r.status}`);
+    for (const p of j.data || []) out.push({ id: p.id, mensagem: p.message || "", criadoEm: p.created_time, imagem: p.full_picture || null, link: p.permalink_url || null });
+    url = j.paging?.next || null;
+  }
+  return out.slice(0, limite);
+}
+/** Apaga UM post da Página. */
+export async function apagarPostPagina(pageId: string, userToken: string, postId: string, tokenPagina?: string): Promise<{ ok: boolean; erro?: string }> {
+  const token = tokenPagina || (await obterPageToken(pageId, userToken));
+  const r = await fetchMeta(`${GRAPH}/${postId}?access_token=${token}`, { method: "DELETE" });
+  const j = (await r.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string } };
+  return r.ok && j.success !== false ? { ok: true } : { ok: false, erro: j.error?.message || `Facebook respondeu ${r.status}` };
+}
+export async function tokenDaPagina(pageId: string, userToken: string): Promise<string> {
+  return obterPageToken(pageId, userToken);
+}

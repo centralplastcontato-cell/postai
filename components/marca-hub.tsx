@@ -19,6 +19,7 @@ import { AtividadesRecentes, type Ativ } from "./atividades-recentes";
 import { type FestaView } from "@/lib/festa-tipos";
 import { ConexaoCard } from "./conexao-card";
 import { EvolucaoCard } from "./evolucao-card";
+import { LimpezaFacebook } from "./limpeza-facebook";
 import { BackfillEngajamento } from "./backfill-engajamento";
 import { BiaDescobriu } from "./bia-descobriu";
 import { RegerarCalendario } from "./regerar-calendario";
@@ -210,6 +211,7 @@ export function MarcaHub({
             <div className="max-w-2xl space-y-4">
               <AutomacaoCard parte="chave" marcaId={marca.id} linkBase={linkBase} chave={apiChave} pendentes={pendentesApi ?? []} />
               <BackfillEngajamento marcaId={marca.id} />
+              {marca.fbPageId && <LimpezaFacebook marcaId={marca.id} />}
             </div>
             <MarcaForm marca={marca} />
           </div>
