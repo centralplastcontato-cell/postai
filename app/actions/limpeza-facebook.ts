@@ -46,20 +46,24 @@ export async function previaRepetidosFacebook(marcaId: string, dias = 7) {
   }
 }
 
-// Apaga um LOTE (até 25 por chamada, pra caber no tempo do site). A tela chama de novo até acabar.
+// Apaga um LOTE pequeno (até 8 por chamada, 4 ao mesmo tempo — cada DELETE na Meta leva ~4s e a
+// chamada tem que caber nos 60s do site). A tela chama de novo até acabar.
 export async function apagarRepetidosFacebook(marcaId: string, ids: string[]) {
   const g = await exigirAdmin();
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await conexao(marcaId);
   if (!c) return { ok: false as const, erro: "Esta marca não tem a Página do Facebook conectada." };
-  const lote = ids.filter((id) => typeof id === "string" && id.startsWith(`${c.pageId}_`)).slice(0, 25); // só posts DESTA página
+  const lote = ids.filter((id) => typeof id === "string" && id.startsWith(`${c.pageId}_`)).slice(0, 8); // só posts DESTA página
   const token = await tokenDaPagina(c.pageId, c.token);
   let apagados = 0;
   const falhas: string[] = [];
-  for (const id of lote) {
-    const r = await apagarPostPagina(c.pageId, c.token, id, token).catch((e) => ({ ok: false, erro: e instanceof Error ? e.message : "erro" }));
-    if (r.ok) apagados++;
-    else falhas.push(r.erro || "erro");
+  for (let i = 0; i < lote.length; i += 4) {
+    const rs = await Promise.all(lote.slice(i, i + 4).map((id) => apagarPostPagina(c.pageId, c.token, id, token).catch((e) => ({ ok: false, erro: e instanceof Error ? e.message : "erro" }))));
+    for (const r of rs) {
+      // "já não existe" conta como apagado (ex.: lote repetido depois de uma chamada que caiu)
+      if (r.ok || /does not exist|cannot be loaded|Unsupported delete/i.test(r.erro || "")) apagados++;
+      else falhas.push(r.erro || "erro");
+    }
   }
   if (apagados) await registrarAtividade(AGENTE, `Apaguei ${apagados} post(s) repetido(s) do Facebook de ${c.nome}.`, marcaId).catch(() => {});
   return { ok: true as const, apagados, falhas: falhas.slice(0, 3), processados: lote.length };

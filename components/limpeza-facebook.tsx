@@ -14,7 +14,7 @@ export function LimpezaFacebook({ marcaId }: { marcaId: string }) {
   const [info, setInfo] = useState("");
   const [erro, setErro] = useState("");
   const [confirmar, setConfirmar] = useState(false);
-  const [apagando, setApagando] = useState<{ feitos: number; total: number } | null>(null);
+  const [apagando, setApagando] = useState<{ feitos: number; total: number; falhas?: number; ultimaFalha?: string } | null>(null);
 
   async function procurar() {
     setErro(""); setInfo(""); setGrupos(null); setConfirmar(false); setBuscando(true);
@@ -30,13 +30,18 @@ export function LimpezaFacebook({ marcaId }: { marcaId: string }) {
     const ids = grupos.flatMap((g) => g.apagar.map((p) => p.id));
     setConfirmar(false); setErro(""); setApagando({ feitos: 0, total: ids.length });
     let feitos = 0, falhas = 0, ultimaFalha = "";
-    for (let i = 0; i < ids.length; i += 25) {
-      const r = await apagarRepetidosFacebook(marcaId, ids.slice(i, i + 25)).catch(() => null);
-      if (!r || !r.ok) { falhas += Math.min(25, ids.length - i); ultimaFalha = (r && "erro" in r && r.erro) || "a chamada caiu"; continue; }
-      feitos += r.apagados;
-      falhas += r.processados - r.apagados;
-      if (r.falhas[0]) ultimaFalha = r.falhas[0];
-      setApagando({ feitos, total: ids.length });
+    const LOTE = 8;
+    for (let i = 0; i < ids.length; i += LOTE) {
+      const pedaco = ids.slice(i, i + LOTE);
+      let r = await apagarRepetidosFacebook(marcaId, pedaco).catch(() => null);
+      if (!r) r = await apagarRepetidosFacebook(marcaId, pedaco).catch(() => null); // caiu? tenta o mesmo lote de novo
+      if (!r || !r.ok) { falhas += pedaco.length; ultimaFalha = (r && "erro" in r && r.erro) || "a chamada caiu"; }
+      else {
+        feitos += r.apagados;
+        falhas += r.processados - r.apagados;
+        if (r.falhas[0]) ultimaFalha = r.falhas[0];
+      }
+      setApagando({ feitos, total: ids.length, falhas, ultimaFalha });
     }
     setApagando(null);
     setGrupos(null);
@@ -58,7 +63,13 @@ export function LimpezaFacebook({ marcaId }: { marcaId: string }) {
       </div>
       {erro && <p className="mt-3 text-sm text-red-400">{erro}</p>}
       {info && <p className="mt-3 text-sm text-emerald-300">{info}</p>}
-      {apagando && <p className="mt-3 text-sm font-semibold text-amber-300">🧹 Apagando… {apagando.feitos} de {apagando.total}</p>}
+      {apagando && (
+        <div className="mt-3 text-sm">
+          <p className="font-semibold text-amber-300">🧹 Apagando… {apagando.feitos} de {apagando.total}{apagando.falhas ? ` · ${apagando.falhas} com erro` : ""}</p>
+          <p className="mt-0.5 text-xs text-muted">Deixe esta tela aberta e o celular desbloqueado — se trocar de aba, o navegador pausa a limpeza.</p>
+          {apagando.ultimaFalha && <p className="mt-0.5 text-xs text-red-400">Último erro: {apagando.ultimaFalha}</p>}
+        </div>
+      )}
 
       {grupos && grupos.length > 0 && !apagando && (
         <>
