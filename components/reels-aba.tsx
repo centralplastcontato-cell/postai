@@ -230,10 +230,18 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
 
   // Nome da festa a partir do título do Reels ("Reels — Samuel" → "Samuel").
   const nomeDoReels = (r: PublicacaoView) => (r.titulo || "").replace(/^Reels\s*[—–-]\s*/i, "").trim();
-  // festas cujo Reels JÁ foi postado — pra marcar no seletor e não reagendar por engano.
-  const nomesPostados = new Set(reels.filter((r) => r.status === "postado").map(nomeDoReels));
-  // festas cujo Reels JÁ está AGENDADO (na fila, ainda não postado) — evita agendar o mesmo 2×.
-  const nomesAgendados = new Set(reels.filter((r) => r.status !== "postado").map(nomeDoReels));
+  // O Reels é DESTA festa? Mesmo vídeo; ou mesmo nome E do dia da festa em diante (um Reels de
+  // antes da festa é de OUTRA criança com o mesmo nome — ex.: dois "Joaquim").
+  const ehDaFesta = (r: PublicacaoView, f: FestaComVideo) => {
+    if (r.videoUrl && f.videoUrl && r.videoUrl === f.videoUrl) return true;
+    if (nomeDoReels(r) !== f.nome) return false;
+    const diaFesta = new Date(f.data); diaFesta.setHours(0, 0, 0, 0);
+    return new Date(r.data).getTime() >= diaFesta.getTime() - 86400_000;
+  };
+  // festa com Reels JÁ postado — pra marcar no seletor e não reagendar por engano
+  const jaPostado = (f: FestaComVideo) => reels.some((r) => r.status === "postado" && ehDaFesta(r, f));
+  // festa com Reels JÁ AGENDADO (na fila, ainda não postado) — evita agendar o mesmo 2×
+  const jaAgendado = (f: FestaComVideo) => reels.some((r) => r.status !== "postado" && ehDaFesta(r, f));
   // Selo do vídeo no seletor. FESTA: postado tem prioridade; senão, agendado (o vídeo da festa é
   // pra postar uma vez). VÍDEO DO BUFFET: é evergreen, então não é "já postado ou não" — é
   // QUANTAS vezes já foi ao ar (contagem que vem pronta do servidor, pela FK videoTematicoId).
@@ -243,8 +251,8 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
       const fila = f.naFila || 0;
       return (n === 0 ? "  🆕 nunca postado" : `  ✅ postado ${n}×`) + (fila > 0 ? `  ⏰ ${fila} na fila` : "");
     }
-    if (nomesPostados.has(f.nome)) return "  ✅ já postado";
-    if (nomesAgendados.has(f.nome)) return "  ⏰ já agendado";
+    if (jaPostado(f)) return "  ✅ já postado";
+    if (jaAgendado(f)) return "  ⏰ já agendado";
     return "";
   };
 
@@ -293,10 +301,10 @@ export function ReelsAba({ reels, festasComVideo, dataAlvo, horaPadrao, focoId }
                 🏰 Vídeo do buffet — feito em {diaMesAno(escolhido.data)}. {historicoTema(escolhido)} Pode ser postado quantas vezes quiser, em datas diferentes.
               </p>
             )}
-            {escolhido?.tipo === "festa" && nomesPostados.has(escolhido.nome) && (
+            {escolhido?.tipo === "festa" && jaPostado(escolhido) && (
               <p className="mt-2 rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-xs font-semibold text-green-400">✅ Essa festa já teve um Reels postado — só agende de novo se quiser repostar.</p>
             )}
-            {escolhido?.tipo === "festa" && !nomesPostados.has(escolhido.nome) && nomesAgendados.has(escolhido.nome) && (
+            {escolhido?.tipo === "festa" && !jaPostado(escolhido) && jaAgendado(escolhido) && (
               <p className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-300">⏰ Esse vídeo já está agendado (na fila, esperando pra postar). Só agende de novo se quiser postar duas vezes.</p>
             )}
             <div className="mt-3 flex items-center justify-between gap-2">
