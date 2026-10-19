@@ -127,28 +127,36 @@ async function claimPublicacao(id: string): Promise<boolean> {
 }
 // Reverte pra "a_postar" (o piloto tenta de novo na próxima passada) e ANOTA o motivo — é o que a
 // API de automação devolve como "falhou" + motivo_falha. Publicar com sucesso limpa o motivo.
-// Post que FALHA várias vezes não pode ficar tentando pra sempre (a cada passada): na 3ª falha
-// seguida ele sai da fila e vai pro cartão "Aguardando sua aprovação" — o dono confere e aprova
-// pra tentar de novo. O nº de falhas fica no começo do erroPostagem ("[falha N] ...").
-const MAX_FALHAS = 3;
+// Post que FALHA não pode ficar tentando a cada passada (travava a fila da marca, porque o piloto
+// sempre pega o post mais antigo — e repetia no Facebook). Agora ele é REAGENDADO sozinho, com
+// espera crescente (15 min → 30 min → 1h → 2h → 4h → 8h → 12h, ~28h no total), e os outros posts
+// da fila seguem saindo. Só depois de 8 falhas ele para e vai pro cartão "Aguardando sua aprovação".
+// O nº de falhas fica no começo do erroPostagem ("[falha N] ...").
+const MAX_FALHAS = 8;
+const ESPERA_MIN = [15, 30, 60, 120, 240, 480, 720];
 function proximaFalha(erroAnterior: string | null): number {
   const m = /^\[falha (\d+)\]/.exec(erroAnterior || "");
   return (m ? Number(m[1]) : erroAnterior ? 1 : 0) + 1;
 }
-async function falhouCarrossel(id: string, erro: string): Promise<boolean> {
+const quandoTentar = (n: number) => new Date(Date.now() + (ESPERA_MIN[Math.min(n, ESPERA_MIN.length) - 1] ?? 720) * 60_000);
+const esperaTxt = (n: number) => { const m = ESPERA_MIN[Math.min(n, ESPERA_MIN.length) - 1] ?? 720; return m < 60 ? `${m} min` : `${m / 60}h`; };
+async function falhouCarrossel(id: string, erro: string): Promise<{ parou: boolean; n: number }> {
   const atual = await prisma.conteudo.findUnique({ where: { id }, select: { erroPostagem: true } }).catch(() => null);
   const n = proximaFalha(atual?.erroPostagem ?? null);
-  const parar = n >= MAX_FALHAS;
-  try { await prisma.conteudo.update({ where: { id }, data: { status: parar ? "aguardando_aprovacao" : "a_postar", postadoEm: null, erroPostagem: cortarTexto(`[falha ${n}] ${erro}`, 500) } }); } catch {}
-  return parar;
+  const parou = n >= MAX_FALHAS;
+  try { await prisma.conteudo.update({ where: { id }, data: { status: parou ? "aguardando_aprovacao" : "a_postar", ...(parou ? {} : { data: quandoTentar(n) }), postadoEm: null, erroPostagem: cortarTexto(`[falha ${n}] ${erro}`, 500) } }); } catch {}
+  return { parou, n };
 }
-async function falhouPublicacao(id: string, erro: string): Promise<boolean> {
+async function falhouPublicacao(id: string, erro: string): Promise<{ parou: boolean; n: number }> {
   const atual = await prisma.publicacao.findUnique({ where: { id }, select: { erroPostagem: true } }).catch(() => null);
   const n = proximaFalha(atual?.erroPostagem ?? null);
-  const parar = n >= MAX_FALHAS;
-  try { await prisma.publicacao.update({ where: { id }, data: { status: parar ? "aguardando_aprovacao" : "a_postar", postadoEm: null, erroPostagem: cortarTexto(`[falha ${n}] ${erro}`, 500) } }); } catch {}
-  return parar;
+  const parou = n >= MAX_FALHAS;
+  try { await prisma.publicacao.update({ where: { id }, data: { status: parou ? "aguardando_aprovacao" : "a_postar", ...(parou ? {} : { data: quandoTentar(n) }), postadoEm: null, erroPostagem: cortarTexto(`[falha ${n}] ${erro}`, 500) } }); } catch {}
+  return { parou, n };
 }
+const avisoFalha = (f: { parou: boolean; n: number }) => f.parou
+  ? ` — falhou ${MAX_FALHAS} vezes em ~1 dia, parei de tentar: está em "Aguardando sua aprovação".`
+  : ` — tento de novo em ${esperaTxt(f.n)} (tentativa ${f.n} de ${MAX_FALHAS}); os outros posts seguem normalmente.`;
 async function reverterPublicacao(id: string, erro: string, extra: { reelsContainerId?: string } = {}) {
   try { await prisma.publicacao.update({ where: { id }, data: { status: "a_postar", postadoEm: null, erroPostagem: cortarTexto(erro, 500), ...extra } }); } catch {}
 }
@@ -176,8 +184,8 @@ async function postarCarrossel(m: { id: string; nome: string; igUserId: string |
       await registrarAtividade(AGENTE, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
       await prisma.conteudo.update({ where: { id: c.id }, data: { mediaId: r.ig.mediaId, permalink: r.ig.permalink, erroPostagem: null } }).catch(() => {}); // guarda o ID pra coletar o engajamento depois
     } else {
-      const parou = await falhouCarrossel(c.id, r.ig.erro);
-      await registrarAtividade(AGENTE, `Não consegui postar o carrossel "${c.titulo}" de ${m.nome}: ${r.ig.erro}${parou ? ` — falhou ${MAX_FALHAS} vezes, parei de tentar: está em "Aguardando sua aprovação" (aprove pra tentar de novo).` : ""}`, m.id).catch(() => {});
+      const f = await falhouCarrossel(c.id, r.ig.erro);
+      await registrarAtividade(AGENTE, `Não consegui postar o carrossel "${c.titulo}" de ${m.nome}: ${r.ig.erro}${avisoFalha(f)}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "carrossel", titulo: c.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
   } catch (e) {
@@ -203,8 +211,8 @@ async function postarFeed(m: { id: string; nome: string; igUserId: string | null
         await registrarAtividade(AGENTE, rs.ig.ok ? `Espelhei "${p.titulo}" no Story de ${m.nome} (auto).` : `Não consegui espelhar "${p.titulo}" no Story: ${rs.ig.erro}`, m.id).catch(() => {});
       }
     } else {
-      const parou = await falhouPublicacao(p.id, r.ig.erro);
-      await registrarAtividade(AGENTE, `Não consegui postar "${p.titulo}" de ${m.nome}: ${r.ig.erro}${parou ? ` — falhou ${MAX_FALHAS} vezes, parei de tentar: está em "Aguardando sua aprovação" (aprove pra tentar de novo).` : ""}`, m.id).catch(() => {});
+      const f = await falhouPublicacao(p.id, r.ig.erro);
+      await registrarAtividade(AGENTE, `Não consegui postar "${p.titulo}" de ${m.nome}: ${r.ig.erro}${avisoFalha(f)}`, m.id).catch(() => {});
     }
     out.push({ marca: m.nome, tipo: "feed", titulo: p.titulo, ok: r.ig.ok, erro: r.ig.ok ? undefined : r.ig.erro });
   } catch (e) {
