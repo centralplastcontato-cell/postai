@@ -6,7 +6,8 @@
 import { prisma } from "@/lib/prisma";
 import { exigirAdmin } from "@/lib/acesso";
 import { listarPostsPagina, apagarPostPagina, tokenDaPagina } from "@/lib/facebook";
-import { listarMidiasIG, apagarMidiaIG } from "@/lib/instagram";
+import { listarMidiasIG } from "@/lib/instagram";
+import { lerFilaIG, type FilaLimpezaIG } from "@/lib/limpeza-ig";
 import { registrarAtividade } from "@/lib/atividade";
 import { AGENTE } from "@/lib/config";
 
@@ -103,33 +104,38 @@ export async function previaRepetidosInstagram(marcaId: string, dias = 7) {
     return { ok: false as const, erro: `Não consegui ler os posts do Instagram: ${e instanceof Error ? e.message : "erro"}` };
   }
 }
-export async function apagarRepetidosInstagram(marcaId: string, ids: string[]) {
+// Põe os repetidos na FILA — quem apaga é o piloto, aos poucos (ver lib/limpeza-ig.ts).
+export async function iniciarLimpezaInstagram(marcaId: string, ids: string[]) {
   const g = await exigirAdmin();
   if (!g.ok) return { ok: false as const, erro: g.erro };
   const c = await conexaoIG(marcaId);
   if (!c) return { ok: false as const, erro: "Esta marca não tem o Instagram conectado." };
-  // só apaga o que está MESMO no perfil desta marca (confere na lista recente)
+  // só entra o que está MESMO no perfil desta marca (confere na lista recente)
   let doPerfil: Set<string>;
   try { doPerfil = new Set((await listarMidiasIG(c.conn, new Date(Date.now() - 31 * 86400_000))).map((m) => m.id)); }
   catch (e) { return { ok: false as const, erro: `Não consegui ler o perfil: ${e instanceof Error ? e.message : "erro"}` }; }
-  // O Instagram trava ("User is performing too many actions") se apagar rápido: aqui vai UM por vez
-  // e para no primeiro aviso de excesso — a tela espera e tenta de novo depois.
-  const lote = ids.filter((id) => typeof id === "string" && doPerfil.has(id)).slice(0, 3);
-  let apagados = 0;
-  let limitado = false;
-  let aviso = "";
-  const falhas: string[] = [];
-  let processados = 0;
-  for (const id of lote) {
-    const r = await apagarMidiaIG(c.conn, id).catch((e) => ({ ok: false, erro: e instanceof Error ? e.message : "erro" }));
-    if (r.ok || /does not exist|cannot be loaded/i.test(r.erro || "")) { apagados++; processados++; continue; }
-    if (/too many|rate limit|limit reached|try again later|#(4|17|32|613|368|80002)[)/]/i.test(r.erro || "")) { limitado = true; aviso = r.erro || ""; break; }
-    falhas.push(r.erro || "erro");
-    processados++;
-  }
-  const pedidos = ids.slice(0, 3);
-  const sumidos = pedidos.filter((id) => !doPerfil.has(id)).length; // já não estão no perfil
-  processados += sumidos;
-  if (apagados) await registrarAtividade(AGENTE, `Apaguei ${apagados} post(s) repetido(s) do Instagram de ${c.nome}.`, marcaId).catch(() => {});
-  return { ok: true as const, apagados: apagados + sumidos, falhas: falhas.slice(0, 3), processados, limitado, aviso };
+  const atual = await prisma.marca.findUnique({ where: { id: marcaId }, select: { limpezaIg: true } });
+  const f = lerFilaIG(atual?.limpezaIg);
+  const ja = f && f.ids.length ? f : null; // fila em andamento: soma (sem repetir)
+  const novos = [...new Set(ids.filter((id) => typeof id === "string" && doPerfil.has(id)))].filter((id) => !ja?.ids.includes(id));
+  if (!novos.length && !ja) return { ok: false as const, erro: "Esses posts já não estão no perfil." };
+  const fila: FilaLimpezaIG = ja
+    ? { ...ja, ids: [...ja.ids, ...novos] }
+    : { ids: novos, feitos: 0, falhas: 0, travas: 0, proxima: "", aviso: "", inicio: new Date().toISOString() };
+  await prisma.marca.update({ where: { id: marcaId }, data: { limpezaIg: JSON.stringify(fila) } });
+  await registrarAtividade(AGENTE, `Coloquei ${novos.length} post(s) repetido(s) do Instagram de ${c.nome} pra apagar aos poucos.`, marcaId).catch(() => {});
+  return { ok: true as const, fila };
+}
+export async function estadoLimpezaInstagram(marcaId: string) {
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const m = await prisma.marca.findUnique({ where: { id: marcaId }, select: { limpezaIg: true } });
+  return { ok: true as const, fila: lerFilaIG(m?.limpezaIg) };
+}
+// Cancela a fila (o que já foi apagado continua apagado) ou fecha o aviso de "terminei".
+export async function fecharLimpezaInstagram(marcaId: string) {
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  await prisma.marca.update({ where: { id: marcaId }, data: { limpezaIg: "" } });
+  return { ok: true as const };
 }

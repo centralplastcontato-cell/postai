@@ -60,6 +60,9 @@ model Marca {
   apiChaveHash    String? // indexado (não UNIQUE: o db push do deploy recusa UNIQUE novo em tabela com dados)
   apiChavePrefixo String    @default("")
   apiChaveEm      DateTime?
+  // LIMPEZA de posts repetidos do Instagram feita AOS POUCOS pelo piloto (o Instagram trava se
+  // apagar rápido). JSON {ids, feitos, falhas, travas, proxima, aviso, inicio}. "" = nada na fila.
+  limpezaIg       String    @default("")
   criadoEm    DateTime @default(now())
 
   // Inteligência: a análise do HISTÓRICO do Instagram ("A Bia estudou seu feed") cacheada,

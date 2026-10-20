@@ -9,6 +9,7 @@ import { tokenArte } from "@/lib/arte-token";
 import { cortarTexto } from "@/lib/api-externa";
 import { timingSafeEqual } from "crypto";
 import { metaNoLimite, usoDaMeta, zerarUsoDaMeta } from "@/lib/meta-uso";
+import { processarLimpezaIG } from "@/lib/limpeza-ig";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -79,6 +80,7 @@ export async function GET(req: Request) {
       await postarStory(m, agora, base, resultados);
       await postarReels(m, agora, resultados);
       await arquivarReelsPostados(m, agora, resultados); // libera storage: apaga MP4 já postado há +24h
+      await processarLimpezaIG(m, agora).catch(() => {}); // limpeza de repetidos do Instagram, aos poucos
       const publicouAgora = resultados.length > antes;
 
       // Estatísticas (best-effort, nunca derrubam o piloto): seguidores e token 1x/dia;
