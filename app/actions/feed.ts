@@ -1056,17 +1056,23 @@ export async function concluirPostArteVideo(id: string, containerId: string) {
 }
 
 // Lista as artes prontas enviadas pela marca (pra a aba "Minha arte").
-export async function listarArtesProntas(marcaId: string) {
+// Paginado: POR_PAGINA artes por página (as mais novas/mais à frente primeiro).
+export async function listarArtesProntas(marcaId: string, pagina = 1) {
+  const POR_PAGINA = 12;
   const g = await guardaMarca(marcaId);
-  if (!g.ok) return { ok: false as const, erro: g.erro, artes: [] as ArteProntaView[] };
+  if (!g.ok) return { ok: false as const, erro: g.erro, artes: [] as ArteProntaView[], total: 0, porPagina: POR_PAGINA };
+  const where = { marcaId, template: "arte-pronta" };
+  const total = await prisma.publicacao.count({ where });
+  const pag = Math.max(1, Math.min(Math.ceil(total / POR_PAGINA) || 1, Math.floor(pagina) || 1));
   const arts = await prisma.publicacao.findMany({
-    where: { marcaId, template: "arte-pronta" },
-    orderBy: { data: "desc" }, take: 60,
+    where,
+    orderBy: { data: "desc" }, skip: (pag - 1) * POR_PAGINA, take: POR_PAGINA,
     select: { id: true, imagemUrl: true, videoUrl: true, formato: true, data: true, status: true, legenda: true, postadoEm: true },
   });
   return {
     ok: true as const,
     artes: arts.map((a) => ({ id: a.id, imagemUrl: a.imagemUrl || "", videoUrl: a.videoUrl || "", formato: a.formato, dataISO: a.data.toISOString(), status: a.status, legenda: a.legenda, postado: a.status === "postado" })),
+    total, pagina: pag, porPagina: POR_PAGINA,
   };
 }
 export type ArteProntaView = { id: string; imagemUrl: string; videoUrl: string; formato: string; dataISO: string; status: string; legenda: string; postado: boolean };

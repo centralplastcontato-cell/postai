@@ -11,6 +11,9 @@ const HORAS_10 = opcoesHora10(); // opções de hora de 10 em 10 min
 function dataBR(iso: string): string {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
 }
+function horaBR(iso: string): string {
+  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+}
 
 // 🖼️ MINHA ARTE — o dono sobe uma arte PRONTA (feita fora, ex: promoção no Canva), a Bia lê a
 // imagem e escreve a legenda combinando, e ele posta como Story/Feed (na hora ou agendado).
@@ -69,15 +72,23 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
   const [postSeg, setPostSeg] = useState(0); // cronômetro (segundos) enquanto posta
   // artes já enviadas
   const [artes, setArtes] = useState<ArteProntaView[]>([]);
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [totalArtes, setTotalArtes] = useState(0);
   const [carregando, setCarregando] = useState(true);
   const [proc, setProc] = useState("");
   const [resultado, setResultado] = useState<{ tipo: "ok" | "erro"; txt: string } | null>(null);
 
   const recarregar = useCallback(async () => {
-    const r = await listarArtesProntas(marcaId).catch(() => null);
+    const r = await listarArtesProntas(marcaId, pagina).catch(() => null);
     setCarregando(false);
-    if (r && r.ok) setArtes(r.artes);
-  }, [marcaId]);
+    if (r && r.ok) {
+      setArtes(r.artes);
+      setTotalArtes(r.total);
+      setTotalPaginas(Math.max(1, Math.ceil(r.total / r.porPagina)));
+      if (r.pagina !== pagina) setPagina(r.pagina); // ex.: apagou a última arte da última página
+    }
+  }, [marcaId, pagina]);
   useEffect(() => { recarregar(); }, [recarregar]);
 
   // Cronômetro: enquanto está salvando/postando (aqui em cima ou num card), conta os segundos.
@@ -524,7 +535,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
 
       {/* Artes já enviadas */}
       <div className="mt-6">
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Suas artes enviadas</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Suas artes enviadas{totalArtes > 0 && <span className="ml-1 normal-case tracking-normal text-muted/70">({totalArtes})</span>}</p>
         {resultado && <p className={`mb-2 text-xs font-semibold ${resultado.tipo === "ok" ? "text-emerald-400" : "text-vermelho"}`}>{resultado.txt}</p>}
         {carregando ? (
           <p className="text-xs text-muted">Carregando…</p>
@@ -549,7 +560,7 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
                 <div className="p-2">
                   <div className="flex items-center justify-between gap-1 text-[10px]">
                     <span className="font-semibold text-white/80">{a.formato === "story" ? "📲 Story" : a.videoUrl ? "🎬 Reels" : "🖼️ Feed"}</span>
-                    <span className={`rounded-full px-1.5 py-0.5 font-bold ${a.postado ? "bg-sky-600 text-white" : a.status === "rascunho" ? "bg-[#7c3aed]/25 text-[#d6c6ff]" : "bg-amber-500/20 text-amber-300"}`}>{a.postado ? "📮 Postado" : a.status === "rascunho" ? "💾 Salvo" : `⏰ ${dataBR(a.dataISO)}`}</span>
+                    <span className={`rounded-full px-1.5 py-0.5 font-bold ${a.postado ? "bg-sky-600 text-white" : a.status === "rascunho" ? "bg-[#7c3aed]/25 text-[#d6c6ff]" : "bg-amber-500/20 text-amber-300"}`}>{a.postado ? "📮 Postado" : a.status === "rascunho" ? "💾 Salvo" : `⏰ ${dataBR(a.dataISO)} às ${horaBR(a.dataISO)}`}</span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {!a.postado && <button type="button" onClick={() => postarArte(a)} disabled={proc === a.id} className="flex-1 rounded-md bg-[#C13584] px-2 py-1 text-[10px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">{proc === a.id ? `⏳ ${mmss(postSeg)}` : "📲 Postar agora"}</button>}
@@ -560,6 +571,13 @@ export function MinhaArte({ marcaId, bibliotecaMusicas = [], musicaBuffetUrl = "
               </div>
               );
             })}
+          </div>
+        )}
+        {totalPaginas > 1 && (
+          <div className="mt-4 flex items-center justify-center gap-2 text-xs">
+            <button type="button" onClick={() => { setCarregando(true); setPagina((p) => Math.max(1, p - 1)); }} disabled={pagina <= 1 || carregando} className="rounded-lg border border-linha px-3 py-1.5 font-semibold text-white transition hover:border-white/30 disabled:opacity-40">← Anterior</button>
+            <span className="text-muted">Página <strong className="text-white">{pagina}</strong> de {totalPaginas}</span>
+            <button type="button" onClick={() => { setCarregando(true); setPagina((p) => Math.min(totalPaginas, p + 1)); }} disabled={pagina >= totalPaginas || carregando} className="rounded-lg border border-linha px-3 py-1.5 font-semibold text-white transition hover:border-white/30 disabled:opacity-40">Próxima →</button>
           </div>
         )}
       </div>
