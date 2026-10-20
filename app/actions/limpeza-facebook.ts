@@ -112,17 +112,23 @@ export async function apagarRepetidosInstagram(marcaId: string, ids: string[]) {
   let doPerfil: Set<string>;
   try { doPerfil = new Set((await listarMidiasIG(c.conn, new Date(Date.now() - 31 * 86400_000))).map((m) => m.id)); }
   catch (e) { return { ok: false as const, erro: `Não consegui ler o perfil: ${e instanceof Error ? e.message : "erro"}` }; }
-  const lote = ids.filter((id) => typeof id === "string" && doPerfil.has(id)).slice(0, 8);
+  // O Instagram trava ("User is performing too many actions") se apagar rápido: aqui vai UM por vez
+  // e para no primeiro aviso de excesso — a tela espera e tenta de novo depois.
+  const lote = ids.filter((id) => typeof id === "string" && doPerfil.has(id)).slice(0, 3);
   let apagados = 0;
+  let limitado = false;
   const falhas: string[] = [];
-  for (let i = 0; i < lote.length; i += 4) {
-    const rs = await Promise.all(lote.slice(i, i + 4).map((id) => apagarMidiaIG(c.conn, id).catch((e) => ({ ok: false, erro: e instanceof Error ? e.message : "erro" }))));
-    for (const r of rs) {
-      if (r.ok || /does not exist|cannot be loaded/i.test(r.erro || "")) apagados++;
-      else falhas.push(r.erro || "erro");
-    }
+  let processados = 0;
+  for (const id of lote) {
+    const r = await apagarMidiaIG(c.conn, id).catch((e) => ({ ok: false, erro: e instanceof Error ? e.message : "erro" }));
+    if (r.ok || /does not exist|cannot be loaded/i.test(r.erro || "")) { apagados++; processados++; continue; }
+    if (/too many|rate limit|limit reached|try again later|#4\)|#17\)|#32\)|#613\)|#368\)/i.test(r.erro || "")) { limitado = true; break; }
+    falhas.push(r.erro || "erro");
+    processados++;
   }
-  const sumidos = ids.slice(0, 8).filter((id) => !doPerfil.has(id)).length; // já não estão no perfil
+  const pedidos = ids.slice(0, 3);
+  const sumidos = pedidos.filter((id) => !doPerfil.has(id)).length; // já não estão no perfil
+  processados += sumidos;
   if (apagados) await registrarAtividade(AGENTE, `Apaguei ${apagados} post(s) repetido(s) do Instagram de ${c.nome}.`, marcaId).catch(() => {});
-  return { ok: true as const, apagados: apagados + sumidos, falhas: falhas.slice(0, 3), processados: Math.min(8, ids.length) };
+  return { ok: true as const, apagados: apagados + sumidos, falhas: falhas.slice(0, 3), processados, limitado };
 }

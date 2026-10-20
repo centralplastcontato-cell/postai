@@ -18,7 +18,7 @@ export function LimpezaFacebook({ marcaId, rede = "facebook" }: { marcaId: strin
   const [info, setInfo] = useState("");
   const [erro, setErro] = useState("");
   const [confirmar, setConfirmar] = useState(false);
-  const [apagando, setApagando] = useState<{ feitos: number; total: number; falhas?: number; ultimaFalha?: string } | null>(null);
+  const [apagando, setApagando] = useState<{ feitos: number; total: number; falhas?: number; ultimaFalha?: string; pausa?: number } | null>(null);
 
   async function procurar() {
     setErro(""); setInfo(""); setGrupos(null); setConfirmar(false); setBuscando(true);
@@ -34,15 +34,35 @@ export function LimpezaFacebook({ marcaId, rede = "facebook" }: { marcaId: strin
     const ids = grupos.flatMap((g) => g.apagar.map((p) => p.id));
     setConfirmar(false); setErro(""); setApagando({ feitos: 0, total: ids.length });
     let feitos = 0, falhas = 0, ultimaFalha = "";
-    const LOTE = 8;
-    for (let i = 0; i < ids.length; i += LOTE) {
+    // Instagram: UM por vez com intervalo — se apagar rápido ele trava ("too many actions").
+    // Quando trava, a tela espera uns minutos e continua sozinha (desiste depois de várias travas seguidas).
+    const LOTE = ehIG ? 1 : 8;
+    const INTERVALO_IG = 8_000;
+    const ESPERAS_MIN = [5, 10, 20, 30];
+    let travasSeguidas = 0;
+    for (let i = 0; i < ids.length; ) {
       const pedaco = ids.slice(i, i + LOTE);
       let r = await apagarLote(marcaId, pedaco).catch(() => null);
       if (!r) r = await apagarLote(marcaId, pedaco).catch(() => null); // caiu? tenta o mesmo lote de novo
+      if (r && r.ok && "limitado" in r && r.limitado && r.processados === 0) {
+        if (travasSeguidas >= ESPERAS_MIN.length) {
+          setApagando(null);
+          setErro(`O Instagram travou as exclusões por excesso (proteção dele contra spam). Apaguei ${feitos} até agora. Espere algumas horas (ou até amanhã) e clique em Procurar de novo — ele continua de onde parou.`);
+          return;
+        }
+        const min = ESPERAS_MIN[travasSeguidas++];
+        for (let s = min * 60; s > 0; s--) {
+          setApagando({ feitos, total: ids.length, falhas, ultimaFalha, pausa: s });
+          await new Promise((ok) => setTimeout(ok, 1000));
+        }
+        continue; // tenta o MESMO post de novo
+      }
+      travasSeguidas = 0;
+      i += LOTE;
       if (!r || !r.ok) { falhas += pedaco.length; ultimaFalha = (r && "erro" in r && r.erro) || "a chamada caiu"; }
       else {
         feitos += r.apagados;
-        falhas += r.processados - r.apagados;
+        falhas += Math.max(0, pedaco.length - r.apagados);
         if (r.falhas[0]) ultimaFalha = r.falhas[0];
       }
       setApagando({ feitos, total: ids.length, falhas, ultimaFalha });
@@ -52,6 +72,7 @@ export function LimpezaFacebook({ marcaId, rede = "facebook" }: { marcaId: strin
         setErro(`A Meta não deixou apagar: falta a permissão de gerenciar conteúdo (${ehIG ? "instagram_manage_contents" : "pages_manage_posts"}) no token desta marca. Nada foi apagado. Erro: ${ultimaFalha}`);
         return;
       }
+      if (ehIG && i < ids.length) await new Promise((ok) => setTimeout(ok, INTERVALO_IG));
     }
     setApagando(null);
     setGrupos(null);
@@ -76,6 +97,8 @@ export function LimpezaFacebook({ marcaId, rede = "facebook" }: { marcaId: strin
       {apagando && (
         <div className="mt-3 text-sm">
           <p className="font-semibold text-amber-300">🧹 Apagando… {apagando.feitos} de {apagando.total}{apagando.falhas ? ` · ${apagando.falhas} com erro` : ""}</p>
+          {!!apagando.pausa && <p className="mt-0.5 text-xs text-amber-200">⏸ O Instagram pediu pra ir devagar — continuo sozinho em {Math.floor(apagando.pausa / 60)}:{String(apagando.pausa % 60).padStart(2, "0")}.</p>}
+          {ehIG && <p className="mt-0.5 text-xs text-muted">No Instagram vai um por vez, com intervalo (senão ele trava) — pode demorar uns minutos.</p>}
           <p className="mt-0.5 text-xs text-muted">Deixe esta tela aberta e o celular desbloqueado — se trocar de aba, o navegador pausa a limpeza.</p>
           {apagando.ultimaFalha && <p className="mt-0.5 text-xs text-red-400">Último erro: {apagando.ultimaFalha}</p>}
         </div>
