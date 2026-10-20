@@ -117,12 +117,13 @@ export async function apagarRepetidosInstagram(marcaId: string, ids: string[]) {
   const lote = ids.filter((id) => typeof id === "string" && doPerfil.has(id)).slice(0, 3);
   let apagados = 0;
   let limitado = false;
+  let aviso = "";
   const falhas: string[] = [];
   let processados = 0;
   for (const id of lote) {
     const r = await apagarMidiaIG(c.conn, id).catch((e) => ({ ok: false, erro: e instanceof Error ? e.message : "erro" }));
     if (r.ok || /does not exist|cannot be loaded/i.test(r.erro || "")) { apagados++; processados++; continue; }
-    if (/too many|rate limit|limit reached|try again later|#4\)|#17\)|#32\)|#613\)|#368\)/i.test(r.erro || "")) { limitado = true; break; }
+    if (/too many|rate limit|limit reached|try again later|#(4|17|32|613|368|80002)[)/]/i.test(r.erro || "")) { limitado = true; aviso = r.erro || ""; break; }
     falhas.push(r.erro || "erro");
     processados++;
   }
@@ -130,5 +131,5 @@ export async function apagarRepetidosInstagram(marcaId: string, ids: string[]) {
   const sumidos = pedidos.filter((id) => !doPerfil.has(id)).length; // já não estão no perfil
   processados += sumidos;
   if (apagados) await registrarAtividade(AGENTE, `Apaguei ${apagados} post(s) repetido(s) do Instagram de ${c.nome}.`, marcaId).catch(() => {});
-  return { ok: true as const, apagados: apagados + sumidos, falhas: falhas.slice(0, 3), processados, limitado };
+  return { ok: true as const, apagados: apagados + sumidos, falhas: falhas.slice(0, 3), processados, limitado, aviso };
 }

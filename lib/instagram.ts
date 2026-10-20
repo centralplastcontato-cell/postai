@@ -498,6 +498,10 @@ export async function listarMidiasIG(conn: ConexaoIG, desde: Date, limite = 600)
 }
 export async function apagarMidiaIG(conn: ConexaoIG, mediaId: string): Promise<{ ok: boolean; erro?: string }> {
   const r = await fetchMeta(`${GRAPH}/${mediaId}?access_token=${conn.accessToken}`, { method: "DELETE" });
-  const j = (await r.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string } };
-  return r.ok && j.success !== false ? { ok: true } : { ok: false, erro: j.error?.message || `Instagram respondeu ${r.status}` };
+  const j = (await r.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string; code?: number; error_subcode?: number; error_user_msg?: string } };
+  if (r.ok && j.success !== false) return { ok: true };
+  const e = j.error;
+  // leva o CÓDIGO junto (ex.: "#4/2207051") — a mesma frase da Meta pode ser trava de minutos ou de dias
+  const cod = e?.code ? ` (#${e.code}${e.error_subcode ? `/${e.error_subcode}` : ""})` : "";
+  return { ok: false, erro: `${e?.error_user_msg || e?.message || `Instagram respondeu ${r.status}`}${cod}` };
 }

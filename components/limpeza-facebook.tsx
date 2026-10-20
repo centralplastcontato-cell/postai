@@ -45,9 +45,10 @@ export function LimpezaFacebook({ marcaId, rede = "facebook" }: { marcaId: strin
       let r = await apagarLote(marcaId, pedaco).catch(() => null);
       if (!r) r = await apagarLote(marcaId, pedaco).catch(() => null); // caiu? tenta o mesmo lote de novo
       if (r && r.ok && "limitado" in r && r.limitado && r.processados === 0) {
+        if ("aviso" in r && r.aviso) ultimaFalha = String(r.aviso);
         if (travasSeguidas >= ESPERAS_MIN.length) {
           setApagando(null);
-          setErro(`O Instagram travou as exclusões por excesso (proteção dele contra spam). Apaguei ${feitos} até agora. Espere algumas horas (ou até amanhã) e clique em Procurar de novo — ele continua de onde parou.`);
+          setErro(`O Instagram travou as exclusões por excesso (proteção dele contra spam). Apaguei ${feitos} até agora. Aviso dele: ${ultimaFalha}. Espere algumas horas (ou até amanhã) e clique em Procurar de novo — ele continua de onde parou.`);
           return;
         }
         const min = ESPERAS_MIN[travasSeguidas++];
