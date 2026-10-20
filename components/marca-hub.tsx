@@ -211,6 +211,7 @@ export function MarcaHub({
             <div className="max-w-2xl space-y-4">
               <AutomacaoCard parte="chave" marcaId={marca.id} linkBase={linkBase} chave={apiChave} pendentes={pendentesApi ?? []} />
               <BackfillEngajamento marcaId={marca.id} />
+              {conectada && <LimpezaFacebook marcaId={marca.id} rede="instagram" />}
               {marca.fbPageId && <LimpezaFacebook marcaId={marca.id} />}
             </div>
             <MarcaForm marca={marca} />

@@ -1,13 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { previaRepetidosFacebook, apagarRepetidosFacebook, type GrupoRepetido } from "@/app/actions/limpeza-facebook";
+import { previaRepetidosFacebook, apagarRepetidosFacebook, previaRepetidosInstagram, apagarRepetidosInstagram, type GrupoRepetido } from "@/app/actions/limpeza-facebook";
 
 // 🧹 Limpar posts REPETIDOS do Facebook (só admin). 1) procura: agrupa os posts recentes da Página
 // pelo mesmo texto e mostra o que vai ficar (o mais antigo) e quantos vão sair; 2) apaga em lotes.
 const dataBR = (iso: string) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 
-export function LimpezaFacebook({ marcaId }: { marcaId: string }) {
+export function LimpezaFacebook({ marcaId, rede = "facebook" }: { marcaId: string; rede?: "facebook" | "instagram" }) {
+  const ehIG = rede === "instagram";
+  const previa = ehIG ? previaRepetidosInstagram : previaRepetidosFacebook;
+  const apagarLote = ehIG ? apagarRepetidosInstagram : apagarRepetidosFacebook;
+  const nomeRede = ehIG ? "Instagram" : "Facebook";
   const [dias, setDias] = useState(7);
   const [buscando, setBuscando] = useState(false);
   const [grupos, setGrupos] = useState<GrupoRepetido[] | null>(null);
@@ -18,7 +22,7 @@ export function LimpezaFacebook({ marcaId }: { marcaId: string }) {
 
   async function procurar() {
     setErro(""); setInfo(""); setGrupos(null); setConfirmar(false); setBuscando(true);
-    const r = await previaRepetidosFacebook(marcaId, dias).catch(() => null);
+    const r = await previa(marcaId, dias).catch(() => null);
     setBuscando(false);
     if (!r || !r.ok) { setErro((r && "erro" in r && r.erro) || "Não consegui procurar agora."); return; }
     setGrupos(r.grupos);
@@ -33,8 +37,8 @@ export function LimpezaFacebook({ marcaId }: { marcaId: string }) {
     const LOTE = 8;
     for (let i = 0; i < ids.length; i += LOTE) {
       const pedaco = ids.slice(i, i + LOTE);
-      let r = await apagarRepetidosFacebook(marcaId, pedaco).catch(() => null);
-      if (!r) r = await apagarRepetidosFacebook(marcaId, pedaco).catch(() => null); // caiu? tenta o mesmo lote de novo
+      let r = await apagarLote(marcaId, pedaco).catch(() => null);
+      if (!r) r = await apagarLote(marcaId, pedaco).catch(() => null); // caiu? tenta o mesmo lote de novo
       if (!r || !r.ok) { falhas += pedaco.length; ultimaFalha = (r && "erro" in r && r.erro) || "a chamada caiu"; }
       else {
         feitos += r.apagados;
@@ -45,13 +49,13 @@ export function LimpezaFacebook({ marcaId }: { marcaId: string }) {
     }
     setApagando(null);
     setGrupos(null);
-    setInfo(`🧹 Apaguei ${feitos} post(s) repetido(s) do Facebook.${falhas ? ` ${falhas} não consegui apagar (${ultimaFalha}) — clique em procurar de novo pra tentar.` : ""}`);
+    setInfo(`🧹 Apaguei ${feitos} post(s) repetido(s) do ${nomeRede}.${falhas ? ` ${falhas} não consegui apagar (${ultimaFalha}) — clique em procurar de novo pra tentar.` : ""}`);
   }
 
   return (
     <div className="rounded-xl border border-linha bg-preto-card p-4 sm:p-5">
-      <p className="text-sm font-semibold text-white">🧹 Limpar posts repetidos do Facebook</p>
-      <p className="mt-1 text-xs text-muted">Procura na Página posts com o <strong className="text-white/80">mesmo texto</strong> e apaga as cópias — fica sempre o <strong className="text-white/80">mais antigo</strong> de cada. Nada é apagado antes de você conferir a lista.</p>
+      <p className="text-sm font-semibold text-white">🧹 Limpar posts repetidos do {nomeRede}</p>
+      <p className="mt-1 text-xs text-muted">Procura {ehIG ? "no perfil" : "na Página"} posts com o <strong className="text-white/80">mesmo texto</strong> e apaga as cópias — fica sempre o <strong className="text-white/80">mais antigo</strong> de cada. Nada é apagado antes de você conferir a lista.</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <select value={dias} onChange={(e) => setDias(Number(e.target.value))} disabled={buscando || !!apagando} className="input-base w-auto text-sm">
           <option value={3}>últimos 3 dias</option>
@@ -91,7 +95,7 @@ export function LimpezaFacebook({ marcaId }: { marcaId: string }) {
             <button type="button" onClick={() => setConfirmar(true)} className="mt-3 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">Apagar {grupos.reduce((s, g) => s + g.apagar.length, 0)} repetido(s)</button>
           ) : (
             <div className="mt-3 rounded-lg border border-red-900/60 bg-red-950/30 p-3">
-              <p className="text-sm text-white">Apagar <strong>{grupos.reduce((s, g) => s + g.apagar.length, 0)}</strong> post(s) do Facebook? Os originais (mais antigos) ficam. <strong>Não dá pra desfazer.</strong></p>
+              <p className="text-sm text-white">Apagar <strong>{grupos.reduce((s, g) => s + g.apagar.length, 0)}</strong> post(s) do {nomeRede}? Os originais (mais antigos) ficam. <strong>Não dá pra desfazer.</strong></p>
               <div className="mt-2 flex gap-2">
                 <button type="button" onClick={() => setConfirmar(false)} className="rounded-lg border border-linha px-3 py-1.5 text-sm text-muted hover:text-white">Cancelar</button>
                 <button type="button" onClick={apagar} className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700">Sim, apagar</button>

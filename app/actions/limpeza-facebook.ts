@@ -6,6 +6,7 @@
 import { prisma } from "@/lib/prisma";
 import { exigirAdmin } from "@/lib/acesso";
 import { listarPostsPagina, apagarPostPagina, tokenDaPagina } from "@/lib/facebook";
+import { listarMidiasIG, apagarMidiaIG } from "@/lib/instagram";
 import { registrarAtividade } from "@/lib/atividade";
 import { AGENTE } from "@/lib/config";
 
@@ -67,4 +68,61 @@ export async function apagarRepetidosFacebook(marcaId: string, ids: string[]) {
   }
   if (apagados) await registrarAtividade(AGENTE, `Apaguei ${apagados} post(s) repetido(s) do Facebook de ${c.nome}.`, marcaId).catch(() => {});
   return { ok: true as const, apagados, falhas: falhas.slice(0, 3), processados: lote.length };
+}
+
+// ---------- o MESMO, no perfil do INSTAGRAM ----------
+async function conexaoIG(marcaId: string) {
+  const m = await prisma.marca.findUnique({ where: { id: marcaId }, select: { igUserId: true, accessToken: true, nome: true } });
+  if (!m?.igUserId || !m.accessToken) return null;
+  return { conn: { igUserId: m.igUserId, accessToken: m.accessToken }, nome: m.nome };
+}
+export async function previaRepetidosInstagram(marcaId: string, dias = 7) {
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const c = await conexaoIG(marcaId);
+  if (!c) return { ok: false as const, erro: "Esta marca não tem o Instagram conectado." };
+  try {
+    const desde = new Date(Date.now() - Math.max(1, Math.min(30, dias)) * 86400_000);
+    const midias = await listarMidiasIG(c.conn, desde);
+    const grupos = new Map<string, typeof midias>();
+    for (const m of midias) {
+      if (!m.legenda.trim()) continue; // sem legenda não dá pra saber se é repetido — não mexe
+      const k = chave(m.legenda);
+      grupos.set(k, [...(grupos.get(k) || []), m]);
+    }
+    const repetidos: GrupoRepetido[] = [];
+    for (const lista of grupos.values()) {
+      if (lista.length < 2) continue;
+      const ord = [...lista].sort((a, b) => a.criadoEm.localeCompare(b.criadoEm));
+      const [manter, ...resto] = ord;
+      repetidos.push({ mensagem: manter.legenda.slice(0, 140), manter: { id: manter.id, criadoEm: manter.criadoEm, imagem: manter.imagem, link: manter.link }, apagar: resto.map((p) => ({ id: p.id, criadoEm: p.criadoEm })) });
+    }
+    repetidos.sort((a, b) => b.apagar.length - a.apagar.length);
+    return { ok: true as const, analisados: midias.length, grupos: repetidos, totalApagar: repetidos.reduce((s, x) => s + x.apagar.length, 0) };
+  } catch (e) {
+    return { ok: false as const, erro: `Não consegui ler os posts do Instagram: ${e instanceof Error ? e.message : "erro"}` };
+  }
+}
+export async function apagarRepetidosInstagram(marcaId: string, ids: string[]) {
+  const g = await exigirAdmin();
+  if (!g.ok) return { ok: false as const, erro: g.erro };
+  const c = await conexaoIG(marcaId);
+  if (!c) return { ok: false as const, erro: "Esta marca não tem o Instagram conectado." };
+  // só apaga o que está MESMO no perfil desta marca (confere na lista recente)
+  let doPerfil: Set<string>;
+  try { doPerfil = new Set((await listarMidiasIG(c.conn, new Date(Date.now() - 31 * 86400_000))).map((m) => m.id)); }
+  catch (e) { return { ok: false as const, erro: `Não consegui ler o perfil: ${e instanceof Error ? e.message : "erro"}` }; }
+  const lote = ids.filter((id) => typeof id === "string" && doPerfil.has(id)).slice(0, 8);
+  let apagados = 0;
+  const falhas: string[] = [];
+  for (let i = 0; i < lote.length; i += 4) {
+    const rs = await Promise.all(lote.slice(i, i + 4).map((id) => apagarMidiaIG(c.conn, id).catch((e) => ({ ok: false, erro: e instanceof Error ? e.message : "erro" }))));
+    for (const r of rs) {
+      if (r.ok || /does not exist|cannot be loaded/i.test(r.erro || "")) apagados++;
+      else falhas.push(r.erro || "erro");
+    }
+  }
+  const sumidos = ids.slice(0, 8).filter((id) => !doPerfil.has(id)).length; // já não estão no perfil
+  if (apagados) await registrarAtividade(AGENTE, `Apaguei ${apagados} post(s) repetido(s) do Instagram de ${c.nome}.`, marcaId).catch(() => {});
+  return { ok: true as const, apagados: apagados + sumidos, falhas: falhas.slice(0, 3), processados: Math.min(8, ids.length) };
 }

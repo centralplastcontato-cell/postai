@@ -474,3 +474,30 @@ export async function buscarStoriesIG(conn: ConexaoIG): Promise<StoryIG[]> {
     return j.data.map((s) => ({ id: s.id || "", tipo: s.media_type || "IMAGE", imagem: imagemDe(s), permalink: s.permalink || "", data: s.timestamp || "" }));
   } catch { return []; }
 }
+
+// ---------- LIMPEZA de posts repetidos no perfil do Instagram ----------
+// A Meta liberou em dez/2025 apagar mídia pela API (Instagram com login do Facebook: DELETE
+// /{ig-media-id}, permissão instagram_manage_contents). Se o token não tiver essa permissão, a
+// Meta devolve erro e a tela mostra.
+export type MidiaIG = { id: string; legenda: string; criadoEm: string; imagem: string | null; link: string | null };
+export async function listarMidiasIG(conn: ConexaoIG, desde: Date, limite = 600): Promise<MidiaIG[]> {
+  const out: MidiaIG[] = [];
+  let url: string | null = `${GRAPH}/${conn.igUserId}/media?fields=id,caption,timestamp,media_type,media_url,thumbnail_url,permalink&limit=100&access_token=${conn.accessToken}`;
+  while (url && out.length < limite) {
+    const r: Response = await fetchMeta(url, { cache: "no-store" });
+    const j = (await r.json().catch(() => ({}))) as { data?: { id: string; caption?: string; timestamp: string; media_type?: string; media_url?: string; thumbnail_url?: string; permalink?: string }[]; paging?: { next?: string }; error?: { message?: string } };
+    if (!r.ok) throw new Error(j.error?.message || `Instagram respondeu ${r.status}`);
+    let passou = false;
+    for (const m of j.data || []) {
+      if (new Date(m.timestamp).getTime() < desde.getTime()) { passou = true; break; } // vem do mais novo pro mais antigo
+      out.push({ id: m.id, legenda: m.caption || "", criadoEm: m.timestamp, imagem: m.media_type === "VIDEO" ? m.thumbnail_url || null : m.media_url || null, link: m.permalink || null });
+    }
+    url = passou ? null : j.paging?.next || null;
+  }
+  return out.slice(0, limite);
+}
+export async function apagarMidiaIG(conn: ConexaoIG, mediaId: string): Promise<{ ok: boolean; erro?: string }> {
+  const r = await fetchMeta(`${GRAPH}/${mediaId}?access_token=${conn.accessToken}`, { method: "DELETE" });
+  const j = (await r.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string } };
+  return r.ok && j.success !== false ? { ok: true } : { ok: false, erro: j.error?.message || `Instagram respondeu ${r.status}` };
+}
