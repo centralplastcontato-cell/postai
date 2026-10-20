@@ -178,7 +178,8 @@ async function postarCarrossel(m: { id: string; nome: string; igUserId: string |
     if (!(await claimCarrossel(c.id))) return; // já pego ou banco falhou — não duplica
 
     const legenda = `${c.legenda}\n\n${c.hashtags}`.trim().slice(0, 2200);
-    const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, urls, legenda);
+    // já falhou antes? confere no perfil se não saiu mesmo assim (evita cópia)
+    const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, urls, legenda, c.erroPostagem ? { conferirSeJaSaiuDesde: c.createdAt ?? c.data } : {});
     if (r.ig.ok) {
       const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
       await registrarAtividade(AGENTE, `Postei "${c.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});
@@ -200,7 +201,7 @@ async function postarFeed(m: { id: string; nome: string; igUserId: string | null
     if (!(await claimPublicacao(p.id))) return;
 
     const legenda = `${p.legenda}\n\n${p.hashtags}`.trim().slice(0, 2200);
-    const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, [imagemApi(p) ?? `${base}/api/feed/${p.id}?v=${tokenArte(p)}`], legenda);
+    const r = await publicarNasRedes(m as { igUserId: string; accessToken: string; fbPageId?: string }, [imagemApi(p) ?? `${base}/api/feed/${p.id}?v=${tokenArte(p)}`], legenda, p.erroPostagem ? { conferirSeJaSaiuDesde: p.createdAt ?? p.data } : {});
     if (r.ig.ok) {
       const onde = r.fb ? (r.fb.ok ? "Instagram + Facebook" : `Instagram (Facebook falhou: ${r.fb.erro})`) : "Instagram";
       await registrarAtividade(AGENTE, `Postei "${p.titulo}" no ${onde} de ${m.nome} (auto).`, m.id).catch(() => {});

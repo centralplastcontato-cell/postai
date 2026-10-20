@@ -110,15 +110,49 @@ export async function materializarArtes(urls: string[]): Promise<string[]> {
  * Publica um carrossel (2 a 10 imagens) ou imagem única (1) no Instagram da marca.
  * Recebe URLs JÁ MATERIALIZADAS (PNG estático) — ver publicarNasRedes.
  */
+// ---------- ANTI-DUPLICATA ----------
+// A Meta às vezes devolve ERRO no media_publish ("Fatal") mas PUBLICA mesmo assim — e cada nova
+// tentativa do piloto virava mais uma cópia no Instagram. Por isso: (1) depois de um erro no
+// publish, confere se o container saiu (status PUBLISHED); (2) antes de tentar de novo um post que
+// já falhou, procura no perfil um post recente com a MESMA legenda.
+const legendaChave = (s: string) => String(s || "").replace(/\s+/g, " ").trim().slice(0, 200).toLowerCase();
+export async function midiaComMesmaLegenda(conn: ConexaoIG, legenda: string, desde?: Date): Promise<{ mediaId: string; permalink: string | null } | null> {
+  try {
+    const r = await fetchMeta(`${GRAPH}/${conn.igUserId}/media?fields=id,caption,timestamp,permalink&limit=30&access_token=${conn.accessToken}`, { cache: "no-store" });
+    const j = (await r.json().catch(() => ({}))) as { data?: { id: string; caption?: string; timestamp?: string; permalink?: string }[] };
+    const alvo = legendaChave(legenda);
+    if (!alvo) return null;
+    const achou = (j.data || []).find((m) => legendaChave(m.caption || "") === alvo && (!desde || !m.timestamp || new Date(m.timestamp).getTime() >= desde.getTime() - 3600_000));
+    return achou ? { mediaId: achou.id, permalink: achou.permalink ?? null } : null;
+  } catch {
+    return null;
+  }
+}
+async function containerPublicado(conn: ConexaoIG, containerId: string): Promise<boolean> {
+  try {
+    const r = await fetchMeta(`${GRAPH}/${containerId}?fields=status_code&access_token=${conn.accessToken}`, { cache: "no-store" });
+    const j = (await r.json().catch(() => ({}))) as { status_code?: string };
+    return j.status_code === "PUBLISHED";
+  } catch {
+    return false;
+  }
+}
+
 export async function publicar(
   conn: ConexaoIG,
   urls: string[],
-  legenda: string
+  legenda: string,
+  opts: { conferirSeJaSaiuDesde?: Date } = {}
 ): Promise<ResultadoPostagem> {
   if (!marcaConectada(conn)) {
     return { ok: false, erro: "Marca sem conexão com o Instagram (falta IG User ID e token)." };
   }
   if (urls.length === 0) return { ok: false, erro: "Nada pra postar (sem imagens)." };
+  // post que JÁ FALHOU antes: pode ter saído mesmo com erro — se já está no perfil, não posta de novo
+  if (opts.conferirSeJaSaiuDesde) {
+    const ja = await midiaComMesmaLegenda(conn, legenda, opts.conferirSeJaSaiuDesde);
+    if (ja) return { ok: true, mediaId: ja.mediaId, permalink: ja.permalink };
+  }
 
   try {
     let containerId: string;
@@ -162,6 +196,13 @@ export async function publicar(
       }
     }
     if (!mediaId) {
+      // a Meta disse erro… mas às vezes publicou: confere antes de devolver falha (senão o piloto repete)
+      await espera(4000);
+      if (await containerPublicado(conn, containerId)) {
+        const saiu = await midiaComMesmaLegenda(conn, legenda);
+        if (saiu) return { ok: true, mediaId: saiu.mediaId, permalink: saiu.permalink };
+        return { ok: true, mediaId: containerId, permalink: null };
+      }
       return { ok: false, erro: `Não consegui publicar após criar o conteúdo: ${ultimoErro}` };
     }
 
@@ -191,7 +232,8 @@ export type ResultadoRedes = { ig: ResultadoPostagem; fb?: ResultadoFB };
 export async function publicarNasRedes(
   marca: { igUserId: string; accessToken: string; fbPageId?: string },
   urlsAbsolutas: string[],
-  legenda: string
+  legenda: string,
+  opts: { conferirSeJaSaiuDesde?: Date } = {}
 ): Promise<ResultadoRedes> {
   let estaticas: string[];
   try {
@@ -200,7 +242,7 @@ export async function publicarNasRedes(
     const erro = e instanceof Error ? `Não consegui preparar as artes: ${e.message}` : "Falha ao preparar as artes.";
     return { ig: { ok: false, erro } };
   }
-  const ig = await publicar({ igUserId: marca.igUserId, accessToken: marca.accessToken }, estaticas, legenda);
+  const ig = await publicar({ igUserId: marca.igUserId, accessToken: marca.accessToken }, estaticas, legenda, opts);
   let fb: ResultadoFB | undefined;
   // Facebook é ESPELHO do Instagram: só publica se o Instagram deu certo. Antes, com o Instagram
   // falhando, o piloto tentava de novo a cada passada e o Facebook recebia o post repetido.
