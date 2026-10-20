@@ -46,6 +46,12 @@ export function LimpezaFacebook({ marcaId, rede = "facebook" }: { marcaId: strin
         if (r.falhas[0]) ultimaFalha = r.falhas[0];
       }
       setApagando({ feitos, total: ids.length, falhas, ultimaFalha });
+      // sem PERMISSÃO pra apagar (erro #10/#200 da Meta): não adianta continuar — para e explica
+      if (feitos === 0 && /permission|#10\)|#200\)/i.test(ultimaFalha)) {
+        setApagando(null);
+        setErro(`A Meta não deixou apagar: falta a permissão de gerenciar conteúdo (${ehIG ? "instagram_manage_contents" : "pages_manage_posts"}) no token desta marca. Nada foi apagado. Erro: ${ultimaFalha}`);
+        return;
+      }
     }
     setApagando(null);
     setGrupos(null);
