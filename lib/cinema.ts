@@ -129,7 +129,7 @@ const curto = (v: unknown, max: number) => typeof v === "string" && v.trim().len
 export function validarCinema(r: Resposta, tema: TemaCinema, fotos: Set<string>, faixa: { min: number; max: number }): string[] {
   const erros: string[] = [];
   const cenas = Array.isArray(r?.cenas) ? r.cenas : [];
-  if (cenas.length < 5 || cenas.length > 9) erros.push(`Use de 5 a 9 cenas (veio ${cenas.length}).`);
+  if (cenas.length < 5 || cenas.length > 8) erros.push(`Use de 6 a 8 cenas (veio ${cenas.length}).`);
   if (!cenas.length) return erros;
   const tipos = cenas.map((c) => c?.tipo as TipoCena);
   tipos.forEach((t, i) => { if (!TIPOS.includes(t)) erros.push(`Cena ${i + 1}: tipo "${t}" não existe.`); });
@@ -191,7 +191,8 @@ export function validarCinema(r: Resposta, tema: TemaCinema, fotos: Set<string>,
   return erros;
 }
 // Problemas que não seguram o vídeo na última tentativa (só tamanho um pouco fora).
-export const soDetalhesCinema = (erros: string[]) => erros.every((e) => /palavras|capa/.test(e));
+// O tamanho da fala é acertado depois, na voz (a Bia encurta sozinha) — então não segura o roteiro.
+export const soDetalhesCinema = (erros: string[]) => erros.every((e) => /palavras|capa|telinhas/.test(e));
 
 // Roteiro final: o sistema completa os dados das cenas que vêm do cadastro (oferta, prazo,
 // depoimento, botão) — esses textos nunca passam pela Bia, saem exatamente como o dono escreveu.
@@ -301,7 +302,7 @@ ${cenasExtras}
 REGRAS:
 - Cena 1 = "notificacao" ou "foto" (sempre com foto real). Nunca 3 "telinhas" seguidas (conversa/checklist/oferta/prazo/depoimento): intercale com cenas de foto. Pelo menos 3 cenas com foto. Cada tipo uma vez só (foto pode repetir).
 - Fotos: use o id EXATO da lista; não repita foto (a final pode repetir a melhor). Prefira fotos com crianças, festa acontecendo, salão decorado. Nunca abra com fachada ou foto vazia.
-- Fala: narração informal, frases curtas, "você" (nunca "cê"), números e datas POR EXTENSO. De 6 a 22 palavras por cena. A narração INTEIRA soma entre ${faixa.min} e ${faixa.max} palavras — CONTE antes de responder.
+- Fala: narração informal, frases curtas, "você" (nunca "cê"), números e datas POR EXTENSO. Cada fala com 6 a ${Math.max(10, Math.floor(faixa.max / 7))} palavras. A narração INTEIRA soma entre ${faixa.min} e ${faixa.max} palavras (mire em ${Math.round((faixa.min + faixa.max) / 2)}) — CONTE antes de responder; se passar, corte palavras.
 - Destaques: em cada cena, 1 ou 2 palavras DA PRÓPRIA FALA que levam a emoção (ex: "tudo", "hoje", "data"). Elas aparecem em itálico, na cor da marca.
 - A tela complementa a fala: a fala conta, a telinha mostra.
 

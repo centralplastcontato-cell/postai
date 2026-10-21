@@ -120,6 +120,8 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
     setOcupado("roteiro");
     const s = await salvarTemaCinema(videoId, temaAtual()).catch(() => null);
     if (!s || !s.ok) { setOcupado(""); setMsg({ tipo: "erro", txt: (s && "erro" in s && s.erro) || "Não consegui salvar." }); return; }
+    // mudou a ideia/oferta/fotos → o roteiro antigo foi descartado no servidor; some da tela também
+    if (s.roteiroZerado) { setRoteiro(null); setAudio(null); setTemTempos(false); setPasso(1); }
     let correcao: { rascunho: string; erros: string[] } | undefined;
     let quedas = 0;
     for (let tentativa = 1; tentativa <= 3; tentativa++) {
@@ -143,7 +145,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
       return;
     }
     setOcupado("");
-    setMsg({ tipo: "erro", txt: `A Bia não fechou um roteiro que passasse na conferência. Problemas: ${correcao?.erros.slice(0, 3).join(" ")} — tente de novo.` });
+    setMsg({ tipo: "erro", txt: `A Bia não fechou um roteiro que passasse na conferência (${correcao?.erros.slice(0, 2).join(" ")}). Toque de novo em "Bia, escreve o roteiro".` });
   }
 
   async function salvarFala() {

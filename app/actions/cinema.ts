@@ -234,7 +234,7 @@ Escreva o roteiro.`;
     const usadas = new Set((resposta.cenas || []).map((x) => x?.foto || ""));
     for (const f of doDono) if (!usadas.has(f.id)) erros.push(`Use a foto "${f.id}" — o dono escolheu ela pro vídeo.`);
   }
-  if (erros.length && !(ultimaTentativa && soDetalhesCinema(erros))) return { ok: false as const, reprovado: true as const, rascunho: texto, erros };
+  if (erros.length && !((ultimaTentativa || correcao) && soDetalhesCinema(erros))) return { ok: false as const, reprovado: true as const, rascunho: texto, erros };
   const roteiro = montarRoteiroCinema(resposta, tema, hojeSP());
   await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(roteiro), narracaoTexto: narracaoCinema(roteiro) } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
