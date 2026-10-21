@@ -328,7 +328,19 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
       videoTextos: (() => { try { const m = JSON.parse(v.videoTextos || "{}"); return m && typeof m === "object" && !Array.isArray(m) ? (m as Record<string, string>) : {}; } catch { return {}; } })(),
       narracao: { texto: v.narracaoTexto, voz: v.narracaoVoz, estilo: v.narracaoEstilo, url: v.narracaoUrl, segundos: v.narracaoSeg },
       capaUrl: (() => {
-        const raw = (v.videoCapa && urlDaFoto.get(v.videoCapa)) || (ids[0] && urlDaFoto.get(ids[0])) || null;
+        // vídeo cinema/anúncio não tem lista de fotos: a miniatura é a foto da 1ª cena do roteiro
+        const doRoteiro = (() => {
+          if (v.modo !== "cinema" && v.modo !== "colagem") return "";
+          try {
+            const r = JSON.parse(v.colagemRoteiro || "{}") as { cenas?: { foto?: string; elementos?: { tipo?: string; asset?: string }[] }[] };
+            for (const c of r.cenas || []) {
+              const id = c.foto || c.elementos?.find((e) => e.tipo === "foto")?.asset || "";
+              if (id && urlDaFoto.get(id)) return id;
+            }
+          } catch {}
+          return "";
+        })();
+        const raw = (v.videoCapa && urlDaFoto.get(v.videoCapa)) || (ids[0] && urlDaFoto.get(ids[0])) || (doRoteiro && urlDaFoto.get(doRoteiro)) || null;
         // Capa ESTILIZADA (impacto/ia/recortado): a miniatura é o QUADRO 0 renderizado (a capa de
         // verdade), não a foto crua. O ?v muda quando algo da capa muda (pra a CDN atualizar).
         const temMascoteVideo = Boolean(marca.mascoteUrl) && ["dir", "esq", "cima-dir", "cima-esq"].includes(v.mascoteCanto || "");
