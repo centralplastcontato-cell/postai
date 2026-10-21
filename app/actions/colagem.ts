@@ -20,9 +20,10 @@ import { gerarNarracaoMp3 } from "@/lib/narracao";
 import { vozValida, VOZ_PADRAO } from "@/lib/vozes";
 import { dispararMotorColagem } from "@/lib/video-engine";
 import { baseUrl } from "@/lib/config";
+import { tempoDasPalavras } from "@/lib/tempo-palavras";
 import {
   garantirOferta, completarCenas, narracaoCompleta, alinharTempos, contarPalavras, prazoCurto, faixaPelaVelocidade, DURACAO,
-  type Oferta, type Roteiro, type FotoInfo, type PalavraFalada,
+  type Oferta, type Roteiro, type FotoInfo,
 } from "@/lib/colagem";
 import { ATOS_MOLDE, moldePorId, sortearMoldes, sortearMascote, validarMoldes, soDetalhesMoldes, montarRoteiroMoldes, promptBiaMoldes, type Ato, type RespostaMoldes } from "@/lib/moldes";
 
@@ -308,28 +309,6 @@ Escreva o roteiro.`;
 }
 
 // ---------- 3. voz + tempo de cada palavra ----------
-async function tempoDasPalavras(audioUrl: string): Promise<PalavraFalada[]> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return [];
-  try {
-    const audio = await fetch(audioUrl, { signal: AbortSignal.timeout(20000) });
-    if (!audio.ok) return [];
-    const form = new FormData();
-    form.append("file", new Blob([await audio.arrayBuffer()], { type: "audio/mpeg" }), "narracao.mp3");
-    form.append("model", "whisper-1");
-    form.append("language", "pt");
-    form.append("response_format", "verbose_json");
-    form.append("timestamp_granularities[]", "word");
-    const r = await fetch("https://api.openai.com/v1/audio/transcriptions", { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: form, signal: AbortSignal.timeout(45000) });
-    if (!r.ok) { console.error("Whisper", r.status, await r.text().catch(() => "")); return []; }
-    const d = await r.json();
-    return Array.isArray(d.words) ? (d.words as PalavraFalada[]) : [];
-  } catch (e) {
-    console.error("Whisper falhou (uso tempo estimado):", e);
-    return [];
-  }
-}
-
 export async function gerarVozColagem(videoId: string, vozId?: string, direcao?: string) {
   const c = await carregar(videoId);
   if (!c.ok) return c;
