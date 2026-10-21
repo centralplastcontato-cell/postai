@@ -216,6 +216,27 @@ const tokens = (s: string) => s.trim().split(/\s+/).filter(Boolean);
 const chave = (s: string) => normalizar(s).replace(/\s+/g, "");
 const casa = (a: string, b: string) => !!a && !!b && (a === b || (b.length >= 3 && a.startsWith(b)) || (a.length >= 4 && b.startsWith(a)));
 
+// Número por extenso (até 999.999) — pra casar "2026" falado com "dois mil e vinte e seis" escrito.
+const UNI = ["zero", "um", "dois", "tres", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"];
+const DEZ = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+const CEN = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"];
+function extenso(n: number): string {
+  if (n < 20) return UNI[n];
+  if (n < 100) return DEZ[Math.floor(n / 10)] + (n % 10 ? ` e ${UNI[n % 10]}` : "");
+  if (n === 100) return "cem";
+  if (n < 1000) return CEN[Math.floor(n / 100)] + (n % 100 ? ` e ${extenso(n % 100)}` : "");
+  if (n < 1_000_000) {
+    const mil = Math.floor(n / 1000), resto = n % 1000;
+    return `${mil === 1 ? "" : `${extenso(mil)} `}mil${resto ? ` e ${extenso(resto)}` : ""}`.trim();
+  }
+  return String(n);
+}
+function soletrar(s: string): string[] {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/(\d+)/g, (x) => ` ${extenso(Number(x))} `)
+    .replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+}
+
 // Casa cada palavra ESCRITA com a FALADA (Whisper), na ordem; o que não casar é estimado entre as
 // vizinhas. Sem Whisper, espalha pelo áudio proporcional ao tamanho das palavras.
 export function alinharCinema(r: RoteiroCinema, falada: PalavraFalada[], segundos: number): RoteiroCinema {
@@ -224,13 +245,31 @@ export function alinharCinema(r: RoteiroCinema, falada: PalavraFalada[], segundo
   const todas = escritas.flat();
   const tempos: ({ s: number; e: number } | null)[] = [];
   if (fw.length) {
-    let j = 0;
-    for (const w of todas) {
-      const k = chave(w);
-      let achou: { s: number; e: number } | null = null;
-      for (let x = j; x < Math.min(fw.length, j + 6); x++) if (casa(fw[x].k, k) || casa(k, fw[x].k)) { achou = { s: fw[x].s, e: fw[x].e }; j = x + 1; break; }
-      tempos.push(achou);
+    // Casamento por SEQUÊNCIA (a maior sequência em comum entre o texto e o que foi falado), palavra
+    // por palavra já "soletrada": "31" do Whisper vira "trinta e um", "2026" vira "dois mil e vinte
+    // e seis" — senão o texto ("trinta e um de outubro") não casava e a legenda escorregava.
+    const falados: { t: string; s: number; e: number }[] = [];
+    for (const w of falada) {
+      const ts = soletrar(w.word);
+      ts.forEach((t, k) => falados.push({ t, s: w.start + ((w.end - w.start) * k) / ts.length, e: w.start + ((w.end - w.start) * (k + 1)) / ts.length }));
     }
+    const escritos: { t: string; dono: number }[] = [];
+    todas.forEach((w, i) => soletrar(w).forEach((t) => escritos.push({ t, dono: i })));
+    const n = escritos.length, m = falados.length;
+    const igual = (a: string, b: string) => a === b || (a.length >= 4 && b.length >= 4 && (a.startsWith(b) || b.startsWith(a)));
+    const dp: Uint16Array[] = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+    for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = igual(escritos[i].t, falados[j].t) ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    const achado: ({ s: number; e: number } | null)[] = todas.map(() => null);
+    for (let i = 0, j = 0; i < n && j < m; ) {
+      if (igual(escritos[i].t, falados[j].t)) {
+        const d = escritos[i].dono;
+        if (!achado[d]) achado[d] = { s: falados[j].s, e: falados[j].e };
+        else achado[d] = { s: achado[d]!.s, e: falados[j].e };
+        i++; j++;
+      } else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
+      else j++;
+    }
+    tempos.push(...achado);
   } else {
     const pesos = todas.map((w) => 0.6 + chave(w).length * 0.12);
     const soma = pesos.reduce((a, b) => a + b, 0) || 1;

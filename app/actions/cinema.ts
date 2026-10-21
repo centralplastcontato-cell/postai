@@ -377,9 +377,16 @@ export async function montarVideoCinema(videoId: string) {
   if (!c.ok) return c;
   const { v } = c;
   if (v.videoUrl === "gerando") return { ok: false as const, erro: "Já estou montando esse vídeo — aguarde um pouquinho." };
-  const roteiro = lerRoteiroCinema(v.colagemRoteiro);
+  let roteiro = lerRoteiroCinema(v.colagemRoteiro);
   if (!roteiro) return { ok: false as const, erro: "Peça o roteiro pra Bia primeiro." };
   if (!v.narracaoUrl.startsWith("http") || !temTemposCinema(roteiro)) return { ok: false as const, erro: "Gere a voz antes de montar o vídeo." };
+  // confere de novo o tempo de cada palavra com a voz salva (garante legenda e cenas no ritmo da fala)
+  const falada = await tempoDasPalavras(v.narracaoUrl);
+  if (falada.length) {
+    const seg = Math.max(v.narracaoSeg, (falada[falada.length - 1]?.end || 0) + 1.2);
+    roteiro = alinharCinema(roteiro, falada, seg);
+    await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(roteiro) } }).catch(() => {});
+  }
 
   // LGPD: só fotos desta marca, soltas ou de festa autorizada.
   const ids = [...new Set(roteiro.cenas.map((x) => x.foto || "").filter(Boolean))];
