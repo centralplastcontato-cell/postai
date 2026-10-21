@@ -67,6 +67,8 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
   }
   const [capaUrl, setCapaUrl] = useState<string | null>(null);
   const [marcadas, setMarcadas] = useState<string[]>([]);
+  const [passo, setPasso] = useState(1); // etapa do passo a passo (1 Ideia … 5 Vídeo)
+  const [comOferta, setComOferta] = useState(false);
 
   async function recarregar() {
     const d = await dadosVideoCinema(videoId).catch(() => null);
@@ -86,6 +88,9 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
     setVideoUrl(d.videoUrl);
     setCapaTitulo(d.roteiro?.capa?.titulo || "");
     setCapaUrl(d.capaUrl);
+    setComOferta(!!d.tema.principal);
+    // abre na etapa onde o vídeo parou
+    setPasso(d.videoUrl === "gerando" || d.videoUrl.startsWith("http") ? 5 : d.temTempos ? 4 : d.roteiro ? 2 : 1);
   }
   useEffect(() => { recarregar(); }, [videoId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -104,7 +109,9 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
 
   const temaAtual = (): TemaCinema => ({
     ...tema,
-    extras: extrasTxt.map((x) => x.trim()).filter(Boolean),
+    principal: comOferta ? tema.principal : "",
+    prazo: comOferta ? tema.prazo : "",
+    extras: comOferta ? extrasTxt.map((x) => x.trim()).filter(Boolean) : [],
     depoimento: comDepoimento && !tema.depoimentoAuto ? tema.depoimento : { nome: "", texto: "", fonte: "" },
   });
 
@@ -126,7 +133,8 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
         setTemTempos(false);
         const d = await dadosVideoCinema(videoId).catch(() => null);
         if (d?.ok) { setFotos(d.fotos); setCapaTitulo(d.roteiro?.capa?.titulo || ""); setCapaUrl(d.capaUrl); }
-        setMsg({ tipo: "ok", txt: `✓ Roteiro pronto (${r.palavras} palavras, ${r.roteiro.cenas.length} cenas). Confira, mude o que quiser e gere a voz.` });
+        setPasso(2);
+        setMsg({ tipo: "ok", txt: `✓ Roteiro pronto (${r.roteiro.cenas.length} cenas). Confira e mude o que quiser.` });
         return;
       }
       if (r && "reprovado" in r && r.reprovado) { correcao = { rascunho: r.rascunho, erros: r.erros }; continue; }
@@ -244,216 +252,305 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
 
   const passoTema = tema.tema.trim().length >= 5;
   const travado = !!ocupado || videoUrl === "gerando";
+  // até onde dá pra ir no passo a passo (cada etapa destrava a próxima)
+  const liberado = [true, !!roteiro, !!roteiro, !!roteiro && temTempos, !!roteiro && temTempos];
+  const ETAPAS = [
+    { n: 1, nome: "Ideia", emoji: "💡" },
+    { n: 2, nome: "Roteiro", emoji: "✍️" },
+    { n: 3, nome: "Voz", emoji: "🎙️" },
+    { n: 4, nome: "Capa", emoji: "🖼️" },
+    { n: 5, nome: "Vídeo", emoji: "🎬" },
+  ];
+  const depoModo = tema.depoimentoAuto ? "auto" : comDepoimento ? "eu" : "nao";
+  const chip = (ativo: boolean) => `rounded-full border px-3 py-1.5 text-xs font-semibold transition ${ativo ? "border-amber-400 bg-amber-500/20 text-amber-100" : "border-linha text-muted hover:border-white/30 hover:text-white"}`;
+  const cartao = "rounded-2xl border border-linha bg-white/[0.02] p-4";
+  const titulo2 = "text-sm font-bold text-white";
+  const ajuda = "mt-0.5 text-xs text-muted";
+
+  async function proximoDaIdeia() {
+    if (roteiro) { setPasso(2); return; }
+    await escreverRoteiro();
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/85 p-0 sm:items-center sm:p-4" onClick={() => !ocupado && onFechar()}>
-      <div onClick={(e) => e.stopPropagation()} className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden bg-preto-card sm:rounded-2xl sm:border sm:border-linha">
-        <div className="flex items-center justify-between gap-2 border-b border-linha px-4 py-3">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-white">🎥 Vídeo cinema — {titulo}</p>
-            <p className="text-[11px] text-muted">Comercial com fotos reais, legenda no ritmo da voz e telinhas animadas.</p>
+      <div onClick={(e) => e.stopPropagation()} className="flex max-h-full w-full max-w-2xl flex-col overflow-hidden bg-preto-card sm:rounded-2xl sm:border sm:border-linha">
+        {/* topo: título + etapas */}
+        <div className="border-b border-linha px-4 pb-3 pt-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate text-sm font-bold text-white">🎥 {titulo || "Vídeo cinema"}</p>
+            <button type="button" onClick={onFechar} disabled={!!ocupado} className="rounded-full border border-linha px-3 py-1 text-sm text-muted hover:text-white disabled:opacity-40">✕</button>
           </div>
-          <button type="button" onClick={onFechar} disabled={!!ocupado} className="rounded-full border border-linha px-3 py-1 text-sm text-muted hover:text-white disabled:opacity-40">✕</button>
+          <div className="mt-3 flex items-center gap-1">
+            {ETAPAS.map((e, i) => {
+              const atual = passo === e.n;
+              const feito = passo > e.n;
+              return (
+                <div key={e.n} className="flex flex-1 items-center gap-1">
+                  <button type="button" disabled={!liberado[i] || travado} onClick={() => setPasso(e.n)}
+                    className={`flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg px-1 py-1.5 text-[10px] font-semibold transition disabled:opacity-35 ${atual ? "bg-amber-500/15 text-amber-200" : feito ? "text-emerald-300 hover:bg-white/5" : "text-muted hover:bg-white/5"}`}>
+                    <span className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${atual ? "bg-amber-400 text-black" : feito ? "bg-emerald-500/25" : "bg-white/10"}`}>{feito ? "✓" : e.emoji}</span>
+                    <span className="truncate">{e.nome}</span>
+                  </button>
+                  {i < ETAPAS.length - 1 && <span className={`h-px w-3 shrink-0 ${passo > e.n ? "bg-emerald-400/60" : "bg-white/15"}`} />}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="flex-1 space-y-3 overflow-y-auto p-4">
           {carregando ? <p className="text-sm text-muted">Carregando…</p> : (<>
-          {/* 1. TEMA */}
-          <section className="rounded-xl border border-linha bg-preto/40 p-3">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-white/90">1 · 💡 Sobre o que é o vídeo</p>
-            <input value={tema.tema} onChange={(e) => setTema({ ...tema, tema: e.target.value })} maxLength={160} placeholder="Ex: últimas datas de dezembro / festa completa sem dor de cabeça" className="input-base mt-2 w-full text-sm" />
-            <p className="mt-3 text-[11px] font-semibold text-muted">Foco das fotos</p>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {FOCOS.map((f) => (
-                <button key={f.id} type="button" title={f.desc} onClick={() => setTema({ ...tema, foco: f.id })} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${tema.foco === f.id ? "border-amber-400 bg-amber-500/20 text-amber-200" : "border-linha text-muted hover:text-white"}`}>{f.emoji} {f.nome}</button>
-              ))}
-            </div>
-            <p className="mt-1 text-[10px] text-muted">{FOCOS.find((f) => f.id === tema.foco)?.desc}. Foto de família posando nunca entra.</p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div>
-                <label className="block text-[11px] font-semibold text-muted">Oferta (opcional)</label>
-                <input value={tema.principal} onChange={(e) => setTema({ ...tema, principal: e.target.value })} maxLength={60} placeholder="Ex: +10 convidados grátis" className="input-base mt-1 w-full text-sm" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-semibold text-muted">Prazo da oferta (opcional)</label>
-                <input type="date" value={tema.prazo} onChange={(e) => setTema({ ...tema, prazo: e.target.value })} className="input-base mt-1 w-full text-sm" />
+
+          {/* ===== 1. IDEIA ===== */}
+          {passo === 1 && (<>
+            <div className={cartao}>
+              <p className={titulo2}>Sobre o que é o vídeo?</p>
+              <p className={ajuda}>Uma frase basta — a Bia cria a história a partir dela.</p>
+              <input value={tema.tema} onChange={(e) => setTema({ ...tema, tema: e.target.value })} maxLength={160} placeholder="Ex: últimas datas de dezembro" className="input-base mt-3 w-full text-base" />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {["Últimas datas do ano", "Festa completa sem estresse", "Conheça nosso espaço", "Diversão garantida pras crianças"].map((x) => (
+                  <button key={x} type="button" onClick={() => setTema({ ...tema, tema: x })} className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-white/70 hover:text-white">{x}</button>
+                ))}
               </div>
             </div>
-            {tema.principal.trim() && (
-              <>
-                <label className="mt-2 block text-[11px] font-semibold text-muted">Extras da oferta (opcional)</label>
-                <div className="mt-1 grid gap-1.5 sm:grid-cols-3">
-                  {extrasTxt.map((x, i) => <input key={i} value={x} onChange={(e) => setExtrasTxt((l) => l.map((y, k) => (k === i ? e.target.value : y)))} maxLength={40} placeholder={i === 0 ? "Ex: 10x sem juros" : "Outro extra"} className="input-base w-full text-sm" />)}
-                </div>
-                <label className="mt-2 flex items-center gap-2 text-[12px] text-white">
-                  <input type="checkbox" checked={tema.condicoes} onChange={(e) => setTema({ ...tema, condicoes: e.target.checked })} /> Mostrar &quot;Consulte condições&quot;
-                </label>
-              </>
-            )}
-            <div className="mt-2">
-              <label className="block text-[11px] font-semibold text-muted">Texto do botão no final</label>
-              <input value={tema.botao} onChange={(e) => setTema({ ...tema, botao: e.target.value })} maxLength={26} className="input-base mt-1 w-full text-sm sm:w-64" />
-            </div>
-            <p className="mt-3 text-[11px] font-semibold text-muted">⭐ Depoimento de cliente</p>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {([["nao", "Sem depoimento"], ["auto", "A plataforma escolhe uma avaliação 5★ do Google"], ["eu", "Eu escolho"]] as const).map(([id, nome]) => {
-                const atual = tema.depoimentoAuto ? "auto" : comDepoimento ? "eu" : "nao";
-                return <button key={id} type="button" onClick={() => { setComDepoimento(id === "eu"); setTema({ ...tema, depoimentoAuto: id === "auto" }); if (id === "eu" && !avaliacoes) carregarAvaliacoes(false); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${atual === id ? "border-amber-400 bg-amber-500/20 text-amber-200" : "border-linha text-muted hover:text-white"}`}>{nome}</button>;
-              })}
-            </div>
-            {tema.depoimentoAuto && <p className="mt-1 text-[10px] text-muted">A cada roteiro entra uma avaliação 5★ de verdade do Google, com o texto exatamente como o cliente escreveu (só o nome fica abreviado).</p>}
-            {comDepoimento && (
-              <div className="mt-2 space-y-2">
-                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-[11px] font-semibold text-white">Avaliações 5★ do Google{avaliacoes?.nota ? ` · nota ${String(avaliacoes.nota).replace(".", ",")} (${avaliacoes.total})` : ""}</p>
-                    <button type="button" onClick={() => carregarAvaliacoes(true)} disabled={buscandoAval} className="text-[10px] font-semibold text-sky-300 hover:underline disabled:opacity-40">{buscandoAval ? "buscando…" : "↻ buscar novas"}</button>
-                  </div>
-                  {erroAval && <p className="mt-1 text-[10px] text-amber-300">{erroAval}</p>}
-                  {avaliacoes && (
-                    <div className="mt-1.5 max-h-48 space-y-1.5 overflow-y-auto">
-                      {avaliacoes.lista.map((a, k) => (
-                        <button key={k} type="button" onClick={() => setTema({ ...tema, depoimento: { nome: a.nome, texto: a.trecho, fonte: avaliacoes.nota ? `Google · nota ${String(avaliacoes.nota).replace(".", ",")}` : "Avaliação no Google" } })}
-                          className={`block w-full rounded-md border p-2 text-left text-[11px] ${tema.depoimento.texto === a.trecho ? "border-amber-400 bg-amber-500/10" : "border-white/10 hover:border-white/30"}`}>
-                          <span className="font-bold text-white">{a.nome}</span> <span className="text-amber-300">★★★★★</span>
-                          <span className="mt-0.5 block text-white/80">“{a.trecho}”</span>
-                        </button>
-                      ))}
-                      {!avaliacoes.lista.length && <p className="text-[10px] text-muted">Nenhuma avaliação 5★ com texto encontrada ainda.</p>}
-                    </div>
-                  )}
-                </div>
-                <p className="text-[10px] text-muted">Toque numa avaliação pra usar — ou cole uma você mesmo:</p>
-                <div className="grid gap-1.5 sm:grid-cols-3">
-                  <input value={tema.depoimento.nome} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, nome: e.target.value } })} maxLength={30} placeholder="Nome (ex: Thati B.)" className="input-base w-full text-sm" />
-                  <input value={tema.depoimento.fonte} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, fonte: e.target.value } })} maxLength={30} placeholder="Onde (ex: Avaliação no Google)" className="input-base w-full text-sm sm:col-span-2" />
-                  <textarea value={tema.depoimento.texto} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, texto: e.target.value } })} maxLength={160} rows={2} placeholder="O que o cliente escreveu (até 160 letras)" className="input-base w-full text-sm sm:col-span-3" />
-                </div>
+
+            <div className={cartao}>
+              <p className={titulo2}>Que fotos usar?</p>
+              <p className={ajuda}>Foto de família posando nunca entra.</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {FOCOS.map((f) => (
+                  <button key={f.id} type="button" onClick={() => setTema({ ...tema, foco: f.id })}
+                    className={`rounded-xl border p-2.5 text-left transition ${tema.foco === f.id ? "border-amber-400 bg-amber-500/10" : "border-linha hover:border-white/30"}`}>
+                    <span className="block text-lg">{f.emoji}</span>
+                    <span className="block text-xs font-bold text-white">{f.nome}</span>
+                    <span className="block text-[10px] leading-snug text-muted">{f.desc}</span>
+                  </button>
+                ))}
               </div>
-            )}
-            <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[11px] font-semibold text-white">📸 Fotos do vídeo <span className="font-normal text-muted">(opcional — vazio = a Bia escolhe; com 4 ou mais, ela usa só as suas)</span></p>
-                <button type="button" onClick={() => abrirSeletor({ modo: "varias" })} disabled={!!ocupado} className="rounded-lg border border-sky-500/40 bg-sky-500/15 px-3 py-1 text-xs font-semibold text-sky-300 hover:bg-sky-500/25 disabled:opacity-40">
-                  {fotosEscolhidas.length ? `Mudar (${fotosEscolhidas.length})` : "Escolher fotos"}
+              <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3">
+                <button type="button" onClick={() => abrirSeletor({ modo: "varias" })} disabled={!!ocupado} className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-1.5 text-xs font-semibold text-sky-300 hover:bg-sky-500/20 disabled:opacity-40">
+                  📸 {fotosEscolhidas.length ? `Minhas fotos (${fotosEscolhidas.length})` : "Prefiro escolher as fotos"}
                 </button>
+                {fotosEscolhidas.slice(0, 8).map((id) => fotos[id] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img key={id} src={fotos[id]} alt="" className="h-9 w-9 rounded object-cover ring-1 ring-white/30" />
+                ) : null)}
               </div>
-              {fotosEscolhidas.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {fotosEscolhidas.map((id) => fotos[id] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={id} src={fotos[id]} alt="" className="h-10 w-10 rounded object-cover ring-1 ring-white/40" />
-                  ) : null)}
+            </div>
+
+            {/* OFERTA (liga/desliga) */}
+            <div className={cartao}>
+              <label className="flex cursor-pointer items-center justify-between gap-3">
+                <span><span className={titulo2}>🎁 Tem uma oferta?</span><span className={`block ${ajuda}`}>Aparece num cartão animado e a Bia fala dela.</span></span>
+                <input type="checkbox" checked={comOferta} onChange={(e) => setComOferta(e.target.checked)} className="h-5 w-5 accent-amber-400" />
+              </label>
+              {comOferta && (
+                <div className="mt-3 space-y-2">
+                  <input value={tema.principal} onChange={(e) => setTema({ ...tema, principal: e.target.value })} maxLength={60} placeholder="A oferta (ex: +10 convidados grátis)" className="input-base w-full text-sm" />
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {extrasTxt.slice(0, 2).map((x, i) => <input key={i} value={x} onChange={(e) => setExtrasTxt((l) => l.map((y, k) => (k === i ? e.target.value : y)))} maxLength={40} placeholder={i === 0 ? "Extra (ex: 10x sem juros)" : "Outro extra (opcional)"} className="input-base w-full text-sm" />)}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="text-xs text-muted">Vale até <input type="date" value={tema.prazo} onChange={(e) => setTema({ ...tema, prazo: e.target.value })} className="input-base ml-1 text-sm" /></label>
+                    <label className="flex items-center gap-1.5 text-xs text-white/80"><input type="checkbox" checked={tema.condicoes} onChange={(e) => setTema({ ...tema, condicoes: e.target.checked })} /> &quot;Consulte condições&quot;</label>
+                  </div>
                 </div>
               )}
             </div>
-          </section>
 
-          {/* 2. ROTEIRO */}
-          <section className="rounded-xl border border-linha bg-preto/40 p-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-white/90">2 · ✍️ Roteiro da Bia</p>
-              <button type="button" onClick={escreverRoteiro} disabled={!passoTema || travado} className="rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-40">
-                {ocupado === "roteiro" ? "✍️ escrevendo e conferindo… (até 1 min)" : roteiro ? "🔄 Pedir outro roteiro" : "✨ Bia monta o roteiro"}
-              </button>
-            </div>
-            {!passoTema && <p className="mt-2 text-[11px] text-amber-300/90">Conte do que é o vídeo pra liberar.</p>}
-            {roteiro && (
-              <div className="mt-3 space-y-2">
-                {roteiro.cenas.map((c, i) => {
-                  const a = NOME_TIPO[c.tipo] || { emoji: "•", nome: c.tipo, cor: "#888" };
-                  const ed = editando?.i === i ? editando : null;
-                  return (
-                    <div key={i} className="flex gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
-                      {COM_FOTO.has(c.tipo) && c.foto && fotos[c.foto] && (
-                        <button type="button" disabled={travado} onClick={() => abrirSeletor({ modo: "trocar", indice: i, atual: c.foto || "" })} className="relative shrink-0" title="Trocar esta foto">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={fotos[c.foto]} alt="" className="h-16 w-12 rounded object-cover ring-2 ring-white" />
-                          <span className="absolute inset-x-0 bottom-0 rounded-b bg-black/70 text-center text-[9px] font-bold text-white">🔄</span>
-                        </button>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-black" style={{ background: a.cor }}>{a.emoji} {a.nome}</span>
-                          {!ed && <button type="button" disabled={travado} onClick={() => setEditando({ i, fala: c.fala, destaques: c.destaques.join(", ") })} className="text-[10px] font-semibold text-sky-300 hover:underline disabled:opacity-40">✏️ editar fala</button>}
-                        </div>
-                        {ed ? (
-                          <div className="mt-1.5 space-y-1.5">
-                            <textarea value={ed.fala} onChange={(e) => setEditando({ ...ed, fala: e.target.value })} rows={2} maxLength={220} className="input-base w-full text-[12px]" />
-                            <input value={ed.destaques} onChange={(e) => setEditando({ ...ed, destaques: e.target.value })} placeholder="Palavras em destaque (até 2, separadas por vírgula)" className="input-base w-full text-[11px]" />
-                            <div className="flex gap-2">
-                              <button type="button" onClick={salvarFala} disabled={ocupado === "fala"} className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white disabled:opacity-40">Salvar</button>
-                              <button type="button" onClick={() => setEditando(null)} className="rounded-md border border-linha px-2.5 py-1 text-[11px] text-muted">Cancelar</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="mt-1.5 text-[12px] leading-snug text-white">
-                            “{c.fala.split(/\s+/).map((w, k) => <span key={k} className={c.destaques.some((d) => w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "").startsWith(d.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "")) && d) ? "font-bold italic text-amber-300" : ""}>{w} </span>)}”
-                          </p>
-                        )}
-                        {resumoDados(c) && <p className="mt-1 text-[10px] text-muted">{resumoDados(c)}</p>}
-                      </div>
-                    </div>
-                  );
-                })}
+            {/* DEPOIMENTO */}
+            <div className={cartao}>
+              <p className={titulo2}>⭐ Depoimento de cliente</p>
+              <p className={ajuda}>Avaliação 5★ de verdade do Google, com o texto como o cliente escreveu.</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {([["nao", "Sem depoimento"], ["auto", "✨ Escolher sozinho"], ["eu", "Eu escolho"]] as const).map(([id, nome]) => (
+                  <button key={id} type="button" onClick={() => { setComDepoimento(id === "eu"); setTema({ ...tema, depoimentoAuto: id === "auto" }); if (id === "eu" && !avaliacoes) carregarAvaliacoes(false); }} className={chip(depoModo === id)}>{nome}</button>
+                ))}
               </div>
-            )}
-          </section>
+              {depoModo === "eu" && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] text-muted">{avaliacoes?.nota ? `Nota ${String(avaliacoes.nota).replace(".", ",")} no Google · ${avaliacoes.total} avaliações` : "Avaliações 5★ do Google"}</p>
+                    <button type="button" onClick={() => carregarAvaliacoes(true)} disabled={buscandoAval} className="text-[11px] font-semibold text-sky-300 hover:underline disabled:opacity-40">{buscandoAval ? "buscando…" : "↻ buscar novas"}</button>
+                  </div>
+                  {erroAval && <p className="text-[11px] text-amber-300">{erroAval}</p>}
+                  {avaliacoes && (
+                    <div className="max-h-56 space-y-1.5 overflow-y-auto">
+                      {avaliacoes.lista.map((a, k) => (
+                        <button key={k} type="button" onClick={() => setTema({ ...tema, depoimento: { nome: a.nome, texto: a.trecho, fonte: avaliacoes.nota ? `Google · nota ${String(avaliacoes.nota).replace(".", ",")}` : "Avaliação no Google" } })}
+                          className={`block w-full rounded-xl border p-2.5 text-left text-xs ${tema.depoimento.texto === a.trecho ? "border-amber-400 bg-amber-500/10" : "border-white/10 hover:border-white/30"}`}>
+                          <span className="font-bold text-white">{a.nome}</span> <span className="text-amber-300">★★★★★</span>{tema.depoimento.texto === a.trecho && <span className="ml-1 text-amber-300">✓ escolhida</span>}
+                          <span className="mt-1 block leading-snug text-white/80">“{a.trecho}”</span>
+                        </button>
+                      ))}
+                      {!avaliacoes.lista.length && <p className="text-[11px] text-muted">Nenhuma avaliação 5★ com texto encontrada ainda.</p>}
+                    </div>
+                  )}
+                  <details className="text-xs">
+                    <summary className="cursor-pointer text-muted hover:text-white">Colar outro depoimento (WhatsApp, Instagram…)</summary>
+                    <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                      <input value={tema.depoimento.nome} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, nome: e.target.value } })} maxLength={30} placeholder="Nome (ex: Thati B.)" className="input-base w-full text-sm" />
+                      <input value={tema.depoimento.fonte} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, fonte: e.target.value } })} maxLength={30} placeholder="Onde (ex: WhatsApp)" className="input-base w-full text-sm" />
+                      <textarea value={tema.depoimento.texto} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, texto: e.target.value } })} maxLength={160} rows={2} placeholder="O que o cliente escreveu (até 160 letras)" className="input-base w-full text-sm sm:col-span-2" />
+                    </div>
+                  </details>
+                </div>
+              )}
+            </div>
 
-          {/* CAPA */}
-          {roteiro && (
-            <section className="rounded-xl border border-linha bg-preto/40 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-white/90">🖼️ Capa <span className="font-normal normal-case text-muted">(miniatura e capa do Reels no perfil)</span></p>
-              <div className="mt-2 flex gap-3">
-                {capaUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={capaUrl} alt="" className="h-40 w-[90px] shrink-0 rounded-lg object-cover ring-1 ring-white/30" />
-                )}
-                <div className="min-w-0 flex-1 space-y-2">
-                  <input value={capaTitulo} onChange={(e) => setCapaTitulo(e.target.value)} maxLength={60} placeholder="Ex: Últimas datas de *dezembro*" className="input-base w-full text-sm" />
-                  <p className="text-[10px] text-muted">Coloque a palavra de destaque entre asteriscos: <span className="text-white/80">*dezembro*</span> sai em itálico amarelo, sublinhada.</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={salvarCapa} disabled={travado || capaTitulo.trim().length < 2} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40">Salvar capa</button>
-                    <button type="button" onClick={() => abrirSeletor({ modo: "capa", atual: roteiro.capa?.foto || "" })} disabled={travado} className="rounded-lg border border-sky-500/40 bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-300 disabled:opacity-40">🔄 Trocar foto da capa</button>
+            <details className={cartao}>
+              <summary className="cursor-pointer text-sm font-bold text-white/80">⚙️ Ajustes finos</summary>
+              <label className="mt-3 block text-xs text-muted">Texto do botão no final do vídeo</label>
+              <input value={tema.botao} onChange={(e) => setTema({ ...tema, botao: e.target.value })} maxLength={26} className="input-base mt-1 w-full text-sm sm:w-72" />
+            </details>
+          </>)}
+
+          {/* ===== 2. ROTEIRO ===== */}
+          {passo === 2 && roteiro && (<>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className={titulo2}>O roteiro da Bia</p>
+                <p className={ajuda}>{roteiro.cenas.length} cenas · toque em ✏️ pra mudar uma fala ou na foto pra trocar.</p>
+              </div>
+              <button type="button" onClick={escreverRoteiro} disabled={travado || !passoTema} className="shrink-0 rounded-lg border border-linha px-3 py-1.5 text-xs font-semibold text-white hover:border-white/30 disabled:opacity-40">{ocupado === "roteiro" ? "✍️ escrevendo…" : "🔄 Outro roteiro"}</button>
+            </div>
+            {roteiro.cenas.map((c, i) => {
+              const a = NOME_TIPO[c.tipo] || { emoji: "•", nome: c.tipo, cor: "#888" };
+              const ed = editando?.i === i ? editando : null;
+              return (
+                <div key={i} className="flex gap-3 rounded-2xl border border-linha bg-white/[0.02] p-3">
+                  <div className="flex w-14 shrink-0 flex-col items-center gap-1">
+                    <span className="text-[10px] font-bold text-muted">{i + 1}</span>
+                    {COM_FOTO.has(c.tipo) && c.foto && fotos[c.foto] ? (
+                      <button type="button" disabled={travado} onClick={() => abrirSeletor({ modo: "trocar", indice: i, atual: c.foto || "" })} className="relative" title="Trocar esta foto">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={fotos[c.foto]} alt="" className="h-20 w-12 rounded-lg object-cover ring-1 ring-white/40" />
+                        <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-black/70 text-center text-[9px] font-bold text-white">🔄 trocar</span>
+                      </button>
+                    ) : (
+                      <span className="flex h-20 w-12 items-center justify-center rounded-lg text-xl" style={{ background: `${a.cor}22` }}>{a.emoji}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-bold text-black" style={{ background: a.cor }}>{a.emoji} {a.nome}</span>
+                      {!ed && <button type="button" disabled={travado} onClick={() => setEditando({ i, fala: c.fala, destaques: c.destaques.join(", ") })} className="text-[11px] font-semibold text-sky-300 hover:underline disabled:opacity-40">✏️ editar</button>}
+                    </div>
+                    {ed ? (
+                      <div className="mt-2 space-y-1.5">
+                        <textarea value={ed.fala} onChange={(e) => setEditando({ ...ed, fala: e.target.value })} rows={3} maxLength={220} className="input-base w-full text-sm" />
+                        <input value={ed.destaques} onChange={(e) => setEditando({ ...ed, destaques: e.target.value })} placeholder="Palavras em destaque (até 2, separadas por vírgula)" className="input-base w-full text-xs" />
+                        <div className="flex gap-2">
+                          <button type="button" onClick={salvarFala} disabled={ocupado === "fala"} className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-bold text-white disabled:opacity-40">Salvar</button>
+                          <button type="button" onClick={() => setEditando(null)} className="rounded-md border border-linha px-3 py-1 text-xs text-muted">Cancelar</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-1.5 text-sm leading-snug text-white">
+                        {c.fala.split(/\s+/).map((w, k) => <span key={k} className={c.destaques.some((d) => d && w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "").startsWith(d.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""))) ? "font-bold italic text-amber-300" : ""}>{w} </span>)}
+                      </p>
+                    )}
+                    {resumoDados(c) && <p className="mt-1 line-clamp-2 text-[11px] text-muted">{resumoDados(c)}</p>}
                   </div>
                 </div>
-              </div>
-            </section>
-          )}
+              );
+            })}
+          </>)}
 
-          {/* 3. VOZ */}
-          <section className={`rounded-xl border border-linha bg-preto/40 p-3 ${roteiro ? "" : "opacity-50"}`}>
-            <p className="text-[11px] font-bold uppercase tracking-wide text-white/90">3 · 🎙️ Voz</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {ESTILOS.map((s) => (
-                <button key={s.nome} type="button" disabled={!roteiro} onClick={() => setEstilo(s.direcao)} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${estilo === s.direcao ? "border-emerald-400 bg-emerald-500/20 text-emerald-200" : "border-linha text-muted hover:text-white"}`}>{s.emoji} {s.nome}</button>
-              ))}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <select value={voz} onChange={(e) => setVoz(e.target.value)} disabled={!roteiro} className="input-base text-sm">
+          {/* ===== 3. VOZ ===== */}
+          {passo === 3 && roteiro && (<>
+            <div className={cartao}>
+              <p className={titulo2}>Jeito de falar</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {ESTILOS.map((s) => <button key={s.nome} type="button" onClick={() => setEstilo(s.direcao)} className={chip(estilo === s.direcao)}>{s.emoji} {s.nome}</button>)}
+              </div>
+              <p className={`mt-4 ${titulo2}`}>Voz</p>
+              <select value={voz} onChange={(e) => setVoz(e.target.value)} className="input-base mt-2 w-full text-sm">
                 {VOZES.map((v) => <option key={v.id} value={v.id}>{v.favorita ? "⭐ " : ""}{v.nome} — {v.sexo === "m" ? "masculina" : "feminina"}, {v.nota}</option>)}
               </select>
-              <button type="button" onClick={gerarVoz} disabled={!roteiro || travado} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-40">
-                {ocupado === "voz" ? "🎙️ gerando e marcando cada palavra…" : audio ? "🔊 Gerar voz de novo" : "🔊 Gerar voz"}
-              </button>
             </div>
-            {audio && <audio key={audio.url} src={audio.url} controls className="mt-2 h-9 w-full" />}
-          </section>
-
-          {/* 4. MONTAR */}
-          <section className={`rounded-xl border border-linha bg-preto/40 p-3 ${temTempos ? "" : "opacity-50"}`}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-white/90">4 · 🎬 Montar o vídeo</p>
-              <button type="button" onClick={montar} disabled={!temTempos || travado} className="rounded-lg bg-gradient-to-r from-amber-500 to-sky-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-40">
-                {videoUrl === "gerando" ? "⏳ Montando…" : ocupado === "montar" ? "Enviando…" : videoUrl.startsWith("http") ? "🔄 Montar de novo" : "⚡ Montar vídeo"}
+            <div className={cartao}>
+              <button type="button" onClick={gerarVoz} disabled={travado} className="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-40">
+                {ocupado === "voz" ? "🎙️ Gerando e marcando cada palavra…" : audio ? "🔊 Gerar a voz de novo" : "🔊 Gerar a voz"}
               </button>
+              {audio && <audio key={audio.url} src={audio.url} controls className="mt-3 h-10 w-full" />}
+              {audio && <p className="mt-1 text-center text-[11px] text-muted">{audio.segundos}s de narração{temTempos ? " · legenda sincronizada ✓" : ""}</p>}
             </div>
-            {videoUrl.startsWith("http") && (
-              // eslint-disable-next-line jsx-a11y/media-has-caption
-              <video src={videoUrl} controls playsInline className="mx-auto mt-3 aspect-[9/16] w-full max-w-xs rounded-xl bg-black" />
-            )}
-          </section>
           </>)}
+
+          {/* ===== 4. CAPA ===== */}
+          {passo === 4 && roteiro && (
+            <div className={`${cartao} flex flex-col gap-4 sm:flex-row`}>
+              {capaUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={capaUrl} alt="" className="mx-auto h-72 w-[162px] shrink-0 rounded-xl object-cover ring-1 ring-white/30" />
+              ) : (
+                <div className="mx-auto flex h-72 w-[162px] shrink-0 items-center justify-center rounded-xl bg-white/5 text-center text-xs text-muted">Escreva o título<br />pra ver a capa</div>
+              )}
+              <div className="min-w-0 flex-1 space-y-3">
+                <div>
+                  <p className={titulo2}>Título da capa</p>
+                  <p className={ajuda}>Aparece na miniatura e na capa do Reels no perfil. Coloque a palavra de destaque entre asteriscos: <span className="text-amber-300">*dezembro*</span>.</p>
+                  <input value={capaTitulo} onChange={(e) => setCapaTitulo(e.target.value)} maxLength={60} placeholder="Ex: Últimas datas de *dezembro*" className="input-base mt-2 w-full text-base" />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={salvarCapa} disabled={travado || capaTitulo.trim().length < 2} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-40">{ocupado === "fala" ? "Salvando…" : "Atualizar capa"}</button>
+                  <button type="button" onClick={() => abrirSeletor({ modo: "capa", atual: roteiro.capa?.foto || "" })} disabled={travado} className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs font-semibold text-sky-300 disabled:opacity-40">🔄 Trocar foto</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ===== 5. VÍDEO ===== */}
+          {passo === 5 && roteiro && (
+            <div className={`${cartao} text-center`}>
+              {videoUrl === "gerando" ? (
+                <div className="py-8">
+                  <p className="text-3xl">🎬</p>
+                  <p className="mt-2 text-sm font-bold text-white">Montando o vídeo…</p>
+                  <p className={ajuda}>Leva uns 4 a 6 minutos. Pode fechar e voltar depois — ele fica guardado em Vídeos.</p>
+                </div>
+              ) : videoUrl.startsWith("http") ? (
+                <>
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <video src={videoUrl} controls playsInline className="mx-auto aspect-[9/16] w-full max-w-[260px] rounded-xl bg-black" />
+                  <p className="mt-2 text-xs text-muted">Pronto! Pra postar ou agendar: 📱 Redes Sociais → 🎬 Reels.</p>
+                </>
+              ) : (
+                <div className="py-8">
+                  <p className="text-3xl">🎬</p>
+                  <p className="mt-2 text-sm font-bold text-white">Tudo pronto pra montar</p>
+                  <p className={ajuda}>Roteiro, voz e capa conferidos. O vídeo sai em uns 4 a 6 minutos.</p>
+                </div>
+              )}
+            </div>
+          )}
+          </>)}
+        </div>
+
+        {/* rodapé fixo: mensagem + ação principal da etapa */}
+        <div className="border-t border-linha px-4 py-3">
+          {msg && <p className={`mb-2 text-xs font-semibold ${msg.tipo === "ok" ? "text-green-400" : msg.tipo === "aviso" ? "text-amber-300" : "text-vermelho"}`}>{msg.txt}</p>}
+          <div className="flex items-center justify-between gap-2">
+            <button type="button" onClick={() => setPasso((p) => Math.max(1, p - 1))} disabled={passo === 1 || travado} className="rounded-lg px-3 py-2 text-sm text-muted hover:text-white disabled:invisible">← Voltar</button>
+            {passo === 1 && roteiro && (
+              <button type="button" onClick={escreverRoteiro} disabled={!passoTema || travado} className="ml-auto rounded-xl border border-linha px-3 py-2.5 text-xs font-semibold text-white hover:border-white/30 disabled:opacity-40">🔄 Novo roteiro</button>
+            )}
+            {passo === 1 && (
+              <button type="button" onClick={proximoDaIdeia} disabled={!passoTema || travado} className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-black hover:bg-amber-300 disabled:opacity-40">
+                {ocupado === "roteiro" ? "✍️ A Bia está escrevendo…" : roteiro ? "Ver o roteiro →" : "✨ Bia, escreve o roteiro"}
+              </button>
+            )}
+            {passo === 2 && <button type="button" onClick={() => setPasso(3)} disabled={travado || !!editando} className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-black hover:bg-amber-300 disabled:opacity-40">Gostei → Voz</button>}
+            {passo === 3 && <button type="button" onClick={() => setPasso(4)} disabled={travado || !temTempos} className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-black hover:bg-amber-300 disabled:opacity-40">{temTempos ? "Próximo → Capa" : "Gere a voz pra seguir"}</button>}
+            {passo === 4 && <button type="button" onClick={() => setPasso(5)} disabled={travado} className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-black hover:bg-amber-300 disabled:opacity-40">Próximo → Vídeo</button>}
+            {passo === 5 && (
+              videoUrl.startsWith("http") && ocupado !== "montar"
+                ? <div className="flex gap-2"><button type="button" onClick={montar} disabled={travado} className="rounded-xl border border-linha px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">🔄 Montar de novo</button><button type="button" onClick={onFechar} className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-black">Concluir</button></div>
+                : <button type="button" onClick={montar} disabled={travado || !temTempos} className="rounded-xl bg-gradient-to-r from-amber-400 to-sky-400 px-5 py-2.5 text-sm font-bold text-black disabled:opacity-40">{videoUrl === "gerando" ? "⏳ Montando…" : ocupado === "montar" ? "Enviando…" : "⚡ Montar o vídeo"}</button>
+            )}
+          </div>
         </div>
 
         {seletor && (
@@ -488,9 +585,6 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
           </div>
         )}
 
-        {msg && (
-          <div className={`border-t border-linha px-4 py-2.5 text-[12px] font-semibold ${msg.tipo === "ok" ? "text-green-400" : msg.tipo === "aviso" ? "text-amber-300" : "text-vermelho"}`}>{msg.txt}</div>
-        )}
       </div>
     </div>
   );
