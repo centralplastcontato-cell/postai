@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VOZES, ESTILOS, VOZ_PADRAO, DIRECAO_PADRAO } from "@/lib/vozes";
 import { TEMA_VAZIO, COM_FOTO, FOCOS, type TemaCinema, type RoteiroCinema, type CenaCinema } from "@/lib/cinema";
-import { dadosVideoCinema, salvarTemaCinema, gerarRoteiroCinema, editarFalaCinema, gerarVozCinema, sincronizarVozCinema, ajustarTamanhoCinema, montarVideoCinema, fotosParaCinema, salvarFotosCinema, trocarFotoCinema, salvarCapaCinema } from "@/app/actions/cinema";
+import { dadosVideoCinema, salvarTemaCinema, gerarRoteiroCinema, editarFalaCinema, gerarVozCinema, sincronizarVozCinema, ajustarTamanhoCinema, montarVideoCinema, fotosParaCinema, salvarFotosCinema, trocarFotoCinema, salvarCapaCinema, avaliacoesGoogleCinema } from "@/app/actions/cinema";
 import { statusVideoTematico } from "@/app/actions/videos-tematicos";
 
 const NOME_TIPO: Record<string, { emoji: string; nome: string; cor: string }> = {
@@ -55,6 +55,16 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
   const [banco, setBanco] = useState<{ id: string; url: string; descricao: string }[] | null>(null);
   const [seletor, setSeletor] = useState<null | { modo: "varias" } | { modo: "trocar"; indice: number; atual: string } | { modo: "capa"; atual: string }>(null);
   const [capaTitulo, setCapaTitulo] = useState("");
+  const [avaliacoes, setAvaliacoes] = useState<{ nota: number; total: number; lista: { nome: string; texto: string; trecho: string }[] } | null>(null);
+  const [buscandoAval, setBuscandoAval] = useState(false);
+  const [erroAval, setErroAval] = useState("");
+  async function carregarAvaliacoes(forcar: boolean) {
+    setBuscandoAval(true); setErroAval("");
+    const r = await avaliacoesGoogleCinema(videoId, forcar).catch(() => null);
+    setBuscandoAval(false);
+    if (!r || !r.ok) { setErroAval((r && "erro" in r && r.erro) || "Não consegui buscar as avaliações agora."); return; }
+    setAvaliacoes({ nota: r.nota, total: r.total, lista: r.lista });
+  }
   const [capaUrl, setCapaUrl] = useState<string | null>(null);
   const [marcadas, setMarcadas] = useState<string[]>([]);
 
@@ -95,7 +105,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
   const temaAtual = (): TemaCinema => ({
     ...tema,
     extras: extrasTxt.map((x) => x.trim()).filter(Boolean),
-    depoimento: comDepoimento ? tema.depoimento : { nome: "", texto: "", fonte: "" },
+    depoimento: comDepoimento && !tema.depoimentoAuto ? tema.depoimento : { nome: "", texto: "", fonte: "" },
   });
 
   async function escreverRoteiro() {
@@ -284,14 +294,41 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
               <label className="block text-[11px] font-semibold text-muted">Texto do botão no final</label>
               <input value={tema.botao} onChange={(e) => setTema({ ...tema, botao: e.target.value })} maxLength={26} className="input-base mt-1 w-full text-sm sm:w-64" />
             </div>
-            <label className="mt-3 flex items-center gap-2 text-[12px] text-white">
-              <input type="checkbox" checked={comDepoimento} onChange={(e) => setComDepoimento(e.target.checked)} /> ⭐ Incluir um depoimento REAL de cliente
-            </label>
+            <p className="mt-3 text-[11px] font-semibold text-muted">⭐ Depoimento de cliente</p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {([["nao", "Sem depoimento"], ["auto", "A plataforma escolhe uma avaliação 5★ do Google"], ["eu", "Eu escolho"]] as const).map(([id, nome]) => {
+                const atual = tema.depoimentoAuto ? "auto" : comDepoimento ? "eu" : "nao";
+                return <button key={id} type="button" onClick={() => { setComDepoimento(id === "eu"); setTema({ ...tema, depoimentoAuto: id === "auto" }); if (id === "eu" && !avaliacoes) carregarAvaliacoes(false); }} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${atual === id ? "border-amber-400 bg-amber-500/20 text-amber-200" : "border-linha text-muted hover:text-white"}`}>{nome}</button>;
+              })}
+            </div>
+            {tema.depoimentoAuto && <p className="mt-1 text-[10px] text-muted">A cada roteiro entra uma avaliação 5★ de verdade do Google, com o texto exatamente como o cliente escreveu (só o nome fica abreviado).</p>}
             {comDepoimento && (
-              <div className="mt-2 grid gap-1.5 sm:grid-cols-3">
-                <input value={tema.depoimento.nome} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, nome: e.target.value } })} maxLength={30} placeholder="Nome (ex: Thati B.)" className="input-base w-full text-sm" />
-                <input value={tema.depoimento.fonte} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, fonte: e.target.value } })} maxLength={30} placeholder="Onde (ex: Avaliação no Google)" className="input-base w-full text-sm sm:col-span-2" />
-                <textarea value={tema.depoimento.texto} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, texto: e.target.value } })} maxLength={160} rows={2} placeholder="Cole o que o cliente escreveu (até 160 letras)" className="input-base w-full text-sm sm:col-span-3" />
+              <div className="mt-2 space-y-2">
+                <div className="rounded-lg border border-white/10 bg-white/[0.03] p-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold text-white">Avaliações 5★ do Google{avaliacoes?.nota ? ` · nota ${String(avaliacoes.nota).replace(".", ",")} (${avaliacoes.total})` : ""}</p>
+                    <button type="button" onClick={() => carregarAvaliacoes(true)} disabled={buscandoAval} className="text-[10px] font-semibold text-sky-300 hover:underline disabled:opacity-40">{buscandoAval ? "buscando…" : "↻ buscar novas"}</button>
+                  </div>
+                  {erroAval && <p className="mt-1 text-[10px] text-amber-300">{erroAval}</p>}
+                  {avaliacoes && (
+                    <div className="mt-1.5 max-h-48 space-y-1.5 overflow-y-auto">
+                      {avaliacoes.lista.map((a, k) => (
+                        <button key={k} type="button" onClick={() => setTema({ ...tema, depoimento: { nome: a.nome, texto: a.trecho, fonte: avaliacoes.nota ? `Google · nota ${String(avaliacoes.nota).replace(".", ",")}` : "Avaliação no Google" } })}
+                          className={`block w-full rounded-md border p-2 text-left text-[11px] ${tema.depoimento.texto === a.trecho ? "border-amber-400 bg-amber-500/10" : "border-white/10 hover:border-white/30"}`}>
+                          <span className="font-bold text-white">{a.nome}</span> <span className="text-amber-300">★★★★★</span>
+                          <span className="mt-0.5 block text-white/80">“{a.trecho}”</span>
+                        </button>
+                      ))}
+                      {!avaliacoes.lista.length && <p className="text-[10px] text-muted">Nenhuma avaliação 5★ com texto encontrada ainda.</p>}
+                    </div>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted">Toque numa avaliação pra usar — ou cole uma você mesmo:</p>
+                <div className="grid gap-1.5 sm:grid-cols-3">
+                  <input value={tema.depoimento.nome} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, nome: e.target.value } })} maxLength={30} placeholder="Nome (ex: Thati B.)" className="input-base w-full text-sm" />
+                  <input value={tema.depoimento.fonte} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, fonte: e.target.value } })} maxLength={30} placeholder="Onde (ex: Avaliação no Google)" className="input-base w-full text-sm sm:col-span-2" />
+                  <textarea value={tema.depoimento.texto} onChange={(e) => setTema({ ...tema, depoimento: { ...tema.depoimento, texto: e.target.value } })} maxLength={160} rows={2} placeholder="O que o cliente escreveu (até 160 letras)" className="input-base w-full text-sm sm:col-span-3" />
+                </div>
               </div>
             )}
             <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">

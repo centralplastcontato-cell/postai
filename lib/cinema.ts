@@ -31,10 +31,11 @@ export type TemaCinema = {
   prazo: string; // AAAA-MM-DD (opcional)
   condicoes: boolean;
   depoimento: { nome: string; texto: string; fonte: string }; // depoimento REAL de cliente (opcional)
+  depoimentoAuto: boolean; // a plataforma escolhe uma avaliação 5★ REAL do Google (texto sem mudar)
   botao: string; // texto do botão final
   foco: FocoFotos; // que tipo de foto o vídeo usa
 };
-export const TEMA_VAZIO: TemaCinema = { tema: "", principal: "", extras: [], prazo: "", condicoes: true, depoimento: { nome: "", texto: "", fonte: "" }, botao: "Chame no WhatsApp", foco: "festa" };
+export const TEMA_VAZIO: TemaCinema = { tema: "", principal: "", extras: [], prazo: "", condicoes: true, depoimento: { nome: "", texto: "", fonte: "" }, botao: "Chame no WhatsApp", foco: "festa", depoimentoAuto: false };
 
 // ---------- FOCO das fotos ----------
 // O dono escolhe o estilo do vídeo; a plataforma filtra o acervo pela CATEGORIA da foto e pela
@@ -84,6 +85,7 @@ export function lerTema(json: string): TemaCinema {
       prazo: /^\d{4}-\d{2}-\d{2}$/.test(o.prazo || "") ? o.prazo : "",
       condicoes: o.condicoes !== false,
       depoimento: { nome: String(dep.nome || "").slice(0, 30), texto: String(dep.texto || "").slice(0, 160), fonte: String(dep.fonte || "").slice(0, 30) },
+      depoimentoAuto: o.depoimentoAuto === true,
       botao: String(o.botao || "").slice(0, 26) || TEMA_VAZIO.botao,
       foco: FOCOS.some((x) => x.id === o.foco) ? o.foco : "festa",
     };
@@ -317,4 +319,17 @@ export function caminhoCapaCinema(id: string, roteiroJson: string, logoUrl = "")
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
   return `/api/capa-cinema/${id}/capa.jpg?v=${h.toString(36)}`;
+}
+
+// Trecho de uma avaliação que cabe no cartão (até 160 letras): frases inteiras do começo; se a 1ª
+// frase já passar, corta na palavra e põe "…". Nunca reescreve — só recorta o que o cliente escreveu.
+export function trechoDaAvaliacao(texto: string, max = 160): string {
+  const t = texto.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  const frases = t.match(/[^.!?]+[.!?]+/g) || [];
+  let out = "";
+  for (const f of frases) { if ((out + f).trim().length > max) break; out += f; }
+  if (out.trim().length >= 30) return out.trim();
+  const corte = t.slice(0, max - 1);
+  return `${corte.slice(0, corte.lastIndexOf(" ")).replace(/[,;:\s]+$/, "")}…`;
 }

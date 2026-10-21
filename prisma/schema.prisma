@@ -63,6 +63,9 @@ model Marca {
   // LIMPEZA de posts repetidos do Instagram feita AOS POUCOS pelo piloto (o Instagram trava se
   // apagar rápido). JSON {ids, feitos, falhas, travas, proxima, aviso, inicio}. "" = nada na fila.
   limpezaIg       String    @default("")
+  // Avaliações REAIS do Google (Places API), guardadas pra os vídeos usarem como depoimento.
+  // JSON {nota, total, em, lista:[{nome, texto, nota, quando}]} — só as de 5 estrelas.
+  avaliacoesGoogle String   @default("{}")
   criadoEm    DateTime @default(now())
 
   // Inteligência: a análise do HISTÓRICO do Instagram ("A Bia estudou seu feed") cacheada,

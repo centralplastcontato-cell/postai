@@ -18,10 +18,12 @@ import { vozValida, VOZ_PADRAO } from "@/lib/vozes";
 import { dispararMotorCinema } from "@/lib/video-engine";
 import { baseUrl } from "@/lib/config";
 import { tempoDasPalavras } from "@/lib/tempo-palavras";
+import { lerAvaliacoes, buscarAvaliacoesGoogle, juntarAvaliacoes, nomeCurto, type AvaliacaoGoogle } from "@/lib/google-avaliacoes";
+import { placeIdDaMarca } from "@/lib/google-review";
 import { contarPalavras } from "@/lib/colagem";
 import {
   lerTema, lerRoteiroCinema, validarCinema, soDetalhesCinema, montarRoteiroCinema, alinharCinema, temTemposCinema,
-  narracaoCinema, faixaCinema, promptBiaCinema, prazoPorExtenso, caminhoCapaCinema, combinaComFoco, FOCOS, DURACAO_CINEMA, COM_FOTO, type TemaCinema,
+  narracaoCinema, faixaCinema, promptBiaCinema, prazoPorExtenso, caminhoCapaCinema, combinaComFoco, trechoDaAvaliacao, FOCOS, DURACAO_CINEMA, COM_FOTO, type TemaCinema,
 } from "@/lib/cinema";
 
 async function carregar(videoId: string) {
@@ -59,6 +61,27 @@ export async function salvarTemaCinema(videoId: string, tema: TemaCinema) {
   const mudou = c.v.colagemOferta !== novo;
   await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemOferta: novo, ...(mudou ? { colagemRoteiro: "{}" } : {}) } });
   return { ok: true as const, tema: t, roteiroZerado: mudou && c.v.colagemRoteiro !== "{}" };
+}
+
+// ---------- AVALIAÇÕES REAIS do Google (depoimentos) ----------
+async function avaliacoesAtualizadas(marca: { id: string; slug: string | null; avaliacoesGoogle: string }, forcar = false) {
+  const atual = lerAvaliacoes(marca.avaliacoesGoogle);
+  const velha = !atual.em || Date.now() - new Date(atual.em).getTime() > 3 * 86400_000; // busca de novo a cada 3 dias
+  if (!forcar && !velha && atual.lista.length) return { ok: true as const, ...atual };
+  const r = await buscarAvaliacoesGoogle(placeIdDaMarca(marca.slug || ""));
+  if (!r.ok) return atual.lista.length ? { ok: true as const, ...atual, aviso: r.erro } : { ok: false as const, erro: r.erro };
+  const novo = { nota: r.nota, total: r.total, em: new Date().toISOString(), lista: juntarAvaliacoes(atual.lista, r.lista) };
+  await prisma.marca.update({ where: { id: marca.id }, data: { avaliacoesGoogle: JSON.stringify(novo) } }).catch(() => {});
+  return { ok: true as const, ...novo };
+}
+export async function avaliacoesGoogleCinema(videoId: string, forcar = false) {
+  const c = await carregar(videoId);
+  if (!c.ok) return c;
+  const m = await prisma.marca.findUnique({ where: { id: c.v.marcaId }, select: { id: true, slug: true, avaliacoesGoogle: true } });
+  if (!m) return { ok: false as const, erro: "Marca não encontrada." };
+  const r = await avaliacoesAtualizadas(m, forcar);
+  if (!r.ok) return r;
+  return { ok: true as const, nota: r.nota, total: r.total, lista: r.lista.map((a) => ({ nome: nomeCurto(a.nome), texto: a.texto, trecho: trechoDaAvaliacao(a.texto), quando: a.quando })) };
 }
 
 // ---------- fotos ----------
@@ -138,8 +161,18 @@ export async function gerarRoteiroCinema(videoId: string, correcao?: { rascunho:
   const c = await carregar(videoId);
   if (!c.ok) return c;
   const { v } = c;
-  const tema = lerTema(v.colagemOferta);
+  let tema = lerTema(v.colagemOferta);
   if (tema.tema.trim().length < 5) return { ok: false as const, erro: "Conte do que é o vídeo primeiro." };
+  // depoimento automático: sorteia uma avaliação 5★ REAL do Google (o texto vai como o cliente escreveu)
+  if (tema.depoimentoAuto && !tema.depoimento.texto) {
+    const m = await prisma.marca.findUnique({ where: { id: v.marcaId }, select: { id: true, slug: true, avaliacoesGoogle: true } });
+    const av = m ? await avaliacoesAtualizadas(m) : null;
+    const lista: AvaliacaoGoogle[] = av && av.ok ? av.lista : [];
+    if (lista.length) {
+      const a = lista[Math.floor(Math.random() * Math.min(lista.length, 10))];
+      tema = { ...tema, depoimento: { nome: nomeCurto(a.nome), texto: trechoDaAvaliacao(a.texto), fonte: av && av.ok && av.nota ? `Google · nota ${String(av.nota).replace(".", ",")}` : "Avaliação no Google" } };
+    }
+  }
   const key = process.env.OPENAI_API_KEY;
   if (!key) return { ok: false as const, erro: "OPENAI_API_KEY não configurada." };
   const faixa = faixaCinema(await velocidadeDaVoz(v.marcaId, v.narracaoVoz || VOZ_PADRAO));

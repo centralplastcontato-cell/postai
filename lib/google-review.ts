@@ -6,6 +6,8 @@ const PLACE_IDS: Record<string, string> = {
   "castelo-da-diversao": "ChIJE5old9n1xZQRuvcPCXZ-yR0",
 };
 
+export const placeIdDaMarca = (slug: string): string => PLACE_IDS[slug] || "";
+
 export function linkAvaliacaoGoogle(slug: string, nome: string): string {
   const placeId = PLACE_IDS[slug];
   if (placeId) return `https://search.google.com/local/writereview?placeid=${placeId}`;
