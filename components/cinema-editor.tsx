@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VOZES, ESTILOS, VOZ_PADRAO, DIRECAO_PADRAO } from "@/lib/vozes";
 import { TEMA_VAZIO, COM_FOTO, type TemaCinema, type RoteiroCinema, type CenaCinema } from "@/lib/cinema";
-import { dadosVideoCinema, salvarTemaCinema, gerarRoteiroCinema, editarFalaCinema, gerarVozCinema, sincronizarVozCinema, ajustarTamanhoCinema, montarVideoCinema, fotosParaCinema, salvarFotosCinema, trocarFotoCinema } from "@/app/actions/cinema";
+import { dadosVideoCinema, salvarTemaCinema, gerarRoteiroCinema, editarFalaCinema, gerarVozCinema, sincronizarVozCinema, ajustarTamanhoCinema, montarVideoCinema, fotosParaCinema, salvarFotosCinema, trocarFotoCinema, salvarCapaCinema } from "@/app/actions/cinema";
 import { statusVideoTematico } from "@/app/actions/videos-tematicos";
 
 const NOME_TIPO: Record<string, { emoji: string; nome: string; cor: string }> = {
@@ -53,7 +53,9 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
   const [editando, setEditando] = useState<{ i: number; fala: string; destaques: string } | null>(null);
   const [fotosEscolhidas, setFotosEscolhidas] = useState<string[]>([]);
   const [banco, setBanco] = useState<{ id: string; url: string; descricao: string }[] | null>(null);
-  const [seletor, setSeletor] = useState<null | { modo: "varias" } | { modo: "trocar"; indice: number; atual: string }>(null);
+  const [seletor, setSeletor] = useState<null | { modo: "varias" } | { modo: "trocar"; indice: number; atual: string } | { modo: "capa"; atual: string }>(null);
+  const [capaTitulo, setCapaTitulo] = useState("");
+  const [capaUrl, setCapaUrl] = useState<string | null>(null);
   const [marcadas, setMarcadas] = useState<string[]>([]);
 
   async function recarregar() {
@@ -72,6 +74,8 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
     setAudio(d.narracao.url.startsWith("http") ? { url: d.narracao.url, segundos: d.narracao.segundos } : null);
     setTemTempos(d.temTempos);
     setVideoUrl(d.videoUrl);
+    setCapaTitulo(d.roteiro?.capa?.titulo || "");
+    setCapaUrl(d.capaUrl);
   }
   useEffect(() => { recarregar(); }, [videoId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -111,7 +115,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
         setAudio(null);
         setTemTempos(false);
         const d = await dadosVideoCinema(videoId).catch(() => null);
-        if (d?.ok) setFotos(d.fotos);
+        if (d?.ok) { setFotos(d.fotos); setCapaTitulo(d.roteiro?.capa?.titulo || ""); setCapaUrl(d.capaUrl); }
         setMsg({ tipo: "ok", txt: `✓ Roteiro pronto (${r.palavras} palavras, ${r.roteiro.cenas.length} cenas). Confira, mude o que quiser e gere a voz.` });
         return;
       }
@@ -191,7 +195,14 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
       setFotosEscolhidas(r.ids);
       setFotos((f) => ({ ...f, ...Object.fromEntries((banco || []).filter((b) => r.ids.includes(b.id)).map((b) => [b.id, b.url])) }));
       setMsg({ tipo: "ok", txt: r.ids.length ? `📸 ${r.ids.length} foto(s) escolhida(s). ${r.ids.length >= 4 ? "A Bia vai usar só essas." : "A Bia usa essas e completa com o banco."}` : "Sem fotos escolhidas: a Bia escolhe sozinha." });
-    } else if (idUnico) {
+    } else if (seletor.modo === "capa" && idUnico) {
+      const r = await salvarCapaCinema(videoId, capaTitulo, idUnico).catch(() => null);
+      if (!r || !r.ok) { setMsg({ tipo: "erro", txt: (r && "erro" in r && r.erro) || "Não consegui trocar a foto da capa." }); return; }
+      setRoteiro(r.roteiro);
+      setCapaUrl(r.capaUrl);
+      setFotos((f) => ({ ...f, ...Object.fromEntries((banco || []).filter((b) => b.id === idUnico).map((b) => [b.id, b.url])) }));
+      setMsg({ tipo: "ok", txt: "🖼️ Foto da capa trocada." });
+    } else if (seletor.modo === "trocar" && idUnico) {
       const r = await trocarFotoCinema(videoId, seletor.indice, idUnico).catch(() => null);
       if (!r || !r.ok) { setMsg({ tipo: "erro", txt: (r && "erro" in r && r.erro) || "Não consegui trocar a foto." }); return; }
       setRoteiro(r.roteiro);
@@ -199,6 +210,16 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
       setMsg({ tipo: "ok", txt: `📸 Foto trocada.${videoUrl.startsWith("http") ? " Clique em \"Montar de novo\" pra ver no vídeo." : ""}` });
     }
     setSeletor(null);
+  }
+
+  async function salvarCapa() {
+    setOcupado("fala");
+    const r = await salvarCapaCinema(videoId, capaTitulo).catch(() => null);
+    setOcupado("");
+    if (!r || !r.ok) { setMsg({ tipo: "erro", txt: (r && "erro" in r && r.erro) || "Não consegui salvar a capa." }); return; }
+    setRoteiro(r.roteiro);
+    setCapaUrl(r.capaUrl);
+    setMsg({ tipo: "ok", txt: "🖼️ Capa atualizada — ela vira a miniatura e a capa do Reels no Instagram." });
   }
 
   async function montar() {
@@ -335,6 +356,27 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
             )}
           </section>
 
+          {/* CAPA */}
+          {roteiro && (
+            <section className="rounded-xl border border-linha bg-preto/40 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-white/90">🖼️ Capa <span className="font-normal normal-case text-muted">(miniatura e capa do Reels no perfil)</span></p>
+              <div className="mt-2 flex gap-3">
+                {capaUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={capaUrl} alt="" className="h-40 w-[90px] shrink-0 rounded-lg object-cover ring-1 ring-white/30" />
+                )}
+                <div className="min-w-0 flex-1 space-y-2">
+                  <input value={capaTitulo} onChange={(e) => setCapaTitulo(e.target.value)} maxLength={60} placeholder="Ex: Últimas datas de *dezembro*" className="input-base w-full text-sm" />
+                  <p className="text-[10px] text-muted">Coloque a palavra de destaque entre asteriscos: <span className="text-white/80">*dezembro*</span> sai em itálico amarelo, sublinhada.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={salvarCapa} disabled={travado || capaTitulo.trim().length < 2} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-40">Salvar capa</button>
+                    <button type="button" onClick={() => abrirSeletor({ modo: "capa", atual: roteiro.capa?.foto || "" })} disabled={travado} className="rounded-lg border border-sky-500/40 bg-sky-500/15 px-3 py-1.5 text-xs font-semibold text-sky-300 disabled:opacity-40">🔄 Trocar foto da capa</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* 3. VOZ */}
           <section className={`rounded-xl border border-linha bg-preto/40 p-3 ${roteiro ? "" : "opacity-50"}`}>
             <p className="text-[11px] font-bold uppercase tracking-wide text-white/90">3 · 🎙️ Voz</p>
@@ -374,7 +416,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
           <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/90 sm:items-center sm:p-4" onClick={() => setSeletor(null)}>
             <div onClick={(e) => e.stopPropagation()} className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden bg-preto-card sm:rounded-2xl sm:border sm:border-linha">
               <div className="flex items-center justify-between gap-2 border-b border-linha px-4 py-3">
-                <p className="text-sm font-bold text-white">{seletor.modo === "varias" ? `📸 Escolha as fotos do vídeo (${marcadas.length})` : "🔄 Escolha a nova foto"}</p>
+                <p className="text-sm font-bold text-white">{seletor.modo === "varias" ? `📸 Escolha as fotos do vídeo (${marcadas.length})` : seletor.modo === "capa" ? "🖼️ Escolha a foto da capa" : "🔄 Escolha a nova foto"}</p>
                 <div className="flex gap-2">
                   {seletor.modo === "varias" && <button type="button" onClick={() => confirmarSeletor()} className="rounded-lg bg-emerald-600 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-500">Salvar</button>}
                   <button type="button" onClick={() => setSeletor(null)} className="rounded-full border border-linha px-3 py-1 text-sm text-muted hover:text-white">✕</button>
@@ -384,7 +426,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
                 {!banco ? <p className="text-sm text-muted">Carregando o banco de imagens…</p> : !banco.length ? <p className="text-sm text-muted">Nenhuma foto liberada pra divulgação no banco de imagens.</p> : (
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
                     {banco.map((f) => {
-                      const sel = seletor.modo === "varias" ? marcadas.includes(f.id) : seletor.atual === f.id;
+                      const sel = seletor.modo === "varias" ? marcadas.includes(f.id) : seletor.atual === f.id; // trocar/capa: a atual
                       return (
                         <button key={f.id} type="button" title={f.descricao || ""}
                           onClick={() => seletor.modo === "varias" ? setMarcadas((m) => (m.includes(f.id) ? m.filter((x) => x !== f.id) : [...m, f.id].slice(0, 20))) : confirmarSeletor(f.id)}

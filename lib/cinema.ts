@@ -19,7 +19,9 @@ export type CenaCinema = {
   fim?: number;
   palavras?: PalavraCena[];
 };
-export type RoteiroCinema = { versao: "cinema1"; cenas: CenaCinema[] };
+// capa: título grande da miniatura/capa do Reels ("*palavra*" = destaque) + a foto de fundo
+export type CapaCinema = { titulo: string; foto?: string };
+export type RoteiroCinema = { versao: "cinema1"; cenas: CenaCinema[]; capa?: CapaCinema };
 
 // O que o dono conta antes da Bia escrever. Só o TEMA é obrigatório; o resto liga cenas extras.
 export type TemaCinema = {
@@ -80,7 +82,7 @@ export function prazoPorExtenso(prazo: string): string {
 }
 
 // ---------- conferência do roteiro da Bia ----------
-type Resposta = { cenas?: { tipo?: string; fala?: string; destaques?: unknown; foto?: string; dados?: Record<string, unknown> }[] };
+type Resposta = { capa?: { titulo?: string }; cenas?: { tipo?: string; fala?: string; destaques?: unknown; foto?: string; dados?: Record<string, unknown> }[] };
 const curto = (v: unknown, max: number) => typeof v === "string" && v.trim().length > 0 && v.trim().length <= max;
 
 export function validarCinema(r: Resposta, tema: TemaCinema, fotos: Set<string>, faixa: { min: number; max: number }): string[] {
@@ -137,6 +139,10 @@ export function validarCinema(r: Resposta, tema: TemaCinema, fotos: Set<string>,
       if (!curto(d.titulo, 30) || it.length < 3 || it.length > 5 || it.some((x) => !curto(x, 26))) erros.push(`Cena ${n} (checklist): dados.titulo (até 30 letras) e de 3 a 5 itens de até 26 letras.`);
     }
   });
+  const tituloCapa = String(r?.capa?.titulo || "").trim();
+  const nCapa = contarPalavras(tituloCapa.replace(/\*/g, ""));
+  if (nCapa < 2 || nCapa > 7 || tituloCapa.replace(/\*/g, "").length > 42) erros.push(`Escreva a capa: "capa":{"titulo":"..."} com 2 a 7 palavras (até 42 letras) e UMA palavra entre asteriscos.`);
+  else if (!/\*[^*]+\*/.test(tituloCapa)) erros.push(`No título da capa, marque UMA palavra de destaque entre asteriscos (ex: "Últimas datas de *dezembro*").`);
   if (total < faixa.min || total > faixa.max) erros.push(`A narração inteira tem ${total} palavras — tem que ficar entre ${faixa.min} e ${faixa.max}. CONTE as palavras.`);
   // prazo falado: confere pelo NOME do mês (o dia vem por extenso: "trinta de novembro")
   const mesDoPrazo = normalizar(prazoPorExtenso(tema.prazo)).split(" ").pop() || "";
@@ -144,7 +150,7 @@ export function validarCinema(r: Resposta, tema: TemaCinema, fotos: Set<string>,
   return erros;
 }
 // Problemas que não seguram o vídeo na última tentativa (só tamanho um pouco fora).
-export const soDetalhesCinema = (erros: string[]) => erros.every((e) => /palavras/.test(e));
+export const soDetalhesCinema = (erros: string[]) => erros.every((e) => /palavras|capa/.test(e));
 
 // Roteiro final: o sistema completa os dados das cenas que vêm do cadastro (oferta, prazo,
 // depoimento, botão) — esses textos nunca passam pela Bia, saem exatamente como o dono escreveu.
@@ -158,7 +164,9 @@ export function montarRoteiroCinema(r: Resposta, tema: TemaCinema, hoje: string)
     if (tipo === "final") base.dados = { botao: tema.botao };
     return base;
   });
-  return { versao: "cinema1", cenas };
+  const primeiraFoto = cenas.find((c) => c.foto)?.foto;
+  const titulo = String(r.capa?.titulo || "").trim().slice(0, 60) || tema.tema.slice(0, 40);
+  return { versao: "cinema1", cenas, capa: { titulo, foto: primeiraFoto } };
 }
 
 // ---------- tempo de cada palavra ----------
@@ -212,6 +220,7 @@ export function alinharCinema(r: RoteiroCinema, falada: PalavraFalada[], segundo
   });
   // início de cada cena = um tiquinho antes da 1ª palavra; fim = início da próxima
   return {
+    ...r,
     versao: "cinema1",
     cenas: cenas.map((c, i) => {
       const inicio = i === 0 ? 0 : Math.max(0, (c.palavras![0]?.s ?? 0) - 0.15);
@@ -254,5 +263,18 @@ REGRAS:
 - Destaques: em cada cena, 1 ou 2 palavras DA PRÓPRIA FALA que levam a emoção (ex: "tudo", "hoje", "data"). Elas aparecem em itálico, na cor da marca.
 - A tela complementa a fala: a fala conta, a telinha mostra.
 
-Responda SÓ com JSON: {"cenas":[{"tipo":"notificacao","fala":"...","destaques":["data"],"foto":"ID","dados":{...}}, ...]}`;
+CAPA (a miniatura do Reels no perfil): um título curto e forte, de 2 a 7 palavras, com UMA palavra de destaque entre asteriscos — ex: "Últimas datas de *dezembro*", "Festa completa sem *estresse*".
+
+Responda SÓ com JSON: {"capa":{"titulo":"..."},"cenas":[{"tipo":"notificacao","fala":"...","destaques":["data"],"foto":"ID","dados":{...}}, ...]}`;
+}
+
+// Endereço da capa (miniatura do card e capa do Reels). O ?v muda quando o título/foto/logo mudam,
+// pra a CDN não servir a capa velha.
+export function caminhoCapaCinema(id: string, roteiroJson: string, logoUrl = ""): string | null {
+  const r = lerRoteiroCinema(roteiroJson);
+  if (!r?.capa?.titulo) return null;
+  const s = ["c2", r.capa.titulo, r.capa.foto || "", logoUrl].join("|");
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0;
+  return `/api/capa-cinema/${id}/capa.jpg?v=${h.toString(36)}`;
 }

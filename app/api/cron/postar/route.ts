@@ -10,6 +10,7 @@ import { cortarTexto } from "@/lib/api-externa";
 import { timingSafeEqual } from "crypto";
 import { metaNoLimite, usoDaMeta, zerarUsoDaMeta } from "@/lib/meta-uso";
 import { processarLimpezaIG } from "@/lib/limpeza-ig";
+import { capaDoReelsCinema } from "@/lib/capa-reels";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -374,7 +375,7 @@ async function postarReels(m: { id: string; nome: string; igUserId: string | nul
     }
 
     // FASE 1 — cria o container e guarda; poll curto pra publicar já se ficar pronto rápido
-    const c = await criarContainerReels(conn, p.videoUrl, legenda, capaApi(p));
+    const c = await criarContainerReels(conn, p.videoUrl, legenda, capaApi(p) ?? (await capaDoReelsCinema(p.videoTematicoId)));
     if (!c.ok) {
       await anotarErroPublicacao(p.id, c.erro);
       await registrarAtividade(AGENTE, `Não consegui preparar o Reels "${p.titulo}" de ${m.nome}: ${c.erro}`, m.id).catch(() => {});

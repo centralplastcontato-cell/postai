@@ -1,5 +1,6 @@
 "use server";
 
+import { capaDoReelsCinema } from "@/lib/capa-reels";
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { prisma } from "@/lib/prisma";
@@ -763,7 +764,7 @@ export async function postarReelsAgora(pubId: string) {
 export async function prepararReelsAgora(pubId: string) {
   const pub = await prisma.publicacao.findUnique({
     where: { id: pubId },
-    select: { marcaId: true, formato: true, status: true, videoUrl: true, legenda: true, marca: { select: { igUserId: true, accessToken: true } } },
+    select: { marcaId: true, formato: true, status: true, videoUrl: true, legenda: true, videoTematicoId: true, marca: { select: { igUserId: true, accessToken: true } } },
   });
   if (!pub) return { ok: false as const, erro: "Reels não encontrado." };
   if (pub.formato !== "reels") return { ok: false as const, erro: "Não é um Reels." };
@@ -772,7 +773,7 @@ export async function prepararReelsAgora(pubId: string) {
   if (pub.status === "postado") return { ok: false as const, erro: "Esse Reels já foi postado." };
   if (!pub.videoUrl) return { ok: false as const, erro: "Esse Reels não tem vídeo." };
   if (!pub.marca.igUserId || !pub.marca.accessToken) return { ok: false as const, erro: "A marca não está conectada ao Instagram." };
-  const c = await criarContainerReels({ igUserId: pub.marca.igUserId, accessToken: pub.marca.accessToken }, pub.videoUrl, pub.legenda);
+  const c = await criarContainerReels({ igUserId: pub.marca.igUserId, accessToken: pub.marca.accessToken }, pub.videoUrl, pub.legenda, await capaDoReelsCinema(pub.videoTematicoId));
   if (!c.ok) return { ok: false as const, erro: c.erro };
   return { ok: true as const, containerId: c.containerId };
 }

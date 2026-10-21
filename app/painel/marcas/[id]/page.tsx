@@ -1,3 +1,4 @@
+import { caminhoCapaCinema } from "@/lib/cinema";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { sessaoAtual } from "@/lib/auth";
@@ -340,6 +341,8 @@ export default async function MarcaPage({ params }: { params: Promise<{ id: stri
           } catch {}
           return "";
         })();
+        // vídeo cinema com título de capa → a capa caprichada (foto + título grande)
+        if (v.modo === "cinema") { const c = caminhoCapaCinema(v.id, v.colagemRoteiro, marca.logoUrl || ""); if (c) return c; }
         const raw = (v.videoCapa && urlDaFoto.get(v.videoCapa)) || (ids[0] && urlDaFoto.get(ids[0])) || (doRoteiro && urlDaFoto.get(doRoteiro)) || null;
         // Capa ESTILIZADA (impacto/ia/recortado): a miniatura é o QUADRO 0 renderizado (a capa de
         // verdade), não a foto crua. O ?v muda quando algo da capa muda (pra a CDN atualizar).

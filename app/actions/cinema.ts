@@ -21,7 +21,7 @@ import { tempoDasPalavras } from "@/lib/tempo-palavras";
 import { contarPalavras } from "@/lib/colagem";
 import {
   lerTema, lerRoteiroCinema, validarCinema, soDetalhesCinema, montarRoteiroCinema, alinharCinema, temTemposCinema,
-  narracaoCinema, faixaCinema, promptBiaCinema, prazoPorExtenso, DURACAO_CINEMA, COM_FOTO, type TemaCinema,
+  narracaoCinema, faixaCinema, promptBiaCinema, prazoPorExtenso, caminhoCapaCinema, DURACAO_CINEMA, COM_FOTO, type TemaCinema,
 } from "@/lib/cinema";
 
 async function carregar(videoId: string) {
@@ -95,7 +95,7 @@ export async function dadosVideoCinema(videoId: string) {
   if (!c.ok) return c;
   const roteiro = lerRoteiroCinema(c.v.colagemRoteiro);
   const escolhidas = lerFotosEscolhidas(c.v.colagemFotos);
-  const ids = [...new Set([...(roteiro ? roteiro.cenas.map((x) => x.foto || "").filter(Boolean) : []), ...escolhidas])];
+  const ids = [...new Set([...(roteiro ? roteiro.cenas.map((x) => x.foto || "").filter(Boolean) : []), ...(roteiro?.capa?.foto ? [roteiro.capa.foto] : []), ...escolhidas])];
   const imgs = ids.length ? await prisma.imagemMarca.findMany({ where: { id: { in: ids }, marcaId: c.v.marcaId }, select: { id: true, url: true } }) : [];
   return {
     ok: true as const,
@@ -106,6 +106,7 @@ export async function dadosVideoCinema(videoId: string) {
     fotosEscolhidas: escolhidas,
     narracao: { url: c.v.narracaoUrl, segundos: c.v.narracaoSeg, voz: c.v.narracaoVoz || VOZ_PADRAO, estilo: c.v.narracaoEstilo },
     temTempos: temTemposCinema(roteiro) && c.v.narracaoUrl.startsWith("http"),
+    capaUrl: caminhoCapaCinema(videoId, c.v.colagemRoteiro, c.v.marca.logoUrl || ""),
     videoUrl: c.v.videoUrl,
   };
 }
@@ -199,6 +200,27 @@ Escreva o roteiro.`;
   await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(roteiro), narracaoTexto: narracaoCinema(roteiro) } });
   revalidatePath(`/painel/marcas/${v.marcaId}`);
   return { ok: true as const, roteiro, palavras: contarPalavras(narracaoCinema(roteiro)) };
+}
+
+// CAPA (miniatura/capa do Reels): título grande ("*palavra*" = destaque) e a foto de fundo.
+export async function salvarCapaCinema(videoId: string, titulo: string, fotoId?: string) {
+  const c = await carregar(videoId);
+  if (!c.ok) return c;
+  const roteiro = lerRoteiroCinema(c.v.colagemRoteiro);
+  if (!roteiro) return { ok: false as const, erro: "Peça o roteiro pra Bia primeiro." };
+  const t = titulo.replace(/\s+/g, " ").trim().slice(0, 60);
+  const n = contarPalavras(t.replace(/\*/g, ""));
+  if (n < 1 || n > 8) return { ok: false as const, erro: "O título da capa tem que ter de 1 a 8 palavras." };
+  let foto = fotoId || roteiro.capa?.foto || roteiro.cenas.find((x) => x.foto)?.foto;
+  if (fotoId) {
+    const ok = (await fotosDivulgaveis(c.v.marcaId, { limite: 400 })).some((f) => f.id === fotoId);
+    if (!ok) return { ok: false as const, erro: "Essa foto não pode ser usada na capa." };
+    foto = fotoId;
+  }
+  roteiro.capa = { titulo: t, foto };
+  await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(roteiro) } });
+  revalidatePath(`/painel/marcas/${c.v.marcaId}`);
+  return { ok: true as const, roteiro, capaUrl: caminhoCapaCinema(videoId, JSON.stringify(roteiro), c.v.marca.logoUrl || "") };
 }
 
 // O dono pode mexer na FALA de uma cena antes de gerar a voz (ex: trocar uma palavra).
