@@ -463,6 +463,37 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
           {/* ===== 3. VOZ ===== */}
           {passo === 3 && roteiro && (<>
             <div className={cartao}>
+              <p className={titulo2}>O que a voz vai falar</p>
+              <p className={ajuda}>É também a legenda do vídeo. Toque em ✏️ pra mudar — depois gere a voz de novo.</p>
+              <div className="mt-3 space-y-2">
+                {roteiro.cenas.map((c, i) => {
+                  const ed = editando?.i === i ? editando : null;
+                  return (
+                    <div key={i} className="flex gap-2 rounded-xl border border-white/10 bg-black/20 p-2.5">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold text-white/70">{i + 1}</span>
+                      {ed ? (
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <textarea value={ed.fala} onChange={(e) => setEditando({ ...ed, fala: e.target.value })} rows={3} maxLength={220} className="input-base w-full text-sm" />
+                          <input value={ed.destaques} onChange={(e) => setEditando({ ...ed, destaques: e.target.value })} placeholder="Palavras em destaque (até 2, separadas por vírgula)" className="input-base w-full text-xs" />
+                          <div className="flex gap-2">
+                            <button type="button" onClick={salvarFala} disabled={ocupado === "fala"} className="rounded-md bg-emerald-600 px-3 py-1 text-xs font-bold text-white disabled:opacity-40">Salvar</button>
+                            <button type="button" onClick={() => setEditando(null)} className="rounded-md border border-linha px-3 py-1 text-xs text-muted">Cancelar</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="min-w-0 flex-1 text-sm leading-snug text-white">
+                            {c.fala.split(/\s+/).map((w, k) => <span key={k} className={c.destaques.some((d) => d && w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "").startsWith(d.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""))) ? "font-bold italic text-amber-300" : ""}>{w} </span>)}
+                          </p>
+                          <button type="button" disabled={travado} onClick={() => setEditando({ i, fala: c.fala, destaques: c.destaques.join(", ") })} className="shrink-0 self-start text-sm disabled:opacity-40" title="Editar">✏️</button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className={cartao}>
               <p className={titulo2}>Jeito de falar</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {ESTILOS.map((s) => <button key={s.nome} type="button" onClick={() => setEstilo(s.direcao)} className={chip(estilo === s.direcao)}>{s.emoji} {s.nome}</button>)}
