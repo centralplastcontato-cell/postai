@@ -32,8 +32,46 @@ export type TemaCinema = {
   condicoes: boolean;
   depoimento: { nome: string; texto: string; fonte: string }; // depoimento REAL de cliente (opcional)
   botao: string; // texto do botão final
+  foco: FocoFotos; // que tipo de foto o vídeo usa
 };
-export const TEMA_VAZIO: TemaCinema = { tema: "", principal: "", extras: [], prazo: "", condicoes: true, depoimento: { nome: "", texto: "", fonte: "" }, botao: "Chame no WhatsApp" };
+export const TEMA_VAZIO: TemaCinema = { tema: "", principal: "", extras: [], prazo: "", condicoes: true, depoimento: { nome: "", texto: "", fonte: "" }, botao: "Chame no WhatsApp", foco: "festa" };
+
+// ---------- FOCO das fotos ----------
+// O dono escolhe o estilo do vídeo; a plataforma filtra o acervo pela CATEGORIA da foto e pela
+// DESCRIÇÃO que a IA fez dela, e só manda pra Bia as que combinam. Foto POSADA de família fica
+// de fora em todos os focos (expõe a família e vende menos que a festa acontecendo).
+export type FocoFotos = "festa" | "espaco" | "brinquedos" | "comida" | "equipe" | "misto";
+export const FOCOS: { id: FocoFotos; emoji: string; nome: string; desc: string }[] = [
+  { id: "festa", emoji: "🎉", nome: "Festa acontecendo", desc: "crianças brincando e decoração (sem foto posada de família)" },
+  { id: "espaco", emoji: "🏰", nome: "Só o espaço", desc: "salão, decoração e mesas, sem pessoas" },
+  { id: "brinquedos", emoji: "🎢", nome: "Só brinquedos", desc: "brinquedões, tobogã, piscina de bolinhas, games" },
+  { id: "comida", emoji: "🍰", nome: "Comida e mesa", desc: "buffet, doces e bolo" },
+  { id: "equipe", emoji: "👩‍🏫", nome: "Equipe", desc: "monitores e equipe trabalhando" },
+  { id: "misto", emoji: "🔀", nome: "Misto", desc: "um pouco de tudo" },
+];
+const sem = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const RE_PESSOAS = /pesso|crian|menin|garot|famil|\bpai\b|\bmae\b|\bpais\b|bebe|convidad|grupo|homem|mulher|aniversariant|adult|monitor|funcionari|equipe|gente|sorri|posand|casal|senhor|senhora|rosto/;
+const RE_POSADO = /posand|posad|famil|\bpai\b|\bmae\b|\bpais\b|casal|retrato|foto em grupo|grupo de pessoas|olhando para a camera|sorrindo para a camera|abracad/;
+const RE_VAZIO = /sem pessoas|vazi|ninguem/;
+const RE_ESPACO = /salao|decora|mesa|ambiente|espaco|luz|luzes|balo|bales|painel|cenario|fachada|entrada/;
+const RE_BRINQ = /brinquedo|tobog|piscina de bolinha|pula|cama elastica|game|fliperama|kart|escorreg|playground|area kids|arcade|realidade virtual|carrinho/;
+const RE_COMIDA = /comida|doce|bolo|buffet|salgad|lanche|pizza|bebida|sobremesa|docinho|cardapio|prato/;
+const RE_EQUIPE = /monitor|equipe|funcionari|garcom|garcon|garconete|recreador|uniforme|staff|animador|atendente|cozinheir|copeir/;
+
+export function combinaComFoco(foco: FocoFotos, f: { descricao: string; categoria: string }): boolean {
+  const d = sem(f.descricao || "");
+  const cat = f.categoria;
+  if (RE_POSADO.test(d)) return false; // família posando: nunca
+  const temGente = RE_PESSOAS.test(d) && !RE_VAZIO.test(d);
+  switch (foco) {
+    case "espaco": return !temGente && (cat === "espaco" || RE_ESPACO.test(d));
+    case "brinquedos": return !RE_EQUIPE.test(d) && (cat === "brinquedos" || RE_BRINQ.test(d));
+    case "comida": return !temGente && (cat === "comida" || RE_COMIDA.test(d));
+    case "equipe": return RE_EQUIPE.test(d);
+    case "festa": return cat === "festa" || cat === "brinquedos" || /brincando|festa|parab|bolo|decora|crian/.test(d);
+    default: return true;
+  }
+}
 
 export function lerTema(json: string): TemaCinema {
   try {
@@ -47,6 +85,7 @@ export function lerTema(json: string): TemaCinema {
       condicoes: o.condicoes !== false,
       depoimento: { nome: String(dep.nome || "").slice(0, 30), texto: String(dep.texto || "").slice(0, 160), fonte: String(dep.fonte || "").slice(0, 30) },
       botao: String(o.botao || "").slice(0, 26) || TEMA_VAZIO.botao,
+      foco: FOCOS.some((x) => x.id === o.foco) ? o.foco : "festa",
     };
   } catch {
     return { ...TEMA_VAZIO, depoimento: { ...TEMA_VAZIO.depoimento } };
@@ -244,6 +283,7 @@ export function promptBiaCinema(marca: { nome: string; descricao: string }, tema
 SOBRE A MARCA (use SÓ isto — nunca invente diferencial, preço ou número): ${marca.descricao || "(sem descrição — fale de forma geral)"}
 
 TEMA DO VÍDEO: ${tema.tema}
+FOCO DAS FOTOS: ${FOCOS.find((x) => x.id === tema.foco)?.nome} — ${FOCOS.find((x) => x.id === tema.foco)?.desc}. A narração combina com isso (ex: foco no espaço fala do salão; em brinquedos, da diversão).
 
 HISTÓRIA (nesta ordem): GANCHO que para o scroll (uma situação real do cliente) → DOR/situação → VIRADA (a marca resolve) → PROVA (o que tem, como é) → ${tema.principal ? "OFERTA → " : ""}${tema.prazo ? "URGÊNCIA → " : ""}CHAMADA final.
 

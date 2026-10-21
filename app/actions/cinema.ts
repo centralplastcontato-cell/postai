@@ -21,7 +21,7 @@ import { tempoDasPalavras } from "@/lib/tempo-palavras";
 import { contarPalavras } from "@/lib/colagem";
 import {
   lerTema, lerRoteiroCinema, validarCinema, soDetalhesCinema, montarRoteiroCinema, alinharCinema, temTemposCinema,
-  narracaoCinema, faixaCinema, promptBiaCinema, prazoPorExtenso, caminhoCapaCinema, DURACAO_CINEMA, COM_FOTO, type TemaCinema,
+  narracaoCinema, faixaCinema, promptBiaCinema, prazoPorExtenso, caminhoCapaCinema, combinaComFoco, FOCOS, DURACAO_CINEMA, COM_FOTO, type TemaCinema,
 } from "@/lib/cinema";
 
 async function carregar(videoId: string) {
@@ -148,9 +148,15 @@ export async function gerarRoteiroCinema(videoId: string, correcao?: { rascunho:
   const todas = await fotosDivulgaveis(v.marcaId, { limite: 400 });
   const doDono = todas.filter((f) => idsDoDono.includes(f.id)).map((f) => ({ ...f, descricao: f.descricao || "(foto escolhida pelo dono)" }));
   const soDoDono = doDono.length >= 4;
+  // FOCO: só entram as fotos que combinam com o estilo escolhido (e nunca família posando)
+  const doFoco = todas.filter((f) => f.descricao && !idsDoDono.includes(f.id) && combinaComFoco(tema.foco, f));
+  if (!soDoDono && doDono.length + doFoco.length < 4) {
+    const nome = FOCOS.find((x) => x.id === tema.foco)?.nome || tema.foco;
+    return { ok: false as const, erro: `Achei só ${doDono.length + doFoco.length} foto(s) com o foco "${nome}" no banco de imagens — preciso de pelo menos 4. Suba mais fotos desse tipo, escolha as fotos na mão (📸 Escolher fotos) ou troque o foco.` };
+  }
   const acervo = soDoDono ? doDono : [
     ...doDono,
-    ...todas.filter((f) => f.descricao && !idsDoDono.includes(f.id)).map((f) => ({ ...f, pts: pontuar(f.descricao) })).sort((a, b) => b.pts - a.pts || a.usos - b.usos).slice(0, 50 - doDono.length),
+    ...doFoco.map((f) => ({ ...f, pts: pontuar(f.descricao) })).sort((a, b) => b.pts - a.pts || a.usos - b.usos).slice(0, 50 - doDono.length),
   ];
   if (acervo.length < 3) return { ok: false as const, erro: "Preciso de pelo menos 3 fotos (com descrição) no banco de imagens pra montar o vídeo." };
   const ids = new Set(acervo.map((f) => f.id));

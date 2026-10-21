@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { VOZES, ESTILOS, VOZ_PADRAO, DIRECAO_PADRAO } from "@/lib/vozes";
-import { TEMA_VAZIO, COM_FOTO, type TemaCinema, type RoteiroCinema, type CenaCinema } from "@/lib/cinema";
+import { TEMA_VAZIO, COM_FOTO, FOCOS, type TemaCinema, type RoteiroCinema, type CenaCinema } from "@/lib/cinema";
 import { dadosVideoCinema, salvarTemaCinema, gerarRoteiroCinema, editarFalaCinema, gerarVozCinema, sincronizarVozCinema, ajustarTamanhoCinema, montarVideoCinema, fotosParaCinema, salvarFotosCinema, trocarFotoCinema, salvarCapaCinema } from "@/app/actions/cinema";
 import { statusVideoTematico } from "@/app/actions/videos-tematicos";
 
@@ -252,6 +252,13 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
           <section className="rounded-xl border border-linha bg-preto/40 p-3">
             <p className="text-[11px] font-bold uppercase tracking-wide text-white/90">1 · 💡 Sobre o que é o vídeo</p>
             <input value={tema.tema} onChange={(e) => setTema({ ...tema, tema: e.target.value })} maxLength={160} placeholder="Ex: últimas datas de dezembro / festa completa sem dor de cabeça" className="input-base mt-2 w-full text-sm" />
+            <p className="mt-3 text-[11px] font-semibold text-muted">Foco das fotos</p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {FOCOS.map((f) => (
+                <button key={f.id} type="button" title={f.desc} onClick={() => setTema({ ...tema, foco: f.id })} className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold ${tema.foco === f.id ? "border-amber-400 bg-amber-500/20 text-amber-200" : "border-linha text-muted hover:text-white"}`}>{f.emoji} {f.nome}</button>
+              ))}
+            </div>
+            <p className="mt-1 text-[10px] text-muted">{FOCOS.find((f) => f.id === tema.foco)?.desc}. Foto de família posando nunca entra.</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <div>
                 <label className="block text-[11px] font-semibold text-muted">Oferta (opcional)</label>
