@@ -36,6 +36,7 @@ async function carregar(videoId: string) {
   if (!g.ok) return { ok: false as const, erro: g.erro };
   return { ok: true as const, v };
 }
+const LIMITE_ACERVO = 5000; // fotos consideradas (antes 400: as mais antigas sumiam da escolha)
 function lerFotosEscolhidas(json: string): string[] {
   try { const a = JSON.parse(json || "[]"); return Array.isArray(a) ? a.map(String).filter(Boolean).slice(0, 20) : []; } catch { return []; }
 }
@@ -88,13 +89,15 @@ export async function avaliacoesGoogleCinema(videoId: string, forcar = false) {
 export async function fotosParaCinema(videoId: string) {
   const c = await carregar(videoId);
   if (!c.ok) return c;
-  const lista = await fotosDivulgaveis(c.v.marcaId, { limite: 400 });
-  return { ok: true as const, fotos: lista.map((f) => ({ id: f.id, url: f.url, descricao: f.descricao })) };
+  // o acervo INTEIRO (mais novas primeiro); a tela filtra por tipo e mostra aos poucos
+  const lista = await fotosDivulgaveis(c.v.marcaId, { limite: LIMITE_ACERVO, recentes: true });
+  const tema = lerTema(c.v.colagemOferta);
+  return { ok: true as const, fotos: lista.map((f) => ({ id: f.id, url: f.url, descricao: f.descricao, categoria: f.categoria, foco: combinaComFoco(tema.foco, f) })) };
 }
 export async function salvarFotosCinema(videoId: string, ids: string[]) {
   const c = await carregar(videoId);
   if (!c.ok) return c;
-  const ok = new Set((await fotosDivulgaveis(c.v.marcaId, { limite: 400 })).map((f) => f.id));
+  const ok = new Set((await fotosDivulgaveis(c.v.marcaId, { limite: LIMITE_ACERVO })).map((f) => f.id));
   const limpas = [...new Set(ids.map(String))].filter((id) => ok.has(id)).slice(0, 20);
   await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemFotos: JSON.stringify(limpas) } });
   return { ok: true as const, ids: limpas };
@@ -106,7 +109,7 @@ export async function trocarFotoCinema(videoId: string, indice: number, fotoId: 
   const roteiro = lerRoteiroCinema(c.v.colagemRoteiro);
   const cena = roteiro?.cenas[indice];
   if (!roteiro || !cena || !COM_FOTO.has(cena.tipo)) return { ok: false as const, erro: "Não achei essa foto no roteiro." };
-  const foto = (await fotosDivulgaveis(c.v.marcaId, { limite: 400 })).find((f) => f.id === fotoId);
+  const foto = (await fotosDivulgaveis(c.v.marcaId, { limite: LIMITE_ACERVO })).find((f) => f.id === fotoId);
   if (!foto) return { ok: false as const, erro: "Essa foto não pode ser usada (não é desta marca ou a festa não foi autorizada)." };
   cena.foto = fotoId;
   await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(roteiro) } });
@@ -178,7 +181,7 @@ export async function gerarRoteiroCinema(videoId: string, correcao?: { rascunho:
   const faixa = faixaCinema(await velocidadeDaVoz(v.marcaId, v.narracaoVoz || VOZ_PADRAO));
 
   const idsDoDono = lerFotosEscolhidas(v.colagemFotos);
-  const todas = await fotosDivulgaveis(v.marcaId, { limite: 400 });
+  const todas = await fotosDivulgaveis(v.marcaId, { limite: LIMITE_ACERVO });
   const doDono = todas.filter((f) => idsDoDono.includes(f.id)).map((f) => ({ ...f, descricao: f.descricao || "(foto escolhida pelo dono)" }));
   const soDoDono = doDono.length >= 4;
   // FOCO: só entram as fotos que combinam com o estilo escolhido (e nunca família posando)
@@ -252,7 +255,7 @@ export async function salvarCapaCinema(videoId: string, titulo: string, fotoId?:
   if (n < 1 || n > 8) return { ok: false as const, erro: "O título da capa tem que ter de 1 a 8 palavras." };
   let foto = fotoId || roteiro.capa?.foto || roteiro.cenas.find((x) => x.foto)?.foto;
   if (fotoId) {
-    const ok = (await fotosDivulgaveis(c.v.marcaId, { limite: 400 })).some((f) => f.id === fotoId);
+    const ok = (await fotosDivulgaveis(c.v.marcaId, { limite: LIMITE_ACERVO })).some((f) => f.id === fotoId);
     if (!ok) return { ok: false as const, erro: "Essa foto não pode ser usada na capa." };
     foto = fotoId;
   }

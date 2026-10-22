@@ -52,7 +52,9 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
   const [msg, setMsg] = useState<{ tipo: "ok" | "erro" | "aviso"; txt: string } | null>(null);
   const [editando, setEditando] = useState<{ i: number; fala: string; destaques: string } | null>(null);
   const [fotosEscolhidas, setFotosEscolhidas] = useState<string[]>([]);
-  const [banco, setBanco] = useState<{ id: string; url: string; descricao: string }[] | null>(null);
+  const [banco, setBanco] = useState<{ id: string; url: string; descricao: string; categoria: string; foco: boolean }[] | null>(null);
+  const [filtroBanco, setFiltroBanco] = useState<"foco" | "espaco" | "brinquedos" | "festa" | "comida" | "todas">("foco");
+  const [qtdBanco, setQtdBanco] = useState(60); // mostra aos poucos (acervo pode ter milhares)
   const [seletor, setSeletor] = useState<null | { modo: "varias" } | { modo: "trocar"; indice: number; atual: string } | { modo: "capa"; atual: string }>(null);
   const [capaTitulo, setCapaTitulo] = useState("");
   const [avaliacoes, setAvaliacoes] = useState<{ nota: number; total: number; lista: { nome: string; texto: string; trecho: string }[] } | null>(null);
@@ -323,7 +325,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
               <p className={ajuda}>Foto de família posando nunca entra.</p>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {FOCOS.map((f) => (
-                  <button key={f.id} type="button" onClick={() => setTema({ ...tema, foco: f.id })}
+                  <button key={f.id} type="button" onClick={() => { setTema({ ...tema, foco: f.id }); setBanco(null); }}
                     className={`rounded-xl border p-2.5 text-left transition ${tema.foco === f.id ? "border-amber-400 bg-amber-500/10" : "border-linha hover:border-white/30"}`}>
                     <span className="block text-lg">{f.emoji}</span>
                     <span className="block text-xs font-bold text-white">{f.nome}</span>
@@ -608,9 +610,19 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-3">
-                {!banco ? <p className="text-sm text-muted">Carregando o banco de imagens…</p> : !banco.length ? <p className="text-sm text-muted">Nenhuma foto liberada pra divulgação no banco de imagens.</p> : (
+                {banco && banco.length > 0 && (() => {
+                  const conta = (id: typeof filtroBanco) => banco.filter((f) => id === "todas" || (id === "foco" ? f.foco : f.categoria === id)).length;
+                  return (
+                    <div className="mb-3 flex flex-wrap gap-1.5">
+                      {([["foco", `🎯 Combina com o foco`], ["brinquedos", "🎢 Brinquedos"], ["espaco", "🏰 Espaço"], ["festa", "🎉 Festas"], ["comida", "🍰 Comida"], ["todas", "Todas"]] as const).map(([id, nome]) => (
+                        <button key={id} type="button" onClick={() => { setFiltroBanco(id); setQtdBanco(60); }} className={chip(filtroBanco === id)}>{nome} ({conta(id)})</button>
+                      ))}
+                    </div>
+                  );
+                })()}
+                {!banco ? <p className="text-sm text-muted">Carregando o banco de imagens…</p> : !banco.length ? <p className="text-sm text-muted">Nenhuma foto liberada pra divulgação no banco de imagens.</p> : (<>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
-                    {banco.map((f) => {
+                    {banco.filter((f) => filtroBanco === "todas" || (filtroBanco === "foco" ? f.foco : f.categoria === filtroBanco)).slice(0, qtdBanco).map((f) => {
                       const sel = seletor.modo === "varias" ? marcadas.includes(f.id) : seletor.atual === f.id; // trocar/capa: a atual
                       return (
                         <button key={f.id} type="button" title={f.descricao || ""}
@@ -623,7 +635,10 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
                       );
                     })}
                   </div>
-                )}
+                  {banco.filter((f) => filtroBanco === "todas" || (filtroBanco === "foco" ? f.foco : f.categoria === filtroBanco)).length > qtdBanco && (
+                    <button type="button" onClick={() => setQtdBanco((q) => q + 60)} className="mx-auto mt-3 block rounded-lg border border-linha px-4 py-2 text-xs font-semibold text-white hover:border-white/30">Mostrar mais fotos (mais antigas)</button>
+                  )}
+                </>)}
               </div>
             </div>
           </div>

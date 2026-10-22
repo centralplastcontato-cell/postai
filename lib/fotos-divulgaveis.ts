@@ -19,12 +19,13 @@ export type FotoDivulgavel = {
 
 export async function fotosDivulgaveis(
   marcaId: string,
-  opts?: { comDescricao?: boolean; limite?: number },
+  opts?: { comDescricao?: boolean; limite?: number; recentes?: boolean },
 ): Promise<FotoDivulgavel[]> {
   const [imgs, festasOk] = await Promise.all([
     prisma.imagemMarca.findMany({
       where: { marcaId, ...(opts?.comDescricao ? { NOT: { descricao: "" } } : {}) },
-      orderBy: [{ usos: "asc" }, { criadoEm: "desc" }],
+      // recentes: pra o dono ESCOLHER (mais novas primeiro); padrão: rodízio (menos usadas primeiro)
+      orderBy: opts?.recentes ? [{ criadoEm: "desc" }] : [{ usos: "asc" }, { criadoEm: "desc" }],
       select: { id: true, url: true, categoria: true, descricao: true, festaId: true, usos: true },
       take: opts?.limite ?? 400,
     }),
