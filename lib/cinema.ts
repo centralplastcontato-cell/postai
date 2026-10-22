@@ -199,7 +199,10 @@ export const soDetalhesCinema = (erros: string[]) => erros.every((e) => /palavra
 export function montarRoteiroCinema(r: Resposta, tema: TemaCinema, hoje: string): RoteiroCinema {
   const cenas: CenaCinema[] = (r.cenas || []).map((c) => {
     const tipo = c.tipo as TipoCena;
-    const base: CenaCinema = { tipo, fala: String(c.fala || "").trim(), destaques: (Array.isArray(c.destaques) ? c.destaques.map(String) : []).slice(0, 2), ...(COM_FOTO.has(tipo) ? { foto: c.foto } : {}), dados: c.dados || {} };
+    // a Bia às vezes marca *palavra* na fala: vira destaque e o asterisco sai (senão a voz/legenda levava)
+    const falaBruta = String(c.fala || "");
+    const marcadas = [...falaBruta.matchAll(/\*([^*\s][^*]*?)\*/g)].map((m) => m[1].trim());
+    const base: CenaCinema = { tipo, fala: falaBruta.replace(/\*/g, "").replace(/\s+/g, " ").trim(), destaques: [...new Set([...(Array.isArray(c.destaques) ? c.destaques.map((d) => String(d).replace(/\*/g, "")) : []), ...marcadas])].filter(Boolean).slice(0, 2), ...(COM_FOTO.has(tipo) ? { foto: c.foto } : {}), dados: c.dados || {} };
     if (tipo === "oferta") base.dados = { principal: tema.principal, extras: tema.extras, prazoTexto: tema.prazo ? `Válido até ${dataBR(tema.prazo)}` : "", condicoes: tema.condicoes, botao: "Quero garantir" };
     if (tipo === "prazo") base.dados = { prazo: tema.prazo, hoje };
     if (tipo === "depoimento") base.dados = { nome: tema.depoimento.nome || "Cliente", texto: tema.depoimento.texto, fonte: tema.depoimento.fonte || "Avaliação de cliente", nota: 5 };

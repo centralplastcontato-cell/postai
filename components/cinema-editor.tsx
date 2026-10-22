@@ -67,6 +67,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
   }
   const [capaUrl, setCapaUrl] = useState<string | null>(null);
   const [marcadas, setMarcadas] = useState<string[]>([]);
+  const [vendo, setVendo] = useState<{ url: string; indice: number; atual: string } | null>(null); // foto ampliada
   const [passo, setPasso] = useState(1); // etapa do passo a passo (1 Ideia … 5 Vídeo)
   const [comOferta, setComOferta] = useState(false);
 
@@ -425,10 +426,10 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
                   <div className="flex w-14 shrink-0 flex-col items-center gap-1">
                     <span className="text-[10px] font-bold text-muted">{i + 1}</span>
                     {COM_FOTO.has(c.tipo) && c.foto && fotos[c.foto] ? (
-                      <button type="button" disabled={travado} onClick={() => abrirSeletor({ modo: "trocar", indice: i, atual: c.foto || "" })} className="relative" title="Trocar esta foto">
+                      <button type="button" onClick={() => setVendo({ url: fotos[c.foto || ""], indice: i, atual: c.foto || "" })} className="relative" title="Ver a foto">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={fotos[c.foto]} alt="" className="h-20 w-12 rounded-lg object-cover ring-1 ring-white/40" />
-                        <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-black/70 text-center text-[9px] font-bold text-white">🔄 trocar</span>
+                        <span className="absolute inset-x-0 bottom-0 rounded-b-lg bg-black/70 text-center text-[9px] font-bold text-white">🔍 ver</span>
                       </button>
                     ) : (
                       <span className="flex h-20 w-12 items-center justify-center rounded-lg text-xl" style={{ background: `${a.cor}22` }}>{a.emoji}</span>
@@ -450,7 +451,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
                       </div>
                     ) : (
                       <p className="mt-1.5 text-sm leading-snug text-white">
-                        {c.fala.split(/\s+/).map((w, k) => <span key={k} className={c.destaques.some((d) => d && w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "").startsWith(d.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""))) ? "font-bold italic text-amber-300" : ""}>{w} </span>)}
+                        {c.fala.replace(/\*/g, "").split(/\s+/).map((w, k) => <span key={k} className={c.destaques.some((d) => d && w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "").startsWith(d.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""))) ? "font-bold italic text-amber-300" : ""}>{w} </span>)}
                       </p>
                     )}
                     {resumoDados(c) && <p className="mt-1 line-clamp-2 text-[11px] text-muted">{resumoDados(c)}</p>}
@@ -483,7 +484,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
                       ) : (
                         <>
                           <p className="min-w-0 flex-1 text-sm leading-snug text-white">
-                            {c.fala.split(/\s+/).map((w, k) => <span key={k} className={c.destaques.some((d) => d && w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "").startsWith(d.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""))) ? "font-bold italic text-amber-300" : ""}>{w} </span>)}
+                            {c.fala.replace(/\*/g, "").split(/\s+/).map((w, k) => <span key={k} className={c.destaques.some((d) => d && w.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "").startsWith(d.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""))) ? "font-bold italic text-amber-300" : ""}>{w} </span>)}
                           </p>
                           <button type="button" disabled={travado} onClick={() => setEditando({ i, fala: c.fala, destaques: c.destaques.join(", ") })} className="shrink-0 self-start text-sm disabled:opacity-40" title="Editar">✏️</button>
                         </>
@@ -586,6 +587,16 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
           </div>
         </div>
 
+        {vendo && (
+          <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3 bg-black/95 p-4" onClick={() => setVendo(null)}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={vendo.url} alt="" onClick={(e) => e.stopPropagation()} className="max-h-[78vh] max-w-full rounded-xl object-contain" />
+            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+              <button type="button" disabled={travado} onClick={() => { const v = vendo; setVendo(null); abrirSeletor({ modo: "trocar", indice: v.indice, atual: v.atual }); }} className="rounded-xl bg-sky-500 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-40">🔄 Trocar esta foto</button>
+              <button type="button" onClick={() => setVendo(null)} className="rounded-xl border border-white/30 px-4 py-2.5 text-sm font-semibold text-white">Fechar</button>
+            </div>
+          </div>
+        )}
         {seletor && (
           <div className="fixed inset-0 z-[60] flex items-stretch justify-center bg-black/90 sm:items-center sm:p-4" onClick={() => setSeletor(null)}>
             <div onClick={(e) => e.stopPropagation()} className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden bg-preto-card sm:rounded-2xl sm:border sm:border-linha">
