@@ -269,10 +269,12 @@ export async function editarFalaCinema(videoId: string, indice: number, fala: st
   const roteiro = lerRoteiroCinema(c.v.colagemRoteiro);
   const cena = roteiro?.cenas[indice];
   if (!roteiro || !cena) return { ok: false as const, erro: "Cena não encontrada." };
-  const f = fala.trim().slice(0, 220);
+  // *palavra* digitada na fala vira DESTAQUE (e os asteriscos saem — senão a legenda mostrava "*data*")
+  const marcadas = [...fala.matchAll(/\*([^*\s][^*]*?)\*/g)].map((m) => m[1].trim());
+  const f = fala.replace(/\*/g, "").replace(/\s+/g, " ").trim().slice(0, 220);
   if (contarPalavras(f) < 2) return { ok: false as const, erro: "A fala ficou vazia." };
   cena.fala = f;
-  cena.destaques = destaques.map((d) => d.trim()).filter(Boolean).slice(0, 2);
+  cena.destaques = [...new Set([...marcadas, ...destaques.map((d) => d.replace(/\*/g, "").trim())])].filter(Boolean).slice(0, 2);
   delete cena.palavras; delete cena.inicio; delete cena.fim; // a voz precisa ser gerada de novo
   await prisma.videoTematico.update({ where: { id: videoId }, data: { colagemRoteiro: JSON.stringify(roteiro), narracaoTexto: narracaoCinema(roteiro) } });
   return { ok: true as const, roteiro };

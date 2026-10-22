@@ -109,7 +109,7 @@ export function faixaCinema(palavrasPorSeg: number): { min: number; max: number 
   return { min: Math.round(v * (DURACAO_CINEMA.min + 2)), max: Math.round(v * (DURACAO_CINEMA.max - 4)) };
 }
 
-export const narracaoCinema = (r: RoteiroCinema) => r.cenas.map((c) => c.fala.trim()).join(" ");
+export const narracaoCinema = (r: RoteiroCinema) => r.cenas.map((c) => c.fala.replace(/\*/g, "").trim()).join(" ");
 
 function dataBR(prazo: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(prazo);
@@ -241,7 +241,7 @@ function soletrar(s: string): string[] {
 // vizinhas. Sem Whisper, espalha pelo áudio proporcional ao tamanho das palavras.
 export function alinharCinema(r: RoteiroCinema, falada: PalavraFalada[], segundos: number): RoteiroCinema {
   const fw = falada.map((w) => ({ k: chave(w.word), s: w.start, e: w.end })).filter((w) => w.k);
-  const escritas = r.cenas.map((c) => tokens(c.fala));
+  const escritas = r.cenas.map((c) => tokens(c.fala.replace(/\*/g, "")));
   const todas = escritas.flat();
   const tempos: ({ s: number; e: number } | null)[] = [];
   if (fw.length) {
@@ -344,6 +344,7 @@ REGRAS:
 - Fala: narração informal, frases curtas, "você" (nunca "cê"), números e datas POR EXTENSO. Cada fala com 6 a ${Math.max(10, Math.floor(faixa.max / 7))} palavras. A narração INTEIRA soma entre ${faixa.min} e ${faixa.max} palavras (mire em ${Math.round((faixa.min + faixa.max) / 2)}) — CONTE antes de responder; se passar, corte palavras.
 - Destaques: em cada cena, 1 ou 2 palavras DA PRÓPRIA FALA que levam a emoção (ex: "tudo", "hoje", "data"). Elas aparecem em itálico, na cor da marca.
 - A tela complementa a fala: a fala conta, a telinha mostra.
+- A fala é SÓ o que o locutor diz em voz alta: nunca escreva descrição de cena ("Mensagem chegando:", "Cena:", "(som de notificação)"), nem asteriscos.
 
 CAPA (a miniatura do Reels no perfil): um título curto e forte, de 2 a 7 palavras, com UMA palavra de destaque entre asteriscos — ex: "Últimas datas de *dezembro*", "Festa completa sem *estresse*".
 
