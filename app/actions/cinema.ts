@@ -86,13 +86,13 @@ export async function avaliacoesGoogleCinema(videoId: string, forcar = false) {
 }
 
 // ---------- fotos ----------
-export async function fotosParaCinema(videoId: string) {
+export async function fotosParaCinema(videoId: string, focoTela?: string) {
   const c = await carregar(videoId);
   if (!c.ok) return c;
   // o acervo INTEIRO (mais novas primeiro); a tela filtra por tipo e mostra aos poucos
   const lista = await fotosDivulgaveis(c.v.marcaId, { limite: LIMITE_ACERVO, recentes: true });
-  const tema = lerTema(c.v.colagemOferta);
-  return { ok: true as const, fotos: lista.map((f) => ({ id: f.id, url: f.url, descricao: f.descricao, categoria: f.categoria, foco: combinaComFoco(tema.foco, f) })) };
+  const foco = FOCOS.find((x) => x.id === focoTela)?.id ?? lerTema(c.v.colagemOferta).foco; // o foco marcado na tela (ainda não salvo)
+  return { ok: true as const, fotos: lista.map((f) => ({ id: f.id, url: f.url, descricao: f.descricao, categoria: f.categoria, foco: combinaComFoco(foco, f) })) };
 }
 export async function salvarFotosCinema(videoId: string, ids: string[]) {
   const c = await carregar(videoId);

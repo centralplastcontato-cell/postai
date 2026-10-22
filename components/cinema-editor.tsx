@@ -205,7 +205,7 @@ export function CinemaEditor({ videoId, onFechar }: { videoId: string; onFechar:
     setSeletor(s);
     setMarcadas(s.modo === "varias" ? fotosEscolhidas : []);
     if (!banco) {
-      const r = await fotosParaCinema(videoId).catch(() => null);
+      const r = await fotosParaCinema(videoId, tema.foco).catch(() => null);
       if (r?.ok) setBanco(r.fotos);
       else { setSeletor(null); setMsg({ tipo: "erro", txt: "Não consegui abrir o banco de imagens." }); }
     }
